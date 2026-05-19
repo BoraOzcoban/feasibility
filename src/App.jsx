@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabaseClient";
+import { emptyFinancialExtraCostForm, emptyFinancialModel, loadFinancialModel, saveFinancialExtraCost, saveFinancialModelSettings } from "./lib/financialService";
+import { emptyOperationForms, emptyOperationPlan, emptyPlanRows, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
 import logoUrl from "./assets/atera-logo.svg";
 
 const emptyForm = {
@@ -27,6 +29,18 @@ const emptyManagedUserForm = {
   accessLevel: "user",
   language: "tr",
 };
+
+function formatNumber(value, maximumFractionDigits = 0) {
+  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits }).format(value || 0);
+}
+
+function formatLira(value, maximumFractionDigits = 0) {
+  return new Intl.NumberFormat("tr-TR", {
+    currency: "TRY",
+    maximumFractionDigits,
+    style: "currency",
+  }).format(value || 0);
+}
 
 const text = {
   en: {
@@ -281,6 +295,29 @@ function App() {
   const [profiles, setProfiles] = useState([]);
   const [roleForm, setRoleForm] = useState(emptyRoleForm);
   const [managedUserForm, setManagedUserForm] = useState(emptyManagedUserForm);
+  const [financialExtraCostForm, setFinancialExtraCostForm] = useState(emptyFinancialExtraCostForm);
+  const [financialHorizon, setFinancialHorizon] = useState("6m");
+  const [financialModel, setFinancialModel] = useState(emptyFinancialModel);
+  const [financialSettingsForm, setFinancialSettingsForm] = useState({ electricityPricePerKwh: 0 });
+  const [financialStatus, setFinancialStatus] = useState("");
+  const [financialLoading, setFinancialLoading] = useState(false);
+  const [financeWindow, setFinanceWindow] = useState("today");
+  const [financeDateRange, setFinanceDateRange] = useState({ start: "", end: "" });
+  const [operationForms, setOperationForms] = useState(emptyOperationForms);
+  const [operationPlan, setOperationPlan] = useState(emptyOperationPlan);
+  const [operationPlanResult, setOperationPlanResult] = useState(null);
+  const [operationsLoading, setOperationsLoading] = useState(false);
+  const [operationsStatus, setOperationsStatus] = useState("");
+  const [operationsWorkspace, setOperationsWorkspace] = useState({
+    activePlans: [],
+    latestPlan: null,
+    machines: [],
+    materials: [],
+    notes: [],
+    product: null,
+    products: [],
+    workforce: [],
+  });
 
   const labels = text[form.language] || text.en;
 
@@ -360,6 +397,31 @@ function App() {
     loadAuthorizationData();
   }, [session]);
 
+  useEffect(() => {
+    if (!session || !supabase) {
+      setOperationsWorkspace({
+        activePlans: [],
+        latestPlan: null,
+        machines: [],
+        materials: [],
+        notes: [],
+        product: null,
+        products: [],
+        workforce: [],
+      });
+      setOperationPlan(emptyOperationPlan);
+      setOperationPlanResult(null);
+      setFinancialModel(emptyFinancialModel);
+      setFinancialSettingsForm({ electricityPricePerKwh: 0 });
+      setFinancialExtraCostForm(emptyFinancialExtraCostForm);
+      setFinancialStatus("");
+      return;
+    }
+
+    loadOperationsData();
+    loadFinancialData();
+  }, [session]);
+
   function goTo(pathname, nextMode) {
     window.history.pushState({}, "", pathname);
     setPath(pathname);
@@ -396,6 +458,277 @@ function App() {
 
   function updateManagedUserForm(field, value) {
     setManagedUserForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateFinanceDateRange(field, value) {
+    setFinanceDateRange((current) => ({ ...current, [field]: value }));
+    setFinanceWindow("custom");
+  }
+
+  function updateOperationPlan(field, value) {
+    setOperationPlan((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateOperationPlanRow(collection, index, field, value) {
+    setOperationPlan((current) => ({
+      ...current,
+      [collection]: (current[collection] || []).map((row, rowIndex) => (
+        rowIndex === index ? { ...row, [field]: value } : row
+      )),
+    }));
+  }
+
+  function addOperationPlanRow(collection, row) {
+    setOperationPlan((current) => ({
+      ...current,
+      [collection]: [...(current[collection] || []), row],
+    }));
+  }
+
+  function removeOperationPlanRow(collection, index) {
+    setOperationPlan((current) => ({
+      ...current,
+      [collection]: (current[collection] || []).filter((_, rowIndex) => rowIndex !== index),
+    }));
+  }
+
+  function updateOperationForm(entity, field, value) {
+    setOperationForms((current) => ({
+      ...current,
+      [entity]: {
+        ...current[entity],
+        [field]: value,
+      },
+    }));
+  }
+
+  function addProductMaterialRow() {
+    setOperationForms((current) => ({
+      ...current,
+      product: {
+        ...current.product,
+        materialRows: [
+          ...(current.product.materialRows || []),
+          {
+            materialId: operationsWorkspace.materials[0]?.id || "",
+            quantityPerUnit: 0,
+          },
+        ],
+      },
+    }));
+  }
+
+  function updateProductMaterialRow(index, field, value) {
+    setOperationForms((current) => ({
+      ...current,
+      product: {
+        ...current.product,
+        materialRows: (current.product.materialRows || []).map((row, rowIndex) => (
+          rowIndex === index ? { ...row, [field]: value } : row
+        )),
+      },
+    }));
+  }
+
+  function removeProductMaterialRow(index) {
+    setOperationForms((current) => ({
+      ...current,
+      product: {
+        ...current.product,
+        materialRows: (current.product.materialRows || []).filter((_, rowIndex) => rowIndex !== index),
+      },
+    }));
+  }
+
+  async function loadOperationsData() {
+    if (!supabase) return;
+
+    setOperationsLoading(true);
+    setOperationsStatus("");
+
+    try {
+      const workspace = await loadOperationsWorkspace(supabase);
+      setOperationsWorkspace(workspace);
+
+      if (workspace.latestPlan) {
+        const savedMachineRows = Array.isArray(workspace.latestPlan.input?.machineRows) ? workspace.latestPlan.input.machineRows : [];
+        const savedMaterialRows = Array.isArray(workspace.latestPlan.input?.materialRows) ? workspace.latestPlan.input.materialRows : [];
+        const savedWorkforceRows = Array.isArray(workspace.latestPlan.input?.workforceRows) ? workspace.latestPlan.input.workforceRows : [];
+        const hasSimplePlanResult = workspace.latestPlan.result?.energyConsumptionKwh !== undefined;
+
+        setOperationPlan({
+          ...emptyOperationPlan,
+          ...workspace.latestPlan.input,
+          machineRows: savedMachineRows.length
+            ? savedMachineRows.map((row) => ({
+                dailyHours: row.dailyHours || 0,
+                machineId: row.machineId || "",
+              }))
+            : (workspace.machines[0]
+                ? [{ ...emptyPlanRows.machine, machineId: workspace.machines[0].id }]
+                : []),
+          materialRows: savedMaterialRows.length
+            ? savedMaterialRows.map((row) => ({
+                dailyQuantity: row.dailyQuantity ?? row.quantityPerUnit ?? 0,
+                materialId: row.materialId || "",
+              }))
+            : workspace.materials.slice(0, 2).map((material) => ({
+                dailyQuantity: 0,
+                materialId: material.id,
+              })),
+          productId: workspace.latestPlan.input?.productId || workspace.product?.id || "",
+          productName: workspace.latestPlan.input?.productName || workspace.product?.name || "",
+          workforceRows: savedWorkforceRows.length
+            ? savedWorkforceRows
+            : (workspace.workforce[0]
+                ? [{ ...emptyPlanRows.workforce, workforceId: workspace.workforce[0].id }]
+                : []),
+        });
+        setOperationPlanResult(hasSimplePlanResult ? workspace.latestPlan.result : null);
+      } else if (workspace.product) {
+        setOperationPlan((current) => ({
+          ...current,
+          machineRows: workspace.machines[0]
+            ? [{ ...emptyPlanRows.machine, machineId: workspace.machines[0].id }]
+            : [],
+          materialRows: workspace.materials.length
+            ? workspace.materials.slice(0, 2).map((material) => ({
+                dailyQuantity: 0,
+                materialId: material.id,
+              }))
+            : [],
+          productId: workspace.product.id,
+          productName: workspace.product.name || "",
+          workforceRows: workspace.workforce[0]
+            ? [{ ...emptyPlanRows.workforce, workforceId: workspace.workforce[0].id }]
+            : [],
+        }));
+        setOperationPlanResult(null);
+      }
+    } catch (error) {
+      setOperationsStatus(`Operations verisi yuklenemedi: ${error.message}`);
+    } finally {
+      setOperationsLoading(false);
+    }
+  }
+
+  async function handleSaveOperationPlan(event) {
+    event.preventDefault();
+    setOperationsStatus("");
+
+    if (!supabase) {
+      setOperationsStatus(labels.configure);
+      return;
+    }
+
+    setOperationsLoading(true);
+
+    try {
+      const savedPlan = await saveOperationResourcePlan(supabase, {
+        ...operationPlan,
+      });
+
+      setOperationPlan({ ...emptyOperationPlan, ...savedPlan.input });
+      setOperationPlanResult(savedPlan.result);
+      setOperationsStatus("Kaynak planı Supabase veritabanına kaydedildi ve backend fonksiyonunda hesaplandı.");
+      await loadOperationsData();
+      await loadFinancialData();
+    } catch (error) {
+      setOperationsStatus(error.message);
+    } finally {
+      setOperationsLoading(false);
+    }
+  }
+
+  async function handleSaveOperationRecord(entity, event) {
+    event.preventDefault();
+    setOperationsStatus("");
+
+    if (!supabase) {
+      setOperationsStatus(labels.configure);
+      return;
+    }
+
+    setOperationsLoading(true);
+
+    try {
+      await saveOperationRecord(supabase, entity, {
+        ...operationForms[entity],
+        productId: operationPlan.productId || operationsWorkspace.product?.id,
+      });
+
+      setOperationForms((current) => ({ ...current, [entity]: emptyOperationForms[entity] }));
+      setOperationsStatus("Operations kaydı Supabase veritabanına kaydedildi.");
+      await loadOperationsData();
+    } catch (error) {
+      setOperationsStatus(error.message);
+    } finally {
+      setOperationsLoading(false);
+    }
+  }
+
+  async function loadFinancialData(nextHorizon = financialHorizon) {
+    if (!supabase) return;
+
+    setFinancialLoading(true);
+    setFinancialStatus("");
+
+    try {
+      const nextModel = await loadFinancialModel(supabase, nextHorizon);
+      setFinancialModel(nextModel);
+      setFinancialSettingsForm({
+        electricityPricePerKwh: nextModel.settings?.electricityPricePerKwh || 0,
+      });
+    } catch (error) {
+      setFinancialStatus(`Finansal model yuklenemedi: ${error.message}`);
+    } finally {
+      setFinancialLoading(false);
+    }
+  }
+
+  async function handleSaveFinancialSettings(event) {
+    event.preventDefault();
+    setFinancialStatus("");
+
+    if (!supabase) {
+      setFinancialStatus(labels.configure);
+      return;
+    }
+
+    setFinancialLoading(true);
+
+    try {
+      await saveFinancialModelSettings(supabase, financialSettingsForm);
+      setFinancialStatus("Elektrik birim fiyatı Supabase'e kaydedildi.");
+      await loadFinancialData();
+    } catch (error) {
+      setFinancialStatus(error.message);
+    } finally {
+      setFinancialLoading(false);
+    }
+  }
+
+  async function handleSaveFinancialExtraCost(event) {
+    event.preventDefault();
+    setFinancialStatus("");
+
+    if (!supabase) {
+      setFinancialStatus(labels.configure);
+      return;
+    }
+
+    setFinancialLoading(true);
+
+    try {
+      await saveFinancialExtraCost(supabase, financialExtraCostForm);
+      setFinancialExtraCostForm(emptyFinancialExtraCostForm);
+      setFinancialStatus("Ek finansal gider Supabase'e kaydedildi.");
+      await loadFinancialData();
+    } catch (error) {
+      setFinancialStatus(error.message);
+    } finally {
+      setFinancialLoading(false);
+    }
   }
 
   function normalizeRole(role) {
@@ -788,6 +1121,816 @@ function App() {
     goTo("/login", "login");
   }
 
+  function renderOperationPlanner() {
+    const result = operationPlanResult;
+    const machineRows = operationPlan.machineRows || [];
+    const workforceRows = operationPlan.workforceRows || [];
+    const selectedProduct = operationsWorkspace.products.find((product) => product.id === operationPlan.productId);
+    const selectedProductMaterials = selectedProduct?.material_rows || [];
+    const defaultMachineRow = {
+      ...emptyPlanRows.machine,
+      machineId: operationsWorkspace.machines[0]?.id || "",
+    };
+    const defaultWorkforceRow = {
+      ...emptyPlanRows.workforce,
+      workforceId: operationsWorkspace.workforce[0]?.id || "",
+    };
+
+    return (
+      <section className="operation-planner" aria-label="Kaynak planlama hesaplayıcı">
+        <form className="operation-card planner-input-card" onSubmit={handleSaveOperationPlan}>
+          <div className="operation-card-heading">
+            <div>
+              <span>Veri girişi</span>
+              <h2>Basit günlük üretim maliyeti</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOperationPlan({
+                ...emptyOperationPlan,
+                machineRows: defaultMachineRow.machineId ? [defaultMachineRow] : [],
+                productId: operationsWorkspace.product?.id || "",
+                productName: operationsWorkspace.product?.name || "",
+                workforceRows: defaultWorkforceRow.workforceId ? [defaultWorkforceRow] : [],
+              })}
+            >
+              Varsayılanı Yükle
+            </button>
+          </div>
+          <div className="planner-fields">
+            <label>
+              <span>Plan adı</span>
+              <div>
+                <input
+                  type="text"
+                  value={operationPlan.planName ?? ""}
+                  onChange={(event) => updateOperationPlan("planName", event.target.value)}
+                />
+              </div>
+            </label>
+            <label>
+              <span>Ürün</span>
+              <div>
+                <select
+                  value={operationPlan.productId || ""}
+                  onChange={(event) => {
+                    const product = operationsWorkspace.products.find((item) => item.id === event.target.value);
+                    setOperationPlan((current) => ({
+                      ...current,
+                      productId: product?.id || "",
+                      productName: product?.name || "",
+                    }));
+                  }}
+                >
+                  <option value="">Ürün seç</option>
+                  {operationsWorkspace.products.map((product) => (
+                    <option value={product.id} key={product.id}>{product.name}</option>
+                  ))}
+                </select>
+                <small>{selectedProduct ? `${formatLira(selectedProduct.price, 2)} / ${selectedProduct.unit || "adet"}` : "Ürünler ekranından kayıt seçin"}</small>
+              </div>
+            </label>
+            {[
+              ["productName", "Yeni ürün adı", "", "text"],
+            ].map(([field, label, suffix, type = "number"]) => (
+              <label key={field}>
+                <span>{label}</span>
+                <div>
+                  <input
+                    min="0"
+                    step="1"
+                    type={type}
+                    value={operationPlan[field] ?? ""}
+                    onChange={(event) => updateOperationPlan(field, event.target.value)}
+                  />
+                  {suffix && <small>{suffix}</small>}
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <div className="resource-section">
+            <div className="resource-section-header">
+              <div>
+                <span>Makine seçimi</span>
+                <p>Ürünü üretirken hangi makinenin günde kaç saat kullanılacağını girin.</p>
+              </div>
+              <button type="button" onClick={() => addOperationPlanRow("machineRows", defaultMachineRow)}>
+                Makine Ekle
+              </button>
+            </div>
+            <div className="resource-row-list">
+              {machineRows.length ? machineRows.map((row, index) => {
+                const selectedMachine = operationsWorkspace.machines.find((machine) => machine.id === row.machineId);
+
+                return (
+                  <div className="resource-row-grid machine-plan-row" key={`machine-${index}`}>
+                    <label>
+                      <span>Makine</span>
+                      <select value={row.machineId || ""} onChange={(event) => updateOperationPlanRow("machineRows", index, "machineId", event.target.value)}>
+                        <option value="">Makine seç</option>
+                        {operationsWorkspace.machines.map((machine) => (
+                          <option value={machine.id} key={machine.id}>
+                            {machine.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Günlük saat</span>
+                      <input
+                        min="0"
+                        step="0.25"
+                        type="number"
+                        value={row.dailyHours ?? ""}
+                        onChange={(event) => updateOperationPlanRow("machineRows", index, "dailyHours", event.target.value)}
+                      />
+                    </label>
+                    <div className="resource-row-meta">
+                      <strong>{selectedMachine ? `${formatNumber(selectedMachine.hourly_energy_consumption_kwh, 2)} kWh/saat` : "-"}</strong>
+                      <small>{selectedMachine ? `Makine fiyatı ${formatLira(selectedMachine.price)}` : "Kayıt seçilmedi"}</small>
+                    </div>
+                    <button type="button" className="resource-remove-button" onClick={() => removeOperationPlanRow("machineRows", index)}>
+                      Sil
+                    </button>
+                  </div>
+                );
+              }) : (
+                <p className="planner-empty-state">Makine kaydı yok. Önce Makine & Ekipman ekranından gerçek makine ekleyin.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="resource-section">
+            <div className="resource-section-header">
+              <div>
+                <span>İşgücü seçimi</span>
+                <p>Hangi rolden kaç kişinin günde kaç saat çalışacağını girin.</p>
+              </div>
+              <button type="button" onClick={() => addOperationPlanRow("workforceRows", defaultWorkforceRow)}>
+                İşgücü Ekle
+              </button>
+            </div>
+            <div className="resource-row-list">
+              {workforceRows.length ? workforceRows.map((row, index) => {
+                const selectedWorkforce = operationsWorkspace.workforce.find((workforce) => workforce.id === row.workforceId);
+
+                return (
+                  <div className="resource-row-grid workforce-plan-row" key={`workforce-${index}`}>
+                    <label>
+                      <span>Rol</span>
+                      <select value={row.workforceId || ""} onChange={(event) => updateOperationPlanRow("workforceRows", index, "workforceId", event.target.value)}>
+                        <option value="">Rol seç</option>
+                        {operationsWorkspace.workforce.map((workforce) => (
+                          <option value={workforce.id} key={workforce.id}>
+                            {workforce.role_name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Kişi</span>
+                      <input
+                        min="0"
+                        step="1"
+                        type="number"
+                        value={row.peopleAssigned ?? ""}
+                        onChange={(event) => updateOperationPlanRow("workforceRows", index, "peopleAssigned", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>Günlük saat</span>
+                      <input
+                        min="0"
+                        step="0.25"
+                        type="number"
+                        value={row.dailyHours ?? ""}
+                        onChange={(event) => updateOperationPlanRow("workforceRows", index, "dailyHours", event.target.value)}
+                      />
+                    </label>
+                    <div className="resource-row-meta">
+                      <strong>{selectedWorkforce ? `${formatLira(selectedWorkforce.hourly_cost)} / saat` : "-"}</strong>
+                      <small>{selectedWorkforce ? "Saatlik maliyet Supabase kaydından okunur" : "Kayıt seçilmedi"}</small>
+                    </div>
+                    <button type="button" className="resource-remove-button" onClick={() => removeOperationPlanRow("workforceRows", index)}>
+                      Sil
+                    </button>
+                  </div>
+                );
+              }) : (
+                <p className="planner-empty-state">İşgücü kaydı yok. Önce İnsan Kaynağı ekranından rol ekleyin.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="resource-section">
+            <div className="resource-section-header">
+              <div>
+                <span>Ürün malzemeleri</span>
+                <p>Malzeme miktarları seçilen ürün reçetesinden ve hesaplanan üretim adedinden otomatik hesaplanır.</p>
+              </div>
+            </div>
+            <div className="resource-row-list">
+              {selectedProductMaterials.length ? selectedProductMaterials.map((row) => (
+                  <div className="resource-row-grid material-plan-row" key={row.id || row.material_id}>
+                    <div className="resource-row-meta">
+                      <strong>{row.material?.name || "-"}</strong>
+                      <small>{formatNumber(row.quantity_per_unit, 4)} {row.material?.unit || ""} / {selectedProduct.unit || "adet"}</small>
+                    </div>
+                    <div className="resource-row-meta">
+                      <strong>{formatLira(row.material?.price_per_unit, 2)}</strong>
+                      <small>Birim fiyat</small>
+                    </div>
+                  </div>
+                )) : (
+                <p className="planner-empty-state">Bu ürün için reçete yok. Önce Ürünler ekranında gerekli malzemeleri ekleyin.</p>
+              )}
+            </div>
+          </div>
+
+          <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
+            {operationsLoading ? "Kaydediliyor..." : "Supabase'e Kaydet ve Hesapla"}
+          </button>
+          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
+        </form>
+
+        <article className="operation-card planner-result-card">
+          <div className="operation-card-heading">
+            <div>
+              <span>{result ? "Backend sonucu hazır" : "Backend sonucu bekleniyor"}</span>
+              <h2>Günlük maliyet özeti</h2>
+            </div>
+            <mark className={result ? "ok" : "bad"}>
+              {result ? `${formatNumber(result.energyConsumptionKwh, 2)} kWh` : "Hesap yok"}
+            </mark>
+          </div>
+          {!result ? (
+            <p className="planner-empty-state">
+              Girdileri kaydettiğinizde hesap Supabase RPC fonksiyonunda yapılacak ve sonuç operation_resource_plans tablosuna yazılacak.
+            </p>
+          ) : (
+            <>
+              <div className="planner-summary-grid">
+                <span>Ürün <strong>{result.productName || "-"}</strong></span>
+                <span>Birim Fiyat <strong>{formatLira(result.productPrice, 2)} / {result.productUnit || "adet"}</strong></span>
+                <span>Üretilecek Miktar <strong>{formatNumber(result.producedQuantity, 2)} {result.productUnit || "adet"}</strong></span>
+                <span>Çevrim Süresi <strong>{formatNumber(result.cycleTimeMinutes, 2)} dk</strong></span>
+                <span>Elektrik Tüketimi <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
+                <span>Malzeme Maliyeti <strong>{formatLira(result.materialCost)}</strong></span>
+                <span>İşgücü Maliyeti <strong>{formatLira(result.workforceCost)}</strong></span>
+              </div>
+              <div className="allocation-grid">
+                <span>Makine Saati <strong>{formatNumber(result.machineHoursUsed, 1)} saat</strong></span>
+                <span>İşgücü Saati <strong>{formatNumber(result.workforceHoursUsed, 1)} saat</strong></span>
+                <span>Seçili Makine Değeri <strong>{formatLira(result.selectedMachineValue)}</strong></span>
+              </div>
+              <div className="cost-breakdown">
+                <span>Takip Edilen Günlük Maliyet <strong>{formatLira(result.totalTrackedDailyCost)}</strong></span>
+                <span>Kayıtlı Ürün <strong>{result.productName || "-"}</strong></span>
+              </div>
+              <div className="selected-resource-results">
+                <div>
+                  <h3>Makine kırılımı</h3>
+                  {(result.machineRows || []).map((row) => (
+                    <span key={row.machineId}>
+                      {row.name} <strong>{formatNumber(row.energyConsumptionKwh, 2)} kWh</strong>
+                    </span>
+                  ))}
+                </div>
+                <div>
+                  <h3>İşgücü kırılımı</h3>
+                  {(result.workforceRows || []).map((row) => (
+                    <span key={row.workforceId}>
+                      {row.roleName} <strong>{formatLira(row.cost)}</strong>
+                    </span>
+                  ))}
+                </div>
+                <div>
+                  <h3>Malzeme kırılımı</h3>
+                  {(result.materialRows || []).map((row) => (
+                    <span key={row.materialId}>
+                      {row.name} <strong>{formatLira(row.cost)}</strong>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </article>
+      </section>
+    );
+  }
+
+  function renderOperationRecordForm(entity, fields) {
+    return (
+      <form className="operation-card operation-data-form" onSubmit={(event) => handleSaveOperationRecord(entity, event)}>
+        <div className="operation-data-fields">
+          {fields.map((field) => (
+            <label key={field.name}>
+              <span>{field.label}</span>
+              {field.type === "select" ? (
+                <select value={operationForms[entity][field.name]} onChange={(event) => updateOperationForm(entity, field.name, event.target.value)}>
+                  {field.options.map((option) => (
+                    <option value={option} key={option}>{option}</option>
+                  ))}
+                </select>
+              ) : field.type === "textarea" ? (
+                <textarea value={operationForms[entity][field.name]} onChange={(event) => updateOperationForm(entity, field.name, event.target.value)} />
+              ) : (
+                <input
+                  min={field.min ?? 0}
+                  step={field.step || "1"}
+                  type={field.type || "text"}
+                  value={operationForms[entity][field.name]}
+                  onChange={(event) => updateOperationForm(entity, field.name, event.target.value)}
+                />
+              )}
+            </label>
+          ))}
+        </div>
+        <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
+          {operationsLoading ? "Kaydediliyor..." : "Supabase'e Kaydet"}
+        </button>
+      </form>
+    );
+  }
+
+  function renderProductDataPage() {
+    const productMaterialRows = operationForms.product.materialRows || [];
+
+    return renderDashboardLayout(
+      `operations/${activeOperationsSubmodule.key}`,
+        <section className="operations-workspace operations-modern">
+          <div className="operations-header">
+            <div>
+              <span>Operations / Ürünler</span>
+              <h1>Ürünler</h1>
+              <p>Veri girişi hesaplamasında kullanılacak ürün reçetesini, birimini, fiyatını ve çevrim süresini tutun.</p>
+            </div>
+            <div className="operations-actions">
+              <button type="button" onClick={loadOperationsData}>Verileri Yenile</button>
+            </div>
+          </div>
+
+          <div className="operation-data-grid">
+            <form className="operation-card operation-data-form" onSubmit={(event) => handleSaveOperationRecord("product", event)}>
+              <div className="operation-data-fields">
+                <label>
+                  <span>Ürün adı</span>
+                  <input
+                    type="text"
+                    value={operationForms.product.name}
+                    onChange={(event) => updateOperationForm("product", "name", event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Birim</span>
+                  <select
+                    value={operationForms.product.unit}
+                    onChange={(event) => updateOperationForm("product", "unit", event.target.value)}
+                  >
+                    {["adet", "kg", "gr", "mg", "metre", "litre", "ml"].map((unit) => (
+                      <option value={unit} key={unit}>{unit}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Fiyat</span>
+                  <input
+                    min="0"
+                    step="0.01"
+                    type="number"
+                    value={operationForms.product.price}
+                    onChange={(event) => updateOperationForm("product", "price", event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Çevrim süresi</span>
+                  <input
+                    min="0.0001"
+                    step="0.01"
+                    type="number"
+                    value={operationForms.product.cycleTimeMinutes}
+                    onChange={(event) => updateOperationForm("product", "cycleTimeMinutes", event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="resource-section">
+                <div className="resource-section-header">
+                  <div>
+                    <span>Gerekli malzemeler</span>
+                    <p>Bir ürün birimi üretmek için gereken malzemeleri ve miktarları girin.</p>
+                  </div>
+                  <button type="button" onClick={addProductMaterialRow}>Malzeme Ekle</button>
+                </div>
+                <div className="resource-row-list">
+                  {productMaterialRows.length ? productMaterialRows.map((row, index) => {
+                    const selectedMaterial = operationsWorkspace.materials.find((material) => material.id === row.materialId);
+
+                    return (
+                      <div className="resource-row-grid material-plan-row" key={`product-material-${index}`}>
+                        <label>
+                          <span>Malzeme</span>
+                          <select value={row.materialId || ""} onChange={(event) => updateProductMaterialRow(index, "materialId", event.target.value)}>
+                            <option value="">Malzeme seç</option>
+                            {operationsWorkspace.materials.map((material) => (
+                              <option value={material.id} key={material.id}>{material.name}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Birim başına miktar</span>
+                          <input
+                            min="0"
+                            step="0.0001"
+                            type="number"
+                            value={row.quantityPerUnit ?? ""}
+                            onChange={(event) => updateProductMaterialRow(index, "quantityPerUnit", event.target.value)}
+                          />
+                        </label>
+                        <div className="resource-row-meta">
+                          <strong>{selectedMaterial?.unit || "-"}</strong>
+                          <small>{selectedMaterial ? `${formatLira(selectedMaterial.price_per_unit, 2)} / ${selectedMaterial.unit}` : "Kayıt seçilmedi"}</small>
+                        </div>
+                        <button type="button" className="resource-remove-button" onClick={() => removeProductMaterialRow(index)}>
+                          Sil
+                        </button>
+                      </div>
+                    );
+                  }) : (
+                    <p className="planner-empty-state">Henüz reçete malzemesi yok. Önce Malzeme Tanımları ekranında malzeme ekleyin, sonra buradan ürüne bağlayın.</p>
+                  )}
+                </div>
+              </div>
+
+              <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
+                {operationsLoading ? "Kaydediliyor..." : "Supabase'e Kaydet"}
+              </button>
+            </form>
+
+            <article className="operation-card operation-data-table-card">
+              <div className="operation-card-heading">
+                <h2>Kayıtlar</h2>
+                <span>{operationsWorkspace.products.length} kayıt</span>
+              </div>
+              <div className="operation-data-table">
+                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: "1.2fr 0.7fr 0.8fr 0.8fr 1.4fr" }}>
+                  <span>Ürün</span>
+                  <span>Birim</span>
+                  <span>Fiyat</span>
+                  <span>Çevrim</span>
+                  <span>Malzemeler</span>
+                </div>
+                {(operationsWorkspace.products.length ? operationsWorkspace.products : [{ id: "empty" }]).map((product) => (
+                  <button
+                    type="button"
+                    className="operation-data-row operation-data-button-row"
+                    style={{ gridTemplateColumns: "1.2fr 0.7fr 0.8fr 0.8fr 1.4fr" }}
+                    key={product.id}
+                    onClick={() => {
+                      if (product.id === "empty") return;
+
+                      setOperationForms((current) => ({
+                        ...current,
+                        product: {
+                          cycleTimeMinutes: product.cycle_time_minutes || 1,
+                          materialRows: (product.material_rows || []).map((row) => ({
+                            materialId: row.material_id,
+                            quantityPerUnit: row.quantity_per_unit,
+                          })),
+                          name: product.name || "",
+                          price: product.price || 0,
+                          unit: product.unit || "adet",
+                        },
+                      }));
+                    }}
+                  >
+                    <span>{product.id === "empty" ? "-" : product.name}</span>
+                    <span>{product.id === "empty" ? "-" : product.unit || "adet"}</span>
+                    <span>{product.id === "empty" ? "-" : formatLira(product.price, 2)}</span>
+                    <span>{product.id === "empty" ? "-" : `${formatNumber(product.cycle_time_minutes || 1, 2)} dk`}</span>
+                    <span>{product.id === "empty" ? "-" : (product.material_rows || []).map((row) => `${row.material?.name || "-"}: ${formatNumber(row.quantity_per_unit, 4)} ${row.material?.unit || ""}`).join(", ") || "-"}</span>
+                  </button>
+                ))}
+              </div>
+            </article>
+          </div>
+          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
+        </section>,
+    );
+  }
+
+  function renderActiveProcessesPage() {
+    const activePlans = operationsWorkspace.activePlans || [];
+
+    return renderDashboardLayout(
+      `operations/${activeOperationsSubmodule.key}`,
+        <section className="operations-workspace operations-modern">
+          <div className="operations-header">
+            <div>
+              <span>Operations / Mevcut Süreçler</span>
+              <h1>Mevcut Süreçler</h1>
+              <p>Supabase'e kaydedilen üretim planlarını ve hesaplanan üretim/maliyet sonuçlarını takip edin.</p>
+            </div>
+            <div className="operations-actions">
+              <button type="button" onClick={loadOperationsData}>Verileri Yenile</button>
+              <button type="button" className="primary" onClick={() => goTo("/operations/data-entry", "login")}>Yeni Plan</button>
+            </div>
+          </div>
+
+          <div className="process-summary-grid">
+            <article className="operation-card process-summary-card">
+              <span>Aktif Plan</span>
+              <strong>{activePlans.length}</strong>
+            </article>
+            <article className="operation-card process-summary-card">
+              <span>Toplam Üretim</span>
+              <strong>{formatNumber(activePlans.reduce((total, plan) => total + (Number(plan.result?.producedQuantity) || 0), 0), 2)}</strong>
+            </article>
+            <article className="operation-card process-summary-card">
+              <span>Takip Edilen Maliyet</span>
+              <strong>{formatLira(activePlans.reduce((total, plan) => total + (Number(plan.result?.totalTrackedDailyCost) || 0), 0))}</strong>
+            </article>
+          </div>
+
+          <div className="process-list">
+            {activePlans.length ? activePlans.map((plan) => {
+              const result = plan.result || {};
+              const productName = plan.product?.name || result.productName || plan.input?.productName || "-";
+              const productUnit = result.productUnit || plan.product?.unit || "adet";
+              const machineRows = Array.isArray(result.machineRows) ? result.machineRows : [];
+              const materialRows = Array.isArray(result.materialRows) ? result.materialRows : [];
+
+              return (
+                <article className="operation-card process-card" key={plan.id}>
+                  <div className="operation-card-heading">
+                    <div>
+                      <span>{new Date(plan.created_at).toLocaleString("tr-TR")}</span>
+                      <h2>{plan.plan_name || "Günlük üretim planı"}</h2>
+                    </div>
+                    <mark className="ok">Aktif</mark>
+                  </div>
+
+                  <div className="process-metrics">
+                    <span>Ürün <strong>{productName}</strong></span>
+                    <span>Üretilecek Miktar <strong>{formatNumber(result.producedQuantity, 2)} {productUnit}</strong></span>
+                    <span>Çevrim <strong>{formatNumber(result.cycleTimeMinutes, 2)} dk</strong></span>
+                    <span>Ana Makine Saati <strong>{formatNumber(result.primaryMachineDailyHours, 2)} saat</strong></span>
+                    <span>Enerji <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
+                    <span>Maliyet <strong>{formatLira(result.totalTrackedDailyCost)}</strong></span>
+                  </div>
+
+                  <div className="process-detail-grid">
+                    <div>
+                      <h3>Makineler</h3>
+                      {(machineRows.length ? machineRows : [{ machineId: "empty", name: "-", dailyHours: 0 }]).map((row) => (
+                        <span key={row.machineId}>
+                          {row.name} <strong>{formatNumber(row.dailyHours, 2)} saat</strong>
+                        </span>
+                      ))}
+                    </div>
+                    <div>
+                      <h3>Malzeme Kullanımı</h3>
+                      {(materialRows.length ? materialRows : [{ materialId: "empty", name: "-", dailyQuantity: 0, unit: "" }]).map((row) => (
+                        <span key={row.materialId}>
+                          {row.name} <strong>{formatNumber(row.dailyQuantity, 4)} {row.unit || ""}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </article>
+              );
+            }) : (
+              <article className="operation-card process-card">
+                <p className="planner-empty-state">Henüz Supabase'e kaydedilmiş üretim planı yok. Veri girişi ekranından plan kaydedince burada görünecek.</p>
+              </article>
+            )}
+          </div>
+
+          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
+        </section>,
+    );
+  }
+
+  function renderFinancialModellingPage() {
+    const summary = financialModel.summary || emptyFinancialModel.summary;
+    const chart = financialModel.trendChart || emptyFinancialModel.trendChart;
+
+    return renderDashboardLayout(
+      "financial-modelling",
+        <section className="financial-workspace">
+          <div className="financial-header">
+            <div>
+              <span>Operations verisine bağlı model</span>
+              <h1>Finansal Modelleme</h1>
+              <p>Gelir, gider ve net kazanç hesapları Supabase fonksiyonunda mevcut süreçlerden hesaplanır.</p>
+            </div>
+            <button type="button" className="primary" onClick={() => loadFinancialData()}>
+              {financialLoading ? "Yükleniyor..." : "Verileri Güncelle"}
+            </button>
+          </div>
+
+          <div className="financial-controls finance-input-panel">
+            <form onSubmit={handleSaveFinancialSettings}>
+              <label>
+                <span>Elektrik kW fiyatı</span>
+                <input
+                  min="0"
+                  step="0.0001"
+                  type="number"
+                  value={financialSettingsForm.electricityPricePerKwh}
+                  onChange={(event) => setFinancialSettingsForm({ electricityPricePerKwh: event.target.value })}
+                />
+              </label>
+              <button type="submit" disabled={financialLoading}>Kaydet</button>
+            </form>
+
+            <form onSubmit={handleSaveFinancialExtraCost}>
+              <label>
+                <span>Ek gider adı</span>
+                <input
+                  type="text"
+                  value={financialExtraCostForm.name}
+                  onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, name: event.target.value }))}
+                />
+              </label>
+              <label>
+                <span>Tip</span>
+                <select
+                  value={financialExtraCostForm.costType}
+                  onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, costType: event.target.value }))}
+                >
+                  <option value="initial">Başlangıç</option>
+                  <option value="recurring">Tekrarlayan</option>
+                </select>
+              </label>
+              <label>
+                <span>Tutar</span>
+                <input
+                  min="0"
+                  step="0.01"
+                  type="number"
+                  value={financialExtraCostForm.amount}
+                  onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, amount: event.target.value }))}
+                />
+              </label>
+              <button type="submit" disabled={financialLoading}>Ek Gider Ekle</button>
+            </form>
+          </div>
+
+          {financialStatus && <p className="status-message">{financialStatus}</p>}
+
+          <div className="finance-metric-grid">
+            {[
+              ["Mevcut Süreç", summary.planCount],
+              ["Satış Kazançları", formatLira(summary.salesRevenue)],
+              ["Toplam Gider", formatLira(summary.totalCost)],
+              ["Net Kazanç", formatLira(summary.netIncome)],
+            ].map(([label, value]) => (
+              <article className="finance-metric-card" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+                <small>Supabase hesap sonucu</small>
+              </article>
+            ))}
+          </div>
+
+          <div className="financial-grid">
+            <article className="financial-card income-card">
+              <div className="financial-card-heading"><h2>Gelir Tablosu</h2></div>
+              <div className="income-table simplified-income-table">
+                <div className="income-row income-head"><span>Kalem</span><span>Tip</span><span>Tutar</span></div>
+                {(financialModel.incomeRows || []).map((row, index) => (
+                  <div className="income-row" key={`${row.label}-${index}`}>
+                    <strong>{row.label}</strong>
+                    <span>{row.kind === "income" ? "Gelir" : row.costType === "initial" ? "Başlangıç gideri" : "Gider"}</span>
+                    <span>{formatLira(row.amount)}</span>
+                  </div>
+                ))}
+                <div className="income-row income-total">
+                  <strong>Net kazanç</strong>
+                  <span>Gelir - gider</span>
+                  <span>{formatLira(summary.netIncome)}</span>
+                </div>
+              </div>
+            </article>
+
+            <article className="financial-card trend-card">
+            <div className="financial-card-heading">
+              <h2>Finansal Trendler</h2>
+              <div className="mini-tabs">
+                {[
+                  ["6m", "6 Ay"],
+                  ["1y", "1 Yıl"],
+                  ["5y", "5 Yıl"],
+                ].map(([value, label]) => (
+                  <button
+                    type="button"
+                    className={financialHorizon === value ? "active" : ""}
+                    onClick={() => {
+                      setFinancialHorizon(value);
+                      loadFinancialData(value);
+                    }}
+                    key={value}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="chart-legend" aria-label="Grafik renk açıklaması">
+              <span className="legend-sales">Satış kazançları</span>
+              <span className="legend-costs">Giderler</span>
+              <span className="legend-net">Net kazanç</span>
+            </div>
+              <svg className="trend-chart finance-model-chart" viewBox="0 0 560 280" role="img" aria-label="Satış kazançları, giderler ve net kazanç projeksiyon grafiği">
+                <text className="axis-label axis-label-y" x="-162" y="18" transform="rotate(-90)">Tutar (TRY)</text>
+                <text className="axis-label axis-label-x" x="272" y="262">Projeksiyon dönemi</text>
+                <path className="chart-grid" d="M30 40 H500 M30 82.5 H500 M30 125 H500 M30 167.5 H500 M30 210 H500" />
+                <path className="chart-axis" d="M30 30 V210 H500" />
+                <text className="chart-tick" x="30" y="214">0</text>
+                <text className="chart-tick" x="24" y="44">Yüksek</text>
+                <text className="chart-tick" x="30" y="232">Başlangıç</text>
+                <text className="chart-tick chart-tick-end" x="500" y="232">Bitiş</text>
+                {chart.salesPath && <path className="trend-line sales" d={chart.salesPath} />}
+                {chart.costPath && <path className="trend-line costs" d={chart.costPath} />}
+                {chart.netPath && <path className="trend-line net" d={chart.netPath} />}
+              </svg>
+            </article>
+
+            <article className="financial-card cost-card">
+              <h2>Maliyet Yapısı</h2>
+              <div className="cost-body">
+                <div className="donut-chart cost-donut" aria-hidden="true"><span>{formatLira(summary.totalCost)}</span></div>
+                <div className="cost-list">
+                  {(financialModel.costStructure || []).map((item) => (
+                    <span key={item.label}>{item.label}<strong>{formatLira(item.amount)}</strong></span>
+                  ))}
+                </div>
+              </div>
+            </article>
+
+            <article className="financial-card scenario-card">
+              <div className="financial-card-heading"><h2>Ek Giderler</h2></div>
+              <div className="scenario-list">
+                {(financialModel.extraCosts?.length ? financialModel.extraCosts : [{ id: "empty", name: "Henüz ek gider yok", costType: "-", amount: 0 }]).map((cost) => (
+                  <div className="scenario-row" key={cost.id}>
+                    <div>
+                      <strong>{cost.name}</strong>
+                      <span>{cost.costType === "initial" ? "Başlangıç gideri" : cost.costType === "recurring" ? "Tekrarlayan gider" : "-"}</span>
+                    </div>
+                    <strong>{cost.id === "empty" ? "-" : formatLira(cost.amount)}</strong>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+        </section>,
+    );
+  }
+
+  function renderOperationDataPage({ columns, description, entity, fields, rows, title }) {
+    return renderDashboardLayout(
+      `operations/${activeOperationsSubmodule.key}`,
+        <section className="operations-workspace operations-modern">
+          <div className="operations-header">
+            <div>
+              <span>Operations / {activeOperationsSubmodule.label}</span>
+              <h1>{title}</h1>
+              <p>{description}</p>
+            </div>
+            <div className="operations-actions">
+              <button type="button" onClick={loadOperationsData}>Verileri Yenile</button>
+            </div>
+          </div>
+
+          <div className="operation-data-grid">
+            {renderOperationRecordForm(entity, fields)}
+            <article className="operation-card operation-data-table-card">
+              <div className="operation-card-heading">
+                <h2>Kayıtlar</h2>
+                <span>{rows.length} kayıt</span>
+              </div>
+              <div className="operation-data-table">
+                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(120px, 1fr))` }}>
+                  {columns.map((column) => <span key={column.header}>{column.header}</span>)}
+                </div>
+                {(rows.length ? rows : [{ id: "empty" }]).map((row) => (
+                  <div className="operation-data-row" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(120px, 1fr))` }} key={row.id}>
+                    {columns.map((column) => (
+                      <span key={column.header}>{row.id === "empty" ? "-" : column.render(row)}</span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
+        </section>,
+    );
+  }
+
   const references = [
     { mark: "NR", name: "Nora Tekstil", tone: "teal" },
     { mark: "AV", name: "Avra Makina", tone: "amber" },
@@ -828,6 +1971,112 @@ function App() {
     },
   ];
 
+  const dashboardStats = [
+    { label: "Günlük Üretim", value: "24.580", delta: "+12%", detail: "düne göre" },
+    { label: "Kapasite Kullanımı", value: "78%", delta: "+8%", detail: "hedefin üstünde" },
+    { label: "Günlük Karlılık", value: "₺4.2M", delta: "+14%", detail: "net operasyonel etki" },
+    { label: "Kritik Alarm", value: "3", delta: "aktif", detail: "aksiyon bekliyor" },
+  ];
+
+  const factoryLines = [
+    { name: "LINE-1", status: "aktif", tone: "teal" },
+    { name: "LINE-2", status: "aktif", tone: "teal" },
+    { name: "LINE-3", status: "bakım", tone: "amber" },
+    { name: "LINE-4", status: "kritik", tone: "clay" },
+    { name: "QC-02", status: "aktif", tone: "cyan" },
+  ];
+
+  const dashboardInsights = [
+    { title: "LINE-2 çıktı limiti", copy: "Vardiya sonuna kadar %8 ek kapasite mümkün.", tone: "amber" },
+    { title: "EK-22 malzeme darboğazı", copy: "Tedarik gecikmesi termin riskini artırıyor.", tone: "clay" },
+    { title: "3 vardiya modeli iyi", copy: "Karlılık için en dengeli rota görünüyor.", tone: "teal" },
+    { title: "Kur farkı etkisi", copy: "Finansal çıktıda koruma ihtiyacı oluştu.", tone: "navy" },
+    { title: "Enerji tüketimi optimize", copy: "Gece üretimi maliyeti aşağı çekiyor.", tone: "cyan" },
+  ];
+
+  const dashboardModules = [
+    { key: "operations", path: "/operations", label: "Operations" },
+    { key: "financial-modelling", path: "/financial-modelling", label: "Financial Modelling" },
+    { key: "sales-strategy", path: "/sales-strategy", label: "Sales Strategy" },
+    { key: "simulation", path: "/simulation", label: "Simulation" },
+    { key: "ai-insights", path: "/ai-insights", label: "AI Insights" },
+    { key: "reports", path: "/reports", label: "Reports" },
+    { key: "settings", path: "/settings", label: "Settings" },
+  ];
+  const operationsSubmodules = [
+    { key: "data-entry", path: "/operations/data-entry", label: "Veri girişi" },
+    { key: "active-processes", path: "/operations/active-processes", label: "Mevcut Süreçler" },
+    { key: "products", path: "/operations/products", label: "Ürünler" },
+    { key: "product-tree", path: "/operations/product-tree", label: "Ürün Ağacı" },
+    { key: "machines-equipment", path: "/operations/machines-equipment", label: "Makine & Ekipman" },
+    { key: "human-resources", path: "/operations/human-resources", label: "İnsan Kaynağı" },
+    { key: "material-definitions", path: "/operations/material-definitions", label: "Malzeme Tanımları" },
+  ];
+
+  const activeModule = dashboardModules.find((module) => module.path === path);
+  const activeOperationsSubmodule = operationsSubmodules.find((module) => module.path === path);
+  const operationSteps = ["Kesim", "Şekillendirme", "Delik Delme", "Kalınlama", "Yüzey İşleme", "Temizlik", "Kontrol", "Paketleme", "Sevkiyat"];
+  const financeMetrics = [
+    { label: "Net Satışlar", value: "₺28.7M", change: "+11%" },
+    { label: "Brüt Kâr", value: "₺9.78M", change: "+8" },
+    { label: "Faaliyet Kârı", value: "₺6.42M", change: "+14" },
+    { label: "Net Kâr", value: "₺4.23M", change: "+10" },
+    { label: "Nakit Pozisyonu", value: "₺12.6M", change: "+16" },
+  ];
+  const incomeRows = [
+    ["Net Satışlar", "₺28.690.000", "₺25.780.000", "+11.3%", "₺27.500.000", "+4.3%"],
+    ["Satışların Maliyeti", "-₺18.912.000", "-₺17.216.000", "+9.9%", "-₺18.300.000", "+3.3%"],
+    ["Brüt Kâr", "₺9.778.000", "₺8.564.000", "+14.2%", "₺9.200.000", "+6.3%"],
+    ["Brüt Kâr Marjı", "34.1", "33.2", "+0.9p", "33.5", "+0.6p"],
+    ["Faaliyet Giderleri", "-₺3.358.000", "-₺3.200.000", "+4.9%", "-₺3.100.000", "+8.3%"],
+    ["FAVÖK", "₺6.420.000", "₺5.371.000", "+19.5%", "₺6.100.000", "+5.2%"],
+    ["Net Kâr", "₺4.230.000", "₺3.810.000", "+11.0%", "₺3.900.000", "+8.5%"],
+  ];
+  const scenarioCards = [
+    { title: "Elektrik Maliyeti +15%", metric: "FAVÖK Etkisi", value: "-₺1.2M", action: "Simüle Et" },
+    { title: "3 Vardiya Geçişi", metric: "Net Kâr Etkisi", value: "+₺2.3M", action: "Simüle Et" },
+    { title: "Makine EK-22 Yatırımı", metric: "Geri Dönüş", value: "14.7 ay", action: "Simüle Et" },
+    { title: "Hammadde Fiyatı +10%", metric: "Marj Etkisi", value: "-₺1.2M", action: "Simüle Et" },
+  ];
+  const simulationParameters = [
+    ["Talep Değişimi", "+15"],
+    ["Hammadde Fiyat Değişimi", "+10"],
+    ["Enerji Fiyatı Değişimi", "-20"],
+    ["İşçilik Maliyeti Değişimi", "+5"],
+    ["Verimlilik Değişimi", "+10"],
+    ["Çalışma Süresi", "3 vardiya"],
+  ];
+  const productionLines = [
+    ["LINE-1", "72%", "4.120", "+512", "87%", "Düşük"],
+    ["LINE-2", "95%", "7.480", "+1.180", "79%", "Orta"],
+    ["LINE-3", "81%", "6.890", "+940", "76%", "Yüksek"],
+    ["LINE-4", "68%", "3.320", "+420", "63%", "Orta"],
+  ];
+  const reportStats = [
+    ["Toplam Rapor", "32", "+14 bu aya göre"],
+    ["Görüntülenen Rapor", "128", "+22 bu aya göre"],
+    ["İndirilen Rapor", "45", "+9 bu aya göre"],
+    ["Otomatik Raporlar", "12", "+33 bu aya göre"],
+    ["Son Rapor", "Finansal Özet Raporu", "21 Mayıs 2024 09:15"],
+  ];
+  const recentReports = [
+    ["Finansal Özet Raporu", "Finansal Raporlar", "21 Mayıs 2024 09:15", "01 May - 31 May 2024", "Ahmet Yılmaz"],
+    ["Üretim Performans Raporu", "Üretim Raporları", "21 Mayıs 2024 08:45", "01 May - 31 May 2024", "Sistem Otomatik"],
+    ["Kapasite Kullanım Raporu", "Kapasite Raporları", "20 Mayıs 2024 11:30", "01 May - 31 May 2024", "Ahmet Yılmaz"],
+    ["Satış Karlılık Analizi", "Satış Raporları", "20 Mayıs 2024 11:00", "01 May - 31 May 2024", "Mehmet Kaya"],
+    ["Makine Bakım Raporu", "Bakım Raporları", "20 Mayıs 2024 08:00", "01 May - 31 May 2024", "Sistem Otomatik"],
+    ["Nakit Akış Raporu", "Finansal Raporlar", "19 Mayıs 2024 15:20", "01 May - 31 May 2024", "Ahmet Yılmaz"],
+  ];
+  const financeWindowLabel =
+    financeWindow === "custom"
+      ? `${financeDateRange.start || "Başlangıç"} - ${financeDateRange.end || "Bitiş"}`
+      : {
+          today: "Bugün",
+          tomorrow: "Yarın",
+          week: "Bu hafta",
+          month: "Bu ay",
+        }[financeWindow];
+
   function renderDashboardLayout(activePage, children) {
     return (
       <main className="dashboard-shell">
@@ -845,6 +2094,31 @@ function App() {
             >
               {labels.dashboard}
             </button>
+            {dashboardModules.map((module) => (
+              <React.Fragment key={module.key}>
+                <button
+                  type="button"
+                  className={activePage === module.key || (module.key === "operations" && activePage.startsWith("operations/")) ? "active" : ""}
+                  onClick={() => goTo(module.key === "operations" ? "/operations/data-entry" : module.path, "login")}
+                >
+                  {module.label}
+                </button>
+                {module.key === "operations" && (activePage === "operations" || activePage.startsWith("operations/")) && (
+                  <div className="dashboard-subnav" aria-label="Operations submodules">
+                    {operationsSubmodules.map((submodule) => (
+                      <button
+                        type="button"
+                        className={activePage === `operations/${submodule.key}` ? "active" : ""}
+                        onClick={() => goTo(submodule.path, "login")}
+                        key={submodule.key}
+                      >
+                        {submodule.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
             {authorizationAccess.read && (
               <button
                 type="button"
@@ -856,10 +2130,19 @@ function App() {
             )}
           </nav>
 
-          <button type="button" className="link-button dashboard-logout" onClick={handleLogout}>
-            {labels.logout}
-          </button>
-          <ThemeToggle />
+          <div className="sidebar-footer">
+            <div className="sync-status-card" role="status" aria-label="Data synchronization status">
+              <span className="live-dot" />
+              <div>
+                <strong>Data Sync</strong>
+                <small>Live</small>
+              </div>
+            </div>
+            <button type="button" className="link-button dashboard-logout" onClick={handleLogout}>
+              {labels.logout}
+            </button>
+            <ThemeToggle />
+          </div>
         </aside>
 
         <section className="dashboard-content">{children}</section>
@@ -988,15 +2271,656 @@ function App() {
   if (session && path === "/dashboard") {
     return renderDashboardLayout(
       "dashboard",
-        <section className="dashboard-panel">
-          <span>{labels.signedIn}</span>
-          <h1>{labels.dashboard}</h1>
-          <p>{labels.dashboardCopy}</p>
-          {authorizationAccess.read && (
-            <button type="button" className="submit-button dashboard-action" onClick={() => goTo("/authorization", "login")}>
-              {labels.authorizationPage}
-            </button>
-          )}
+        <section className="command-dashboard" aria-label="Atera command dashboard">
+          <div className="command-topbar">
+            <div className="command-context">
+              <strong>ARKAS METAL</strong>
+              <span>Otomotiv Conta Üretimi</span>
+            </div>
+            <div className="command-live">
+              <span className="live-dot" />
+              <strong>Sistem Sağlıklı</strong>
+            </div>
+            <div className="command-user">
+              <span>{currentProfile?.username || form.username || "Atera"}</span>
+              <small>Admin</small>
+            </div>
+            <button type="button" className="command-run-button">Simülasyon Çalışıyor</button>
+          </div>
+
+          <div className="command-hero">
+            <div className="hero-copy">
+              <span>Bugünün Operasyon Modeli</span>
+              <h1>Fabrikanızın Geleceğini Bugün Modelleyin.</h1>
+              <p>Kur, kapasite, malzeme ve üretim kararlarını tek ekranda takip edin.</p>
+            </div>
+            <div className="blueprint-visual" aria-hidden="true">
+              <span className="blueprint-ring ring-one" />
+              <span className="blueprint-ring ring-two" />
+              <span className="blueprint-ring ring-three" />
+              <span className="blueprint-line line-one" />
+              <span className="blueprint-line line-two" />
+            </div>
+          </div>
+
+          <div className="command-stat-grid">
+            {dashboardStats.map((stat, index) => (
+              <article className={`command-card stat-card stat-card-${index + 1}`} key={stat.label}>
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+                <small>{stat.delta} {stat.detail}</small>
+                <svg viewBox="0 0 120 42" aria-hidden="true">
+                  <path d="M4 34 L22 26 L36 30 L52 18 L70 22 L88 10 L116 6" />
+                </svg>
+              </article>
+            ))}
+          </div>
+
+          <div className="command-main-grid">
+            <article className="command-card factory-map-card">
+              <div className="card-heading">
+                <div>
+                  <span>Dijital Fabrika Haritası</span>
+                  <h2>Üretim sahası</h2>
+                </div>
+                <button type="button">Tam ekran</button>
+              </div>
+              <div className="factory-map" aria-label="Mock digital factory map">
+                {factoryLines.map((line, index) => (
+                  <div className={`factory-node ${line.tone} node-${index + 1}`} key={line.name}>
+                    <strong>{line.name}</strong>
+                    <span>{line.status}</span>
+                  </div>
+                ))}
+                <div className="factory-building building-a">Kesim</div>
+                <div className="factory-building building-b">Pres</div>
+                <div className="factory-building building-c">Paketleme</div>
+              </div>
+              <div className="factory-metrics">
+                <span>Toplam Hatlar <strong>42</strong></span>
+                <span>Çalışan Makine <strong>38</strong></span>
+                <span>Duraklama <strong>3</strong></span>
+                <span>Kalite NOK <strong>1</strong></span>
+              </div>
+            </article>
+
+            <article className="command-card finance-card">
+              <div className="card-heading">
+                <div>
+                  <span>Finansal Etki Paneli</span>
+                  <h2>{financeWindowLabel} etkisi</h2>
+                </div>
+                <div className="finance-date-controls" aria-label="Finansal etki tarih aralığı">
+                  <select value={financeWindow} onChange={(event) => setFinanceWindow(event.target.value)}>
+                    <option value="today">Bugün</option>
+                    <option value="tomorrow">Yarın</option>
+                    <option value="week">Bu hafta</option>
+                    <option value="month">Bu ay</option>
+                    <option value="custom">Özel aralık</option>
+                  </select>
+                  <input
+                    aria-label="Başlangıç tarihi"
+                    type="date"
+                    value={financeDateRange.start}
+                    onChange={(event) => updateFinanceDateRange("start", event.target.value)}
+                  />
+                  <input
+                    aria-label="Bitiş tarihi"
+                    type="date"
+                    value={financeDateRange.end}
+                    onChange={(event) => updateFinanceDateRange("end", event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="finance-kpis">
+                <span>Tahmini Ciro <strong>₺28.7M</strong></span>
+                <span>Tahmini Maliyet <strong>₺24.5M</strong></span>
+                <span>Net Kâr <strong>₺4.2M</strong></span>
+              </div>
+              <div className="finance-chart" aria-hidden="true">
+                <svg viewBox="0 0 420 180">
+                  <path className="chart-grid" d="M20 30 H400 M20 75 H400 M20 120 H400 M20 165 H400" />
+                  <path className="chart-line" d="M24 154 L58 138 L82 146 L108 112 L136 120 L166 92 L194 104 L226 72 L256 86 L286 54 L316 66 L346 42 L392 48" />
+                  <path className="chart-dash" d="M316 66 L346 68 L376 62 L400 70" />
+                </svg>
+              </div>
+              <div className="risk-list">
+                <span>Kur etkisi <strong>-₺1.2M</strong></span>
+                <span>Tedarik baskısı <strong>+₺0.8M</strong></span>
+                <span>Enerji avantajı <strong>+₺2.1M</strong></span>
+              </div>
+            </article>
+          </div>
+
+          <section className="insight-strip" aria-label="AI insights">
+            <div className="card-heading">
+              <div>
+                <span>AI insights</span>
+                <h2>Canlı öneriler</h2>
+              </div>
+              {authorizationAccess.read && (
+                <button type="button" onClick={() => goTo("/authorization", "login")}>
+                  {labels.authorizationPage}
+                </button>
+              )}
+            </div>
+            <div className="insight-grid">
+              {dashboardInsights.map((item) => (
+                <article className={`insight-card ${item.tone}`} key={item.title}>
+                  <strong>{item.title}</strong>
+                  <p>{item.copy}</p>
+                  <span>Detayları incele</span>
+                </article>
+              ))}
+            </div>
+          </section>
+        </section>,
+    );
+  }
+
+  if (session && (activeModule || activeOperationsSubmodule)) {
+    if (path === "/operations") {
+      goTo("/operations/data-entry", "login");
+      return null;
+    }
+
+    if (activeOperationsSubmodule?.key === "data-entry") {
+      return renderDashboardLayout(
+        `operations/${activeOperationsSubmodule.key}`,
+          <section className="operations-workspace operations-modern">
+            <div className="operations-header">
+              <div>
+                <span>Operations / Veri girişi</span>
+                <h1>Kaynak Planlama</h1>
+              </div>
+              <div className="operations-actions">
+                <button type="button" onClick={loadOperationsData}>Verileri Yenile</button>
+              </div>
+            </div>
+            {renderOperationPlanner()}
+          </section>,
+      );
+    }
+
+    if (activeOperationsSubmodule?.key === "active-processes") {
+      return renderActiveProcessesPage();
+    }
+
+    if (activeOperationsSubmodule?.key === "machines-equipment") {
+      return renderOperationDataPage({
+        columns: [
+          { header: "Makine", render: (row) => row.name },
+          { header: "Fiyat", render: (row) => formatLira(row.price) },
+          { header: "Saatlik Enerji", render: (row) => `${formatNumber(row.hourly_energy_consumption_kwh, 2)} kWh` },
+        ],
+        description: "Sadece üretimde seçilecek makinenin adını, fiyatını ve saatlik enerji tüketimini tutun.",
+        entity: "machine",
+        fields: [
+          { name: "name", label: "Makine adı" },
+          { name: "price", label: "Makine fiyatı", step: "0.01", type: "number" },
+          { name: "hourlyEnergyConsumptionKwh", label: "Saatlik enerji tüketimi", step: "0.01", type: "number" },
+        ],
+        rows: operationsWorkspace.machines,
+        title: "Makine & Ekipman",
+      });
+    }
+
+    if (activeOperationsSubmodule?.key === "products") {
+      return renderProductDataPage();
+    }
+
+    if (activeOperationsSubmodule?.key === "human-resources") {
+      return renderOperationDataPage({
+        columns: [
+          { header: "Rol", render: (row) => row.role_name },
+          { header: "Saatlik Maliyet", render: (row) => formatLira(row.hourly_cost) },
+        ],
+        description: "Üretim planında seçilecek rolü ve o rolün saatlik maliyetini tutun.",
+        entity: "workforce",
+        fields: [
+          { name: "roleName", label: "Rol" },
+          { name: "hourlyCost", label: "Saatlik maliyet", type: "number" },
+        ],
+        rows: operationsWorkspace.workforce,
+        title: "İnsan Kaynağı",
+      });
+    }
+
+    if (activeOperationsSubmodule?.key === "material-definitions") {
+      return renderOperationDataPage({
+        columns: [
+          { header: "Malzeme", render: (row) => row.name },
+          { header: "Birim", render: (row) => row.unit },
+          { header: "Birim Fiyat", render: (row) => formatLira(row.price_per_unit, 2) },
+        ],
+        description: "Günlük üretim maliyetine girecek malzemenin adını, birimini ve birim fiyatını tutun.",
+        entity: "material",
+        fields: [
+          { name: "name", label: "Malzeme adı" },
+          { name: "unit", label: "Birim", type: "select", options: ["kg", "gr", "mg", "adet", "metre", "litre", "ml"] },
+          { name: "pricePerUnit", label: "Birim fiyat", step: "0.01", type: "number" },
+        ],
+        rows: operationsWorkspace.materials,
+        title: "Malzeme Tanımları",
+      });
+    }
+
+    if (activeOperationsSubmodule?.key === "product-tree") {
+      return renderDashboardLayout(
+        `operations/${activeOperationsSubmodule.key}`,
+          <section className="operations-workspace">
+            <div className="operations-header">
+              <div>
+                <span>Ürün Ağacı / Ürün Detayı</span>
+                <h1>{operationsWorkspace.product?.name || "Operasyonel Tanımlama"}</h1>
+              </div>
+              <div className="operations-actions">
+                <button type="button">Geri</button>
+                <button type="button">Kopyala</button>
+                <button type="button">Revizyon Geçmişi</button>
+                <button type="button" className="primary">Düzenle</button>
+              </div>
+            </div>
+
+            <div className="operations-tabs" role="tablist" aria-label="Operasyon detay sekmeleri">
+              {["Genel Bilgiler", "Teknik Özellikler", "Malzeme & Bileşenler", "Operasyon Sırası", "Süreç Akışı", "Kalite", "Dokümanlar", "Notlar"].map((tab, index) => (
+                <button type="button" className={index === 0 ? "active" : ""} key={tab}>{tab}</button>
+              ))}
+            </div>
+
+            <div className="operations-grid">
+              <article className="operation-card part-visual-card">
+                <div className="part-blueprint" aria-label="Conta teknik görseli">
+                  <div className="gasket-shape">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+                <div className="part-status-row">
+                  <span>Ağırlık <strong>{operationsWorkspace.product?.weight_kg || "-"}kg</strong></span>
+                  <span>Boyut <strong>{operationsWorkspace.product?.dimensions || "-"}</strong></span>
+                  <span>Malzeme <strong>{operationsWorkspace.product?.material_name || "-"}</strong></span>
+                  <span>Kalite <strong>{operationsWorkspace.product?.quality_grade || "-"}</strong></span>
+                  <span>Çevrim <strong>{operationsWorkspace.product?.cycle_time_seconds || "-"} sn</strong></span>
+                </div>
+              </article>
+
+              <article className="operation-card part-info-card">
+                <div className="part-title">
+                  <span>{operationsWorkspace.product?.status || "Aktif"}</span>
+                  <h2>{operationsWorkspace.product?.product_code || "CONTA-0478-A"}</h2>
+                </div>
+                <dl>
+                  <div><dt>Ürün Kodu</dt><dd>{operationsWorkspace.product?.product_code || "-"}</dd></div>
+                  <div><dt>Ürün Adı</dt><dd>{operationsWorkspace.product?.name || "-"}</dd></div>
+                  <div><dt>Ürün Grubu</dt><dd>{operationsWorkspace.product?.product_group || "-"}</dd></div>
+                  <div><dt>Revizyon</dt><dd>{operationsWorkspace.product?.revision || "-"}</dd></div>
+                  <div><dt>Durum</dt><dd>{operationsWorkspace.product?.status || "-"}</dd></div>
+                  <div><dt>Oluşturma Tarihi</dt><dd>{operationsWorkspace.product?.created_at ? new Date(operationsWorkspace.product.created_at).toLocaleDateString("tr-TR") : "-"}</dd></div>
+                  <div><dt>Son Güncelleme</dt><dd>{operationsWorkspace.product?.updated_at ? new Date(operationsWorkspace.product.updated_at).toLocaleString("tr-TR") : "-"}</dd></div>
+                  <div><dt>Açıklama</dt><dd>{operationsWorkspace.product?.description || "-"}</dd></div>
+                </dl>
+              </article>
+
+              <article className="operation-card machine-card">
+                <div className="operation-card-heading">
+                  <h2>Makine Havuzu</h2>
+                  <span>Makine havuzu</span>
+                </div>
+                <div className="machine-table">
+                  <div className="machine-row machine-head"><span>Makine</span><span>Fiyat</span><span>Enerji</span><span>Durum</span></div>
+                  {operationsWorkspace.machines.map((machine) => (
+                    <div className="machine-row" key={machine.id}>
+                      <strong>{machine.name}</strong>
+                      <span>{formatLira(machine.price)}</span>
+                      <span>{formatNumber(machine.hourly_energy_consumption_kwh, 2)} kWh/saat</span>
+                      <mark className="ok">Tanımlı</mark>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="operation-card technical-card">
+                <h2>Teknik Özellikler</h2>
+                <div className="technical-grid">
+                  {[
+                    ["Kalınlık", "1.20 mm"],
+                    ["Çap Delik", "82.00 mm"],
+                    ["Delik Sayısı", "4"],
+                    ["Sıkıştırılma", "0.35 mm"],
+                    ["Çelik Sınıfı", "316"],
+                    ["Çalışma Sıcaklığı", "-40 / +300°C"],
+                    ["Maks. Basınç", "120 bar"],
+                    ["Yüzey Kaplama", "Kaplamasız"],
+                    ["Test Basıncı", "90 bar"],
+                    ["Yüzey Kalitesi", "Kaplamasız"],
+                  ].map(([label, value]) => (
+                    <div key={label}><span>{label}</span><strong>{value}</strong></div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="operation-card finance-impact-card">
+                <div className="operation-card-heading">
+                  <h2>Finansal Etki</h2>
+                  <select defaultValue="mayıs">
+                    <option value="mayıs">Mayıs 2024</option>
+                    <option value="haziran">Haziran 2024</option>
+                    <option value="ceyrek">Bu çeyrek</option>
+                  </select>
+                </div>
+                <div className="impact-kpis">
+                  <span>Birim Satış Fiyatı <strong>₺45,00</strong></span>
+                  <span>Günlük Maliyet <strong>{operationPlanResult ? formatLira(operationPlanResult.totalTrackedDailyCost) : "-"}</strong></span>
+                  <span>Birim Kâr <strong>₺17,65</strong></span>
+                  <span>Kâr Marjı <strong>39.2%</strong></span>
+                </div>
+                <div className="impact-body">
+                  <div className="donut-chart" aria-hidden="true"><span>{operationPlanResult ? formatLira(operationPlanResult.totalTrackedDailyCost) : "-"}</span></div>
+                  <div className="monthly-impact">
+                    <span>Ürün <strong>{operationPlanResult?.productName || "-"}</strong></span>
+                    <span>Tahmini Ciro <strong>₺1.10M</strong></span>
+                    <span>Tahmini Maliyet <strong>{operationPlanResult ? formatLira(operationPlanResult.totalTrackedDailyCost) : "-"}</strong></span>
+                    <span>Net Kâr Marjı <strong>39.2%</strong></span>
+                  </div>
+                </div>
+              </article>
+
+              <article className="operation-card notes-card">
+                <div className="operation-card-heading">
+                  <h2>Notlar</h2>
+                  <button type="button">Yeni Not</button>
+                </div>
+                {(operationsWorkspace.notes.length ? operationsWorkspace.notes : [{ id: "empty", note: "Henüz ürün notu yok.", created_at: new Date().toISOString() }]).map((note) => (
+                  <p key={note.id}>{new Date(note.created_at).toLocaleDateString("tr-TR")}: {note.note}</p>
+                ))}
+              </article>
+            </div>
+
+            <article className="operation-card operation-flow">
+              <div className="operation-card-heading">
+                <h2>Operasyon Akışı</h2>
+                <button type="button">Akış Diyagramını Gör</button>
+              </div>
+              <div className="flow-steps">
+                {operationSteps.map((name, index) => ({ id: name, step_order: index + 1, name, station: index % 2 === 0 ? "Lazer Kesim" : "Proses" })).map((step) => (
+                  <div className="flow-step" key={step.id}>
+                    <span>{step.step_order}</span>
+                    <strong>{step.name}</strong>
+                    <small>{step.station}</small>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>,
+      );
+    }
+
+    if (activeOperationsSubmodule) {
+      return renderDashboardLayout(
+        `operations/${activeOperationsSubmodule.key}`,
+          <section className="module-placeholder">
+            <div>
+              <span>Operations placeholder</span>
+              <h1>{activeOperationsSubmodule.label}</h1>
+              <p>Bu alt sayfa Operations modülü altında hazırlandı. İçerik ve iş mantığı daha sonra eklenecek.</p>
+            </div>
+            <div className="placeholder-grid">
+              <article>
+                <strong>Alt Modül</strong>
+                <p>{activeOperationsSubmodule.label} için ekran yapısı burada geliştirilecek.</p>
+              </article>
+              <article>
+                <strong>Durum</strong>
+                <p>Şimdilik sadece frontend routing ve boş durum ekranı mevcut.</p>
+              </article>
+            </div>
+          </section>,
+      );
+    }
+
+    if (activeModule.key === "financial-modelling") {
+      return renderFinancialModellingPage();
+    }
+
+    if (activeModule.key === "simulation") {
+      return renderDashboardLayout(
+        activeModule.key,
+          <section className="simulation-workspace">
+            <div className="simulation-header">
+              <div>
+                <span>ARKAS METAL / Otomotiv Conta Üretimi</span>
+                <h1>Simülasyon & Senaryo Analizi</h1>
+                <p>Karar vermeden önce sonucu görün.</p>
+              </div>
+              <button type="button" className="primary">Simülasyonu Çalıştır</button>
+            </div>
+
+            <div className="scenario-management">
+              <article className="scenario-choice active"><span>İyi Senaryo</span><strong>85/100</strong><p>Talep artışı, verimlilik iyileşmesi ve enerji optimizasyonu.</p></article>
+              <article className="scenario-choice"><span>Orta Senaryo</span><strong>60/100</strong><p>Mevcut koşullarda üretim hedefi.</p></article>
+              <article className="scenario-choice warning"><span>Kötü Senaryo</span><strong>30/100</strong><p>Maliyet artışı, talep düşüşü ve verim kaybı.</p></article>
+              <button type="button" className="new-scenario">+ Yeni Senaryo</button>
+            </div>
+
+            <div className="simulation-tabs" role="tablist" aria-label="Simülasyon sekmeleri">
+              {["Senaryo Kurulumu", "Üretim Etkisi", "Finansal Etki", "Karşılaştırma", "Duyarlılık Analizi"].map((tab, index) => (
+                <button type="button" className={index === 0 ? "active" : ""} key={tab}>{tab}</button>
+              ))}
+            </div>
+
+            <div className="simulation-grid">
+              <aside className="simulation-card parameter-card">
+                <h2>Senaryo Parametreleri</h2>
+                <p>Aşağıdaki parametreleri değiştirerek senaryo etkisini görün.</p>
+                {simulationParameters.map(([label, value], index) => (
+                  <label className="sim-slider" key={label}>
+                    <span>{label}<strong>{value}{index < 5 ? "%" : ""}</strong></span>
+                    <input type="range" min="-30" max="30" defaultValue={index === 5 ? 10 : Number.parseInt(value, 10) || 0} />
+                  </label>
+                ))}
+                <div className="scenario-version">
+                  <span>Senaryo</span>
+                  <select defaultValue="best"><option value="best">İyi Senaryo</option><option value="base">Orta Senaryo</option><option value="bad">Kötü Senaryo</option></select>
+                </div>
+                <button type="button" className="wide-action">Senaryoyu Güncelle</button>
+              </aside>
+
+              <main className="simulation-main">
+                <article className="simulation-card production-impact">
+                  <div className="simulation-card-heading">
+                    <div><span>Üretim Etkisi</span><h2>Senaryonun üretim performansına etkisi</h2></div>
+                  </div>
+                  <div className="impact-summary">
+                    <span>Toplam Üretim <strong>27.850 adet</strong><small>+15.2%</small></span>
+                    <span>Kapasite Kullanımı <strong>86%</strong><small>+8.1%</small></span>
+                    <span>Ortalama OEE <strong>78.3%</strong><small>+10.1%</small></span>
+                    <span>Çevrim Süresi <strong>45.2 sn</strong><small>-8.4%</small></span>
+                  </div>
+                  <div className="line-impact-table">
+                    <div className="line-impact-row line-impact-head"><span>Hat</span><span>Kapasite</span><span>Üretim</span><span>OEE</span><span>Darboğaz Riski</span></div>
+                    {productionLines.map((line) => (
+                      <div className="line-impact-row" key={line[0]}>
+                        <strong>{line[0]}</strong>
+                        <span><i style={{ width: line[1] }} />{line[1]}</span>
+                        <span>{line[2]} <em>{line[3]}</em></span>
+                        <span>{line[4]}</span>
+                        <mark>{line[5]}</mark>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="simulation-card flow-impact-card">
+                  <h2>Üretim Akışı Simülasyonu</h2>
+                  <div className="flow-impact-grid">
+                    {["Hammadde", "Kesim", "Şekillendirme", "Kaplama", "Kontrol", "Paketleme"].map((step, index) => (
+                      <div className={index === 3 ? "flow-impact-item risk" : "flow-impact-item"} key={step}>
+                        <strong>{step}</strong>
+                        <span>{[18500, 27300, 24000, 22950, 27050, 26030][index]} adet</span>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </main>
+
+              <aside className="simulation-side">
+                <article className="simulation-card sim-financial">
+                  <div className="simulation-card-heading">
+                    <h2>Finansal Etki (Özet)</h2>
+                    <select defaultValue="try"><option value="try">TRY</option><option value="usd">USD</option></select>
+                  </div>
+                  <div className="sim-financial-table">
+                    {["Net Satışlar", "Brüt Kâr", "FAVÖK", "Net Kâr", "Nakit Akışı", "Net Kâr Marjı"].map((item, index) => (
+                      <div key={item}><span>{item}</span><strong>{["₺32.1M", "₺11.7M", "₺7.8M", "₺5.6M", "₺8.8M", "18.4%"][index]}</strong><em>{index % 2 === 0 ? "+12.5%" : "+9.4%"}</em></div>
+                    ))}
+                  </div>
+                  <svg className="sim-chart" viewBox="0 0 420 180" aria-hidden="true">
+                    <path className="chart-grid" d="M20 35 H400 M20 85 H400 M20 135 H400" />
+                    <path className="trend-line sales" d="M24 150 L70 134 L116 118 L162 102 L208 86 L254 72 L300 58 L380 40" />
+                    <path className="trend-line gross" d="M24 160 L70 148 L116 136 L162 126 L208 114 L254 104 L300 94 L380 80" />
+                    <path className="trend-line net" d="M24 168 L70 158 L116 150 L162 142 L208 134 L254 128 L300 120 L380 112" />
+                  </svg>
+                </article>
+
+                <article className="simulation-card compare-card">
+                  <div className="simulation-card-heading"><h2>Senaryo Karşılaştırma</h2><button type="button">Kritik Ağrılar</button></div>
+                  <div className="compare-table">
+                    <div><span>Toplam Skor</span><strong>100%</strong><b>85</b><b>60</b><b>30</b></div>
+                    <div><span>Nakit Akışı</span><strong>20%</strong><b>80</b><b>58</b><b>22</b></div>
+                    <div><span>Operasyonel Risk</span><strong>15%</strong><b>88</b><b>60</b><b>23</b></div>
+                    <div><span>Yatırım İhtiyacı</span><strong>10%</strong><b>90</b><b>58</b><b>20</b></div>
+                  </div>
+                </article>
+              </aside>
+            </div>
+
+            <div className="simulation-bottom">
+              <article className="simulation-card"><h2>AI Önerisi</h2><p>İyi senaryo 3. haftada darboğaz riski nedeniyle yatırım gerektirebilir. EK-22 hattı için kapasite kontrolü önerilir.</p><button type="button">Detaylı Analiz</button></article>
+              <article className="simulation-card"><h2>Kritik Bulgular</h2><p>LINE-3 hattı darboğaz olabilir. Enerji tüketiminde %12 avantaj oluşuyor. 3 vardiya modeli kârlılığı artırıyor.</p></article>
+              <article className="simulation-card risk-card"><h2>Risk Uyarıları</h2><p>Hammadde fiyatındaki artış ve kapasite stresi simülasyonda kritik seviyeye yaklaşıyor.</p><button type="button">Tüm Riskleri Gör</button></article>
+            </div>
+          </section>,
+      );
+    }
+
+    if (activeModule.key === "reports") {
+      return renderDashboardLayout(
+        activeModule.key,
+          <section className="reports-workspace">
+            <div className="reports-header">
+              <div>
+                <span>ARKAS METAL / Otomotiv Conta Üretimi</span>
+                <h1>Raporlar</h1>
+                <p>Performansınızı analiz edin, içgörüleri keşfedin ve doğru kararlar alın.</p>
+              </div>
+            </div>
+
+            <div className="reports-tabs" role="tablist" aria-label="Rapor türleri">
+              {["Tüm Raporlar", "Üretim Raporları", "Finansal Raporlar", "Satış Raporları", "Kapasite Raporları", "Bakım Raporları", "Özel Raporlar"].map((tab, index) => (
+                <button type="button" className={index === 0 ? "active" : ""} key={tab}>{tab}</button>
+              ))}
+            </div>
+
+            <div className="reports-controls">
+              <label><span>Rapor ara</span><input placeholder="Rapor ara..." /></label>
+              <button type="button">Filtreler</button>
+              <select defaultValue="may"><option value="may">01 Mayıs 2024 - 31 Mayıs 2024</option><option value="q2">Q2 2024</option></select>
+              <button type="button" className="primary">Dışa Aktar</button>
+            </div>
+
+            <div className="report-stat-grid">
+              {reportStats.map(([label, value, detail]) => (
+                <article className="report-stat-card" key={label}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                  <small>{detail}</small>
+                </article>
+              ))}
+            </div>
+
+            <div className="reports-grid">
+              <article className="reports-card distribution-card">
+                <h2>Rapor Kategorilerine Göre Dağılım</h2>
+                <div className="distribution-body">
+                  <div className="donut-chart report-donut" aria-hidden="true"><span>32<small>Toplam</small></span></div>
+                  <div className="report-category-list">
+                    {["Üretim Raporları", "Finansal Raporlar", "Satış Raporları", "Kapasite Raporları", "Bakım Raporları", "Özel Raporlar"].map((item, index) => (
+                      <span key={item}>{item}<strong>{[37, 23, 15, 10, 6, 4][index]}%</strong></span>
+                    ))}
+                  </div>
+                </div>
+              </article>
+
+              <article className="reports-card usage-card">
+                <div className="reports-card-heading"><h2>Rapor Kullanım Trendi</h2><select defaultValue="daily"><option value="daily">Günlük</option><option value="weekly">Haftalık</option></select></div>
+                <svg className="reports-trend" viewBox="0 0 620 230" aria-hidden="true">
+                  <path className="chart-grid" d="M30 42 H590 M30 92 H590 M30 142 H590 M30 192 H590" />
+                  <path className="trend-line sales" d="M34 166 L72 146 L108 156 L146 126 L184 142 L222 118 L260 132 L298 104 L336 122 L374 92 L412 110 L450 82 L488 102 L526 76 L586 54" />
+                  <path className="trend-line gross" d="M34 188 L72 176 L108 168 L146 160 L184 156 L222 148 L260 142 L298 132 L336 126 L374 120 L412 114 L450 106 L488 96 L526 90 L586 72" />
+                  <path className="trend-line net" d="M34 204 L72 202 L108 198 L146 196 L184 194 L222 190 L260 192 L298 184 L336 186 L374 178 L412 182 L450 174 L488 176 L526 170 L586 164" />
+                </svg>
+              </article>
+
+              <article className="reports-card recent-reports-card">
+                <div className="reports-card-heading"><h2>Son Raporlar</h2><button type="button">Tümünü Gör</button></div>
+                <div className="recent-report-table">
+                  <div className="recent-report-row report-head"><span>Rapor Adı</span><span>Kategori</span><span>Oluşturulma Tarihi</span><span>Dönem</span><span>Oluşturan</span><span>İşlemler</span></div>
+                  {recentReports.map((report) => (
+                    <div className="recent-report-row" key={report[0]}>
+                      {report.map((cell, index) => index === 0 ? <strong key={cell}>{cell}</strong> : <span key={`${report[0]}-${index}`}>{cell}</span>)}
+                      <span className="report-actions">⌕ ↓ ⋯</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <aside className="reports-side">
+                <article className="reports-card schedule-card">
+                  <div className="reports-card-heading"><h2>Otomatik Rapor Takvimi</h2><button type="button">Tümünü Gör</button></div>
+                  {["Günlük Üretim Özeti", "Haftalık Finansal Özet", "Aylık Yönetim Raporu", "Aylık Karlılık Analizi"].map((item, index) => (
+                    <div className="schedule-row" key={item}>
+                      <strong>{item}</strong>
+                      <span>{["Her gün 08:00", "Her Pazartesi 09:00", "Her ayın 1. günü 10:00", "Her ayın 5. günü 10:30"][index]}</span>
+                      <mark>Aktif</mark>
+                    </div>
+                  ))}
+                </article>
+
+                <article className="reports-card quick-report-card">
+                  <h2>Hızlı Rapor Oluştur</h2>
+                  <div className="quick-report-grid">
+                    {["Üretim Raporu", "Finansal Özet", "Satış Analizi", "Kapasite Analizi", "Özel Rapor"].map((item) => (
+                      <button type="button" key={item}>{item}</button>
+                    ))}
+                  </div>
+                </article>
+              </aside>
+            </div>
+          </section>,
+      );
+    }
+
+    return renderDashboardLayout(
+      activeModule.key,
+        <section className="module-placeholder">
+          <div>
+            <span>Module placeholder</span>
+            <h1>{activeModule.label}</h1>
+            <p>This module is visible in the dashboard navigation and is ready for its frontend workflow.</p>
+          </div>
+          <div className="placeholder-grid">
+            <article>
+              <strong>Workspace</strong>
+              <p>Empty state for upcoming tools, tables, and decision screens.</p>
+            </article>
+            <article>
+              <strong>Status</strong>
+              <p>No backend, database, or algorithm behavior is connected yet.</p>
+            </article>
+          </div>
         </section>,
     );
   }
