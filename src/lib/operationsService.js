@@ -1,7 +1,7 @@
 export const emptyOperationPlan = {
   machineRows: [],
   materialRows: [],
-  planName: "Günlük üretim planı",
+  planName: "",
   productId: "",
   productName: "",
   workforceRows: [],
