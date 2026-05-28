@@ -1471,6 +1471,8 @@ function App() {
 
   function renderOperationPlanner() {
     const result = operationPlanResult;
+    const latestProcess = operationsWorkspace.activePlans?.[0] || operationsWorkspace.latestPlan;
+    const latestProcessName = latestProcess?.plan_name || latestProcess?.input?.planName || result?.planName || "";
     const machineRows = operationPlan.machineRows || [];
     const workforceRows = operationPlan.workforceRows || [];
     const selectedProduct = operationsWorkspace.products.find((product) => product.id === operationPlan.productId);
@@ -1705,7 +1707,7 @@ function App() {
         <article className="operation-card planner-result-card">
           <div className="operation-card-heading">
             <div>
-              <span>{result ? copy("Backend result ready", "Backend sonucu hazır") : copy("Waiting for backend result", "Backend sonucu bekleniyor")}</span>
+              <span>{latestProcessName || copy("Waiting for backend result", "Backend sonucu bekleniyor")}</span>
               <h2>{copy("Daily cost summary", "Günlük maliyet özeti")}</h2>
             </div>
             <mark className={result ? "ok" : "bad"}>
@@ -3690,21 +3692,6 @@ function App() {
               <small>{copy("Admin", "Admin")}</small>
             </div>
             <button type="button" className="command-run-button">{copy("Simulation Running", "Simülasyon Çalışıyor")}</button>
-          </div>
-
-          <div className="command-hero">
-            <div className="hero-copy">
-              <span>{copy("Today's Operation Model", "Bugünün Operasyon Modeli")}</span>
-              <h1>{copy("Model Your Factory's Future Today.", "Fabrikanızın Geleceğini Bugün Modelleyin.")}</h1>
-              <p>{copy("Track FX, capacity, material, and production decisions on one screen.", "Kur, kapasite, malzeme ve üretim kararlarını tek ekranda takip edin.")}</p>
-            </div>
-            <div className="blueprint-visual" aria-hidden="true">
-              <span className="blueprint-ring ring-one" />
-              <span className="blueprint-ring ring-two" />
-              <span className="blueprint-ring ring-three" />
-              <span className="blueprint-line line-one" />
-              <span className="blueprint-line line-two" />
-            </div>
           </div>
 
           <div className="command-stat-grid">
