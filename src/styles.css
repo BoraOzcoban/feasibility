@@ -3296,7 +3296,10 @@ select {
 }
 
 .finance-input-panel {
-  grid-template-columns: minmax(240px, 0.8fr) minmax(420px, 1.4fr);
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
 }
 
 .finance-input-panel form {
@@ -3306,8 +3309,8 @@ select {
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
 }
 
-.finance-input-panel form:first-child {
-  grid-template-columns: minmax(180px, 1fr) auto;
+.finance-input-panel .financial-assumption-form {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
 }
 
 .financial-controls label {
@@ -3333,6 +3336,41 @@ select {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.financial-feasibility-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.financial-feasibility-card {
+  background: color-mix(in srgb, var(--color-section) 68%, var(--color-surface));
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-height: 96px;
+  padding: 13px;
+}
+
+.financial-feasibility-card span {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.financial-feasibility-card strong {
+  color: var(--color-heading);
+  font-size: 1.15rem;
+  line-height: 1.08;
+}
+
+.financial-feasibility-card small {
+  color: var(--color-teal);
+  font-size: 0.74rem;
+  font-weight: 800;
 }
 
 .finance-metric-card,
@@ -3712,6 +3750,33 @@ select {
   font-weight: 900;
   min-height: 36px;
   padding: 0 12px;
+}
+
+.simulation-header-actions,
+.sales-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.simulation-header-actions button,
+.sales-header-actions button {
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-heading);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.simulation-header-actions .primary,
+.sales-header-actions .primary {
+  background: color-mix(in srgb, var(--color-cyan) 14%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-cyan) 32%, var(--color-line));
 }
 
 .scenario-management {
@@ -4508,11 +4573,31 @@ select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.sales-forecast-card {
+  align-content: start;
+}
+
+.sales-forecast-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sales-forecast-grid label {
+  color: var(--color-muted);
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 900;
+  gap: 5px;
+  text-transform: uppercase;
+}
+
 .sales-form-grid.compact {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .sales-form-grid label,
+.sales-forecast-grid label,
 .sales-edit-card label,
 .sales-table label {
   color: var(--color-muted);
@@ -4525,6 +4610,7 @@ select {
 
 .sales-form-grid input,
 .sales-form-grid textarea,
+.sales-forecast-grid input,
 .sales-edit-card input,
 .sales-edit-card textarea,
 .sales-table input,
@@ -5431,6 +5517,11 @@ select {
     justify-content: flex-start;
   }
 
+  .simulation-header-actions,
+  .sales-header-actions {
+    justify-content: flex-start;
+  }
+
   .operations-grid,
   .operation-planner,
   .part-status-row,
@@ -5440,7 +5531,9 @@ select {
   .financial-controls,
   .finance-input-panel,
   .finance-input-panel form,
+  .financial-assumption-form,
   .finance-metric-grid,
+  .financial-feasibility-grid,
   .financial-grid,
   .cost-body,
   .cash-chart,
@@ -5460,6 +5553,7 @@ select {
   .sales-grid,
   .sales-form-grid,
   .sales-form-grid.compact,
+  .sales-forecast-grid,
   .sales-channel-grid,
   .sales-edit-card,
   .competitor-grid,
@@ -5607,6 +5701,7 @@ select {
 
   .financial-controls,
   .finance-metric-grid,
+  .financial-feasibility-grid,
   .financial-grid,
   .scenario-management,
   .simulation-grid,
@@ -5622,6 +5717,7 @@ select {
   .sales-grid,
   .sales-form-grid,
   .sales-form-grid.compact,
+  .sales-forecast-grid,
   .sales-channel-grid,
   .sales-edit-card,
   .competitor-grid,

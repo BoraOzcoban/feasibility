@@ -46,12 +46,14 @@ create table if not exists public.profiles (
   access_level text not null default 'user',
   profile_picture_url text,
   language text not null default 'en',
+  theme text not null default 'light' check (theme in ('light', 'dark')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.profiles
-  add column if not exists company_id uuid references public.companies(id);
+  add column if not exists company_id uuid references public.companies(id),
+  add column if not exists theme text not null default 'light';
 
 do $$
 begin
@@ -364,7 +366,8 @@ begin
     company_id,
     department,
     access_level,
-    language
+    language,
+    theme
   )
   values (
     new.id,
@@ -379,7 +382,8 @@ begin
     ),
     new.raw_user_meta_data->>'department',
     coalesce(new.raw_user_meta_data->>'access_level', 'user'),
-    coalesce(new.raw_user_meta_data->>'language', 'en')
+    coalesce(new.raw_user_meta_data->>'language', 'en'),
+    case when new.raw_user_meta_data->>'theme' in ('light', 'dark') then new.raw_user_meta_data->>'theme' else 'light' end
   )
   on conflict (id) do update set
     username = excluded.username,
@@ -388,7 +392,8 @@ begin
     company_id = excluded.company_id,
     department = excluded.department,
     access_level = excluded.access_level,
-    language = excluded.language;
+    language = excluded.language,
+    theme = excluded.theme;
 
   perform public.ensure_company_defaults((
     select company_id from public.profiles where id = new.id
@@ -660,10 +665,32 @@ alter table public.operation_plan_materials
 create table if not exists public.financial_model_settings (
   company_id uuid primary key references public.companies(id) on delete cascade,
   electricity_price_per_kwh numeric(14, 4) not null default 0,
+  working_days_per_month numeric(5, 2) not null default 22,
+  initial_cash numeric(14, 2) not null default 0,
+  loan_amount numeric(14, 2) not null default 0,
+  annual_interest_rate numeric(8, 4) not null default 0,
+  loan_term_months integer not null default 24,
+  vat_rate numeric(8, 4) not null default 20,
+  income_tax_rate numeric(8, 4) not null default 20,
+  raw_material_buffer_months numeric(6, 2) not null default 1,
+  salary_buffer_months numeric(6, 2) not null default 1,
+  rent_buffer_months numeric(6, 2) not null default 1,
   updated_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.financial_model_settings
+  add column if not exists working_days_per_month numeric(5, 2) not null default 22,
+  add column if not exists initial_cash numeric(14, 2) not null default 0,
+  add column if not exists loan_amount numeric(14, 2) not null default 0,
+  add column if not exists annual_interest_rate numeric(8, 4) not null default 0,
+  add column if not exists loan_term_months integer not null default 24,
+  add column if not exists vat_rate numeric(8, 4) not null default 20,
+  add column if not exists income_tax_rate numeric(8, 4) not null default 20,
+  add column if not exists raw_material_buffer_months numeric(6, 2) not null default 1,
+  add column if not exists salary_buffer_months numeric(6, 2) not null default 1,
+  add column if not exists rent_buffer_months numeric(6, 2) not null default 1;
 
 create table if not exists public.financial_extra_costs (
   id uuid primary key default gen_random_uuid(),
@@ -674,6 +701,101 @@ create table if not exists public.financial_extra_costs (
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table if not exists public.sales_strategy_settings (
+  company_id uuid primary key references public.companies(id) on delete cascade,
+  product_name text not null default '',
+  target_segment text not null default '',
+  base_sales_price numeric(14, 4) not null default 0,
+  monthly_target numeric(14, 3) not null default 0,
+  monthly_forecast jsonb not null default '[]'::jsonb,
+  annual_sales_growth_percent numeric(8, 4) not null default 0,
+  spoilage_rate numeric(8, 4) not null default 0,
+  market_share numeric(8, 4) not null default 0,
+  reputation_score numeric(8, 4) not null default 0,
+  positioning text not null default '',
+  updated_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.sales_channels (
+  company_id uuid not null references public.companies(id) on delete cascade,
+  id text not null,
+  name text not null default '',
+  type text not null default '',
+  price numeric(14, 4) not null default 0,
+  budget numeric(14, 2) not null default 0,
+  revenue_share numeric(8, 4) not null default 0,
+  conversion_rate numeric(8, 4) not null default 0,
+  margin_percent numeric(8, 4) not null default 0,
+  discount_percent numeric(8, 4) not null default 0,
+  return_rate_percent numeric(8, 4) not null default 0,
+  payment_delay_days numeric(8, 2) not null default 0,
+  success_score numeric(8, 4) not null default 0,
+  note text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (company_id, id)
+);
+
+create table if not exists public.sales_campaigns (
+  company_id uuid not null references public.companies(id) on delete cascade,
+  id text not null,
+  name text not null default '',
+  type text not null default '',
+  channel text not null default '',
+  budget numeric(14, 2) not null default 0,
+  duration_weeks numeric(8, 2) not null default 0,
+  success_score numeric(8, 4) not null default 0,
+  goal text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (company_id, id)
+);
+
+create table if not exists public.sales_competitors (
+  company_id uuid not null references public.companies(id) on delete cascade,
+  id text not null,
+  name text not null default '',
+  sales_price numeric(14, 4) not null default 0,
+  market_share numeric(8, 4) not null default 0,
+  reputation_score numeric(8, 4) not null default 0,
+  marketing_budget numeric(14, 2) not null default 0,
+  threat_score numeric(8, 4) not null default 0,
+  campaign_type text not null default '',
+  strategy text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (company_id, id)
+);
+
+create table if not exists public.sales_personnel (
+  company_id uuid not null references public.companies(id) on delete cascade,
+  id text not null,
+  name text not null default '',
+  role text not null default '',
+  assigned_channel text not null default '',
+  monthly_target numeric(14, 3) not null default 0,
+  pipeline_value numeric(14, 2) not null default 0,
+  win_rate numeric(8, 4) not null default 0,
+  success_score numeric(8, 4) not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (company_id, id)
+);
+
+create table if not exists public.simulation_variants (
+  company_id uuid not null references public.companies(id) on delete cascade,
+  id text not null,
+  name text not null default '',
+  label text not null default '',
+  path text not null default '',
+  parameters jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (company_id, id)
 );
 
 do $$
@@ -705,6 +827,12 @@ alter table public.operation_plan_workforce enable row level security;
 alter table public.operation_plan_materials enable row level security;
 alter table public.financial_model_settings enable row level security;
 alter table public.financial_extra_costs enable row level security;
+alter table public.sales_strategy_settings enable row level security;
+alter table public.sales_channels enable row level security;
+alter table public.sales_campaigns enable row level security;
+alter table public.sales_competitors enable row level security;
+alter table public.sales_personnel enable row level security;
+alter table public.simulation_variants enable row level security;
 
 drop policy if exists "operation_products_select_company" on public.operation_products;
 drop policy if exists "operation_products_write_company" on public.operation_products;
@@ -727,6 +855,18 @@ drop policy if exists "financial_model_settings_select_company" on public.financ
 drop policy if exists "financial_model_settings_write_company" on public.financial_model_settings;
 drop policy if exists "financial_extra_costs_select_company" on public.financial_extra_costs;
 drop policy if exists "financial_extra_costs_write_company" on public.financial_extra_costs;
+drop policy if exists "sales_strategy_settings_select_company" on public.sales_strategy_settings;
+drop policy if exists "sales_strategy_settings_write_company" on public.sales_strategy_settings;
+drop policy if exists "sales_channels_select_company" on public.sales_channels;
+drop policy if exists "sales_channels_write_company" on public.sales_channels;
+drop policy if exists "sales_campaigns_select_company" on public.sales_campaigns;
+drop policy if exists "sales_campaigns_write_company" on public.sales_campaigns;
+drop policy if exists "sales_competitors_select_company" on public.sales_competitors;
+drop policy if exists "sales_competitors_write_company" on public.sales_competitors;
+drop policy if exists "sales_personnel_select_company" on public.sales_personnel;
+drop policy if exists "sales_personnel_write_company" on public.sales_personnel;
+drop policy if exists "simulation_variants_select_company" on public.simulation_variants;
+drop policy if exists "simulation_variants_write_company" on public.simulation_variants;
 
 create policy "operation_products_select_company"
 on public.operation_products
@@ -921,6 +1061,72 @@ for all
 using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
 with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
 
+create policy "sales_strategy_settings_select_company"
+on public.sales_strategy_settings
+for select
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+
+create policy "sales_strategy_settings_write_company"
+on public.sales_strategy_settings
+for all
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
+with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+
+create policy "sales_channels_select_company"
+on public.sales_channels
+for select
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+
+create policy "sales_channels_write_company"
+on public.sales_channels
+for all
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
+with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+
+create policy "sales_campaigns_select_company"
+on public.sales_campaigns
+for select
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+
+create policy "sales_campaigns_write_company"
+on public.sales_campaigns
+for all
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
+with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+
+create policy "sales_competitors_select_company"
+on public.sales_competitors
+for select
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+
+create policy "sales_competitors_write_company"
+on public.sales_competitors
+for all
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
+with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+
+create policy "sales_personnel_select_company"
+on public.sales_personnel
+for select
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+
+create policy "sales_personnel_write_company"
+on public.sales_personnel
+for all
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
+with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+
+create policy "simulation_variants_select_company"
+on public.simulation_variants
+for select
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+
+create policy "simulation_variants_write_company"
+on public.simulation_variants
+for all
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
+with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+
 drop trigger if exists operation_products_set_updated_at on public.operation_products;
 create trigger operation_products_set_updated_at
 before update on public.operation_products
@@ -954,6 +1160,36 @@ for each row execute function public.set_updated_at();
 drop trigger if exists financial_extra_costs_set_updated_at on public.financial_extra_costs;
 create trigger financial_extra_costs_set_updated_at
 before update on public.financial_extra_costs
+for each row execute function public.set_updated_at();
+
+drop trigger if exists sales_strategy_settings_set_updated_at on public.sales_strategy_settings;
+create trigger sales_strategy_settings_set_updated_at
+before update on public.sales_strategy_settings
+for each row execute function public.set_updated_at();
+
+drop trigger if exists sales_channels_set_updated_at on public.sales_channels;
+create trigger sales_channels_set_updated_at
+before update on public.sales_channels
+for each row execute function public.set_updated_at();
+
+drop trigger if exists sales_campaigns_set_updated_at on public.sales_campaigns;
+create trigger sales_campaigns_set_updated_at
+before update on public.sales_campaigns
+for each row execute function public.set_updated_at();
+
+drop trigger if exists sales_competitors_set_updated_at on public.sales_competitors;
+create trigger sales_competitors_set_updated_at
+before update on public.sales_competitors
+for each row execute function public.set_updated_at();
+
+drop trigger if exists sales_personnel_set_updated_at on public.sales_personnel;
+create trigger sales_personnel_set_updated_at
+before update on public.sales_personnel
+for each row execute function public.set_updated_at();
+
+drop trigger if exists simulation_variants_set_updated_at on public.simulation_variants;
+create trigger simulation_variants_set_updated_at
+before update on public.simulation_variants
 for each row execute function public.set_updated_at();
 
 create or replace function public.save_operation_resource_plan(p_input jsonb)
@@ -1376,15 +1612,47 @@ begin
   end if;
 
   insert into public.financial_model_settings (
-    company_id, electricity_price_per_kwh, updated_by
+    company_id,
+    electricity_price_per_kwh,
+    working_days_per_month,
+    initial_cash,
+    loan_amount,
+    annual_interest_rate,
+    loan_term_months,
+    vat_rate,
+    income_tax_rate,
+    raw_material_buffer_months,
+    salary_buffer_months,
+    rent_buffer_months,
+    updated_by
   )
   values (
     v_company_id,
     greatest(0, coalesce(nullif(p_input->>'electricityPricePerKwh', '')::numeric, 0)),
+    greatest(1, coalesce(nullif(p_input->>'workingDaysPerMonth', '')::numeric, 22)),
+    greatest(0, coalesce(nullif(p_input->>'initialCash', '')::numeric, 0)),
+    greatest(0, coalesce(nullif(p_input->>'loanAmount', '')::numeric, 0)),
+    greatest(0, coalesce(nullif(p_input->>'annualInterestRate', '')::numeric, 0)),
+    greatest(1, coalesce(nullif(p_input->>'loanTermMonths', '')::integer, 24)),
+    greatest(0, coalesce(nullif(p_input->>'vatRate', '')::numeric, 20)),
+    greatest(0, coalesce(nullif(p_input->>'incomeTaxRate', '')::numeric, 20)),
+    greatest(0, coalesce(nullif(p_input->>'rawMaterialBufferMonths', '')::numeric, 1)),
+    greatest(0, coalesce(nullif(p_input->>'salaryBufferMonths', '')::numeric, 1)),
+    greatest(0, coalesce(nullif(p_input->>'rentBufferMonths', '')::numeric, 1)),
     auth.uid()
   )
   on conflict (company_id) do update set
     electricity_price_per_kwh = excluded.electricity_price_per_kwh,
+    working_days_per_month = excluded.working_days_per_month,
+    initial_cash = excluded.initial_cash,
+    loan_amount = excluded.loan_amount,
+    annual_interest_rate = excluded.annual_interest_rate,
+    loan_term_months = excluded.loan_term_months,
+    vat_rate = excluded.vat_rate,
+    income_tax_rate = excluded.income_tax_rate,
+    raw_material_buffer_months = excluded.raw_material_buffer_months,
+    salary_buffer_months = excluded.salary_buffer_months,
+    rent_buffer_months = excluded.rent_buffer_months,
     updated_by = excluded.updated_by;
 
   select to_jsonb(s.*)
@@ -1451,6 +1719,16 @@ as $$
 declare
   v_company_id uuid := public.current_profile_company_id();
   v_electricity_price numeric := 0;
+  v_working_days_per_month numeric := 22;
+  v_initial_cash numeric := 0;
+  v_loan_amount numeric := 0;
+  v_annual_interest_rate numeric := 0;
+  v_loan_term_months integer := 24;
+  v_vat_rate numeric := 20;
+  v_income_tax_rate numeric := 20;
+  v_raw_material_buffer_months numeric := 1;
+  v_salary_buffer_months numeric := 1;
+  v_rent_buffer_months numeric := 1;
   v_base_sales_revenue numeric := 0;
   v_base_material_cost numeric := 0;
   v_base_electricity_cost numeric := 0;
@@ -1493,12 +1771,44 @@ begin
     raise exception 'Operations read permission is required.';
   end if;
 
-  select coalesce(electricity_price_per_kwh, 0)
-    into v_electricity_price
+  select
+    coalesce(electricity_price_per_kwh, 0),
+    coalesce(working_days_per_month, 22),
+    coalesce(initial_cash, 0),
+    coalesce(loan_amount, 0),
+    coalesce(annual_interest_rate, 0),
+    coalesce(loan_term_months, 24),
+    coalesce(vat_rate, 20),
+    coalesce(income_tax_rate, 20),
+    coalesce(raw_material_buffer_months, 1),
+    coalesce(salary_buffer_months, 1),
+    coalesce(rent_buffer_months, 1)
+    into
+      v_electricity_price,
+      v_working_days_per_month,
+      v_initial_cash,
+      v_loan_amount,
+      v_annual_interest_rate,
+      v_loan_term_months,
+      v_vat_rate,
+      v_income_tax_rate,
+      v_raw_material_buffer_months,
+      v_salary_buffer_months,
+      v_rent_buffer_months
   from public.financial_model_settings
   where company_id = v_company_id;
 
   v_electricity_price := coalesce(v_electricity_price, 0);
+  v_working_days_per_month := coalesce(v_working_days_per_month, 22);
+  v_initial_cash := coalesce(v_initial_cash, 0);
+  v_loan_amount := coalesce(v_loan_amount, 0);
+  v_annual_interest_rate := coalesce(v_annual_interest_rate, 0);
+  v_loan_term_months := coalesce(v_loan_term_months, 24);
+  v_vat_rate := coalesce(v_vat_rate, 20);
+  v_income_tax_rate := coalesce(v_income_tax_rate, 20);
+  v_raw_material_buffer_months := coalesce(v_raw_material_buffer_months, 1);
+  v_salary_buffer_months := coalesce(v_salary_buffer_months, 1);
+  v_rent_buffer_months := coalesce(v_rent_buffer_months, 1);
   v_month_count := case
     when p_horizon = '5y' then 60
     when p_horizon = '1y' then 12
@@ -1678,7 +1988,19 @@ begin
   from financial_model_periods;
 
   return jsonb_build_object(
-    'settings', jsonb_build_object('electricityPricePerKwh', v_electricity_price),
+    'settings', jsonb_build_object(
+      'electricityPricePerKwh', v_electricity_price,
+      'workingDaysPerMonth', v_working_days_per_month,
+      'initialCash', v_initial_cash,
+      'loanAmount', v_loan_amount,
+      'annualInterestRate', v_annual_interest_rate,
+      'loanTermMonths', v_loan_term_months,
+      'vatRate', v_vat_rate,
+      'incomeTaxRate', v_income_tax_rate,
+      'rawMaterialBufferMonths', v_raw_material_buffer_months,
+      'salaryBufferMonths', v_salary_buffer_months,
+      'rentBufferMonths', v_rent_buffer_months
+    ),
     'horizon', p_horizon,
     'summary', jsonb_build_object(
       'planCount', v_plan_count,
@@ -1707,92 +2029,6 @@ end;
 $$;
 
 grant execute on function public.calculate_financial_model(text) to authenticated;
-
-do $$
-declare
-  v_company_id uuid;
-  v_product_id uuid;
-begin
-  select id into v_company_id from public.companies where name = 'Atera' limit 1;
-
-  if v_company_id is null then
-    return;
-  end if;
-
-  insert into public.operation_products (
-    company_id, product_code, name, product_group, revision, status, description,
-    quality_grade, weight_kg, dimensions, material_name, cycle_time_seconds, cycle_time_minutes,
-    labor_minutes_per_unit, material_kg_per_unit, scrap_rate
-  )
-  values (
-    v_company_id, 'CONTA-0478-A', 'Silindir Kapak Contası', 'Otomotiv Conta', 'A', 'Aktif',
-    '1.8L ve 2.0L silindir başlıkları için çok katmanlı çelik conta.',
-    'A+', 2.4, '470 x 190 x 12mm', 'MLC-Çelik', 5.8, 0.1, 0.42, 0.18, 3
-  )
-  on conflict (company_id, product_code) do update set
-    name = excluded.name,
-    unit = excluded.unit,
-    price = excluded.price,
-    cycle_time_minutes = excluded.cycle_time_minutes,
-    product_group = excluded.product_group,
-    description = excluded.description,
-    quality_grade = excluded.quality_grade,
-    weight_kg = excluded.weight_kg,
-    dimensions = excluded.dimensions,
-    material_name = excluded.material_name,
-    cycle_time_seconds = excluded.cycle_time_seconds,
-    labor_minutes_per_unit = excluded.labor_minutes_per_unit,
-    material_kg_per_unit = excluded.material_kg_per_unit,
-    scrap_rate = excluded.scrap_rate
-  returning id into v_product_id;
-
-  insert into public.operation_machines (
-    company_id, name, price, hourly_energy_consumption_kwh
-  )
-  values
-    (v_company_id, 'Hidrolik Pres 110T', 2850000, 42.5),
-    (v_company_id, 'Hidrolik Pres 550T', 6400000, 68.0),
-    (v_company_id, 'Lazer Kesim Hattı 2', 5200000, 55.5)
-  on conflict (company_id, name) do update set
-    price = excluded.price,
-    hourly_energy_consumption_kwh = excluded.hourly_energy_consumption_kwh;
-
-  insert into public.operation_materials (
-    company_id, name, unit, price_per_unit
-  )
-  values
-    (v_company_id, 'MLC-Çelik Levha', 'kg', 62),
-    (v_company_id, 'Sızdırmazlık Kaplaması', 'kg', 118),
-    (v_company_id, 'Standart Paketleme Seti', 'adet', 4.5)
-  on conflict (company_id, name) do update set
-    unit = excluded.unit,
-    price_per_unit = excluded.price_per_unit;
-
-  insert into public.operation_product_materials (
-    product_id, material_id, quantity_per_unit
-  )
-  select v_product_id, m.id, 0.18
-  from public.operation_materials m
-  where m.company_id = v_company_id
-    and m.name = 'MLC-Çelik Levha'
-  on conflict (product_id, material_id) do update set
-    quantity_per_unit = excluded.quantity_per_unit;
-
-  insert into public.operation_workforce_resources (
-    company_id, role_name, hourly_cost
-  )
-  values
-    (v_company_id, 'Pres Operatörü', 280),
-    (v_company_id, 'Lazer Operatörü', 300),
-    (v_company_id, 'Paketleme Ekibi', 220)
-  on conflict (company_id, role_name) do update set
-    hourly_cost = excluded.hourly_cost;
-
-  insert into public.operation_notes (product_id, note)
-  select v_product_id, 'Basit üretim maliyeti için ürün ağacı referans kaydı.'
-  where not exists (select 1 from public.operation_notes where product_id = v_product_id and note like 'Basit üretim%');
-end;
-$$;
 
 insert into storage.buckets (id, name, public)
 values ('profile-pictures', 'profile-pictures', true)
