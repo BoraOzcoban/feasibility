@@ -37,6 +37,7 @@ export const emptyOperationForms = {
   product: {
     cycleTimeUnit: "minute",
     cycleTimeValue: 1,
+    id: "",
     materialRows: [],
     name: "",
     price: 0,
@@ -73,6 +74,7 @@ export async function loadOperationsWorkspace(supabase) {
       supabase
         .from("operation_resource_plans")
         .select("*, product:operation_products(id, name, unit, price, cycle_time_minutes, cycle_time_unit)")
+        .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(50),
       supabase.from("operation_workforce_resources").select("*").order("role_name", { ascending: true }),
@@ -85,8 +87,9 @@ export async function loadOperationsWorkspace(supabase) {
   if (activePlansError) throw activePlansError;
   if (workforceError) throw workforceError;
 
-  const product = products?.[0] || null;
-  let latestPlan = null;
+  const contextProductId = activePlans?.[0]?.product_id || activePlans?.[0]?.product?.id || products?.[0]?.id || "";
+  const product = (products || []).find((item) => item.id === contextProductId) || products?.[0] || null;
+  let latestPlan = activePlans?.find((plan) => plan.product_id === product?.id || plan.product?.id === product?.id) || activePlans?.[0] || null;
   let notes = [];
 
   if (product) {
@@ -104,6 +107,7 @@ export async function loadOperationsWorkspace(supabase) {
         .from("operation_resource_plans")
         .select("*")
         .eq("product_id", product.id)
+        .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(1),
     ]);
@@ -111,7 +115,7 @@ export async function loadOperationsWorkspace(supabase) {
     if (notesError) throw notesError;
     if (plansError) throw plansError;
 
-    latestPlan = latestPlans?.[0] || null;
+    latestPlan = latestPlans?.[0] || latestPlan;
     notes = noteRows || [];
   }
 

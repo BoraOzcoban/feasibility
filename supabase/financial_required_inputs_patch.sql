@@ -1,3 +1,9 @@
+insert into public.app_modules (module_key, name)
+values ('financial-modelling', 'Finansal Modelleme')
+on conflict (module_key) do update set name = excluded.name;
+
+select public.ensure_company_defaults(id) from public.companies;
+
 alter table public.financial_model_settings
   add column if not exists loan_rows jsonb not null default '[]'::jsonb,
   add column if not exists investment_grant_amount numeric(14, 2) not null default 0,
@@ -57,8 +63,11 @@ begin
     raise exception 'Current profile is not connected to a company.';
   end if;
 
-  if not public.has_module_permission('operations', 'write') then
-    raise exception 'Operations write permission is required.';
+  if not (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  ) then
+    raise exception 'Financial modelling write permission is required.';
   end if;
 
   if p_input is null or jsonb_typeof(p_input) <> 'object' then

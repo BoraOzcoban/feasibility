@@ -94,7 +94,11 @@ where company_id is null;
 insert into public.app_modules (module_key, name)
 values
   ('authorization', 'Yetkilendirme'),
-  ('operations', 'Operations')
+  ('operations', 'Operations'),
+  ('sales-strategy', 'Satış Stratejisi'),
+  ('financial-modelling', 'Finansal Modelleme'),
+  ('simulation', 'Simülasyon'),
+  ('reports', 'Raporlar')
 on conflict (module_key) do update set name = excluded.name;
 
 create or replace function public.ensure_company_defaults(p_company_id uuid)
@@ -343,16 +347,7 @@ with check (
   and public.has_module_permission('authorization', 'write')
 );
 
-create or replace function public.get_login_email(p_username text)
-returns text
-language sql
-security definer
-set search_path = public
-as $$
-  select email from public.profiles where lower(username) = lower(p_username) limit 1;
-$$;
-
-grant execute on function public.get_login_email(text) to anon, authenticated;
+drop function if exists public.get_login_email(text);
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -360,10 +355,28 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_company_name text := coalesce(nullif(trim(new.raw_user_meta_data->>'company'), ''), 'Atera');
+  v_company_id uuid;
+  v_access_level text := 'user';
 begin
   insert into public.companies (name)
-  values (coalesce(nullif(trim(new.raw_user_meta_data->>'company'), ''), 'Atera'))
+  values (v_company_name)
   on conflict (name) do nothing;
+
+  select id
+    into v_company_id
+  from public.companies
+  where name = v_company_name
+  limit 1;
+
+  if not exists (
+    select 1
+    from public.profiles
+    where company_id = v_company_id
+  ) then
+    v_access_level := 'admin';
+  end if;
 
   insert into public.profiles (
     id,
@@ -381,14 +394,9 @@ begin
     coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
     new.email,
     new.raw_user_meta_data->>'phone_number',
-    (
-      select id
-      from public.companies
-      where name = coalesce(nullif(trim(new.raw_user_meta_data->>'company'), ''), 'Atera')
-      limit 1
-    ),
+    v_company_id,
     new.raw_user_meta_data->>'department',
-    coalesce(new.raw_user_meta_data->>'access_level', 'user'),
+    v_access_level,
     coalesce(new.raw_user_meta_data->>'language', 'en'),
     case when new.raw_user_meta_data->>'theme' in ('light', 'dark') then new.raw_user_meta_data->>'theme' else 'light' end
   )
@@ -398,13 +406,11 @@ begin
     phone_number = excluded.phone_number,
     company_id = excluded.company_id,
     department = excluded.department,
-    access_level = excluded.access_level,
+    access_level = profiles.access_level,
     language = excluded.language,
     theme = excluded.theme;
 
-  perform public.ensure_company_defaults((
-    select company_id from public.profiles where id = new.id
-  ));
+  perform public.ensure_company_defaults(v_company_id);
 
   return new;
 end;
@@ -639,6 +645,7 @@ create table if not exists public.operation_resource_plans (
   company_id uuid not null references public.companies(id) on delete cascade,
   product_id uuid not null references public.operation_products(id) on delete cascade,
   plan_name text not null default 'Günlük üretim planı',
+  is_active boolean not null default true,
   target_daily_output numeric(14, 3) not null default 0,
   input jsonb not null,
   result jsonb not null,
@@ -648,11 +655,23 @@ create table if not exists public.operation_resource_plans (
 
 alter table public.operation_resource_plans
   add column if not exists plan_name text not null default 'Günlük üretim planı',
+  add column if not exists is_active boolean not null default true,
   add column if not exists target_daily_output numeric(14, 3) not null default 0,
   drop column if exists shifts,
   drop column if exists hours_per_shift,
   drop column if exists planned_downtime_minutes,
   drop column if exists setup_minutes;
+
+with ranked_plans as (
+  select
+    id,
+    row_number() over (partition by company_id, product_id order by created_at desc, id desc) as plan_rank
+  from public.operation_resource_plans
+)
+update public.operation_resource_plans p
+set is_active = ranked_plans.plan_rank = 1
+from ranked_plans
+where p.id = ranked_plans.id;
 
 create table if not exists public.operation_plan_machines (
   id uuid primary key default gen_random_uuid(),
@@ -1383,35 +1402,89 @@ using (
 create policy "financial_model_settings_select_company"
 on public.financial_model_settings
 for select
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'read')
+    or public.has_module_permission('operations', 'read')
+  )
+);
 
 create policy "financial_model_settings_write_company"
 on public.financial_model_settings
 for all
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
-with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+)
+with check (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+);
 
 create policy "financial_extra_costs_select_company"
 on public.financial_extra_costs
 for select
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'read')
+    or public.has_module_permission('operations', 'read')
+  )
+);
 
 create policy "financial_extra_costs_write_company"
 on public.financial_extra_costs
 for all
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
-with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+)
+with check (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+);
 
 create policy "sales_strategy_settings_select_company"
 on public.sales_strategy_settings
 for select
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'read')
+    or public.has_module_permission('operations', 'read')
+  )
+);
 
 create policy "sales_strategy_settings_write_company"
 on public.sales_strategy_settings
 for all
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
-with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+)
+with check (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+);
 
 create policy "sales_channel_types_select_authenticated"
 on public.sales_channel_types
@@ -1426,46 +1499,118 @@ using (auth.uid() is not null);
 create policy "sales_channels_select_company"
 on public.sales_channels
 for select
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'read')
+    or public.has_module_permission('operations', 'read')
+  )
+);
 
 create policy "sales_channels_write_company"
 on public.sales_channels
 for all
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
-with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+)
+with check (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+);
 
 create policy "sales_campaigns_select_company"
 on public.sales_campaigns
 for select
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'read')
+    or public.has_module_permission('operations', 'read')
+  )
+);
 
 create policy "sales_campaigns_write_company"
 on public.sales_campaigns
 for all
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
-with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+)
+with check (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+);
 
 create policy "sales_personnel_select_company"
 on public.sales_personnel
 for select
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'read')
+    or public.has_module_permission('operations', 'read')
+  )
+);
 
 create policy "sales_personnel_write_company"
 on public.sales_personnel
 for all
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
-with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+)
+with check (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('sales-strategy', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+);
 
 create policy "simulation_variants_select_company"
 on public.simulation_variants
 for select
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('simulation', 'read')
+    or public.has_module_permission('operations', 'read')
+  )
+);
 
 create policy "simulation_variants_write_company"
 on public.simulation_variants
 for all
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
-with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('simulation', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+)
+with check (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('simulation', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+);
 
 drop trigger if exists operation_products_set_updated_at on public.operation_products;
 create trigger operation_products_set_updated_at
@@ -1590,43 +1735,21 @@ begin
     raise exception 'Operations write permission is required.';
   end if;
 
-  if v_product_id is not null and not exists (
+  if v_product_id is null then
+    raise exception 'Select a saved product before saving a process plan.';
+  end if;
+
+  if not exists (
     select 1
     from public.operation_products
     where id = v_product_id
       and company_id = v_company_id
   ) then
-    v_product_id := null;
+    raise exception 'Selected product was not found for your company.';
   end if;
 
-  if v_product_id is null then
-    insert into public.operation_products (
-      company_id, product_code, name, product_group, revision, status, description
-    )
-    values (
-      v_company_id,
-      'PLAN-' || upper(substr(md5(v_product_name), 1, 12)),
-      v_product_name,
-      'Basit Üretim',
-      'A',
-      'Aktif',
-      'Veri girişi planları için otomatik oluşturulan yüzeysel ürün kaydı.'
-    )
-    on conflict (company_id, product_code) do update set
-      name = excluded.name,
-      product_group = excluded.product_group,
-      status = excluded.status,
-      description = excluded.description
-    returning id into v_product_id;
-  else
-    update public.operation_products
-    set name = v_product_name
-    where id = v_product_id
-      and company_id = v_company_id;
-  end if;
-
-  select unit, price, cycle_time_minutes
-    into v_product_unit, v_product_price, v_product_cycle_time_minutes
+  select name, unit, price, cycle_time_minutes
+    into v_product_name, v_product_unit, v_product_price, v_product_cycle_time_minutes
   from public.operation_products
   where id = v_product_id
     and company_id = v_company_id;
@@ -1659,6 +1782,10 @@ begin
   v_product_cycle_time_minutes := greatest(0.0001, coalesce(v_product_cycle_time_minutes, 1));
   v_produced_quantity := (v_primary_machine_daily_hours * 60) / v_product_cycle_time_minutes;
 
+  if v_produced_quantity <= 0 then
+    raise exception 'At least one selected machine must have daily hours greater than zero.';
+  end if;
+
   for v_entry in select value from jsonb_array_elements(v_workforce_rows) loop
     select * into v_workforce
     from public.operation_workforce_resources
@@ -1687,6 +1814,10 @@ begin
   select count(*) into v_product_material_count
   from public.operation_product_materials
   where product_id = v_product_id;
+
+  if v_product_material_count = 0 then
+    raise exception 'The selected product needs a saved material recipe before feasibility can be calculated.';
+  end if;
 
   if v_product_material_count > 0 then
     for v_material in
@@ -1738,6 +1869,14 @@ begin
     end loop;
   end if;
 
+  if not exists (
+    select 1
+    from jsonb_array_elements(v_material_summary) as material_row(value)
+    where coalesce(nullif(material_row.value->>'dailyQuantity', '')::numeric, 0) > 0
+  ) then
+    raise exception 'The selected product needs at least one positive material recipe quantity before feasibility can be calculated.';
+  end if;
+
   v_total_tracked_daily_cost := v_material_cost + v_workforce_cost;
 
   v_result := jsonb_build_object(
@@ -1759,11 +1898,17 @@ begin
     'materialRows', v_material_summary
   );
 
+  update public.operation_resource_plans
+  set is_active = false
+  where company_id = v_company_id
+    and product_id = v_product_id
+    and is_active;
+
   insert into public.operation_resource_plans (
-    company_id, product_id, plan_name, target_daily_output, input, result, created_by
+    company_id, product_id, plan_name, is_active, target_daily_output, input, result, created_by
   )
   values (
-    v_company_id, v_product_id, v_plan_name, 0, p_input, v_result, auth.uid()
+    v_company_id, v_product_id, v_plan_name, true, 0, p_input, v_result, auth.uid()
   )
   returning id into v_plan_id;
 
@@ -1861,35 +2006,57 @@ begin
   end if;
 
   if p_entity = 'product' then
-    insert into public.operation_products (
-      company_id, product_code, name, unit, price, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
-    )
-    values (
-      v_company_id,
-      'PROD-' || upper(substr(md5(coalesce(nullif(trim(p_input->>'name'), ''), gen_random_uuid()::text)), 1, 12)),
-      nullif(trim(p_input->>'name'), ''),
-      coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
-      greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
-      greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
-      case
-        when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
-        else 'minute'
-      end,
-      'Basit Üretim',
-      'A',
-      'Aktif',
-      'Veri girişi planlarında seçilmek için eklenen ürün kaydı.'
-    )
-    on conflict (company_id, product_code) do update set
-      name = excluded.name,
-      unit = excluded.unit,
-      price = excluded.price,
-      cycle_time_minutes = excluded.cycle_time_minutes,
-      cycle_time_unit = excluded.cycle_time_unit,
-      product_group = excluded.product_group,
-      status = excluded.status,
-      description = excluded.description
-    returning id into v_record_id;
+    v_record_id := nullif(p_input->>'productId', '')::uuid;
+
+    if v_record_id is not null and exists (
+      select 1
+      from public.operation_products
+      where id = v_record_id
+        and company_id = v_company_id
+    ) then
+      update public.operation_products
+      set
+        name = nullif(trim(p_input->>'name'), ''),
+        unit = coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
+        price = greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+        cycle_time_minutes = greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
+        cycle_time_unit = case
+          when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
+          else 'minute'
+        end
+      where id = v_record_id
+        and company_id = v_company_id;
+    else
+      insert into public.operation_products (
+        company_id, product_code, name, unit, price, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
+      )
+      values (
+        v_company_id,
+        'PROD-' || upper(substr(md5(coalesce(nullif(trim(p_input->>'name'), ''), gen_random_uuid()::text)), 1, 12)),
+        nullif(trim(p_input->>'name'), ''),
+        coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
+        greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+        greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
+        case
+          when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
+          else 'minute'
+        end,
+        'Basit Üretim',
+        'A',
+        'Aktif',
+        'Veri girişi planlarında seçilmek için eklenen ürün kaydı.'
+      )
+      on conflict (company_id, product_code) do update set
+        name = excluded.name,
+        unit = excluded.unit,
+        price = excluded.price,
+        cycle_time_minutes = excluded.cycle_time_minutes,
+        cycle_time_unit = excluded.cycle_time_unit,
+        product_group = excluded.product_group,
+        status = excluded.status,
+        description = excluded.description
+      returning id into v_record_id;
+    end if;
 
     delete from public.operation_product_materials
     where product_id = v_record_id;
@@ -1967,6 +2134,194 @@ $$;
 
 grant execute on function public.save_operation_record(text, jsonb) to authenticated;
 
+create or replace function public.save_sales_strategy(p_input jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_company_id uuid := public.current_profile_company_id();
+  v_entry jsonb;
+  v_type_id text;
+  v_product_id uuid;
+begin
+  if v_company_id is null then
+    raise exception 'Current profile is not connected to a company.';
+  end if;
+
+  if not (
+    public.has_module_permission('sales-strategy', 'write')
+    or public.has_module_permission('operations', 'write')
+  ) then
+    raise exception 'Sales strategy write permission is required.';
+  end if;
+
+  if p_input is null or jsonb_typeof(p_input) <> 'object' then
+    raise exception 'Sales strategy input is required.';
+  end if;
+
+  insert into public.sales_strategy_settings (
+    company_id,
+    monthly_multipliers,
+    updated_by
+  )
+  values (
+    v_company_id,
+    case
+      when jsonb_typeof(p_input->'company'->'monthlyMultipliers') = 'array' then p_input->'company'->'monthlyMultipliers'
+      else '[1,1,1,1,1,1,1,1,1,1,1,1]'::jsonb
+    end,
+    auth.uid()
+  )
+  on conflict (company_id) do update set
+    monthly_multipliers = excluded.monthly_multipliers,
+    updated_by = excluded.updated_by;
+
+  delete from public.sales_personnel where company_id = v_company_id;
+  delete from public.sales_campaigns where company_id = v_company_id;
+  delete from public.sales_channels where company_id = v_company_id;
+
+  for v_entry in
+    select value
+    from jsonb_array_elements(case when jsonb_typeof(p_input->'channels') = 'array' then p_input->'channels' else '[]'::jsonb end)
+  loop
+    v_type_id := coalesce(nullif(v_entry->>'typeId', ''), v_entry->'type'->>'id', 'direct');
+    if not exists (select 1 from public.sales_channel_types where id = v_type_id) then
+      v_type_id := 'direct';
+    end if;
+
+    v_product_id := nullif(coalesce(v_entry->>'productId', v_entry->>'product_id', ''), '')::uuid;
+    if v_product_id is not null and not exists (
+      select 1
+      from public.operation_products
+      where id = v_product_id
+        and company_id = v_company_id
+    ) then
+      v_product_id := null;
+    end if;
+
+    insert into public.sales_channels (
+      company_id,
+      id,
+      name,
+      type_id,
+      product_id,
+      start_month,
+      monthly_sales_units,
+      growth_months_1_6_percent,
+      growth_months_7_18_percent,
+      growth_months_19_24_percent,
+      growth_years_3_5_percent,
+      collection_days,
+      customer_acquisition_cost,
+      commission_percent,
+      basket_size,
+      conversion_rate_percent,
+      traffic_score,
+      repeat_rate_percent,
+      churn_rate_percent,
+      discount_rate_percent,
+      return_rate_percent,
+      capacity_limit,
+      launch_fee,
+      moq_monthly,
+      failure_probability_percent,
+      ramp_up_months,
+      seasonality_curve
+    )
+    values (
+      v_company_id,
+      coalesce(nullif(v_entry->>'id', ''), gen_random_uuid()::text),
+      coalesce(v_entry->>'name', ''),
+      v_type_id,
+      v_product_id,
+      greatest(1, coalesce(nullif(v_entry->>'startMonth', '')::integer, 1)),
+      greatest(0, coalesce(nullif(v_entry->>'monthlySalesUnits', '')::numeric, 0)),
+      greatest(0, coalesce(nullif(v_entry->>'growthMonths1To6Percent', '')::numeric, 0)),
+      greatest(0, coalesce(nullif(v_entry->>'growthMonths7To18Percent', '')::numeric, 0)),
+      greatest(0, coalesce(nullif(v_entry->>'growthMonths19To24Percent', '')::numeric, 0)),
+      greatest(0, coalesce(nullif(v_entry->>'growthYears3To5Percent', '')::numeric, 0)),
+      greatest(0, coalesce(nullif(v_entry->>'collectionDays', '')::numeric, 30)),
+      greatest(0, coalesce(nullif(v_entry->>'customerAcquisitionCost', '')::numeric, 0)),
+      greatest(0, coalesce(nullif(v_entry->>'commissionPercent', '')::numeric, 0)),
+      nullif(v_entry->>'basketSize', '')::numeric,
+      nullif(v_entry->>'conversionRatePercent', '')::numeric,
+      nullif(v_entry->>'trafficScore', '')::numeric,
+      nullif(v_entry->>'repeatRatePercent', '')::numeric,
+      nullif(v_entry->>'churnRatePercent', '')::numeric,
+      nullif(v_entry->>'discountRatePercent', '')::numeric,
+      nullif(v_entry->>'returnRatePercent', '')::numeric,
+      nullif(v_entry->>'capacityLimit', '')::numeric,
+      nullif(v_entry->>'launchFee', '')::numeric,
+      nullif(v_entry->>'moqMonthly', '')::numeric,
+      nullif(v_entry->>'failureProbabilityPercent', '')::numeric,
+      nullif(v_entry->>'rampUpMonths', '')::numeric,
+      case when jsonb_typeof(v_entry->'seasonalityCurve') = 'array' then v_entry->'seasonalityCurve' else null end
+    );
+  end loop;
+
+  for v_entry in
+    select value
+    from jsonb_array_elements(case when jsonb_typeof(p_input->'campaigns') = 'array' then p_input->'campaigns' else '[]'::jsonb end)
+  loop
+    v_type_id := coalesce(nullif(v_entry->>'typeId', ''), v_entry->'type'->>'id', 'digital');
+    if not exists (select 1 from public.sales_campaign_types where id = v_type_id) then
+      v_type_id := 'digital';
+    end if;
+
+    insert into public.sales_campaigns (
+      company_id,
+      id,
+      name,
+      type_id,
+      channel,
+      budget,
+      duration_days,
+      goal
+    )
+    values (
+      v_company_id,
+      coalesce(nullif(v_entry->>'id', ''), gen_random_uuid()::text),
+      coalesce(v_entry->>'name', ''),
+      v_type_id,
+      coalesce(v_entry->>'channel', ''),
+      greatest(0, coalesce(nullif(v_entry->>'budget', '')::numeric, 0)),
+      greatest(0, coalesce(nullif(v_entry->>'durationDays', '')::numeric, 0)),
+      coalesce(v_entry->>'goal', '')
+    );
+  end loop;
+
+  for v_entry in
+    select value
+    from jsonb_array_elements(case when jsonb_typeof(p_input->'personnel') = 'array' then p_input->'personnel' else '[]'::jsonb end)
+  loop
+    insert into public.sales_personnel (
+      company_id,
+      id,
+      name,
+      role,
+      assigned_channel,
+      monthly_target,
+      realized_sales_units
+    )
+    values (
+      v_company_id,
+      coalesce(nullif(v_entry->>'id', ''), gen_random_uuid()::text),
+      coalesce(v_entry->>'name', ''),
+      coalesce(v_entry->>'role', ''),
+      coalesce(v_entry->>'assignedChannel', ''),
+      greatest(0, coalesce(nullif(v_entry->>'monthlyTarget', '')::numeric, 0)),
+      greatest(0, coalesce(nullif(v_entry->>'realizedSalesUnits', '')::numeric, 0))
+    );
+  end loop;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+grant execute on function public.save_sales_strategy(jsonb) to authenticated;
+
 create or replace function public.save_financial_model_settings(p_input jsonb)
 returns jsonb
 language plpgsql
@@ -1994,8 +2349,11 @@ begin
     raise exception 'Current profile is not connected to a company.';
   end if;
 
-  if not public.has_module_permission('operations', 'write') then
-    raise exception 'Operations write permission is required.';
+  if not (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  ) then
+    raise exception 'Financial modelling write permission is required.';
   end if;
 
   if p_input is null or jsonb_typeof(p_input) <> 'object' then
@@ -2278,8 +2636,11 @@ begin
     raise exception 'Current profile is not connected to a company.';
   end if;
 
-  if not public.has_module_permission('operations', 'write') then
-    raise exception 'Operations write permission is required.';
+  if not (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  ) then
+    raise exception 'Financial modelling write permission is required.';
   end if;
 
   insert into public.financial_extra_costs (
@@ -2369,8 +2730,11 @@ begin
     raise exception 'Current profile is not connected to a company.';
   end if;
 
-  if not public.has_module_permission('operations', 'read') then
-    raise exception 'Operations read permission is required.';
+  if not (
+    public.has_module_permission('financial-modelling', 'read')
+    or public.has_module_permission('operations', 'read')
+  ) then
+    raise exception 'Financial modelling read permission is required.';
   end if;
 
   select
@@ -2449,14 +2813,16 @@ begin
   into v_plan_count, v_base_produced_quantity, v_base_sales_revenue, v_base_electricity_cost
   from public.operation_resource_plans rp
   join public.operation_products p on p.id = rp.product_id
-  where rp.company_id = v_company_id;
+  where rp.company_id = v_company_id
+    and rp.is_active;
 
   select coalesce(sum(pm.daily_quantity * greatest(m.price_per_unit, 0)), 0)
     into v_base_material_cost
   from public.operation_plan_materials pm
   join public.operation_resource_plans rp on rp.id = pm.plan_id
   join public.operation_materials m on m.id = pm.material_id
-  where rp.company_id = v_company_id;
+  where rp.company_id = v_company_id
+    and rp.is_active;
 
   select coalesce(sum(machine_price), 0)
     into v_machine_purchase_cost
@@ -2466,6 +2832,7 @@ begin
     join public.operation_resource_plans rp on rp.id = opm.plan_id
     join public.operation_machines m on m.id = opm.machine_id
     where rp.company_id = v_company_id
+      and rp.is_active
   ) used_machines;
 
   select
@@ -2668,17 +3035,25 @@ $$;
 grant execute on function public.calculate_financial_model(text) to authenticated;
 
 insert into storage.buckets (id, name, public)
-values ('profile-pictures', 'profile-pictures', true)
+values ('profile-pictures', 'profile-pictures', false)
 on conflict (id) do nothing;
 
+update storage.buckets
+set public = false
+where id = 'profile-pictures';
+
 drop policy if exists "profile_pictures_public_read" on storage.objects;
+drop policy if exists "profile_pictures_owner_read" on storage.objects;
 drop policy if exists "profile_pictures_owner_insert" on storage.objects;
 drop policy if exists "profile_pictures_owner_update" on storage.objects;
 
-create policy "profile_pictures_public_read"
+create policy "profile_pictures_owner_read"
 on storage.objects
 for select
-using (bucket_id = 'profile-pictures');
+using (
+  bucket_id = 'profile-pictures'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
 
 create policy "profile_pictures_owner_insert"
 on storage.objects
@@ -2692,6 +3067,10 @@ create policy "profile_pictures_owner_update"
 on storage.objects
 for update
 using (
+  bucket_id = 'profile-pictures'
+  and auth.uid()::text = (storage.foldername(name))[1]
+)
+with check (
   bucket_id = 'profile-pictures'
   and auth.uid()::text = (storage.foldername(name))[1]
 );

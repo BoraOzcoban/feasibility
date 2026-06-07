@@ -238,6 +238,7 @@ export const emptyFinancialModel = {
   extraCosts: [],
   incomeRows: [],
   settings: defaultFinancialSettings,
+  settingsSaved: false,
   summary: {
     breakEvenMonth: null,
     cashRunwayMonths: 0,
@@ -289,6 +290,15 @@ export const emptyFinancialExtraCostForm = {
   name: "",
 };
 
+function mapFinancialExtraCostRow(row) {
+  return {
+    amount: row.amount,
+    costType: row.cost_type,
+    id: row.id,
+    name: row.name,
+  };
+}
+
 function mapFinancialSettingsRow(row) {
   if (!row) return {};
 
@@ -326,46 +336,34 @@ function mapFinancialSettingsRow(row) {
 }
 
 export async function loadFinancialModel(supabase, horizon = "6m") {
-  const { data, error } = await supabase.rpc("calculate_financial_model", { p_horizon: horizon });
-
-  if (error) throw error;
-
   let settingsRow = null;
-  const { data: settingsData, error: settingsError } = await supabase
-    .from("financial_model_settings")
-    .select("electricity_price_per_kwh, working_days_per_month, initial_cash, investment_grant_amount, loan_amount, loan_rows, annual_interest_rate, loan_term_months, vat_rate, sales_vat_rate, expense_vat_rate, income_tax_rate, tax_payment_delay_months, receivables_collection_days, raw_material_stock_days, supplier_payment_days, initial_capacity_units, raw_material_buffer_months, salary_buffer_months, rent_buffer_months, monthly_currency_increase_percent, monthly_inflation_percent, monthly_energy_price_increase_percent, monthly_wage_increase_percent, cogs_inflation_annual_percent, opex_inflation_annual_percent, price_increase_annual_percent, asset_value_increase_annual_percent, increase_frequency")
-    .maybeSingle();
-
-  if (settingsError?.code === "42703" || settingsError?.message?.includes("loan_rows") || settingsError?.message?.includes("monthly_") || settingsError?.message?.includes("investment_grant_amount")) {
-    const { data: legacySettingsData, error: legacySettingsError } = await supabase
+  const [
+    { data: settingsData, error: settingsError },
+    { data: extraCostRows, error: extraCostsError },
+  ] = await Promise.all([
+    supabase
       .from("financial_model_settings")
-      .select("electricity_price_per_kwh, working_days_per_month, initial_cash, loan_amount, annual_interest_rate, loan_term_months, vat_rate, income_tax_rate, raw_material_buffer_months, salary_buffer_months, rent_buffer_months")
-      .maybeSingle();
+      .select("electricity_price_per_kwh, working_days_per_month, initial_cash, investment_grant_amount, loan_amount, loan_rows, annual_interest_rate, loan_term_months, vat_rate, sales_vat_rate, expense_vat_rate, income_tax_rate, tax_payment_delay_months, receivables_collection_days, raw_material_stock_days, supplier_payment_days, initial_capacity_units, raw_material_buffer_months, salary_buffer_months, rent_buffer_months, monthly_currency_increase_percent, monthly_inflation_percent, monthly_energy_price_increase_percent, monthly_wage_increase_percent, cogs_inflation_annual_percent, opex_inflation_annual_percent, price_increase_annual_percent, asset_value_increase_annual_percent, increase_frequency")
+      .maybeSingle(),
+    supabase
+      .from("financial_extra_costs")
+      .select("id, name, cost_type, amount")
+      .order("created_at", { ascending: false }),
+  ]);
 
-    if (legacySettingsError) throw legacySettingsError;
-    settingsRow = legacySettingsData;
-  } else if (settingsError) {
-    throw settingsError;
-  } else {
-    settingsRow = settingsData;
-  }
+  if (settingsError) throw settingsError;
+  if (extraCostsError) throw extraCostsError;
+  settingsRow = settingsData;
 
   return {
     ...emptyFinancialModel,
-    ...(data || {}),
+    extraCosts: (extraCostRows || []).map(mapFinancialExtraCostRow),
     settings: {
       ...defaultFinancialSettings,
-      ...(data?.settings || {}),
       ...mapFinancialSettingsRow(settingsRow),
     },
-    summary: {
-      ...emptyFinancialModel.summary,
-      ...(data?.summary || {}),
-    },
-    trendChart: {
-      ...emptyFinancialModel.trendChart,
-      ...(data?.trendChart || {}),
-    },
+    settingsSaved: Boolean(settingsRow),
+    horizon,
   };
 }
 

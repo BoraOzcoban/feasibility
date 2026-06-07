@@ -12,6 +12,7 @@ import {
   saveFinancialExtraCost,
   saveFinancialModelSettings,
 } from "./lib/financialService";
+import { getCurrentOperationPlans, hasViablePlanResult } from "./lib/operationsCalculations";
 import { emptyOperationForms, emptyOperationPlan, emptyPlanRows, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
 import { deleteSimulationVariantRecord, emptySalesStrategy, emptySimulationVariant, loadSalesStrategy, loadSimulationVariants, saveSalesStrategy, saveSimulationVariant } from "./lib/planningService";
 import logoUrl from "./assets/atera-logo.svg";
@@ -297,9 +298,7 @@ function getPlanProductId(plan) {
 }
 
 function getMonthlyProductProductionMap(operationsWorkspace, workingDaysPerMonth = 22) {
-  const plans = operationsWorkspace.activePlans?.length
-    ? operationsWorkspace.activePlans
-    : (operationsWorkspace.latestPlan ? [operationsWorkspace.latestPlan] : []);
+  const plans = getCurrentOperationPlans(operationsWorkspace).filter((plan) => hasViablePlanResult(plan.result));
   const productionByProduct = new Map();
 
   plans.forEach((plan) => {
@@ -394,9 +393,7 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
     ...(settingsInput || {}),
   };
   const monthCount = getProjectionMonthCount(horizon);
-  const activePlans = operationsWorkspace.activePlans?.length
-    ? operationsWorkspace.activePlans
-    : (operationsWorkspace.latestPlan ? [operationsWorkspace.latestPlan] : []);
+  const activePlans = getCurrentOperationPlans(operationsWorkspace).filter((plan) => hasViablePlanResult(plan.result));
   const electricityPrice = Math.max(0, toFiniteNumber(settings.electricityPricePerKwh));
   const workingDaysPerMonth = Math.max(1, toFiniteNumber(settings.workingDaysPerMonth, 22));
   const investmentGrantAmount = Math.max(0, toFiniteNumber(settings.investmentGrantAmount));
@@ -728,18 +725,16 @@ const text = {
     dataSync: "Data Sync",
     live: "Live",
     login: "Log in",
-    signup: "Create user",
-    createUserLink: "Create a new user",
-    backToLogin: "Back to login",
+    adminProvisionedAccess: "Accounts are created by your company admin in Authorization.",
     who: "Who are we?",
     solutions: "Our solutions",
     references: "Our references",
     contact: "Contact",
     heroTitle: "Atera",
-    heroCopy: "The operating logic behind tailor-made production planning.",
+    heroCopy: "Check whether a new factory plan can produce, sell, and pay back before you commit capital.",
     goToLogin: "Go to log in",
-    whoCopy: "Plan. Test. Decide. Scale. Atera brings production teams, finance, and operations into one practical hub where feasibility, cost, stock, and delivery scenarios can move from scattered assumptions to clear decisions.",
-    solutionsCopy: "Scenario planning, production visibility, material tracking, cost analysis, and workflow tools will move here step by step as the migration from atera_v2 continues.",
+    whoCopy: "Plan. Test. Decide. Scale. Atera brings production, sales, finance, and operations into one practical hub so a factory leader can see capacity, cost, cash, and delivery risk before making the next commitment.",
+    solutionsCopy: "Define the product, resources, production plan, sales channels, financial assumptions, and scenarios in one flow. The goal is simple: see if the operation is feasible and what to improve first.",
     farmerPersona: "Planning team",
     factoryOwnerPersona: "Production lead",
     entrepreneurPersona: "Finance team",
@@ -762,6 +757,7 @@ const text = {
     contactEmail: "hello@atera.app",
     contactLocation: "Istanbul, Turkiye",
     username: "Username",
+    loginEmail: "Email",
     password: "Password",
     email: "Mail address",
     phoneNumber: "Phone number",
@@ -773,7 +769,6 @@ const text = {
     resetPassword: "Set new password",
     confirmPassword: "Confirm password",
     submitLogin: "Log in",
-    submitSignup: "Create account",
     logout: "Log out",
     signedIn: "Signed in",
     dashboard: "Dashboard",
@@ -807,7 +802,6 @@ const text = {
     forgotEmailPrompt: "Enter your mail address for password reset.",
     passwordMismatch: "Passwords do not match.",
     passwordTooShort: "Password must be at least 6 characters.",
-    signupSuccess: "Account created. Check email confirmation if your Supabase project requires it.",
     passwordUpdated: "Password updated. You can log in now.",
     usernameNotFound: "Username was not found.",
     missingUser: "Supabase did not return a user.",
@@ -825,18 +819,16 @@ const text = {
     dataSync: "Veri Senkronu",
     live: "Canlı",
     login: "Giriş yap",
-    signup: "Kullanıcı oluştur",
-    createUserLink: "Yeni kullanıcı oluştur",
-    backToLogin: "Girişe dön",
+    adminProvisionedAccess: "Hesaplar şirket admini tarafından Yetkilendirme ekranında oluşturulur.",
     who: "Biz kimiz?",
     solutions: "Çözümlerimiz",
     references: "Referanslarımız",
     contact: "İletişim",
     heroTitle: "Atera",
-    heroCopy: "Tailor-made üretim planlamasının arkasındaki operasyon mantığı.",
+    heroCopy: "Yeni bir fabrika planının üretip satıp yatırımını geri ödeyip ödeyemeyeceğini sermaye bağlamadan önce kontrol edin.",
     goToLogin: "Girişe git",
-    whoCopy: "Planla. Dene. Karar ver. Büyüt. Atera; üretim, finans ve operasyon ekiplerini fizibilite, maliyet, stok ve termin senaryolarını dağınık varsayımlardan net kararlara taşıyan pratik bir hub'da buluşturur.",
-    solutionsCopy: "Senaryo planlama, üretim görünürlüğü, malzeme takibi, maliyet analizi ve iş akışı araçları atera_v2'den parça parça buraya taşınacak.",
+    whoCopy: "Planla. Dene. Karar ver. Büyüt. Atera; üretim, satış, finans ve operasyonu tek pratik alanda toplar. Böylece fabrika yöneticisi kapasiteyi, maliyeti, nakdi ve termin riskini bir sonraki karardan önce görebilir.",
+    solutionsCopy: "Ürünü, kaynakları, üretim planını, satış kanallarını, finansal varsayımları ve senaryoları tek akışta tanımlayın. Amaç basit: operasyon fizibl mi ve önce ne iyileştirilmeli?",
     farmerPersona: "Planlama ekibi",
     factoryOwnerPersona: "Üretim sorumlusu",
     entrepreneurPersona: "Finans ekibi",
@@ -859,6 +851,7 @@ const text = {
     contactEmail: "hello@atera.app",
     contactLocation: "Istanbul, Turkiye",
     username: "Kullanıcı adı",
+    loginEmail: "E-posta",
     password: "Şifre",
     email: "Mail adresi",
     phoneNumber: "Telefon numarası",
@@ -870,7 +863,6 @@ const text = {
     resetPassword: "Yeni şifre belirle",
     confirmPassword: "Şifreyi onayla",
     submitLogin: "Giriş yap",
-    submitSignup: "Hesap oluştur",
     logout: "Çıkış yap",
     signedIn: "Giriş yapıldı",
     dashboard: "Dashboard",
@@ -904,7 +896,6 @@ const text = {
     forgotEmailPrompt: "Şifre sıfırlama için mail adresini gir.",
     passwordMismatch: "Şifreler eşleşmiyor.",
     passwordTooShort: "Şifre en az 6 karakter olmalı.",
-    signupSuccess: "Hesap oluşturuldu. Supabase projeniz gerektiriyorsa e-posta onayını kontrol edin.",
     passwordUpdated: "Şifre güncellendi. Artık giriş yapabilirsiniz.",
     usernameNotFound: "Kullanıcı adı bulunamadı.",
     missingUser: "Supabase kullanıcı bilgisi döndürmedi.",
@@ -973,7 +964,6 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [theme, setTheme] = useState("light");
-  const [profileFile, setProfileFile] = useState(null);
   const [profilePreview, setProfilePreview] = useState("");
   const [session, setSession] = useState(null);
   const [status, setStatus] = useState("");
@@ -997,25 +987,15 @@ function App() {
   const [financialOverviewWidgets, setFinancialOverviewWidgets] = useState([]);
   const [financeWindow, setFinanceWindow] = useState("today");
   const [financeDateRange, setFinanceDateRange] = useState({ start: "", end: "" });
+  const [reportsFilterOpen, setReportsFilterOpen] = useState(false);
+  const [reportsSearch, setReportsSearch] = useState("");
+  const [reportsTab, setReportsTab] = useState("all");
+  const [productPlusTab, setProductPlusTab] = useState("general");
   const [operationForms, setOperationForms] = useState(emptyOperationForms);
   const [operationPlan, setOperationPlan] = useState(emptyOperationPlan);
   const [operationPlanResult, setOperationPlanResult] = useState(null);
   const [operationsLoading, setOperationsLoading] = useState(false);
   const [operationsStatus, setOperationsStatus] = useState("");
-  const [semiFinishedForm, setSemiFinishedForm] = useState({
-    componentRows: [],
-    name: "",
-    pricePerUnit: 0,
-    unit: "adet",
-  });
-  const [semiFinishedItems, setSemiFinishedItems] = useState([]);
-  const [serviceForm, setServiceForm] = useState({
-    initialCost: 0,
-    monthlyCost: 0,
-    name: "",
-    price: 0,
-  });
-  const [serviceItems, setServiceItems] = useState([]);
   const [salesStrategy, setSalesStrategy] = useState(emptySalesStrategy);
   const [salesStatus, setSalesStatus] = useState("");
   const [salesLoading, setSalesLoading] = useState(false);
@@ -1104,6 +1084,7 @@ function App() {
     if (!session || !supabase) {
       setOperationsWorkspace({
         activePlans: [],
+        equipment: [],
         latestPlan: null,
         machines: [],
         materials: [],
@@ -1552,13 +1533,15 @@ function App() {
 
     try {
       const workspace = await loadOperationsWorkspace(supabase);
+      const currentPlans = getCurrentOperationPlans(workspace);
+      const currentLatestPlan = currentPlans.find((plan) => plan.id === workspace.latestPlan?.id) || currentPlans[0] || null;
       setOperationsWorkspace(workspace);
 
       if (workspace.latestPlan) {
         const savedMachineRows = Array.isArray(workspace.latestPlan.input?.machineRows) ? workspace.latestPlan.input.machineRows : [];
         const savedMaterialRows = Array.isArray(workspace.latestPlan.input?.materialRows) ? workspace.latestPlan.input.materialRows : [];
         const savedWorkforceRows = Array.isArray(workspace.latestPlan.input?.workforceRows) ? workspace.latestPlan.input.workforceRows : [];
-        const hasSimplePlanResult = workspace.latestPlan.result?.energyConsumptionKwh !== undefined;
+        const hasSimplePlanResult = currentLatestPlan?.result?.energyConsumptionKwh !== undefined;
 
         setOperationPlan({
           ...emptyOperationPlan,
@@ -1588,7 +1571,7 @@ function App() {
                 ? [{ ...emptyPlanRows.workforce, workforceId: workspace.workforce[0].id }]
                 : []),
         });
-        setOperationPlanResult(hasSimplePlanResult ? workspace.latestPlan.result : null);
+        setOperationPlanResult(hasSimplePlanResult ? currentLatestPlan.result : null);
       } else if (workspace.product) {
         setOperationPlan((current) => ({
           ...current,
@@ -1622,6 +1605,24 @@ function App() {
 
     if (!supabase) {
       setOperationsStatus(labels.configure);
+      return;
+    }
+
+    const selectedProduct = operationsWorkspace.products.find((product) => product.id === operationPlan.productId);
+    const hasPositiveMachineHours = (operationPlan.machineRows || []).some((row) => row.machineId && toFiniteNumber(row.dailyHours) > 0);
+
+    if (!selectedProduct) {
+      setOperationsStatus(copy("Select a saved product with a recipe before calculating feasibility.", "Fizibilite hesaplamadan önce reçetesi olan kayıtlı bir ürün seçin."));
+      return;
+    }
+
+    if (!Array.isArray(selectedProduct.material_rows) || !selectedProduct.material_rows.some((row) => toFiniteNumber(row.quantity_per_unit) > 0)) {
+      setOperationsStatus(copy("Add at least one material with a positive quantity to the selected product recipe before saving a process plan.", "Süreç planını kaydetmeden önce seçili ürün reçetesine pozitif miktarlı en az bir malzeme ekleyin."));
+      return;
+    }
+
+    if (!hasPositiveMachineHours) {
+      setOperationsStatus(copy("Add at least one machine with daily hours greater than zero.", "Günlük saati sıfırdan büyük en az bir makine ekleyin."));
       return;
     }
 
@@ -1665,12 +1666,13 @@ function App() {
             ...formInput,
             cycleTimeMinutes: getCycleTimeMinutes(formInput.cycleTimeValue, formInput.cycleTimeUnit),
             cycleTimeUnit: normalizeCycleTimeUnit(formInput.cycleTimeUnit),
+            productId: formInput.id || "",
           }
         : formInput;
 
       await saveOperationRecord(supabase, entity, {
         ...recordInput,
-        productId: operationPlan.productId || operationsWorkspace.product?.id,
+        productId: entity === "product" ? recordInput.productId : operationPlan.productId || operationsWorkspace.product?.id,
       });
 
       setOperationForms((current) => ({ ...current, [entity]: emptyOperationForms[entity] }));
@@ -1873,6 +1875,65 @@ function App() {
     }
   }
 
+  async function handleCreateOperationNote() {
+    setOperationsStatus("");
+
+    if (!supabase) {
+      setOperationsStatus(labels.configure);
+      return;
+    }
+
+    if (!operationsWorkspace.product?.id) {
+      setOperationsStatus(copy("Select or create a product before adding notes.", "Not eklemeden önce bir ürün seçin veya oluşturun."));
+      return;
+    }
+
+    const note = window.prompt(copy("New product note", "Yeni ürün notu"))?.trim();
+    if (!note) return;
+
+    setOperationsLoading(true);
+    try {
+      const { error } = await supabase.from("operation_notes").insert({
+        created_by: session?.user?.id,
+        note,
+        product_id: operationsWorkspace.product.id,
+      });
+
+      if (error) throw error;
+      await loadOperationsData();
+      setOperationsStatus(copy("Product note was saved.", "Ürün notu kaydedildi."));
+    } catch (error) {
+      setOperationsStatus(error.message);
+    } finally {
+      setOperationsLoading(false);
+    }
+  }
+
+  function openFactoryMapFullscreen() {
+    const target = document.querySelector(".factory-map-card");
+    if (target?.requestFullscreen) {
+      target.requestFullscreen().catch((error) => setOperationsStatus(error.message));
+    }
+  }
+
+  function focusOperationFlow() {
+    document.querySelector(".operation-flow")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function exportReportsCsv(rows) {
+    const reportRows = rows.length ? rows : [[copy("No report snapshots yet", "Henüz rapor anlık görünümü yok"), copy("Input required", "Girdi gerekli"), "-", "-", currentProfile?.username || currentProfile?.email || "Atera"]];
+    const header = [copy("Report Name", "Rapor Adı"), copy("Category", "Kategori"), copy("Created Date", "Oluşturulma Tarihi"), copy("Period", "Dönem"), copy("Created By", "Oluşturan")];
+    const escapeCell = (cell) => `"${String(cell ?? "").replaceAll("\"", "\"\"")}"`;
+    const csv = [header, ...reportRows].map((row) => row.map(escapeCell).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `atera-reports-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function normalizeRole(role) {
     const permissions = {};
 
@@ -1907,7 +1968,7 @@ function App() {
       if (profileError) throw profileError;
 
       setCurrentProfile(profile);
-      if (profile?.profile_picture_url) setProfilePreview(profile.profile_picture_url);
+      setProfilePreview(profile?.profile_picture_url ? await resolveProfilePicturePreview(profile.profile_picture_url) : "");
       if (profile?.language && ["en", "tr"].includes(profile.language)) {
         setForm((current) => ({ ...current, language: profile.language }));
       }
@@ -2088,6 +2149,19 @@ function App() {
         setSession(adminSession);
       }
 
+      const { error: profileUpdateError } = await supabase
+        .from("profiles")
+        .update({
+          access_level: managedUserForm.accessLevel,
+          department: managedUserForm.department.trim(),
+          language: managedUserForm.language,
+          phone_number: managedUserForm.phoneNumber.trim(),
+          theme,
+        })
+        .eq("id", data.user.id);
+
+      if (profileUpdateError) throw profileUpdateError;
+
       setManagedUserForm({ ...emptyManagedUserForm, language: form.language });
       await loadAuthorizationData();
       setAuthorizationStatus(labels.userCreated);
@@ -2098,75 +2172,20 @@ function App() {
     }
   }
 
-  function onProfileFileChange(event) {
-    const file = event.target.files?.[0];
-    setProfileFile(file || null);
-    setProfilePreview(file ? URL.createObjectURL(file) : "");
-  }
+  async function resolveProfilePicturePreview(storageValue) {
+    if (!storageValue || !supabase) return "";
+    if (/^https?:\/\//i.test(storageValue)) return storageValue;
 
-  async function uploadProfilePicture(userId) {
-    if (!profileFile) return null;
-
-    const extension = profileFile.name.split(".").pop() || "jpg";
-    const path = `${userId}/profile.${extension}`;
-
-    const { error } = await supabase.storage
+    const { data, error } = await supabase.storage
       .from("profile-pictures")
-      .upload(path, profileFile, { upsert: true });
+      .createSignedUrl(storageValue, 60 * 60);
 
-    if (error) throw error;
-
-    const { data } = supabase.storage.from("profile-pictures").getPublicUrl(path);
-    return data.publicUrl;
-  }
-
-  async function handleSignup(event) {
-    event.preventDefault();
-    setStatus("");
-
-    if (!supabase) {
-      setStatus(labels.configure);
-      return;
+    if (error) {
+      console.warn("Profile picture preview could not be signed.", error);
+      return "";
     }
 
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: {
-          data: {
-            username: form.username,
-            phone_number: form.phoneNumber,
-            company: form.company,
-            department: form.department,
-            access_level: form.accessLevel,
-            language: form.language,
-            theme,
-          },
-        },
-      });
-
-      if (error) throw error;
-      if (!data.user) throw new Error(labels.missingUser);
-
-      if (data.session) {
-        const profilePictureUrl = await uploadProfilePicture(data.user.id);
-
-        const { error: profileError } = await supabase.from("profiles").update({
-          profile_picture_url: profilePictureUrl,
-        }).eq("id", data.user.id);
-
-        if (profileError) throw profileError;
-      }
-
-      setStatus(labels.signupSuccess);
-      goTo("/login", "login");
-    } catch (error) {
-      setStatus(error.message);
-    } finally {
-      setLoading(false);
-    }
+    return data?.signedUrl || "";
   }
 
   async function handleLogin(event) {
@@ -2180,14 +2199,8 @@ function App() {
 
     setLoading(true);
     try {
-      const { data: email, error: profileError } = await supabase.rpc("get_login_email", {
-        p_username: form.username,
-      });
-
-      if (profileError || !email) throw new Error(labels.usernameNotFound);
-
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: form.email.trim(),
         password: form.password,
       });
 
@@ -2198,14 +2211,14 @@ function App() {
         .select("profile_picture_url, language, theme")
         .single();
 
-      if (userProfile?.profile_picture_url) setProfilePreview(userProfile.profile_picture_url);
+      setProfilePreview(userProfile?.profile_picture_url ? await resolveProfilePicturePreview(userProfile.profile_picture_url) : "");
       if (userProfile?.language && ["en", "tr"].includes(userProfile.language)) {
         setForm((current) => ({ ...current, language: userProfile.language }));
       }
       if (userProfile?.theme && ["light", "dark"].includes(userProfile.theme)) {
         setTheme(userProfile.theme);
       }
-      goTo("/dashboard", "login");
+      goTo(path && !["/", "/login"].includes(path) ? path : "/dashboard", "login");
     } catch (error) {
       setStatus(error.message);
     } finally {
@@ -2346,23 +2359,6 @@ function App() {
                 <small>{selectedProduct ? `${formatLira(selectedProduct.price, 2)} / ${selectedProduct.unit || copy("pcs", "adet")}` : copy("Select a record from the Products screen", "Ürünler ekranından kayıt seçin")}</small>
               </div>
             </label>
-            {[
-              ["productName", copy("New product name", "Yeni ürün adı"), "", "text"],
-            ].map(([field, label, suffix, type = "number"]) => (
-              <label key={field}>
-                <span>{label}</span>
-                <div>
-                  <input
-                    min="0"
-                    step="1"
-                    type={type}
-                    value={operationPlan[field] ?? ""}
-                    onChange={(event) => updateOperationPlan(field, event.target.value)}
-                  />
-                  {suffix && <small>{suffix}</small>}
-                </div>
-              </label>
-            ))}
           </div>
 
           <div className="resource-section">
@@ -2611,111 +2607,8 @@ function App() {
     );
   }
 
-  function updateSemiFinishedForm(field, value) {
-    setSemiFinishedForm((current) => ({ ...current, [field]: value }));
-  }
-
-  function addSemiFinishedComponentRow() {
-    const firstMaterial = operationsWorkspace.materials[0];
-
-    setSemiFinishedForm((current) => ({
-      ...current,
-      componentRows: [
-        ...(current.componentRows || []),
-        {
-          componentId: firstMaterial?.id || "",
-          componentType: "material",
-          quantityPerUnit: 0,
-        },
-      ],
-    }));
-  }
-
-  function updateSemiFinishedComponentRow(index, field, value) {
-    setSemiFinishedForm((current) => ({
-      ...current,
-      componentRows: (current.componentRows || []).map((row, rowIndex) => (
-        rowIndex === index ? { ...row, [field]: value } : row
-      )),
-    }));
-  }
-
-  function removeSemiFinishedComponentRow(index) {
-    setSemiFinishedForm((current) => ({
-      ...current,
-      componentRows: (current.componentRows || []).filter((_, rowIndex) => rowIndex !== index),
-    }));
-  }
-
-  function handleSaveSemiFinished(event) {
-    event.preventDefault();
-
-    if (!semiFinishedForm.name.trim()) {
-      setOperationsStatus(copy("Enter a semi-finished item name first.", "Önce yarı mamül adı girin."));
-      return;
-    }
-
-    setSemiFinishedItems((current) => [
-      ...current,
-      {
-        ...semiFinishedForm,
-        id: `semi-${Date.now()}`,
-        componentRows: [...(semiFinishedForm.componentRows || [])],
-      },
-    ]);
-    setSemiFinishedForm({
-      componentRows: [],
-      name: "",
-      pricePerUnit: 0,
-      unit: "adet",
-    });
-    setOperationsStatus(copy("Semi-finished item was added locally.", "Yarı mamül yerel olarak eklendi."));
-  }
-
-  function updateServiceForm(field, value) {
-    setServiceForm((current) => ({ ...current, [field]: value }));
-  }
-
-  function handleSaveService(event) {
-    event.preventDefault();
-
-    if (!serviceForm.name.trim()) {
-      setOperationsStatus(copy("Enter a service name first.", "Önce hizmet adı girin."));
-      return;
-    }
-
-    setServiceItems((current) => [
-      ...current,
-      {
-        ...serviceForm,
-        id: `service-${Date.now()}`,
-      },
-    ]);
-    setServiceForm({
-      initialCost: 0,
-      monthlyCost: 0,
-      name: "",
-      price: 0,
-    });
-    setOperationsStatus(copy("Service was added locally.", "Hizmet yerel olarak eklendi."));
-  }
-
   function renderResourcesPage() {
     const unitOptions = ["kg", "gr", "mg", "adet", "metre", "litre", "ml"];
-    const semiComponentOptions = [
-      ...operationsWorkspace.materials.map((material) => ({
-        id: material.id,
-        label: material.name,
-        type: "material",
-        unit: material.unit,
-      })),
-      ...semiFinishedItems.map((item) => ({
-        id: item.id,
-        label: item.name,
-        type: "semi",
-        unit: item.unit,
-      })),
-    ];
 
     return renderDashboardLayout(
       "operations/resources",
@@ -2812,145 +2705,37 @@ function App() {
               </div>
             </article>
 
-            <form className="operation-card resource-definition-card semi-finished-card" onSubmit={handleSaveSemiFinished}>
+            <article className="operation-card resource-definition-card resource-guidance-card">
               <div className="operation-card-heading">
                 <div>
-                  <span>{copy("Add semi-finished item", "Yarı mamül ekle")}</span>
-                  <h2>{copy("Semi-finished", "Yarı Mamül")}</h2>
-                </div>
-                <button type="button" onClick={addSemiFinishedComponentRow}>{copy("Add component", "Bileşen ekle")}</button>
-              </div>
-              <div className="operation-data-fields">
-                <label>
-                  <span>{copy("Name", "Ad")}</span>
-                  <input type="text" value={semiFinishedForm.name} onChange={(event) => updateSemiFinishedForm("name", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Unit", "Birim")}</span>
-                  <select value={semiFinishedForm.unit} onChange={(event) => updateSemiFinishedForm("unit", event.target.value)}>
-                    {unitOptions.map((unit) => <option value={unit} key={unit}>{unit}</option>)}
-                  </select>
-                </label>
-                <label>
-                  <span>{copy("Unit price", "Birim fiyat")}</span>
-                  <input min="0" step="0.01" type="number" value={semiFinishedForm.pricePerUnit} onChange={(event) => updateSemiFinishedForm("pricePerUnit", event.target.value)} />
-                </label>
-              </div>
-
-              <div className="resource-section">
-                <div className="resource-section-header">
-                  <div>
-                    <span>{copy("Inputs per semi-finished unit", "Yarı mamül birimi için girdiler")}</span>
-                    <p>{copy("Select materials or other semi-finished items and define the amount needed for one unit.", "Bir birim için gereken malzeme veya diğer yarı mamülleri ve miktarlarını tanımlayın.")}</p>
-                  </div>
-                </div>
-                <div className="resource-row-list">
-                  {(semiFinishedForm.componentRows || []).length ? semiFinishedForm.componentRows.map((row, index) => {
-                    const availableOptions = semiComponentOptions.filter((option) => option.type === row.componentType);
-                    const selectedOption = availableOptions.find((option) => option.id === row.componentId);
-
-                    return (
-                      <div className="resource-row-grid material-plan-row" key={`semi-component-${index}`}>
-                        <label>
-                          <span>{copy("Type", "Tip")}</span>
-                          <select
-                            value={row.componentType}
-                            onChange={(event) => {
-                              const nextType = event.target.value;
-                              const nextOptions = semiComponentOptions.filter((option) => option.type === nextType);
-                              updateSemiFinishedComponentRow(index, "componentType", nextType);
-                              updateSemiFinishedComponentRow(index, "componentId", nextOptions[0]?.id || "");
-                            }}
-                          >
-                            <option value="material">{copy("Material", "Malzeme")}</option>
-                            <option value="semi">{copy("Semi-finished", "Yarı Mamül")}</option>
-                          </select>
-                        </label>
-                        <label>
-                          <span>{copy("Item", "Kalem")}</span>
-                          <select value={row.componentId || ""} onChange={(event) => updateSemiFinishedComponentRow(index, "componentId", event.target.value)}>
-                            <option value="">{copy("Select item", "Kalem seç")}</option>
-                            {availableOptions.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}
-                          </select>
-                        </label>
-                        <label>
-                          <span>{copy("Amount", "Miktar")}</span>
-                          <input min="0" step="0.0001" type="number" value={row.quantityPerUnit ?? ""} onChange={(event) => updateSemiFinishedComponentRow(index, "quantityPerUnit", event.target.value)} />
-                        </label>
-                        <div className="resource-row-meta">
-                          <strong>{selectedOption?.unit || "-"}</strong>
-                          <small>{copy("per unit", "birim başına")}</small>
-                        </div>
-                        <button type="button" className="resource-remove-button" onClick={() => removeSemiFinishedComponentRow(index)}>
-                          {copy("Delete", "Sil")}
-                        </button>
-                      </div>
-                    );
-                  }) : (
-                    <p className="planner-empty-state">{copy("No input rows yet. Add a component to define the semi-finished recipe.", "Henüz girdi satırı yok. Yarı mamül reçetesini tanımlamak için bileşen ekleyin.")}</p>
-                  )}
+                  <span>{copy("Semi-finished items", "Yarı mamüller")}</span>
+                  <h2>{copy("Use a material record for now", "Şimdilik malzeme kaydı kullanın")}</h2>
                 </div>
               </div>
-
-              <button className="submit-button planner-save-button" type="submit">{copy("Add Semi-finished", "Yarı Mamül Ekle")}</button>
-            </form>
-
-            <article className="operation-card resource-definition-card resource-list-card">
-              <div className="operation-card-heading">
-                <h2>{copy("Semi-finished records", "Yarı Mamül kayıtları")}</h2>
-                <span>{semiFinishedItems.length} {copy("records", "kayıt")}</span>
-              </div>
-              <div className="compact-resource-list">
-                {(semiFinishedItems.length ? semiFinishedItems : [{ id: "empty" }]).map((item) => (
-                  <span key={item.id}>
-                    <strong>{item.id === "empty" ? "-" : item.name}</strong>
-                    <small>{item.id === "empty" ? "-" : `${formatLira(item.pricePerUnit, 2)} / ${item.unit} • ${(item.componentRows || []).length} ${copy("inputs", "girdi")}`}</small>
-                  </span>
-                ))}
-              </div>
+              <p className="planner-empty-state">
+                {copy(
+                  "Semi-finished recipe nesting is not persisted yet. Add the semi-finished item as a material with a real unit price, then use it in the product recipe.",
+                  "Yarı mamül reçete kırılımı henüz kalıcı değil. Yarı mamülü gerçek birim fiyatıyla malzeme olarak ekleyin, sonra ürün reçetesinde kullanın.",
+                )}
+              </p>
             </article>
 
-            <form className="operation-card resource-definition-card service-card" onSubmit={handleSaveService}>
+            <article className="operation-card resource-definition-card resource-guidance-card">
               <div className="operation-card-heading">
                 <div>
-                  <span>{copy("Add service", "Hizmet ekle")}</span>
-                  <h2>{copy("Service", "Hizmet")}</h2>
+                  <span>{copy("Services", "Hizmetler")}</span>
+                  <h2>{copy("Persist service cost in finance", "Hizmet maliyetini finansta kaydedin")}</h2>
                 </div>
+                <button type="button" onClick={() => goTo("/financial-modelling/girdiler", "login")}>
+                  {copy("Open Financial Inputs", "Finans Girdilerini Aç")}
+                </button>
               </div>
-              <div className="operation-data-fields">
-                <label>
-                  <span>{copy("Name", "Ad")}</span>
-                  <input type="text" value={serviceForm.name} onChange={(event) => updateServiceForm("name", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Price", "Fiyat")}</span>
-                  <input min="0" step="0.01" type="number" value={serviceForm.price} onChange={(event) => updateServiceForm("price", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Initial cost", "Başlangıç maliyeti")}</span>
-                  <input min="0" step="0.01" type="number" value={serviceForm.initialCost} onChange={(event) => updateServiceForm("initialCost", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Monthly cost", "Aylık maliyet")}</span>
-                  <input min="0" step="0.01" type="number" value={serviceForm.monthlyCost} onChange={(event) => updateServiceForm("monthlyCost", event.target.value)} />
-                </label>
-              </div>
-              <button className="submit-button planner-save-button" type="submit">{copy("Add Service", "Hizmet Ekle")}</button>
-            </form>
-
-            <article className="operation-card resource-definition-card resource-list-card">
-              <div className="operation-card-heading">
-                <h2>{copy("Services", "Hizmetler")}</h2>
-                <span>{serviceItems.length} {copy("records", "kayıt")}</span>
-              </div>
-              <div className="compact-resource-list">
-                {(serviceItems.length ? serviceItems : [{ id: "empty" }]).map((service) => (
-                  <span key={service.id}>
-                    <strong>{service.id === "empty" ? "-" : service.name}</strong>
-                    <small>{service.id === "empty" ? "-" : `${formatLira(service.price, 2)} • ${copy("Initial", "Başlangıç")}: ${formatLira(service.initialCost, 2)} • ${copy("Monthly", "Aylık")}: ${formatLira(service.monthlyCost, 2)}`}</small>
-                  </span>
-                ))}
-              </div>
+              <p className="planner-empty-state">
+                {copy(
+                  "Service costs affect feasibility through optional financial expenses. Use initial or recurring expense rows so they are saved in Supabase and included in the model.",
+                  "Hizmet maliyetleri fizibiliteyi opsiyonel finans giderleri üzerinden etkiler. Supabase'e kaydedilip modele dahil olması için başlangıç veya tekrarlayan gider satırlarını kullanın.",
+                )}
+              </p>
             </article>
           </div>
           {operationsStatus && <p className="status-message">{operationsStatus}</p>}
@@ -3109,6 +2894,7 @@ function App() {
                         ...current,
                         product: {
                           ...getCycleTimeInputFromMinutes(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute"),
+                          id: product.id,
                           materialRows: (product.material_rows || []).map((row) => ({
                             materialId: row.material_id,
                             quantityPerUnit: row.quantity_per_unit,
@@ -3136,7 +2922,7 @@ function App() {
   }
 
   function renderActiveProcessesPage() {
-    const activePlans = operationsWorkspace.activePlans || [];
+    const activePlans = getCurrentOperationPlans(operationsWorkspace);
 
     return renderDashboardLayout(
       `operations/${activeOperationsSubmodule.key}`,
@@ -5026,14 +4812,10 @@ function App() {
 
   const dashboardModules = [
     { key: "operations", path: "/operations", label: "Operations" },
-    { key: "product-plus", path: "/product-plus", label: "Ürün +" },
-    { key: "human-resources-plus", path: "/human-resources-plus", label: copy("Human Resources +", "İnsan Kaynağı +") },
     { key: "sales-strategy", path: "/sales-strategy", label: copy("Sales Strategy", "Satış Stratejisi") },
     { key: "financial-modelling", path: "/financial-modelling", label: copy("Financial Modelling", "Finansal Modelleme") },
     { key: "simulation", path: "/simulation", label: copy("Simulation", "Simülasyon") },
-    { key: "ai-insights", path: "/ai-insights", label: copy("AI Insights", "AI İçgörüleri") },
     { key: "reports", path: "/reports", label: copy("Reports", "Raporlar") },
-    { key: "settings", path: "/settings", label: copy("Settings", "Ayarlar") },
   ];
   const operationsSubmodules = [
     { key: "resources", path: "/operations/resources", label: copy("Resources", "Kaynak") },
@@ -5073,8 +4855,9 @@ function App() {
   const financialSummary = projectedFinancialModel.summary || emptyFinancialModel.summary;
   const financialTrendRows = projectedFinancialModel.trendRows || [];
   const financialMonthCount = getProjectionMonthCount(financialHorizon);
-  const activePlanResults = (operationsWorkspace.activePlans || []).map((plan) => plan.result || {}).filter(Boolean);
-  const latestPlan = operationsWorkspace.latestPlan || operationsWorkspace.activePlans?.[0] || null;
+  const currentOperationPlans = getCurrentOperationPlans(operationsWorkspace);
+  const activePlanResults = currentOperationPlans.map((plan) => plan.result || {}).filter(hasViablePlanResult);
+  const latestPlan = currentOperationPlans[0] || operationsWorkspace.latestPlan || null;
   const latestPlanResult = operationPlanResult || latestPlan?.result || null;
   const totalDailyProduction = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.producedQuantity), 0);
   const totalDailyTrackedCost = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.totalTrackedDailyCost), 0);
@@ -5087,7 +4870,7 @@ function App() {
   const dashboardBaseMonthlySalesUnits = getBaseMonthlySalesUnits(salesStrategy);
   const dashboardExpectedSalesUnits = dashboardMonthlyMultipliers.reduce((total, multiplier) => total + (dashboardBaseMonthlySalesUnits * multiplier), 0);
   const hasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
-  const hasFinancialSourceData = Boolean(activePlanResults.length && hasSalesForecast);
+  const hasFinancialSourceData = Boolean(activePlanResults.length && hasSalesForecast && financialModel.settingsSaved);
   const noDataValue = "-";
   const moneyOrMissing = (value) => (hasFinancialSourceData ? formatLira(value) : noDataValue);
   const monthlyRevenue = financialMonthCount ? toFiniteNumber(financialSummary.salesRevenue) / financialMonthCount : 0;
@@ -5207,6 +4990,20 @@ function App() {
     category,
     recentReports.length ? Math.round((count / recentReports.length) * 100) : 0,
   ]);
+  const reportTabs = [
+    { key: "all", label: copy("All Reports", "Tüm Raporlar") },
+    { category: copy("Production Reports", "Üretim Raporları"), key: "production", label: copy("Production Reports", "Üretim Raporları") },
+    { category: copy("Financial Reports", "Finansal Raporlar"), key: "financial", label: copy("Financial Reports", "Finansal Raporlar") },
+    { category: copy("Sales Reports", "Satış Raporları"), key: "sales", label: copy("Sales Reports", "Satış Raporları") },
+    { category: copy("Capacity Reports", "Kapasite Raporları"), key: "capacity", label: copy("Capacity Reports", "Kapasite Raporları") },
+  ];
+  const activeReportTab = reportTabs.find((tab) => tab.key === reportsTab) || reportTabs[0];
+  const normalizedReportSearch = reportsSearch.trim().toLocaleLowerCase(locale);
+  const visibleRecentReports = recentReports.filter((report) => {
+    const matchesTab = !activeReportTab.category || report[1] === activeReportTab.category;
+    const matchesSearch = !normalizedReportSearch || report.join(" ").toLocaleLowerCase(locale).includes(normalizedReportSearch);
+    return matchesTab && matchesSearch;
+  });
   const reportStats = [
     [copy("Available Snapshots", "Mevcut Anlık Rapor"), formatNumber(recentReports.length), copy("derived from Supabase data", "Supabase verisinden türetildi")],
     [copy("Products", "Ürünler"), formatNumber(operationsWorkspace.products.length), copy("operation product records", "operasyon ürün kayıtları")],
@@ -5223,6 +5020,86 @@ function App() {
           week: copy("This week", "Bu hafta"),
           month: copy("This month", "Bu ay"),
         }[financeWindow];
+  const hasFinancialAssumptions = Boolean(financialModel.settingsSaved) && requiredFinancialSettingFields.every((field) => (
+    financialSettingsForm[field] !== "" &&
+    financialSettingsForm[field] !== null &&
+    financialSettingsForm[field] !== undefined &&
+    Number.isFinite(Number(financialSettingsForm[field]))
+  ));
+  const feasibilityChecklist = [
+    {
+      action: copy("Add Product", "Ürün Ekle"),
+      done: operationsWorkspace.products.length > 0,
+      label: copy("Product, price, and recipe", "Ürün, fiyat ve reçete"),
+      path: "/operations/products",
+    },
+    {
+      action: copy("Save Process Plan", "Süreç Planı Kaydet"),
+      done: activePlanResults.length > 0,
+      label: copy("Daily production capacity and cost", "Günlük üretim kapasitesi ve maliyeti"),
+      path: "/operations/data-entry",
+    },
+    {
+      action: copy("Add Sales Channel", "Satış Kanalı Ekle"),
+      done: hasSalesForecast,
+      label: copy("Product-linked sales forecast", "Ürüne bağlı satış tahmini"),
+      path: "/sales-strategy",
+    },
+    {
+      action: copy("Review Finance", "Finansı Kontrol Et"),
+      done: hasFinancialAssumptions,
+      label: copy("Cash, tax, stock, and payment assumptions", "Nakit, vergi, stok ve ödeme varsayımları"),
+      path: "/financial-modelling/girdiler",
+    },
+  ];
+  const missingFeasibilityItem = feasibilityChecklist.find((item) => !item.done);
+  const feasibilityReadyCount = feasibilityChecklist.filter((item) => item.done).length;
+  const unmetForecastUnits = hasFinancialSourceData
+    ? Math.max(0, toFiniteNumber(financialSummary.forecastSalesUnits) - toFiniteNumber(financialSummary.netSoldUnits))
+    : 0;
+  const hasPositiveNet = hasFinancialSourceData && monthlyNet > 0;
+  const hasEnoughRunway = hasFinancialSourceData && financialSummary.cashRunwayMonths >= Math.min(financialMonthCount, 6);
+  const hasNoCapacityGap = hasFinancialSourceData && unmetForecastUnits <= 0;
+  const feasibilityVerdict = !hasFinancialSourceData
+    ? {
+        action: missingFeasibilityItem?.action || copy("Complete Inputs", "Girdileri Tamamla"),
+        copy: copy("Complete the basic product, process, sales, and finance inputs before using this as a decision report.", "Bunu karar raporu olarak kullanmadan önce temel ürün, süreç, satış ve finans girdilerini tamamlayın."),
+        label: copy("Not decision-ready", "Karar için hazır değil"),
+        path: missingFeasibilityItem?.path || "/operations/products",
+        tone: "amber",
+      }
+    : (hasPositiveNet && hasEnoughRunway && hasNoCapacityGap)
+        ? {
+            action: copy("Open Simulation", "Simülasyonu Aç"),
+            copy: copy("The current plan covers the sales forecast, keeps cash alive in the selected horizon, and shows positive monthly net.", "Mevcut plan satış tahminini karşılıyor, seçilen ufukta nakdi taşıyor ve pozitif aylık net gösteriyor."),
+            label: copy("Looks feasible", "Fizibl görünüyor"),
+            path: "/simulation/current-situation",
+            tone: "teal",
+          }
+        : hasPositiveNet
+          ? {
+              action: copy("Review Risks", "Riskleri İncele"),
+              copy: copy("The plan can make money, but capacity, cash runway, or inventory risk needs attention before committing.", "Plan para kazanabilir; fakat kapasite, nakit dayanma veya stok riski karar öncesi kontrol edilmeli."),
+              label: copy("Feasible with watchouts", "Dikkatle fizibl"),
+              path: "/financial-modelling/analiz",
+              tone: "amber",
+            }
+          : {
+              action: copy("Improve Plan", "Planı İyileştir"),
+              copy: copy("The current assumptions do not yet support a healthy production decision. Start with price, cost, capacity, or cash.", "Mevcut varsayımlar sağlıklı bir üretim kararını henüz desteklemiyor. Fiyat, maliyet, kapasite veya nakitten başlayın."),
+              label: copy("High risk", "Yüksek risk"),
+              path: "/financial-modelling/analiz",
+              tone: "clay",
+            };
+  const improvementFocus = [
+    !operationsWorkspace.products.length && copy("Add the product price and recipe so cost is based on a real item.", "Maliyet gerçek ürüne dayansın diye ürün fiyatını ve reçetesini ekleyin."),
+    !activePlanResults.length && copy("Save one daily process plan to calculate capacity, labor, material, and energy.", "Kapasite, işçilik, malzeme ve enerjiyi hesaplamak için bir günlük süreç planı kaydedin."),
+    !hasSalesForecast && copy("Link sales channels to products so revenue and stock risk become visible.", "Ciro ve stok riski görünsün diye satış kanallarını ürünlere bağlayın."),
+    hasFinancialSourceData && unmetForecastUnits > 0 && copy("Sales demand is above available production. Increase capacity or reduce the promise.", "Satış talebi mevcut üretimin üstünde. Kapasiteyi artırın ya da satış sözünü düşürün."),
+    hasFinancialSourceData && financialSummary.unsoldInventoryUnits > 0 && copy("Production is above sales. Reduce output, add demand, or plan stock financing.", "Üretim satışın üstünde. Çıktıyı düşürün, talep ekleyin veya stok finansmanı planlayın."),
+    hasFinancialSourceData && monthlyNet <= 0 && copy("Net result is weak. Recheck price, material cost, labor hours, and channel commissions.", "Net sonuç zayıf. Fiyatı, malzeme maliyetini, işçilik saatini ve kanal komisyonlarını kontrol edin."),
+    hasFinancialSourceData && financialSummary.cashRunwayMonths < Math.min(financialMonthCount, 3) && copy("Cash runway is short. Add starting cash, financing, or delay non-critical spend.", "Nakit dayanma kısa. Başlangıç nakdi/finansman ekleyin ya da kritik olmayan harcamayı erteleyin."),
+  ].filter(Boolean).slice(0, 3);
 
   function renderDashboardLayout(activePage, children) {
     return (
@@ -5511,7 +5388,7 @@ function App() {
             </div>
             <div className="command-live">
               <span className="live-dot" />
-              <strong>{hasOperationData || hasSalesForecast ? copy("Supabase data loaded", "Supabase verisi yüklendi") : copy("Input needed", "Girdi gerekli")}</strong>
+              <strong>{hasOperationData || hasSalesForecast ? copy("Workspace data loaded", "Çalışma alanı verisi yüklendi") : copy("Input needed", "Girdi gerekli")}</strong>
             </div>
             <div className="command-user">
               <span>{currentProfile?.username || form.username || "Atera"}</span>
@@ -5519,6 +5396,55 @@ function App() {
             </div>
             <button type="button" className="command-run-button" onClick={() => goTo("/simulation/current-situation", "login")}>{copy("Open Simulation", "Simülasyonu Aç")}</button>
           </div>
+
+          <section className={`feasibility-snapshot ${feasibilityVerdict.tone}`} aria-label={copy("Feasibility snapshot", "Fizibilite özeti")}>
+            <article className="command-card feasibility-verdict-card">
+              <span>{copy("Feasibility snapshot", "Fizibilite özeti")}</span>
+              <h1>{feasibilityVerdict.label}</h1>
+              <p>{feasibilityVerdict.copy}</p>
+              <button type="button" onClick={() => goTo(feasibilityVerdict.path, "login")}>
+                {feasibilityVerdict.action}
+              </button>
+            </article>
+
+            <article className="command-card feasibility-metrics-card">
+              <div className="card-heading">
+                <div>
+                  <span>{copy("Decision signals", "Karar sinyalleri")}</span>
+                  <h2>{copy("What the current plan says", "Mevcut plan ne söylüyor")}</h2>
+                </div>
+                <strong>{feasibilityReadyCount}/{feasibilityChecklist.length}</strong>
+              </div>
+              <div className="feasibility-metrics">
+                {[
+                  [copy("Monthly net", "Aylık net"), hasFinancialSourceData ? formatLira(monthlyNet) : noDataValue],
+                  [copy("Cash runway", "Nakit dayanma"), hasFinancialSourceData ? `${formatNumber(financialSummary.cashRunwayMonths)} ${copy("mo", "ay")}` : noDataValue],
+                  [copy("Unmet sales", "Karşılanmayan satış"), hasFinancialSourceData ? `${formatNumber(unmetForecastUnits)} ${copy("units", "adet")}` : noDataValue],
+                  [copy("Unsold stock", "Satılmayan stok"), hasFinancialSourceData ? `${formatNumber(financialSummary.unsoldInventoryUnits)} ${copy("units", "adet")}` : noDataValue],
+                ].map(([label, value]) => (
+                  <span key={label}>{label}<strong>{value}</strong></span>
+                ))}
+              </div>
+            </article>
+
+            <article className="command-card feasibility-checklist-card">
+              <div className="card-heading">
+                <div>
+                  <span>{copy("Next inputs", "Sıradaki girdiler")}</span>
+                  <h2>{copy("Keep it decision-ready", "Karara hazır tut")}</h2>
+                </div>
+              </div>
+              <div className="feasibility-checklist">
+                {feasibilityChecklist.map((item) => (
+                  <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
+                    <i>{item.done ? "OK" : "!"}</i>
+                    <span>{item.label}</span>
+                    <strong>{item.done ? copy("Ready", "Hazır") : item.action}</strong>
+                  </button>
+                ))}
+              </div>
+            </article>
+          </section>
 
           <div className="command-stat-grid">
             {dashboardStats.map((stat, index) => (
@@ -5540,7 +5466,7 @@ function App() {
                   <span>{copy("Digital Factory Map", "Dijital Fabrika Haritası")}</span>
                   <h2>{copy("Production floor", "Üretim sahası")}</h2>
                 </div>
-                <button type="button">{copy("Full screen", "Tam ekran")}</button>
+                <button type="button" onClick={openFactoryMapFullscreen}>{copy("Full screen", "Tam ekran")}</button>
               </div>
               <div className="factory-map" aria-label={copy("Digital factory map", "Dijital fabrika haritası")}>
                 {(factoryLines.length ? factoryLines : [{ name: copy("Add machines", "Makine ekleyin"), status: copy("Operations input", "Operations girdisi"), tone: "amber" }]).map((line, index) => (
@@ -5608,11 +5534,11 @@ function App() {
             </article>
           </div>
 
-          <section className="insight-strip" aria-label="AI insights">
+          <section className="insight-strip" aria-label={copy("Decision insights", "Karar içgörüleri")}>
             <div className="card-heading">
               <div>
-                <span>{copy("AI insights", "AI içgörüleri")}</span>
-                <h2>{copy("Live recommendations", "Canlı öneriler")}</h2>
+                <span>{copy("Decision insights", "Karar içgörüleri")}</span>
+                <h2>{copy("What to improve first", "Önce ne iyileştirilmeli")}</h2>
               </div>
               {authorizationAccess.read && (
                 <button type="button" onClick={() => goTo("/authorization", "login")}>
@@ -5626,6 +5552,13 @@ function App() {
                   <strong>{item.title}</strong>
                   <p>{item.copy}</p>
                   <span>{copy("Review details", "Detayları incele")}</span>
+                </article>
+              ))}
+              {(improvementFocus.length ? improvementFocus : [copy("The core workflow is complete. Use Simulation to test a conservative and optimistic variant.", "Ana akış tamam. Simülasyon ile temkinli ve iyimser bir varyantı test edin.")]).map((item, index) => (
+                <article className={`insight-card ${index === 0 ? feasibilityVerdict.tone : "cyan"}`} key={item}>
+                  <strong>{index === 0 ? copy("Recommended move", "Önerilen adım") : copy("Next check", "Sonraki kontrol")}</strong>
+                  <p>{item}</p>
+                  <span>{copy("Use before committing", "Karardan önce kullan")}</span>
                 </article>
               ))}
             </div>
@@ -5803,25 +5736,20 @@ function App() {
                 <h1>{operationsWorkspace.product?.name || copy("Operational Definition", "Operasyonel Tanımlama")}</h1>
               </div>
               <div className="operations-actions">
-                <button type="button">{copy("Back", "Geri")}</button>
-                <button type="button">{copy("Copy", "Kopyala")}</button>
-                <button type="button">{copy("Revision History", "Revizyon Geçmişi")}</button>
-                <button type="button" className="primary">{copy("Edit", "Düzenle")}</button>
+                <button type="button" onClick={() => goTo("/dashboard", "login")}>{copy("Back", "Geri")}</button>
+                <button type="button" className="primary" onClick={() => goTo("/operations/products", "login")}>{copy("Edit Product", "Ürünü Düzenle")}</button>
               </div>
             </div>
 
             <div className="operations-tabs" role="tablist" aria-label={copy("Operation detail tabs", "Operasyon detay sekmeleri")}>
               {[
-                copy("General Information", "Genel Bilgiler"),
-                copy("Technical Specs", "Teknik Özellikler"),
-                copy("Materials & Components", "Malzeme & Bileşenler"),
-                copy("Operation Sequence", "Operasyon Sırası"),
-                copy("Process Flow", "Süreç Akışı"),
-                copy("Quality", "Kalite"),
-                copy("Documents", "Dokümanlar"),
-                copy("Notes", "Notlar"),
-              ].map((tab, index) => (
-                <button type="button" className={index === 0 ? "active" : ""} key={tab}>{tab}</button>
+                ["general", copy("General Information", "Genel Bilgiler")],
+                ["technical", copy("Technical Specs", "Teknik Özellikler")],
+                ["materials", copy("Materials & Components", "Malzeme & Bileşenler")],
+                ["flow", copy("Process Flow", "Süreç Akışı")],
+                ["notes", copy("Notes", "Notlar")],
+              ].map(([key, tab]) => (
+                <button type="button" className={productPlusTab === key ? "active" : ""} onClick={() => setProductPlusTab(key)} key={key}>{tab}</button>
               ))}
             </div>
 
@@ -5917,7 +5845,7 @@ function App() {
               <article className="operation-card notes-card">
                 <div className="operation-card-heading">
                   <h2>{copy("Notes", "Notlar")}</h2>
-                  <button type="button">{copy("New Note", "Yeni Not")}</button>
+                  <button type="button" onClick={handleCreateOperationNote} disabled={operationsLoading}>{copy("New Note", "Yeni Not")}</button>
                 </div>
                 {(operationsWorkspace.notes.length ? operationsWorkspace.notes : [{ id: "empty", note: copy("No product note yet.", "Henüz ürün notu yok."), created_at: new Date().toISOString() }]).map((note) => (
                   <p key={note.id}>{new Date(note.created_at).toLocaleDateString(locale)}: {note.note}</p>
@@ -5928,7 +5856,7 @@ function App() {
             <article className="operation-card operation-flow">
               <div className="operation-card-heading">
                 <h2>{copy("Operation Flow", "Operasyon Akışı")}</h2>
-                <button type="button">{copy("View Flow Diagram", "Akış Diyagramını Gör")}</button>
+                <button type="button" onClick={focusOperationFlow}>{copy("View Flow Diagram", "Akış Diyagramını Gör")}</button>
               </div>
               <div className="flow-steps">
                 {(operationFlowSteps.length ? operationFlowSteps : [{ id: "empty", name: copy("Save a process plan", "Süreç planı kaydedin"), station: copy("Backend result needed", "Backend sonucu gerekli") }]).map((step, index) => ({ ...step, step_order: index + 1 })).map((step) => (
@@ -6007,21 +5935,27 @@ function App() {
             </div>
 
             <div className="reports-tabs" role="tablist" aria-label={copy("Report types", "Rapor türleri")}>
-              {[copy("All Reports", "Tüm Raporlar"), copy("Production Reports", "Üretim Raporları"), copy("Financial Reports", "Finansal Raporlar"), copy("Sales Reports", "Satış Raporları"), copy("Capacity Reports", "Kapasite Raporları"), copy("Maintenance Reports", "Bakım Raporları"), copy("Custom Reports", "Özel Raporlar")].map((tab, index) => (
-                <button type="button" className={index === 0 ? "active" : ""} key={tab}>{tab}</button>
+              {reportTabs.map((tab) => (
+                <button type="button" className={reportsTab === tab.key ? "active" : ""} onClick={() => setReportsTab(tab.key)} key={tab.key}>{tab.label}</button>
               ))}
             </div>
 
             <div className="reports-controls">
-              <label><span>{copy("Search reports", "Rapor ara")}</span><input placeholder={copy("Search reports...", "Rapor ara...")} /></label>
-              <button type="button">{copy("Filters", "Filtreler")}</button>
+              <label><span>{copy("Search reports", "Rapor ara")}</span><input placeholder={copy("Search reports...", "Rapor ara...")} value={reportsSearch} onChange={(event) => setReportsSearch(event.target.value)} /></label>
+              <button type="button" className={reportsFilterOpen ? "active" : ""} onClick={() => setReportsFilterOpen((current) => !current)}>{copy("Filters", "Filtreler")}</button>
               <select value={financialHorizon} onChange={(event) => loadFinancialData(event.target.value)}>
                 <option value="6m">{copy("Next 6 months", "Gelecek 6 ay")}</option>
                 <option value="1y">{copy("Next 12 months", "Gelecek 12 ay")}</option>
                 <option value="5y">{copy("Next 60 months", "Gelecek 60 ay")}</option>
               </select>
-              <button type="button" className="primary">{copy("Export", "Dışa Aktar")}</button>
+              <button type="button" className="primary" onClick={() => exportReportsCsv(visibleRecentReports)}>{copy("Export", "Dışa Aktar")}</button>
             </div>
+            {reportsFilterOpen && (
+              <div className="reports-filter-summary">
+                {copy("Showing", "Gösterilen")} <strong>{activeReportTab.label}</strong>
+                {reportsSearch ? ` / ${copy("search", "arama")}: ${reportsSearch}` : ""}
+              </div>
+            )}
 
             <div className="report-stat-grid">
               {reportStats.map(([label, value, detail]) => (
@@ -6057,10 +5991,10 @@ function App() {
               </article>
 
               <article className="reports-card recent-reports-card">
-                <div className="reports-card-heading"><h2>{copy("Recent Reports", "Son Raporlar")}</h2><button type="button">{copy("View All", "Tümünü Gör")}</button></div>
+                <div className="reports-card-heading"><h2>{copy("Recent Reports", "Son Raporlar")}</h2><button type="button" onClick={() => { setReportsTab("all"); setReportsSearch(""); }}>{copy("View All", "Tümünü Gör")}</button></div>
                 <div className="recent-report-table">
                   <div className="recent-report-row report-head"><span>{copy("Report Name", "Rapor Adı")}</span><span>{copy("Category", "Kategori")}</span><span>{copy("Created Date", "Oluşturulma Tarihi")}</span><span>{copy("Period", "Dönem")}</span><span>{copy("Created By", "Oluşturan")}</span><span>{copy("Actions", "İşlemler")}</span></div>
-                  {(recentReports.length ? recentReports : [[copy("No report snapshots yet", "Henüz rapor anlık görünümü yok"), copy("Input required", "Girdi gerekli"), "-", "-", reportAuthor]]).map((report) => (
+                  {(visibleRecentReports.length ? visibleRecentReports : [[copy("No report snapshots match the current filter", "Geçerli filtreyle eşleşen rapor yok"), copy("Input required", "Girdi gerekli"), "-", "-", reportAuthor]]).map((report) => (
                     <div className="recent-report-row" key={report[0]}>
                       {report.map((cell, index) => index === 0 ? <strong key={cell}>{cell}</strong> : <span key={`${report[0]}-${index}`}>{cell}</span>)}
                       <span className="report-actions">-</span>
@@ -6076,7 +6010,7 @@ function App() {
                     [copy("Product record", "Ürün kaydı"), operationsWorkspace.product ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                     [copy("Process backend result", "Süreç backend sonucu"), activePlanResults.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                     [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
-                    [copy("Financial assumptions", "Finansal varsayımlar"), financialModel.settings ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
+                    [copy("Financial assumptions", "Finansal varsayımlar"), hasFinancialAssumptions ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                   ].map(([item, state]) => (
                     <div className="schedule-row" key={item}>
                       <strong>{item}</strong>
@@ -6089,8 +6023,14 @@ function App() {
                 <article className="reports-card quick-report-card">
                   <h2>{copy("Create Quick Report", "Hızlı Rapor Oluştur")}</h2>
                   <div className="quick-report-grid">
-                    {[copy("Production Report", "Üretim Raporu"), copy("Financial Summary", "Finansal Özet"), copy("Sales Analysis", "Satış Analizi"), copy("Capacity Analysis", "Kapasite Analizi"), copy("Custom Report", "Özel Rapor")].map((item) => (
-                      <button type="button" key={item}>{item}</button>
+                    {[
+                      [copy("Production Report", "Üretim Raporu"), "production"],
+                      [copy("Financial Summary", "Finansal Özet"), "financial"],
+                      [copy("Sales Analysis", "Satış Analizi"), "sales"],
+                      [copy("Capacity Analysis", "Kapasite Analizi"), "capacity"],
+                      [copy("Custom Report", "Özel Rapor"), "all"],
+                    ].map(([item, tabKey]) => (
+                      <button type="button" onClick={() => { setReportsTab(tabKey); setReportsSearch(""); }} key={item}>{item}</button>
                     ))}
                   </div>
                 </article>
@@ -6397,12 +6337,6 @@ function App() {
           <div className="avatar">
             {profilePreview ? <img src={profilePreview} alt={copy("Profile preview", "Profil önizlemesi")} /> : <span>{initials}</span>}
           </div>
-          {mode === "signup" && (
-            <label className="file-button">
-              {labels.profilePicture}
-              <input accept="image/*" type="file" onChange={onProfileFileChange} />
-            </label>
-          )}
         </div>
 
         {session ? (
@@ -6459,14 +6393,15 @@ function App() {
             </button>
           </form>
         ) : (
-          <form className="auth-form" onSubmit={mode === "login" ? handleLogin : handleSignup}>
+          <form className="auth-form" onSubmit={handleLogin}>
             <label>
-              <span>{labels.username}</span>
+              <span>{labels.loginEmail}</span>
               <input
-                autoComplete="username"
+                autoComplete="email"
                 required
-                value={form.username}
-                onChange={(event) => updateField("username", event.target.value)}
+                type="email"
+                value={form.email}
+                onChange={(event) => updateField("email", event.target.value)}
               />
             </label>
 
@@ -6474,7 +6409,7 @@ function App() {
               <span>{labels.password}</span>
               <div className="password-field">
                 <input
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  autoComplete="current-password"
                   required
                   type={showPassword ? "text" : "password"}
                   value={form.password}
@@ -6491,61 +6426,15 @@ function App() {
               </div>
             </label>
 
-            {mode === "signup" && (
-              <label>
-                <span>{labels.email}</span>
-                <input
-                  autoComplete="email"
-                  required
-                  type="email"
-                  value={form.email}
-                  onChange={(event) => updateField("email", event.target.value)}
-                />
-              </label>
-            )}
-
-            {mode === "signup" && (
-              <div className="signup-grid">
-                <label>
-                  <span>{labels.phoneNumber}</span>
-                  <input
-                    autoComplete="tel"
-                    value={form.phoneNumber}
-                    onChange={(event) => updateField("phoneNumber", event.target.value)}
-                  />
-                </label>
-
-                <label>
-                  <span>{labels.company}</span>
-                  <input value={form.company} onChange={(event) => updateField("company", event.target.value)} />
-                </label>
-
-                <label>
-                  <span>{labels.department}</span>
-                  <input value={form.department} onChange={(event) => updateField("department", event.target.value)} />
-                </label>
-
-                <label>
-                  <span>{labels.accessLevel}</span>
-                  <select value={form.accessLevel} onChange={(event) => updateField("accessLevel", event.target.value)}>
-                    <option value="user">{copy("User", "Kullanıcı")}</option>
-                    <option value="manager">{copy("Manager", "Yönetici")}</option>
-                    <option value="admin">{copy("Admin", "Admin")}</option>
-                  </select>
-                </label>
-              </div>
-            )}
-
-            {mode === "login" && (
-              <div className="form-options">
-                <button type="button" className="link-button" onClick={handleForgotPassword}>
-                  {labels.forgot}
-                </button>
-              </div>
-            )}
+            <div className="form-options">
+              <span>{labels.adminProvisionedAccess}</span>
+              <button type="button" className="link-button" onClick={handleForgotPassword}>
+                {labels.forgot}
+              </button>
+            </div>
 
             <button className="submit-button" disabled={loading} type="submit">
-              {loading ? "..." : mode === "login" ? labels.submitLogin : labels.submitSignup}
+              {loading ? "..." : labels.submitLogin}
             </button>
           </form>
         )}

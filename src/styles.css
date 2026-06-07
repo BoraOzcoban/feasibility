@@ -15,6 +15,7 @@
   --color-amber: #d99a24;
   --color-amber-soft: #fff4d9;
   --color-clay: #9d5b3f;
+  --color-green: #2f8f57;
   --shadow-soft: 0 18px 42px rgba(16, 43, 50, 0.1);
   --shadow-strong: 0 24px 80px rgba(13, 31, 36, 0.26);
   color: var(--color-ink);
@@ -42,6 +43,7 @@
   --color-amber: #e1aa3f;
   --color-amber-soft: #3b2f18;
   --color-clay: #c47c5e;
+  --color-green: #68c887;
   --shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.26);
   --shadow-strong: 0 24px 80px rgba(0, 0, 0, 0.42);
 }
@@ -990,12 +992,6 @@ select {
   gap: 6px;
 }
 
-.signup-grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: 1fr 1fr;
-}
-
 .form-options {
   align-items: center;
   display: flex;
@@ -1445,6 +1441,158 @@ select {
   padding: 10px 14px;
 }
 
+.feasibility-snapshot {
+  --verdict-color: var(--color-amber);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(280px, 0.92fr) minmax(280px, 1.08fr) minmax(260px, 0.9fr);
+}
+
+.feasibility-snapshot.teal {
+  --verdict-color: var(--color-teal);
+}
+
+.feasibility-snapshot.amber {
+  --verdict-color: var(--color-amber);
+}
+
+.feasibility-snapshot.clay {
+  --verdict-color: var(--color-clay);
+}
+
+.feasibility-verdict-card,
+.feasibility-metrics-card,
+.feasibility-checklist-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.feasibility-verdict-card {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--verdict-color) 18%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 92%, transparent));
+  border-color: color-mix(in srgb, var(--verdict-color) 34%, var(--color-line));
+}
+
+.feasibility-verdict-card h1 {
+  color: var(--color-heading);
+  font-size: clamp(1.9rem, 3vw, 3.2rem);
+  line-height: 1;
+  margin: 0;
+}
+
+.feasibility-verdict-card p {
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.feasibility-verdict-card button {
+  background: color-mix(in srgb, var(--verdict-color) 18%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--verdict-color) 42%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-heading);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  justify-self: start;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.feasibility-metrics-card .card-heading > strong {
+  align-items: center;
+  background: color-mix(in srgb, var(--verdict-color) 14%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--verdict-color) 34%, var(--color-line));
+  border-radius: 999px;
+  color: var(--color-heading);
+  display: inline-flex;
+  font-size: 0.82rem;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.feasibility-metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.feasibility-metrics span {
+  background: color-mix(in srgb, var(--color-section) 58%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-muted);
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.feasibility-metrics strong {
+  color: var(--color-heading);
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.feasibility-checklist {
+  display: grid;
+  gap: 8px;
+}
+
+.feasibility-checklist button {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-heading);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 48px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.feasibility-checklist button.done {
+  background: color-mix(in srgb, var(--color-teal) 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-teal) 28%, var(--color-line));
+}
+
+.feasibility-checklist i {
+  align-items: center;
+  background: color-mix(in srgb, var(--verdict-color) 15%, var(--color-surface));
+  border-radius: 999px;
+  color: var(--color-heading);
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 900;
+  height: 26px;
+  justify-content: center;
+  width: 26px;
+}
+
+.feasibility-checklist button.done i {
+  background: color-mix(in srgb, var(--color-teal) 18%, var(--color-surface));
+  color: var(--color-teal-strong);
+}
+
+.feasibility-checklist span {
+  color: var(--color-heading);
+  font-size: 0.84rem;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.feasibility-checklist strong {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  text-align: right;
+}
+
 .command-context,
 .command-user {
   display: grid;
@@ -1826,6 +1974,14 @@ select {
   --node-color: var(--color-cyan);
 }
 
+.factory-node.navy {
+  --node-color: var(--color-navy-soft);
+}
+
+.factory-node.green {
+  --node-color: var(--color-green);
+}
+
 .node-1 {
   left: 22%;
   top: 29%;
@@ -1942,7 +2098,7 @@ select {
 .insight-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .insight-card {
@@ -6096,10 +6252,12 @@ select {
 
   .command-topbar,
   .command-hero,
+  .feasibility-snapshot,
   .command-stat-grid,
   .command-main-grid,
   .insight-grid,
   .summary-grid,
+  .feasibility-metrics,
   .factory-metrics,
   .finance-kpis,
   .finance-date-controls {
@@ -6112,6 +6270,16 @@ select {
 
   .command-hero {
     padding: 22px;
+  }
+
+  .feasibility-checklist button {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .feasibility-checklist strong {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
   }
 
   .blueprint-visual {
@@ -6310,10 +6478,6 @@ select {
     justify-content: flex-start;
   }
 
-  .signup-grid {
-    grid-template-columns: 1fr;
-  }
-
   .link-button {
     text-align: left;
   }
@@ -6321,6 +6485,7 @@ select {
 
 @media (min-width: 621px) and (max-width: 1120px) {
   .command-topbar,
+  .feasibility-snapshot,
   .command-main-grid,
   .insight-grid {
     grid-template-columns: 1fr;
@@ -6414,4 +6579,25 @@ select {
     opacity: 1;
     transform: scale(1.16);
   }
+}
+
+.reports-filter-summary {
+  align-items: center;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px 12px;
+}
+
+.reports-controls button.active {
+  border-color: var(--color-teal);
+  color: var(--color-teal);
+}
+
+.resource-guidance-card {
+  align-content: start;
 }

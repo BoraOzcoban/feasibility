@@ -102,35 +102,57 @@ begin
   end if;
 
   if p_entity = 'product' then
-    insert into public.operation_products (
-      company_id, product_code, name, unit, price, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
-    )
-    values (
-      v_company_id,
-      'PROD-' || upper(substr(md5(coalesce(nullif(trim(p_input->>'name'), ''), gen_random_uuid()::text)), 1, 12)),
-      nullif(trim(p_input->>'name'), ''),
-      coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
-      greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
-      greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
-      case
-        when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
-        else 'minute'
-      end,
-      'Basit Üretim',
-      'A',
-      'Aktif',
-      'Veri girişi planlarında seçilmek için eklenen ürün kaydı.'
-    )
-    on conflict (company_id, product_code) do update set
-      name = excluded.name,
-      unit = excluded.unit,
-      price = excluded.price,
-      cycle_time_minutes = excluded.cycle_time_minutes,
-      cycle_time_unit = excluded.cycle_time_unit,
-      product_group = excluded.product_group,
-      status = excluded.status,
-      description = excluded.description
-    returning id into v_record_id;
+    v_record_id := nullif(p_input->>'productId', '')::uuid;
+
+    if v_record_id is not null and exists (
+      select 1
+      from public.operation_products
+      where id = v_record_id
+        and company_id = v_company_id
+    ) then
+      update public.operation_products
+      set
+        name = nullif(trim(p_input->>'name'), ''),
+        unit = coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
+        price = greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+        cycle_time_minutes = greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
+        cycle_time_unit = case
+          when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
+          else 'minute'
+        end
+      where id = v_record_id
+        and company_id = v_company_id;
+    else
+      insert into public.operation_products (
+        company_id, product_code, name, unit, price, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
+      )
+      values (
+        v_company_id,
+        'PROD-' || upper(substr(md5(coalesce(nullif(trim(p_input->>'name'), ''), gen_random_uuid()::text)), 1, 12)),
+        nullif(trim(p_input->>'name'), ''),
+        coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
+        greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+        greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
+        case
+          when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
+          else 'minute'
+        end,
+        'Basit Üretim',
+        'A',
+        'Aktif',
+        'Veri girişi planlarında seçilmek için eklenen ürün kaydı.'
+      )
+      on conflict (company_id, product_code) do update set
+        name = excluded.name,
+        unit = excluded.unit,
+        price = excluded.price,
+        cycle_time_minutes = excluded.cycle_time_minutes,
+        cycle_time_unit = excluded.cycle_time_unit,
+        product_group = excluded.product_group,
+        status = excluded.status,
+        description = excluded.description
+      returning id into v_record_id;
+    end if;
 
     delete from public.operation_product_materials
     where product_id = v_record_id;
@@ -207,3 +229,5 @@ end;
 $$;
 
 grant execute on function public.save_operation_record(text, jsonb) to authenticated;
+
+select pg_notify('pgrst', 'reload schema');

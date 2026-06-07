@@ -5,7 +5,7 @@ New Atera workspace for migrating `atera_v2` piece by piece.
 ## Run locally
 
 ```zsh
-cd ~/Desktop/Coding/Atera
+cd ~/Desktop/Coding/atera
 npm install
 cp .env.example .env
 npm run dev
@@ -25,19 +25,31 @@ Fill `.env` with the values from your new Supabase project:
 5. Add these to the redirect URLs:
    - `http://127.0.0.1:5173/login`
    - `http://127.0.0.1:5174/login`
-6. Confirm the storage bucket named `profile-pictures` exists. The SQL file creates it.
+6. Confirm the storage bucket named `profile-pictures` exists and is private. The SQL file creates it and applies owner-only policies.
 
 Passwords are not stored in `public.profiles`. Supabase Auth stores password hashes securely in its own auth schema.
 
-## What changed from `atera_v2`
+## Access model
 
-`atera_v2` uses Supabase email/password login directly from `src/pages/AuthPage.tsx` and reads credentials from `src/services/supabaseClient.ts`.
+Users do not self-register from the public login screen. Company admins create users from `Yetkilendirme > Kullanıcı tanımlama`, which creates the Supabase Auth user and the matching profile record.
 
-This new app keeps that same Supabase client pattern, but adds:
+The first company admin should be created through Supabase/Auth setup or an already trusted admin flow. After that, users should be provisioned in the app.
 
-- username/password login
-- profile fields table
-- profile picture storage
-- language selector
-- remember username option
-- forgot password and reset password flow
+## QA commands
+
+```zsh
+npm run test
+npm run build
+```
+
+`npm run test` uses Node's built-in test runner and covers the core feasibility/readiness helpers that do not require a browser or live Supabase project.
+
+## Product flow
+
+The feasibility flow is intentionally simple:
+
+1. Define materials, workforce, machines/equipment, and products in Operations.
+2. Save a process plan for a product with a material recipe and nonzero machine hours.
+3. Add product-linked sales channels in Sales Strategy.
+4. Save financial assumptions and optional expenses in Financial Modelling.
+5. Review dashboard, reports, and simulation views for feasibility signals.
