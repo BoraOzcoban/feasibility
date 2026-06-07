@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabaseClient";
-import { defaultFinancialSettings, emptyFinancialExtraCostForm, emptyFinancialModel, loadFinancialModel, saveFinancialExtraCost, saveFinancialModelSettings } from "./lib/financialService";
+import {
+  defaultFinancialSettings,
+  emptyFinancialExtraCostForm,
+  emptyFinancialModel,
+  generalFinancialAssumptionFields,
+  inflationRevaluationFinancialFields,
+  loadFinancialModel,
+  optionalMacroFinancialSettingFields,
+  requiredFinancialSettingFields,
+  saveFinancialExtraCost,
+  saveFinancialModelSettings,
+} from "./lib/financialService";
 import { emptyOperationForms, emptyOperationPlan, emptyPlanRows, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
 import { deleteSimulationVariantRecord, emptySalesStrategy, emptySimulationVariant, loadSalesStrategy, loadSimulationVariants, saveSalesStrategy, saveSimulationVariant } from "./lib/planningService";
 import logoUrl from "./assets/atera-logo.svg";
@@ -31,6 +42,22 @@ const emptyManagedUserForm = {
   language: "tr",
 };
 
+const simulationAlgorithms = {
+  withTendency: "fbm_with_tendency",
+  withoutTendency: "fbm_without_tendency",
+};
+
+function normalizeSimulationAlgorithm(value) {
+  return value === simulationAlgorithms.withoutTendency
+    ? simulationAlgorithms.withoutTendency
+    : simulationAlgorithms.withTendency;
+}
+
+function isAdminRole(roleOrName) {
+  const name = typeof roleOrName === "string" ? roleOrName : roleOrName?.name;
+  return String(name || "").trim().toLowerCase() === "admin";
+}
+
 function formatNumber(value, maximumFractionDigits = 0) {
   const locale = document.documentElement.lang === "tr" ? "tr-TR" : "en-US";
   return new Intl.NumberFormat(locale, { maximumFractionDigits }).format(value || 0);
@@ -50,6 +77,58 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function toOptionalFiniteNumber(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getOptionalPositiveNumber(value) {
+  const number = toOptionalFiniteNumber(value);
+  return number === null || number <= 0 ? null : number;
+}
+
+const cycleTimeUnits = {
+  day: 1440,
+  hour: 60,
+  minute: 1,
+};
+
+function normalizeCycleTimeUnit(unit) {
+  return Object.prototype.hasOwnProperty.call(cycleTimeUnits, unit) ? unit : "minute";
+}
+
+function getCycleTimeUnitLabel(unit, language = document.documentElement.lang) {
+  const normalizedUnit = normalizeCycleTimeUnit(unit);
+  const labels = {
+    day: language === "tr" ? "gün" : "day",
+    hour: language === "tr" ? "saat" : "hour",
+    minute: language === "tr" ? "dk" : "min",
+  };
+
+  return labels[normalizedUnit];
+}
+
+function getCycleTimeMinutes(value, unit) {
+  return Math.max(0.0001, toFiniteNumber(value, 1) * cycleTimeUnits[normalizeCycleTimeUnit(unit)]);
+}
+
+function getCycleTimeInputFromMinutes(minutes, preferredUnit = "minute") {
+  const safeMinutes = Math.max(0.0001, toFiniteNumber(minutes, 1));
+  const normalizedPreferredUnit = normalizeCycleTimeUnit(preferredUnit);
+  const divisor = cycleTimeUnits[normalizedPreferredUnit] || 1;
+
+  return {
+    cycleTimeUnit: normalizedPreferredUnit,
+    cycleTimeValue: safeMinutes / divisor,
+  };
+}
+
+function formatCycleTime(minutes, preferredUnit, maximumFractionDigits = 2) {
+  const { cycleTimeUnit, cycleTimeValue } = getCycleTimeInputFromMinutes(minutes, preferredUnit);
+  return `${formatNumber(cycleTimeValue, maximumFractionDigits)} ${getCycleTimeUnitLabel(cycleTimeUnit)}`;
+}
+
 function getProjectionMonthCount(horizon) {
   if (horizon === "5y") return 60;
   if (horizon === "1y") return 12;
@@ -67,63 +146,245 @@ function getMonthlyLoanPayment(amount, annualInterestRate, termMonths) {
   return principal * (monthlyRate * ((1 + monthlyRate) ** term)) / (((1 + monthlyRate) ** term) - 1);
 }
 
-function getSalesForecastForMonth(salesStrategy, monthIndex) {
-  const company = salesStrategy.company || {};
-  const monthlyForecast = Array.isArray(company.monthlyForecast) ? company.monthlyForecast : [];
-  const baseUnits = toFiniteNumber(monthlyForecast[monthIndex % Math.max(monthlyForecast.length, 1)], toFiniteNumber(company.monthlyTarget));
-  const annualGrowth = toFiniteNumber(company.annualSalesGrowthPercent) / 100;
-  const yearIndex = Math.floor(monthIndex / Math.max(monthlyForecast.length, 1));
-
-  return Math.max(0, baseUnits * ((1 + annualGrowth) ** yearIndex));
+function getMonthlyRateFromAnnualPercent(annualPercent) {
+  const annualRate = Math.max(0, toFiniteNumber(annualPercent)) / 100;
+  return ((1 + annualRate) ** (1 / 12)) - 1;
 }
 
-function calculateChannelMonth(grossSoldUnits, salesStrategy) {
-  const company = salesStrategy.company || {};
-  const channels = Array.isArray(salesStrategy.channels) && salesStrategy.channels.length
-    ? salesStrategy.channels
-    : [{ price: company.baseSalesPrice, revenueShare: 100 }];
-  const totalShare = channels.reduce((total, channel) => total + Math.max(0, toFiniteNumber(channel.revenueShare)), 0) || channels.length;
+function getIncreaseFrequencyMonths(frequency) {
+  if (frequency === "monthly") return 1;
+  if (frequency === "quarterly") return 3;
+  if (frequency === "annual") return 12;
+  return 6;
+}
 
-  return channels.reduce((totals, channel) => {
-    const share = totalShare
-      ? (Math.max(0, toFiniteNumber(channel.revenueShare, 100 / channels.length)) / totalShare)
-      : (1 / channels.length);
-    const channelUnits = grossSoldUnits * share;
-    const price = Math.max(0, toFiniteNumber(channel.price, company.baseSalesPrice));
-    const discountRate = Math.max(0, toFiniteNumber(channel.discountPercent)) / 100;
-    const marginRate = Math.max(0, toFiniteNumber(channel.marginPercent)) / 100;
+function getPeriodicAnnualIncreaseMultiplier(annualPercent, monthIndex, frequency) {
+  const annualRate = Math.max(0, toFiniteNumber(annualPercent)) / 100;
+  if (!annualRate) return 1;
+
+  const periodMonths = getIncreaseFrequencyMonths(frequency);
+  const periodRate = ((1 + annualRate) ** (periodMonths / 12)) - 1;
+  const elapsedPeriods = Math.floor(monthIndex / periodMonths);
+
+  return (1 + periodRate) ** elapsedPeriods;
+}
+
+function getFinancialLoanRows(settings = {}) {
+  const sourceRows = Array.isArray(settings.loanRows) ? settings.loanRows : [];
+  const rows = sourceRows.length
+    ? sourceRows
+    : (toFiniteNumber(settings.loanAmount) > 0
+        ? [{
+            amount: settings.loanAmount,
+            annualInterestRate: settings.annualInterestRate,
+            gracePeriodMonths: settings.gracePeriodMonths,
+            id: "legacy-loan",
+            loanTermMonths: settings.loanTermMonths,
+          }]
+        : []);
+
+  return rows
+    .map((row, index) => {
+      const amount = Math.max(0, toFiniteNumber(row.amount));
+      const annualInterestRate = Math.max(0, toFiniteNumber(row.annualInterestRate));
+      const loanTermMonths = Math.max(1, Math.round(toFiniteNumber(row.loanTermMonths, 24)));
+      const gracePeriodMonths = Math.min(
+        loanTermMonths - 1,
+        Math.max(0, Math.round(toFiniteNumber(row.gracePeriodMonths))),
+      );
+      const monthlyRate = annualInterestRate / 100 / 12;
+      const principalAfterGrace = monthlyRate ? amount * ((1 + monthlyRate) ** gracePeriodMonths) : amount;
+      const repaymentTermMonths = Math.max(1, loanTermMonths - gracePeriodMonths);
+
+      return {
+        amount,
+        annualInterestRate,
+        gracePeriodMonths,
+        id: row.id || `loan-${index + 1}`,
+        loanTermMonths,
+        monthlyPayment: getMonthlyLoanPayment(principalAfterGrace, annualInterestRate, repaymentTermMonths),
+        principalAfterGrace,
+        repaymentTermMonths,
+      };
+    })
+    .filter((row) => row.amount > 0);
+}
+
+function getSalesExpectationMultipliers(salesStrategy) {
+  const company = salesStrategy.company || {};
+  const source = Array.isArray(company.monthlyMultipliers)
+    ? company.monthlyMultipliers
+    : (Array.isArray(company.monthlyForecast) ? company.monthlyForecast : []);
+
+  return Array.from({ length: 12 }, (_, index) => Math.max(0, toFiniteNumber(source[index], 1)));
+}
+
+function getSalesExpectationMultiplier(salesStrategy, monthIndex) {
+  const multipliers = getSalesExpectationMultipliers(salesStrategy);
+  return multipliers[monthIndex % multipliers.length] ?? 1;
+}
+
+function getChannelGrowthRate(channel, elapsedMonthIndex) {
+  if (elapsedMonthIndex < 6) return Math.max(0, toFiniteNumber(channel.growthMonths1To6Percent)) / 100;
+  if (elapsedMonthIndex < 18) return Math.max(0, toFiniteNumber(channel.growthMonths7To18Percent)) / 100;
+  if (elapsedMonthIndex < 24) return Math.max(0, toFiniteNumber(channel.growthMonths19To24Percent)) / 100;
+  return Math.max(0, toFiniteNumber(channel.growthYears3To5Percent)) / 100;
+}
+
+function getChannelGrowthMultiplier(channel, elapsedMonthIndex) {
+  let multiplier = 1;
+
+  for (let index = 1; index <= elapsedMonthIndex; index += 1) {
+    multiplier *= 1 + getChannelGrowthRate(channel, index - 1);
+  }
+
+  return multiplier;
+}
+
+function getChannelSeasonalityMultiplier(channel, monthIndex) {
+  const curve = Array.isArray(channel.seasonalityCurve) ? channel.seasonalityCurve : [];
+  const value = getOptionalPositiveNumber(curve[monthIndex % 12]);
+  return value ?? 1;
+}
+
+function getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy) {
+  const startMonth = Math.max(1, Math.round(toFiniteNumber(channel.startMonth, 1)));
+  const monthNumber = monthIndex + 1;
+
+  if (monthNumber < startMonth) return 0;
+
+  const elapsedMonthIndex = monthNumber - startMonth;
+  const expectationMultiplier = getSalesExpectationMultiplier(salesStrategy, monthIndex);
+  const trafficScore = getOptionalPositiveNumber(channel.trafficScore) ?? 1;
+  const rampUpMonths = getOptionalPositiveNumber(channel.rampUpMonths);
+  const failureRate = Math.min(1, Math.max(0, toFiniteNumber(channel.failureProbabilityPercent)) / 100);
+  const capacityLimit = getOptionalPositiveNumber(channel.capacityLimit);
+  const moqMonthly = getOptionalPositiveNumber(channel.moqMonthly);
+  let units = Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) *
+    getChannelGrowthMultiplier(channel, elapsedMonthIndex) *
+    expectationMultiplier *
+    getChannelSeasonalityMultiplier(channel, monthIndex) *
+    trafficScore *
+    (1 - failureRate);
+
+  if (rampUpMonths) {
+    units *= Math.min(1, (elapsedMonthIndex + 1) / rampUpMonths);
+  }
+
+  if (capacityLimit) {
+    units = Math.min(units, capacityLimit);
+  }
+
+  if (moqMonthly && units > 0) {
+    units = Math.max(units, moqMonthly);
+  }
+
+  return Math.max(0, units);
+}
+
+function getBaseMonthlySalesUnits(salesStrategy) {
+  const channels = Array.isArray(salesStrategy.channels) ? salesStrategy.channels : [];
+  return channels.reduce((total, channel) => total + Math.max(0, toFiniteNumber(channel.monthlySalesUnits)), 0);
+}
+
+function getSalesForecastForMonth(salesStrategy, monthIndex) {
+  const channels = Array.isArray(salesStrategy.channels) ? salesStrategy.channels : [];
+  return channels.reduce((total, channel) => total + getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy), 0);
+}
+
+function getPlanProductId(plan) {
+  return plan?.product_id || plan?.product?.id || plan?.input?.productId || "";
+}
+
+function getMonthlyProductProductionMap(operationsWorkspace, workingDaysPerMonth = 22) {
+  const plans = operationsWorkspace.activePlans?.length
+    ? operationsWorkspace.activePlans
+    : (operationsWorkspace.latestPlan ? [operationsWorkspace.latestPlan] : []);
+  const productionByProduct = new Map();
+
+  plans.forEach((plan) => {
+    const productId = getPlanProductId(plan);
+    if (!productId) return;
+
+    const monthlyProduced = Math.max(0, toFiniteNumber(plan.result?.producedQuantity)) * Math.max(1, toFiniteNumber(workingDaysPerMonth, 22));
+    productionByProduct.set(productId, (productionByProduct.get(productId) || 0) + monthlyProduced);
+  });
+
+  return productionByProduct;
+}
+
+function getOperationProductMap(operationsWorkspace) {
+  return new Map((operationsWorkspace.products || []).map((product) => [product.id, product]));
+}
+
+function calculateChannelMonth(monthIndex, salesStrategy, operationsWorkspace = {}, workingDaysPerMonth = 22, settingsInput = {}) {
+  const channels = Array.isArray(salesStrategy.channels) ? salesStrategy.channels : [];
+  const productionByProduct = getMonthlyProductProductionMap(operationsWorkspace, workingDaysPerMonth);
+  const productMap = getOperationProductMap(operationsWorkspace);
+  const priceIncreaseMultiplier = getPeriodicAnnualIncreaseMultiplier(settingsInput.priceIncreaseAnnualPercent, monthIndex, settingsInput.increaseFrequency);
+
+  const totals = channels.reduce((currentTotals, channel) => {
+    const productId = channel.productId || channel.product_id || "";
+    const desiredUnits = getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy);
+    const availableUnits = productId ? Math.max(0, productionByProduct.get(productId) || 0) : 0;
+    const channelUnits = Math.min(desiredUnits, availableUnits);
+    const product = productMap.get(productId) || channel.product || {};
+    const price = Math.max(0, toFiniteNumber(product.price)) * priceIncreaseMultiplier;
+    const commissionRate = Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100;
+    const discountRate = Math.max(0, toFiniteNumber(channel.discountRatePercent)) / 100;
     const returnRate = Math.max(0, toFiniteNumber(channel.returnRatePercent)) / 100;
     const returnedUnits = channelUnits * returnRate;
     const netUnits = Math.max(0, channelUnits - returnedUnits);
-    const discountedPrice = price * (1 - discountRate);
-    const producerPrice = discountedPrice * (1 - marginRate);
-    const revenue = netUnits * producerPrice;
-    const delayMonths = Math.max(0, Math.ceil(toFiniteNumber(channel.paymentDelayDays) / 30));
+    const launchFee = monthIndex + 1 === Math.max(1, Math.round(toFiniteNumber(channel.startMonth, 1)))
+      ? Math.max(0, toFiniteNumber(channel.launchFee))
+      : 0;
+    const grossRevenue = netUnits * price * Math.max(0, 1 - discountRate);
+    const acquisitionCost = netUnits * Math.max(0, toFiniteNumber(channel.customerAcquisitionCost));
+    const commissionCost = grossRevenue * commissionRate;
+    const channelCost = commissionCost + acquisitionCost + launchFee;
+    const revenue = Math.max(0, grossRevenue - channelCost);
+    const collectionDays = toOptionalFiniteNumber(channel.collectionDays) ?? toFiniteNumber(settingsInput.receivablesCollectionDays, 30);
+    const delayMonths = Math.max(0, Math.ceil(collectionDays / 30));
 
-    totals.channels.push({
+    if (productId) {
+      productionByProduct.set(productId, Math.max(0, availableUnits - channelUnits));
+    }
+
+    currentTotals.channels.push({
       delayMonths,
-      marginCost: channelUnits * discountedPrice * marginRate,
+      desiredUnits,
+      marginCost: channelCost,
+      productId,
       revenue,
       returnedUnits,
-      units: channelUnits,
+      units: netUnits,
     });
-    totals.discountCost += channelUnits * price * discountRate;
-    totals.marginCost += channelUnits * discountedPrice * marginRate;
-    totals.netSoldUnits += netUnits;
-    totals.returnedUnits += returnedUnits;
-    totals.revenue += revenue;
-    totals.weightedPaymentDelayDays += share * toFiniteNumber(channel.paymentDelayDays);
+    currentTotals.delayWeight += desiredUnits;
+    currentTotals.discountCost += netUnits * price * discountRate;
+    currentTotals.marginCost += channelCost;
+    currentTotals.netSoldUnits += netUnits;
+    currentTotals.forecastUnits += desiredUnits;
+    currentTotals.revenue += revenue;
+    currentTotals.returnedUnits += returnedUnits;
+    currentTotals.weightedPaymentDelayDays += desiredUnits * collectionDays;
 
-    return totals;
+    return currentTotals;
   }, {
     channels: [],
+    delayWeight: 0,
     discountCost: 0,
+    forecastUnits: 0,
     marginCost: 0,
     netSoldUnits: 0,
     returnedUnits: 0,
     revenue: 0,
     weightedPaymentDelayDays: 0,
   });
+
+  return {
+    ...totals,
+    weightedPaymentDelayDays: totals.delayWeight ? totals.weightedPaymentDelayDays / totals.delayWeight : 0,
+  };
 }
 
 function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput, operationsWorkspace, horizon) {
@@ -138,6 +399,8 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
     : (operationsWorkspace.latestPlan ? [operationsWorkspace.latestPlan] : []);
   const electricityPrice = Math.max(0, toFiniteNumber(settings.electricityPricePerKwh));
   const workingDaysPerMonth = Math.max(1, toFiniteNumber(settings.workingDaysPerMonth, 22));
+  const investmentGrantAmount = Math.max(0, toFiniteNumber(settings.investmentGrantAmount));
+  const initialCapacityUnits = Math.max(0, toFiniteNumber(settings.initialCapacityUnits));
   const dailyProduced = activePlans.reduce((total, plan) => total + Math.max(0, toFiniteNumber(plan.result?.producedQuantity)), 0);
   const dailyMaterialCost = activePlans.reduce((total, plan) => total + Math.max(0, toFiniteNumber(plan.result?.materialCost)), 0);
   const dailyWorkforceCost = activePlans.reduce((total, plan) => total + Math.max(0, toFiniteNumber(plan.result?.workforceCost)), 0);
@@ -153,6 +416,10 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
   });
 
   const machinePurchaseCost = Array.from(uniqueMachines.values()).reduce((total, price) => total + price, 0) || toFiniteNumber(baseModel.summary?.machinePurchaseCost);
+  const equipmentPurchaseCost = (operationsWorkspace.equipment || []).reduce(
+    (total, equipment) => total + (Math.max(0, toFiniteNumber(equipment.price)) * Math.max(0, toFiniteNumber(equipment.quantity, 1))),
+    0,
+  );
   const unitMaterialCost = dailyProduced ? dailyMaterialCost / dailyProduced : 0;
   const unitWorkforceCost = dailyProduced ? dailyWorkforceCost / dailyProduced : 0;
   const unitElectricityCost = dailyProduced ? dailyElectricityCost / dailyProduced : 0;
@@ -162,25 +429,40 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
   const extraRecurringCost = extraCosts.reduce((total, cost) => total + (cost.costType === "recurring" ? Math.max(0, toFiniteNumber(cost.amount)) : 0), 0);
   const monthlyMaterialCost = dailyMaterialCost * workingDaysPerMonth;
   const monthlyWorkforceCost = dailyWorkforceCost * workingDaysPerMonth;
-  const workingCapitalRequirement =
-    (monthlyMaterialCost * Math.max(0, toFiniteNumber(settings.rawMaterialBufferMonths, 1))) +
+  const loanRows = getFinancialLoanRows(settings);
+  const loanAmount = loanRows.reduce((total, row) => total + row.amount, 0);
+  const monthlyLoanPayment = loanRows.reduce((total, row) => total + row.monthlyPayment, 0);
+  const monthlyCurrencyIncreaseRate = Math.max(0, toFiniteNumber(settings.monthlyCurrencyIncreasePercent)) / 100;
+  const monthlyEnergyPriceIncreaseRate = Math.max(0, toFiniteNumber(settings.monthlyEnergyPriceIncreasePercent)) / 100;
+  const monthlyInflationRate = Math.max(0, toFiniteNumber(settings.monthlyInflationPercent)) / 100;
+  const monthlyWageIncreaseRate = Math.max(0, toFiniteNumber(settings.monthlyWageIncreasePercent)) / 100;
+  const monthlyCogsInflationRate = getMonthlyRateFromAnnualPercent(settings.cogsInflationAnnualPercent);
+  const monthlyOpexInflationRate = getMonthlyRateFromAnnualPercent(settings.opexInflationAnnualPercent);
+  const compoundMonthlyRate = (rate, monthIndex) => ((1 + rate) ** monthIndex);
+  const salesVatRate = Math.max(0, toFiniteNumber(settings.salesVatRate, settings.vatRate ?? 20)) / 100;
+  const expenseVatRate = Math.max(0, toFiniteNumber(settings.expenseVatRate, settings.vatRate ?? 20)) / 100;
+  const incomeTaxRate = Math.max(0, toFiniteNumber(settings.incomeTaxRate, 25)) / 100;
+  const taxPaymentDelayMonths = Math.max(0, Math.round(toFiniteNumber(settings.taxPaymentDelayMonths, 0)));
+  const initialCash = Math.max(0, toFiniteNumber(settings.initialCash));
+  const initialInvestment = machinePurchaseCost + equipmentPurchaseCost + extraInitialCost;
+  const receivablesWorkingCapital = Math.max(0, calculateChannelMonth(0, salesStrategy, operationsWorkspace, workingDaysPerMonth, settings).revenue) *
+    (Math.max(0, toFiniteNumber(settings.receivablesCollectionDays, 30)) / 30);
+  const materialStockMonths = Math.max(0, toFiniteNumber(settings.rawMaterialStockDays)) / 30;
+  const supplierCreditMonths = Math.max(0, toFiniteNumber(settings.supplierPaymentDays)) / 30;
+  const materialWorkingCapital = monthlyMaterialCost * Math.max(0, Math.max(0, toFiniteNumber(settings.rawMaterialBufferMonths, 1)) + materialStockMonths - supplierCreditMonths);
+  const adjustedWorkingCapitalRequirement =
+    materialWorkingCapital +
+    receivablesWorkingCapital +
     (monthlyWorkforceCost * Math.max(0, toFiniteNumber(settings.salaryBufferMonths, 1))) +
     (extraRecurringCost * Math.max(0, toFiniteNumber(settings.rentBufferMonths, 1)));
-  const loanAmount = Math.max(0, toFiniteNumber(settings.loanAmount));
-  const loanTermMonths = Math.max(1, Math.round(toFiniteNumber(settings.loanTermMonths, 24)));
-  const annualInterestRate = Math.max(0, toFiniteNumber(settings.annualInterestRate));
-  const monthlyLoanPayment = getMonthlyLoanPayment(loanAmount, annualInterestRate, loanTermMonths);
-  const monthlyLoanRate = annualInterestRate / 100 / 12;
-  const vatRate = Math.max(0, toFiniteNumber(settings.vatRate, 20)) / 100;
-  const incomeTaxRate = Math.max(0, toFiniteNumber(settings.incomeTaxRate, 20)) / 100;
-  const initialCash = Math.max(0, toFiniteNumber(settings.initialCash));
-  const initialInvestment = machinePurchaseCost + extraInitialCost;
-  const requiredOwnCash = Math.max(0, initialInvestment + workingCapitalRequirement - loanAmount);
+  const workingCapitalRequirement = adjustedWorkingCapitalRequirement;
+  const requiredOwnCash = Math.max(0, initialInvestment + adjustedWorkingCapitalRequirement - loanAmount - investmentGrantAmount);
   const cashReceipts = Array.from({ length: monthCount + 24 }, () => 0);
+  const taxPayments = Array.from({ length: monthCount + taxPaymentDelayMonths + 24 }, () => 0);
   const rows = [];
-  let loanBalance = loanAmount;
-  let cashBalance = initialCash + loanAmount - initialInvestment - workingCapitalRequirement;
-  let cumulativePayback = -initialInvestment - workingCapitalRequirement + loanAmount;
+  const loanBalances = loanRows.map((row) => row.amount);
+  let cashBalance = initialCash + loanAmount + investmentGrantAmount - initialInvestment - adjustedWorkingCapitalRequirement;
+  let cumulativePayback = -initialInvestment - adjustedWorkingCapitalRequirement + loanAmount + investmentGrantAmount;
   let cashRunwayMonths = cashBalance < 0 ? 0 : monthCount;
   let breakEvenMonth = null;
   let paybackMonth = null;
@@ -192,6 +474,8 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
     expiredWriteOffUnits: 0,
     forecastSalesUnits: 0,
     incomeTax: 0,
+    loanInterest: 0,
+    loanPayment: 0,
     materialCost: 0,
     netIncome: 0,
     netSoldUnits: 0,
@@ -206,25 +490,54 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
   };
 
   for (let index = 0; index < monthCount; index += 1) {
-    const producedUnits = dailyProduced * workingDaysPerMonth;
+    const cogsCostMultiplier = compoundMonthlyRate(monthlyCogsInflationRate, index);
+    const opexCostMultiplier = compoundMonthlyRate(monthlyOpexInflationRate, index);
+    const materialCostMultiplier = compoundMonthlyRate(monthlyCurrencyIncreaseRate, index) * compoundMonthlyRate(monthlyInflationRate, index) * cogsCostMultiplier;
+    const workforceCostMultiplier = compoundMonthlyRate(monthlyWageIncreaseRate || monthlyInflationRate, index);
+    const electricityCostMultiplier = compoundMonthlyRate(monthlyEnergyPriceIncreaseRate || monthlyInflationRate, index) * cogsCostMultiplier;
+    const overheadCostMultiplier = compoundMonthlyRate(monthlyInflationRate, index) * opexCostMultiplier;
+    const monthlyUnitMaterialCost = unitMaterialCost * materialCostMultiplier;
+    const monthlyUnitWorkforceCost = unitWorkforceCost * workforceCostMultiplier;
+    const monthlyUnitElectricityCost = unitElectricityCost * electricityCostMultiplier;
+    const monthlyUnitProductionCost = monthlyUnitMaterialCost + monthlyUnitWorkforceCost + monthlyUnitElectricityCost;
+    const monthlyExtraRecurringCost = extraRecurringCost * overheadCostMultiplier;
+    const plannedProducedUnits = dailyProduced * workingDaysPerMonth;
+    const producedUnits = index === 0 && initialCapacityUnits > 0
+      ? Math.min(plannedProducedUnits, initialCapacityUnits)
+      : plannedProducedUnits;
     const forecastUnits = getSalesForecastForMonth(salesStrategy, index);
-    const grossSoldUnits = Math.min(forecastUnits, producedUnits);
-    const channelMonth = calculateChannelMonth(grossSoldUnits, salesStrategy);
+    const channelMonth = calculateChannelMonth(index, salesStrategy, operationsWorkspace, workingDaysPerMonth, settings);
+    const grossSoldUnits = channelMonth.netSoldUnits;
     const unsoldUnits = Math.max(0, producedUnits - grossSoldUnits);
-    const spoilageRate = Math.max(0, toFiniteNumber(salesStrategy.company?.spoilageRate)) / 100;
+    const spoilageRate = 0;
     const expiredUnits = unsoldUnits * spoilageRate;
     const writeOffUnits = expiredUnits + channelMonth.returnedUnits;
-    const writeOffCost = writeOffUnits * unitProductionCost;
-    const cogsSold = channelMonth.netSoldUnits * unitProductionCost;
-    const cashProductionCost = producedUnits * unitProductionCost;
-    const materialCost = producedUnits * unitMaterialCost;
-    const workforceCost = producedUnits * unitWorkforceCost;
-    const electricityCost = producedUnits * unitElectricityCost;
-    const loanPayment = index < loanTermMonths ? Math.min(monthlyLoanPayment, loanBalance + (loanBalance * monthlyLoanRate)) : 0;
-    const loanInterest = index < loanTermMonths ? loanBalance * monthlyLoanRate : 0;
-    const loanPrincipal = Math.max(0, loanPayment - loanInterest);
+    const writeOffCost = writeOffUnits * monthlyUnitProductionCost;
+    const cogsSold = channelMonth.netSoldUnits * monthlyUnitProductionCost;
+    const cashProductionCost = producedUnits * monthlyUnitProductionCost;
+    const materialCost = producedUnits * monthlyUnitMaterialCost;
+    const workforceCost = producedUnits * monthlyUnitWorkforceCost;
+    const electricityCost = producedUnits * monthlyUnitElectricityCost;
+    const loanMonth = loanRows.reduce((total, loan, loanIndex) => {
+      const balance = loanBalances[loanIndex] || 0;
+      const monthlyRate = loan.annualInterestRate / 100 / 12;
+      const interest = index < loan.loanTermMonths ? balance * monthlyRate : 0;
+      const isGraceMonth = index < loan.gracePeriodMonths;
+      const payment = index < loan.loanTermMonths && !isGraceMonth ? Math.min(loan.monthlyPayment, balance + interest) : 0;
+      const principal = Math.max(0, payment - interest);
 
-    loanBalance = Math.max(0, loanBalance - loanPrincipal);
+      loanBalances[loanIndex] = isGraceMonth
+        ? Math.max(0, balance + interest)
+        : Math.max(0, balance - principal);
+
+      return {
+        interest: total.interest + interest,
+        payment: total.payment + payment,
+        principal: total.principal + principal,
+      };
+    }, { interest: 0, payment: 0, principal: 0 });
+    const loanPayment = loanMonth.payment;
+    const loanInterest = loanMonth.interest;
 
     channelMonth.channels.forEach((channel) => {
       const receiptIndex = index + channel.delayMonths;
@@ -234,14 +547,19 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
     });
 
     const cashIn = cashReceipts[index] || 0;
-    const outputVat = channelMonth.revenue * vatRate;
-    const inputVat = Math.max(0, (materialCost + electricityCost + extraRecurringCost) * vatRate);
+    const outputVat = channelMonth.revenue * salesVatRate;
+    const inputVat = Math.max(0, (materialCost + electricityCost + monthlyExtraRecurringCost) * expenseVatRate);
     const vatPayable = Math.max(0, outputVat - inputVat);
-    const profitBeforeTax = channelMonth.revenue - cogsSold - writeOffCost - extraRecurringCost - loanInterest;
+    const profitBeforeTax = channelMonth.revenue - cogsSold - writeOffCost - monthlyExtraRecurringCost - loanInterest;
     const incomeTax = Math.max(0, profitBeforeTax * incomeTaxRate);
     const netIncome = profitBeforeTax - incomeTax;
-    const cashFlow = cashIn - cashProductionCost - extraRecurringCost - loanPayment - vatPayable - incomeTax;
-    const totalCost = cogsSold + writeOffCost + extraRecurringCost + loanInterest + incomeTax;
+    const taxPaymentIndex = index + taxPaymentDelayMonths;
+    if (taxPaymentIndex < taxPayments.length) {
+      taxPayments[taxPaymentIndex] += vatPayable + incomeTax;
+    }
+    const taxCashOut = taxPayments[index] || 0;
+    const cashFlow = cashIn - cashProductionCost - monthlyExtraRecurringCost - loanPayment - taxCashOut;
+    const totalCost = cogsSold + writeOffCost + monthlyExtraRecurringCost + loanInterest + incomeTax;
 
     cashBalance += cashFlow;
     cumulativePayback += cashFlow;
@@ -265,6 +583,8 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
     totals.expiredWriteOffUnits += writeOffUnits;
     totals.forecastSalesUnits += forecastUnits;
     totals.incomeTax += incomeTax;
+    totals.loanInterest += loanInterest;
+    totals.loanPayment += loanPayment;
     totals.materialCost += materialCost;
     totals.netIncome += netIncome;
     totals.netSoldUnits += channelMonth.netSoldUnits;
@@ -296,7 +616,7 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
   }
 
   const firstMonth = rows[0] || {};
-  const averageNetPrice = totals.netSoldUnits ? totals.revenue / totals.netSoldUnits : toFiniteNumber(salesStrategy.company?.baseSalesPrice);
+  const averageNetPrice = totals.netSoldUnits ? totals.revenue / totals.netSoldUnits : toFiniteNumber(operationsWorkspace.products?.[0]?.price);
   const contributionPerUnit = Math.max(0, averageNetPrice - unitProductionCost);
   const requiredMonthlySalesVolume = contributionPerUnit
     ? (extraRecurringCost + Math.min(monthlyLoanPayment, loanAmount || monthlyLoanPayment)) / contributionPerUnit
@@ -321,19 +641,23 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
       { amount: extraRecurringCost * monthCount, id: "recurringExtraCost", label: "Recurring overhead" },
       { amount: totals.vatPayable, id: "vatPayable", label: "VAT payable" },
       { amount: totals.incomeTax, id: "incomeTax", label: "Income tax" },
+      { amount: totals.loanInterest, id: "loanInterest", label: "Loan interest" },
     ],
     extraCosts,
     incomeRows: [
       { amount: totals.revenue, id: "salesRevenue", kind: "income", label: "Sales revenue from monthly forecast" },
+      { amount: investmentGrantAmount, id: "investmentGrant", kind: "income", label: "Investment grant / subsidy" },
       { amount: totals.materialCost, costType: "recurring", id: "materialCost", kind: "cost", label: "Raw materials and packaging" },
       { amount: totals.workforceCost, costType: "recurring", id: "workforceCost", kind: "cost", label: "Salaries and labor" },
       { amount: totals.electricityCost, costType: "recurring", id: "electricityCost", kind: "cost", label: "Electricity" },
       { amount: totals.expiredWriteOffCost, costType: "recurring", id: "writeOffCost", kind: "cost", label: "Spoilage, returns and expired write-off" },
       { amount: machinePurchaseCost, costType: "initial", id: "machinePurchase", kind: "cost", label: "Machine investment" },
+      { amount: equipmentPurchaseCost, costType: "initial", id: "equipmentPurchase", kind: "cost", label: "Equipment investment" },
       { amount: extraInitialCost, costType: "initial", id: "extraInitialCost", kind: "cost", label: "Initial extra costs" },
       { amount: workingCapitalRequirement, costType: "initial", id: "workingCapital", kind: "cost", label: "Working capital requirement" },
       { amount: totals.vatPayable, costType: "recurring", id: "vatPayable", kind: "cost", label: "VAT payable" },
       { amount: totals.incomeTax, costType: "recurring", id: "incomeTax", kind: "cost", label: "Income tax" },
+      { amount: totals.loanInterest, costType: "recurring", id: "loanInterest", kind: "cost", label: "Loan interest" },
     ],
     settings,
     summary: {
@@ -344,6 +668,7 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
       cashRunwayMonths,
       discountCost: totals.discountCost,
       electricityCost: totals.electricityCost,
+      equipmentPurchaseCost,
       expiredWriteOffCost: totals.expiredWriteOffCost,
       expiredWriteOffUnits: totals.expiredWriteOffUnits,
       extraInitialCost,
@@ -351,9 +676,13 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
       forecastSalesUnits: totals.forecastSalesUnits,
       incomeTax: totals.incomeTax,
       initialCash,
+      investmentGrantAmount,
       initialCashRequired: requiredOwnCash,
       loanAmount,
+      loanInterest: totals.loanInterest,
       loanPayment: monthlyLoanPayment,
+      loanPaymentTotal: totals.loanPayment,
+      loanRows,
       machinePurchaseCost,
       materialCost: totals.materialCost,
       netIncome: totals.netIncome,
@@ -370,7 +699,7 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
       unitProductionCost,
       unsoldInventoryUnits: totals.unsoldInventoryUnits,
       vatPayable: totals.vatPayable,
-      weightedPaymentDelayDays: calculateChannelMonth(1, salesStrategy).weightedPaymentDelayDays,
+      weightedPaymentDelayDays: calculateChannelMonth(0, salesStrategy, operationsWorkspace, workingDaysPerMonth, settings).weightedPaymentDelayDays,
       workingCapitalRequirement,
       workingDaysPerMonth,
       firstMonthCashBalance: firstMonth.cashBalance || 0,
@@ -665,6 +994,7 @@ function App() {
   const [financialSettingsForm, setFinancialSettingsForm] = useState(defaultFinancialSettings);
   const [financialStatus, setFinancialStatus] = useState("");
   const [financialLoading, setFinancialLoading] = useState(false);
+  const [financialOverviewWidgets, setFinancialOverviewWidgets] = useState([]);
   const [financeWindow, setFinanceWindow] = useState("today");
   const [financeDateRange, setFinanceDateRange] = useState({ start: "", end: "" });
   const [operationForms, setOperationForms] = useState(emptyOperationForms);
@@ -694,6 +1024,7 @@ function App() {
   const [simulationLoading, setSimulationLoading] = useState(false);
   const [operationsWorkspace, setOperationsWorkspace] = useState({
     activePlans: [],
+    equipment: [],
     latestPlan: null,
     machines: [],
     materials: [],
@@ -787,6 +1118,7 @@ function App() {
       setFinancialSettingsForm(defaultFinancialSettings);
       setFinancialExtraCostForm(emptyFinancialExtraCostForm);
       setFinancialStatus("");
+      setFinancialOverviewWidgets([]);
       setSalesStrategy(emptySalesStrategy);
       setSalesStatus("");
       setSimulationVariants([emptySimulationVariant]);
@@ -826,18 +1158,17 @@ function App() {
 
   function updateSalesForecast(index, value) {
     setSalesStrategy((current) => {
-      const monthlyForecast = Array.isArray(current.company.monthlyForecast)
-        ? [...current.company.monthlyForecast]
-        : Array.from({ length: 12 }, () => 0);
+      const monthlyMultipliers = Array.isArray(current.company.monthlyMultipliers)
+        ? [...current.company.monthlyMultipliers]
+        : Array.from({ length: 12 }, () => 1);
 
-      monthlyForecast[index] = value;
+      monthlyMultipliers[index] = value;
 
       return {
         ...current,
         company: {
           ...current.company,
-          monthlyForecast,
-          monthlyTarget: monthlyForecast.reduce((total, item) => total + toFiniteNumber(item), 0) / Math.max(monthlyForecast.length, 1),
+          monthlyMultipliers,
         },
       };
     });
@@ -850,60 +1181,161 @@ function App() {
     }));
   }
 
+  function updateSalesChannelSeasonality(id, index, value) {
+    setSalesStrategy((current) => ({
+      ...current,
+      channels: current.channels.map((channel) => {
+        if (channel.id !== id) return channel;
+        const seasonalityCurve = Array.isArray(channel.seasonalityCurve)
+          ? [...channel.seasonalityCurve]
+          : Array.from({ length: 12 }, () => "");
+
+        seasonalityCurve[index] = value;
+        return { ...channel, seasonalityCurve };
+      }),
+    }));
+  }
+
+  function removeSalesItem(collection, id) {
+    setSalesStrategy((current) => ({
+      ...current,
+      [collection]: current[collection].filter((item) => item.id !== id),
+    }));
+  }
+
   function addSalesItem(collection) {
     const nextId = `${collection}-${Date.now()}`;
+    const defaultProduct = operationsWorkspace.products[0];
     const templates = {
       campaigns: {
         budget: 0,
-        channel: copy("New channel", "Yeni kanal"),
-        durationWeeks: 4,
+        channel: "",
+        durationDays: 30,
         goal: copy("Campaign objective", "Kampanya hedefi"),
         id: nextId,
         name: copy("New campaign", "Yeni kampanya"),
-        successScore: 50,
-        type: copy("Campaign type", "Kampanya tipi"),
+        typeId: salesStrategy.campaignTypes?.[0]?.id || "digital",
       },
       channels: {
-        budget: 0,
-        conversionRate: 0,
-        discountPercent: 0,
+        advancedOpen: true,
+        basketSize: "",
+        capacityLimit: "",
+        churnRatePercent: "",
+        commissionPercent: 0,
+        conversionRatePercent: "",
+        collectionDays: 30,
+        customerAcquisitionCost: 0,
+        discountRatePercent: "",
+        failureProbabilityPercent: "",
+        growthMonths1To6Percent: 0,
+        growthMonths7To18Percent: 0,
+        growthMonths19To24Percent: 0,
+        growthYears3To5Percent: 0,
         id: nextId,
-        marginPercent: 0,
+        launchFee: "",
+        moqMonthly: "",
+        monthlySalesUnits: 0,
         name: copy("New channel", "Yeni kanal"),
-        note: copy("Channel notes", "Kanal notları"),
-        paymentDelayDays: 30,
-        price: salesStrategy.company.baseSalesPrice,
-        revenueShare: 0,
-        returnRatePercent: 0,
-        successScore: 50,
-        type: copy("Channel type", "Kanal tipi"),
-      },
-      competitors: {
-        campaignType: copy("Manual campaign input", "Manuel kampanya girdisi"),
-        id: nextId,
-        marketShare: 0,
-        marketingBudget: 0,
-        name: copy("New competitor", "Yeni rakip"),
-        reputationScore: 50,
-        salesPrice: 0,
-        strategy: copy("Competitor strategy notes", "Rakip strateji notları"),
-        threatScore: 50,
+        productId: defaultProduct?.id || "",
+        productName: defaultProduct?.name || "",
+        rampUpMonths: "",
+        repeatRatePercent: "",
+        returnRatePercent: "",
+        seasonalityCurve: Array.from({ length: 12 }, () => ""),
+        startMonth: 1,
+        trafficScore: "",
+        typeId: salesStrategy.channelTypes?.[0]?.id || "direct",
       },
       personnel: {
-        assignedChannel: copy("Assigned channel", "Atanan kanal"),
+        assignedChannel: "",
         id: nextId,
         monthlyTarget: 0,
         name: copy("New sales person", "Yeni satış personeli"),
-        pipelineValue: 0,
+        realizedSalesUnits: 0,
         role: copy("Sales role", "Satış rolü"),
-        successScore: 50,
-        winRate: 0,
       },
     };
+
+    if (!templates[collection]) return;
 
     setSalesStrategy((current) => ({
       ...current,
       [collection]: [...current[collection], templates[collection]],
+    }));
+  }
+
+  function hasRequiredNumber(value) {
+    if (value === "" || value === null || value === undefined) return false;
+    return Number.isFinite(Number(value));
+  }
+
+  function validateSalesStrategy() {
+    for (let index = 0; index < salesStrategy.channels.length; index += 1) {
+      const channel = salesStrategy.channels[index];
+      const label = channel.name?.trim() || `${copy("Channel", "Kanal")} ${index + 1}`;
+      const requiredNumbers = [
+        [channel.startMonth, copy("Start month", "Başlangıç ayı"), 1],
+        [channel.monthlySalesUnits, copy("First month sales", "İlk ay satış"), 0],
+        [channel.growthMonths1To6Percent, copy("Growth (1-6 months)", "Büyüme (1-6 ay)"), 0],
+        [channel.growthMonths7To18Percent, copy("Growth (7-18 months)", "Büyüme (7-18 ay)"), 0],
+        [channel.growthMonths19To24Percent, copy("Growth (19-24 months)", "Büyüme (19-24 ay)"), 0],
+        [channel.growthYears3To5Percent, copy("Year 3-5 growth", "Yıl 3-5 büyüme"), 0],
+        [channel.collectionDays, copy("Collection days", "Tahsilat günü"), 0],
+        [channel.customerAcquisitionCost, copy("Unit marketing CAC", "Birim pazarlama CAC"), 0],
+        [channel.commissionPercent, copy("Channel commission", "Kanal komisyonu"), 0],
+      ];
+
+      if (!channel.name?.trim()) {
+        return copy(`Channel ${index + 1}: channel name is required.`, `Kanal ${index + 1}: kanal adı zorunlu.`);
+      }
+
+      if (!channel.typeId) {
+        return copy(`${label}: channel type is required.`, `${label}: kanal tipi zorunlu.`);
+      }
+
+      if (!channel.productId) {
+        return copy(`${label}: product to sell is required.`, `${label}: satılacak ürün zorunlu.`);
+      }
+
+      for (const [value, fieldLabel, minimum] of requiredNumbers) {
+        if (!hasRequiredNumber(value) || Number(value) < minimum) {
+          return copy(`${label}: ${fieldLabel} must be filled.`, `${label}: ${fieldLabel} doldurulmalı.`);
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function addFinancialLoanRow() {
+    setFinancialSettingsForm((current) => ({
+      ...current,
+      loanRows: [
+        ...(Array.isArray(current.loanRows) ? current.loanRows : []),
+        {
+          amount: "",
+          annualInterestRate: "",
+          gracePeriodMonths: 0,
+          id: `loan-${Date.now()}`,
+          loanTermMonths: "",
+        },
+      ],
+    }));
+  }
+
+  function updateFinancialLoanRow(index, field, value) {
+    setFinancialSettingsForm((current) => {
+      const loanRows = Array.isArray(current.loanRows) ? [...current.loanRows] : [];
+      loanRows[index] = { ...loanRows[index], [field]: value };
+
+      return { ...current, loanRows };
+    });
+  }
+
+  function removeFinancialLoanRow(index) {
+    setFinancialSettingsForm((current) => ({
+      ...current,
+      loanRows: (Array.isArray(current.loanRows) ? current.loanRows : []).filter((_, rowIndex) => rowIndex !== index),
     }));
   }
 
@@ -929,6 +1361,19 @@ function App() {
   function addSimulationVariant() {
     const linkedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForm, operationsWorkspace, financialHorizon);
     const linkedSummary = linkedFinancialModel.summary || emptyFinancialModel.summary;
+    const horizonMonths = Math.max(1, getProjectionMonthCount(financialHorizon));
+    const monthlySalesUnits = Math.round(
+      toFiniteNumber(linkedSummary.netSoldUnits) / horizonMonths ||
+      getSalesForecastForMonth(salesStrategy, 0),
+    );
+    const monthlyProductionUnits = Math.max(
+      monthlySalesUnits,
+      Math.round(toFiniteNumber(linkedSummary.totalProduced) / horizonMonths),
+    );
+    const unitSalesPrice = toFiniteNumber(
+      linkedSummary.averageNetPrice,
+      toFiniteNumber(operationsWorkspace.product?.price, toFiniteNumber(operationsWorkspace.products[0]?.price)),
+    );
     const nextIndex = simulationVariants.length + 1;
     const nextId = `variant-${Date.now()}`;
     const nextVariant = {
@@ -940,11 +1385,18 @@ function App() {
       parameters: {
         ...emptySimulationVariant.parameters,
         baseRevenue: Math.round(toFiniteNumber(linkedSummary.salesRevenue)),
+        discountPercent: 0,
         fixedCost: Math.round(toFiniteNumber(linkedSummary.extraRecurringCost)),
         grossMargin: linkedSummary.salesRevenue ? Math.max(0, Math.round((toFiniteNumber(linkedSummary.netIncome) / toFiniteNumber(linkedSummary.salesRevenue)) * 100)) : 0,
-        marketShare: toFiniteNumber(salesStrategy.company?.marketShare),
-        reputationScore: toFiniteNumber(salesStrategy.company?.reputationScore),
-        timeHorizonMonths: getProjectionMonthCount(financialHorizon),
+        marketShare: 0,
+        reputationScore: 0,
+        marketingBudget: 0,
+        productionUnits: monthlyProductionUnits,
+        returnRatePercent: 0,
+        salesUnits: monthlySalesUnits,
+        spoilagePercent: 0,
+        timeHorizonMonths: horizonMonths,
+        unitSalesPrice,
         variableCostRatio: linkedSummary.salesRevenue ? Math.min(95, Math.round((toFiniteNumber(linkedSummary.totalCost) / toFiniteNumber(linkedSummary.salesRevenue)) * 100)) : 0,
       },
     };
@@ -1207,8 +1659,17 @@ function App() {
     setOperationsLoading(true);
 
     try {
+      const formInput = operationForms[entity];
+      const recordInput = entity === "product"
+        ? {
+            ...formInput,
+            cycleTimeMinutes: getCycleTimeMinutes(formInput.cycleTimeValue, formInput.cycleTimeUnit),
+            cycleTimeUnit: normalizeCycleTimeUnit(formInput.cycleTimeUnit),
+          }
+        : formInput;
+
       await saveOperationRecord(supabase, entity, {
-        ...operationForms[entity],
+        ...recordInput,
         productId: operationPlan.productId || operationsWorkspace.product?.id,
       });
 
@@ -1231,10 +1692,16 @@ function App() {
 
     try {
       const nextModel = await loadFinancialModel(supabase, nextHorizon);
-      setFinancialModel(nextModel);
-      setFinancialSettingsForm({
+      const nextSettings = {
         ...defaultFinancialSettings,
         ...(nextModel.settings || {}),
+      };
+      setFinancialModel(nextModel);
+      setFinancialSettingsForm({
+        ...nextSettings,
+        loanRows: Array.isArray(nextSettings.loanRows) && nextSettings.loanRows.length
+          ? nextSettings.loanRows
+          : getFinancialLoanRows(nextSettings),
       });
     } catch (error) {
       setFinancialStatus(`${copy("Financial model could not be loaded:", "Finansal model yüklenemedi:")} ${error.message}`);
@@ -1258,6 +1725,41 @@ function App() {
       await saveFinancialModelSettings(supabase, financialSettingsForm);
       setFinancialStatus(copy("Financial assumptions were saved to Supabase.", "Finansal varsayımlar Supabase'e kaydedildi."));
       await loadFinancialData();
+    } catch (error) {
+      setFinancialStatus(error.message);
+    } finally {
+      setFinancialLoading(false);
+    }
+  }
+
+  function toggleFinancialOverviewWidget(widgetId) {
+    setFinancialOverviewWidgets((current) => (
+      current.includes(widgetId)
+        ? current.filter((id) => id !== widgetId)
+        : [...current, widgetId]
+    ));
+  }
+
+  async function saveFinancialOverviewScreen() {
+    setFinancialStatus("");
+
+    if (!supabase || !session?.user?.id) {
+      setFinancialStatus(labels.configure);
+      return;
+    }
+
+    setFinancialLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ financial_overview_widgets: financialOverviewWidgets })
+        .eq("id", session.user.id);
+
+      if (error) throw error;
+
+      setCurrentProfile((current) => current ? { ...current, financial_overview_widgets: financialOverviewWidgets } : current);
+      setFinancialStatus(copy("Financial analysis screen was saved.", "Finansal analiz ekranı kaydedildi."));
     } catch (error) {
       setFinancialStatus(error.message);
     } finally {
@@ -1323,6 +1825,12 @@ function App() {
 
     if (!currentProfile?.company_id) {
       setSalesStatus(copy("Company profile is still loading.", "Şirket profili henüz yükleniyor."));
+      return;
+    }
+
+    const validationMessage = validateSalesStrategy();
+    if (validationMessage) {
+      setSalesStatus(validationMessage);
       return;
     }
 
@@ -1392,7 +1900,7 @@ function App() {
     try {
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("id, username, email, phone_number, company_id, department, access_level, language, theme, profile_picture_url, company:companies(name)")
+        .select("*, company:companies(name)")
         .eq("id", session.user.id)
         .single();
 
@@ -1406,6 +1914,7 @@ function App() {
       if (profile?.theme && ["light", "dark"].includes(profile.theme)) {
         setTheme(profile.theme);
       }
+      setFinancialOverviewWidgets(Array.isArray(profile?.financial_overview_widgets) ? profile.financial_overview_widgets : []);
 
       const [{ data: canRead }, { data: canWrite }] = await Promise.all([
         supabase.rpc("has_module_permission", { p_module_key: "authorization", p_permission: "read" }),
@@ -1465,6 +1974,10 @@ function App() {
 
     const nextName = roleForm.name.trim().toLowerCase();
     if (!nextName) return;
+    if (isAdminRole(nextName)) {
+      setAuthorizationStatus(copy("Admin role is managed by the system and cannot be recreated or edited here.", "Admin rolü sistem tarafından yönetilir; burada yeniden oluşturulamaz veya düzenlenemez."));
+      return;
+    }
 
     setAuthorizationLoading(true);
     try {
@@ -1504,6 +2017,7 @@ function App() {
 
   async function updatePermission(role, module, field, checked) {
     if (!supabase || !authorizationAccess.write) return;
+    if (isAdminRole(role)) return;
 
     const existing = role.permissions[module.module_key];
     const nextPermission = {
@@ -2016,7 +2530,7 @@ function App() {
                 <span>{copy("Product", "Ürün")} <strong>{result.productName || "-"}</strong></span>
                 <span>{copy("Unit Price", "Birim Fiyat")} <strong>{formatLira(result.productPrice, 2)} / {result.productUnit || copy("pcs", "adet")}</strong></span>
                 <span>{copy("Quantity to Produce", "Üretilecek Miktar")} <strong>{formatNumber(result.producedQuantity, 2)} {result.productUnit || copy("pcs", "adet")}</strong></span>
-                <span>{copy("Cycle Time", "Çevrim Süresi")} <strong>{formatNumber(result.cycleTimeMinutes, 2)} {copy("min", "dk")}</strong></span>
+                <span>{copy("Cycle Time", "Çevrim Süresi")} <strong>{formatCycleTime(result.cycleTimeMinutes, selectedProduct?.cycle_time_unit || "minute")}</strong></span>
                 <span>{copy("Electricity Consumption", "Elektrik Tüketimi")} <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
                 <span>{copy("Material Cost", "Malzeme Maliyeti")} <strong>{formatLira(result.materialCost)}</strong></span>
                 <span>{copy("Workforce Cost", "İşgücü Maliyeti")} <strong>{formatLira(result.workforceCost)}</strong></span>
@@ -2495,13 +3009,24 @@ function App() {
                 </label>
                 <label>
                   <span>{copy("Cycle time", "Çevrim süresi")}</span>
-                  <input
-                    min="0.0001"
-                    step="0.01"
-                    type="number"
-                    value={operationForms.product.cycleTimeMinutes}
-                    onChange={(event) => updateOperationForm("product", "cycleTimeMinutes", event.target.value)}
-                  />
+                  <div className="cycle-time-control">
+                    <input
+                      min="0.0001"
+                      step="0.01"
+                      type="number"
+                      value={operationForms.product.cycleTimeValue}
+                      onChange={(event) => updateOperationForm("product", "cycleTimeValue", event.target.value)}
+                    />
+                    <select
+                      aria-label={copy("Cycle time unit", "Çevrim süresi birimi")}
+                      value={operationForms.product.cycleTimeUnit}
+                      onChange={(event) => updateOperationForm("product", "cycleTimeUnit", event.target.value)}
+                    >
+                      <option value="minute">{copy("Minute", "Dakika")}</option>
+                      <option value="hour">{copy("Hour", "Saat")}</option>
+                      <option value="day">{copy("Day", "Gün")}</option>
+                    </select>
+                  </div>
                 </label>
               </div>
 
@@ -2583,7 +3108,7 @@ function App() {
                       setOperationForms((current) => ({
                         ...current,
                         product: {
-                          cycleTimeMinutes: product.cycle_time_minutes || 1,
+                          ...getCycleTimeInputFromMinutes(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute"),
                           materialRows: (product.material_rows || []).map((row) => ({
                             materialId: row.material_id,
                             quantityPerUnit: row.quantity_per_unit,
@@ -2598,7 +3123,7 @@ function App() {
                     <span>{product.id === "empty" ? "-" : product.name}</span>
                     <span>{product.id === "empty" ? "-" : product.unit || "adet"}</span>
                     <span>{product.id === "empty" ? "-" : formatLira(product.price, 2)}</span>
-                    <span>{product.id === "empty" ? "-" : `${formatNumber(product.cycle_time_minutes || 1, 2)} ${copy("min", "dk")}`}</span>
+                    <span>{product.id === "empty" ? "-" : formatCycleTime(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute")}</span>
                     <span>{product.id === "empty" ? "-" : (product.material_rows || []).map((row) => `${row.material?.name || "-"}: ${formatNumber(row.quantity_per_unit, 4)} ${row.material?.unit || ""}`).join(", ") || "-"}</span>
                   </button>
                 ))}
@@ -2664,7 +3189,7 @@ function App() {
                   <div className="process-metrics">
                     <span>{copy("Product", "Ürün")} <strong>{productName}</strong></span>
                     <span>{copy("Quantity to Produce", "Üretilecek Miktar")} <strong>{formatNumber(result.producedQuantity, 2)} {productUnit}</strong></span>
-                    <span>{copy("Cycle", "Çevrim")} <strong>{formatNumber(result.cycleTimeMinutes, 2)} {copy("min", "dk")}</strong></span>
+                    <span>{copy("Cycle", "Çevrim")} <strong>{formatCycleTime(result.cycleTimeMinutes, plan.product?.cycle_time_unit || "minute")}</strong></span>
                     <span>{copy("Main Machine Hours", "Ana Makine Saati")} <strong>{formatNumber(result.primaryMachineDailyHours, 2)} {copy("hours", "saat")}</strong></span>
                     <span>{copy("Energy", "Enerji")} <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
                     <span>{copy("Cost", "Maliyet")} <strong>{formatLira(result.totalTrackedDailyCost)}</strong></span>
@@ -2707,13 +3232,18 @@ function App() {
     const summary = model.summary || emptyFinancialModel.summary;
     const chart = model.trendChart || emptyFinancialModel.trendChart;
     const currentFinancialPage = activeFinancialSubmodule || financialSubmodules[0];
-    const investmentTotal = (summary.machinePurchaseCost || 0) + (summary.extraInitialCost || 0) + (summary.workingCapitalRequirement || 0);
+    const investmentTotal = (summary.machinePurchaseCost || 0) + (summary.equipmentPurchaseCost || 0) + (summary.extraInitialCost || 0) + (summary.workingCapitalRequirement || 0);
     const returnOnInvestment = investmentTotal ? `${formatNumber(((summary.netIncome || 0) / investmentTotal) * 100, 1)}%` : "-";
     const formatMonth = (month) => (month ? `${month}. ${copy("month", "ay")}` : "-");
     const financialRowLabels = {
       electricityCost: copy("Electricity", "Elektrik"),
+      equipmentPurchase: copy("Equipment investment", "Ekipman yatırımı"),
       extraInitialCost: copy("Initial extra costs", "Başlangıç ek giderleri"),
       incomeTax: copy("Income tax", "Gelir vergisi"),
+      investmentGrant: copy("Investment grant / subsidy", "Yatırım / hibe"),
+      loanAmount: copy("Loan financing", "Kredi finansmanı"),
+      loanInterest: copy("Loan interest", "Kredi faizi"),
+      loanPaymentTotal: copy("Loan payments", "Kredi ödemeleri"),
       machinePurchase: copy("Machine investment", "Makine yatırımı"),
       materialCost: copy("Raw materials and packaging", "Hammadde ve paketleme"),
       recurringExtraCost: copy("Recurring overhead", "Tekrarlayan genel gider"),
@@ -2725,6 +3255,18 @@ function App() {
     };
     const getFinancialRowLabel = (row) => financialRowLabels[row.id] || row.label;
     const financialPageMeta = {
+      inputs: {
+        description: copy("Enter financial assumptions and extra costs used by the feasibility model.", "Fizibilite modelinde kullanılacak finansal varsayımları ve ek giderleri girin."),
+        title: "Girdiler",
+      },
+      overview: {
+        description: copy("Review all financial rows and the income-expense projection. Add only the widgets you want to keep on your saved screen.", "Tüm finansal satırları ve gelir-gider projeksiyonunu inceleyin. Kayıtlı ekranınızda tutmak istediğiniz widgetları ayrıca ekleyin."),
+        title: copy("Cost & Return Analysis", "Maliyet & Getiri Analizi"),
+      },
+      loans: {
+        description: copy("Add financing loans separately from optional expenses. Each loan needs its own amount, annual interest, and term.", "Finansman kredilerini opsiyonel giderlerden ayrı girin. Her kredinin tutarı, yıllık faizi ve vadesi ayrı olmalıdır."),
+        title: copy("Loans", "Krediler"),
+      },
       "product-cost": {
         description: copy("Product cost is calculated from active operation plans, product recipes, machine energy, workforce, materials, and recurring extra costs.", "Ürün maliyeti; aktif operasyon planları, ürün reçeteleri, makine enerjisi, işgücü, malzeme ve tekrarlayan ek giderlerden hesaplanır."),
         title: "Ürün Maliyeti",
@@ -2770,12 +3312,682 @@ function App() {
     };
     const isCostPage = currentFinancialPage.key.includes("cost");
     const isInvestmentPage = currentFinancialPage.key.includes("investment");
+    const costBreakdownRows = (model.costStructure || []).filter((item) => toFiniteNumber(item.amount) > 0);
+    const investmentBreakdownRows = [
+      { amount: summary.machinePurchaseCost, id: "machinePurchase", label: copy("Machine investment", "Makine yatırımı") },
+      { amount: summary.equipmentPurchaseCost, id: "equipmentPurchase", label: copy("Equipment investment", "Ekipman yatırımı") },
+      { amount: summary.extraInitialCost, id: "extraInitialCost", label: copy("Initial extra costs", "Başlangıç ek giderleri") },
+      { amount: summary.workingCapitalRequirement, id: "workingCapital", label: copy("Working capital requirement", "İşletme sermayesi ihtiyacı") },
+    ].filter((item) => toFiniteNumber(item.amount) > 0);
+    const returnBreakdownRows = [
+      { amount: summary.salesRevenue, id: "salesRevenue", label: copy("Sales revenue", "Satış geliri"), tone: "income" },
+      { amount: summary.netIncome, id: "netIncome", label: copy("Net income", "Net kazanç"), tone: "net" },
+      { amount: summary.totalCashFlow, id: "cashFlow", label: copy("Total cash flow", "Toplam nakit akışı"), tone: "cash" },
+    ];
+    const maxCostBreakdownAmount = Math.max(1, ...costBreakdownRows.map((item) => toFiniteNumber(item.amount)));
+    const maxInvestmentBreakdownAmount = Math.max(1, ...investmentBreakdownRows.map((item) => toFiniteNumber(item.amount)));
+    const maxReturnBreakdownAmount = Math.max(1, ...returnBreakdownRows.map((item) => Math.abs(toFiniteNumber(item.amount))));
+    const renderBreakdownBars = (rows, maxAmount, emptyLabel, tone = "cost") => (
+      <div className="financial-bar-list">
+        {(rows.length ? rows : [{ amount: 0, id: "empty", label: emptyLabel, tone }]).map((item) => {
+          const amount = toFiniteNumber(item.amount);
+          const width = item.id === "empty" ? 0 : Math.max(4, Math.min(100, (Math.abs(amount) / maxAmount) * 100));
+
+          return (
+            <div className={`financial-bar-row ${item.tone || tone}`} key={item.id || item.label}>
+              <div>
+                <span>{getFinancialRowLabel(item)}</span>
+                <strong>{item.id === "empty" ? "-" : formatLira(amount)}</strong>
+              </div>
+              <i style={{ width: `${width}%` }} />
+            </div>
+          );
+        })}
+      </div>
+    );
+    const financialInputConfig = {
+      assetValueIncreaseAnnualPercent: { label: copy("Asset value increase % / year", "Varlık değer artışı (% yıllık)"), min: "0", step: "0.01" },
+      cogsInflationAnnualPercent: { label: copy("COGS inflation % / year", "SMM enflasyonu (% yıllık)"), min: "0", step: "0.01" },
+      electricityPricePerKwh: { label: copy("Electricity kWh price", "Elektrik kWh fiyatı"), min: "0", step: "0.0001" },
+      expenseVatRate: { label: copy("Average expense VAT %", "Ortalama gider KDV oranı (%)"), min: "0", step: "0.01" },
+      incomeTaxRate: { label: copy("Corporate tax %", "Kurumlar vergisi oranı"), min: "0", step: "0.01" },
+      increaseFrequency: {
+        label: copy("Increase frequency", "Artış sıklığı"),
+        options: [
+          ["monthly", copy("Monthly", "Aylık")],
+          ["quarterly", copy("Quarterly", "3 Ayda Bir")],
+          ["semiannual", copy("Every 6 months", "6 Ayda Bir")],
+          ["annual", copy("Annual", "Yıllık")],
+        ],
+        type: "select",
+      },
+      initialCash: { label: copy("Initial cash", "Başlangıç nakdi"), min: "0", step: "1000" },
+      initialCapacityUnits: { label: copy("Initial capacity (month 1)", "Başlangıç kapasitesi (Ay 1)"), min: "0", step: "1" },
+      investmentGrantAmount: { label: copy("Investment / grant to receive", "Alınacak yatırım / hibe"), min: "0", step: "1000" },
+      monthlyCurrencyIncreasePercent: { label: copy("Monthly FX increase %", "Aylık döviz artışı %"), min: "0", step: "0.01" },
+      monthlyEnergyPriceIncreasePercent: { label: copy("Monthly energy price increase %", "Aylık enerji fiyat artışı %"), min: "0", step: "0.01" },
+      monthlyInflationPercent: { label: copy("Monthly inflation %", "Aylık enflasyon %"), min: "0", step: "0.01" },
+      monthlyWageIncreasePercent: { label: copy("Monthly wage increase %", "Aylık ücret artışı %"), min: "0", step: "0.01" },
+      opexInflationAnnualPercent: { label: copy("OpEx inflation % / year", "OpEx enflasyonu (% yıllık)"), min: "0", step: "0.01" },
+      priceIncreaseAnnualPercent: { label: copy("Price increase policy % / year", "Fiyat artış politikası (% yıllık)"), min: "0", step: "0.01" },
+      rawMaterialBufferMonths: { label: copy("Material buffer months", "Malzeme tampon ay"), min: "0", step: "0.1" },
+      rawMaterialStockDays: { label: copy("Raw material stock holding days", "Hammadde stok tutma süresi (gün)"), min: "0", step: "1" },
+      receivablesCollectionDays: { label: copy("Receivables collection days", "Alacak tahsil süresi (gün)"), min: "0", step: "1" },
+      rentBufferMonths: { label: copy("Rent buffer months", "Kira tampon ay"), min: "0", step: "0.1" },
+      salaryBufferMonths: { label: copy("Salary buffer months", "Maaş tampon ay"), min: "0", step: "0.1" },
+      salesVatRate: { label: copy("Average sales VAT %", "Ortalama satış KDV oranı (%)"), min: "0", step: "0.01" },
+      supplierPaymentDays: { label: copy("Supplier payment days", "Tedarikçi ödeme süresi (gün)"), min: "0", step: "1" },
+      taxPaymentDelayMonths: { label: copy("Tax payment delay months", "Vergi ödeme gecikmesi (ay)"), min: "0", step: "1" },
+      workingDaysPerMonth: { label: copy("Working days / month", "Aylık çalışma günü"), min: "1", step: "1" },
+    };
+    const renderFinancialField = (field, isRequired) => {
+      const config = financialInputConfig[field];
+
+      return (
+        <label className={isRequired ? "required-financial-field" : "optional-financial-field"} key={field}>
+          <span>
+            {config.label}
+            <small>{isRequired ? copy("Required", "Zorunlu") : copy("Optional", "Opsiyonel")}</small>
+          </span>
+          {config.type === "select" ? (
+            <select
+              aria-required={isRequired}
+              required={isRequired}
+              value={financialSettingsForm[field] ?? ""}
+              onChange={(event) => setFinancialSettingsForm((current) => ({ ...current, [field]: event.target.value }))}
+            >
+              {config.options.map(([value, label]) => (
+                <option value={value} key={value}>{label}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              aria-required={isRequired}
+              min={config.min}
+              required={isRequired}
+              step={config.step}
+              type="number"
+              value={financialSettingsForm[field] ?? ""}
+              onChange={(event) => setFinancialSettingsForm((current) => ({ ...current, [field]: event.target.value }))}
+            />
+          )}
+        </label>
+      );
+    };
+    const renderFinancialInputs = () => (
+      <div className="financial-controls finance-input-panel">
+        <form className="financial-assumption-form" onSubmit={handleSaveFinancialSettings}>
+          <section className="financial-input-section">
+            <div className="financial-input-section-heading">
+              <div>
+                <span>{copy("Required inputs", "Zorunlu girdiler")}</span>
+                <p>{copy("These assumptions must be present for the financial model to be saved.", "Finansal modelin kaydedilmesi için bu varsayımlar girilmelidir.")}</p>
+              </div>
+              <strong>{requiredFinancialSettingFields.length}</strong>
+            </div>
+            <div className="financial-input-grid">
+              {requiredFinancialSettingFields.map((field) => renderFinancialField(field, true))}
+            </div>
+          </section>
+
+          <section className="financial-input-section general-financial-assumptions">
+            <div className="financial-input-section-heading">
+              <div>
+                <span>{copy("General financial assumptions", "Genel finansal varsayımlar")}</span>
+                <p>{copy("Grant, tax, VAT, collection, supplier payment, stock holding and starting capacity assumptions.", "Yatırım/hibe, vergi, KDV, tahsilat, tedarikçi ödeme, stok tutma ve başlangıç kapasitesi varsayımları.")}</p>
+              </div>
+              <strong>{generalFinancialAssumptionFields.length}</strong>
+            </div>
+            <div className="financial-input-grid">
+              {generalFinancialAssumptionFields.map((field) => renderFinancialField(field, true))}
+            </div>
+          </section>
+
+          <section className="financial-input-section optional-macro-section">
+            <div className="financial-input-section-heading">
+              <div>
+                <span>{copy("Optional macro assumptions", "Opsiyonel makro varsayımlar")}</span>
+                <p>{copy("These percentages can inflate material, wage, energy and overhead projections month by month. Leave empty or zero to ignore.", "Bu yüzdeler malzeme, ücret, enerji ve genel gider projeksiyonlarını aylık artırabilir. Dikkate almak istemiyorsanız boş veya sıfır bırakın.")}</p>
+              </div>
+              <strong>{optionalMacroFinancialSettingFields.length}</strong>
+            </div>
+            <div className="financial-input-grid">
+              {optionalMacroFinancialSettingFields.map((field) => renderFinancialField(field, false))}
+            </div>
+          </section>
+
+          <section className="financial-input-section inflation-revaluation-section">
+            <div className="financial-input-section-heading">
+              <div>
+                <span>{copy("Inflation and revaluation", "Enflasyon ve yeniden değerleme")}</span>
+                <p>{copy("Annual COGS, OpEx, price increase and asset value policies. Frequency controls how annual increases step through the projection.", "Yıllık SMM, OpEx, fiyat artışı ve varlık değer politikaları. Artış sıklığı yıllık artışların projeksiyona nasıl dağıtılacağını belirler.")}</p>
+              </div>
+              <strong>{inflationRevaluationFinancialFields.length}</strong>
+            </div>
+            <div className="financial-input-grid">
+              {inflationRevaluationFinancialFields.map((field) => renderFinancialField(field, true))}
+            </div>
+          </section>
+
+          <button type="submit" disabled={financialLoading}>{copy("Save Assumptions", "Varsayımları Kaydet")}</button>
+        </form>
+
+        <form onSubmit={handleSaveFinancialExtraCost}>
+          <label>
+            <span>{copy("Optional expense name", "Opsiyonel gider adı")}</span>
+            <input
+              type="text"
+              value={financialExtraCostForm.name}
+              onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, name: event.target.value }))}
+            />
+          </label>
+          <label>
+            <span>{copy("Type", "Tip")}</span>
+            <select
+              value={financialExtraCostForm.costType}
+              onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, costType: event.target.value }))}
+            >
+              <option value="initial">{copy("Initial", "Başlangıç")}</option>
+              <option value="recurring">{copy("Recurring", "Tekrarlayan")}</option>
+            </select>
+          </label>
+          <label>
+            <span>{copy("Amount", "Tutar")}</span>
+            <input
+              min="0"
+              step="0.01"
+              type="number"
+              value={financialExtraCostForm.amount}
+              onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, amount: event.target.value }))}
+            />
+          </label>
+          <button type="submit" disabled={financialLoading}>{copy("Add Optional Expense", "Opsiyonel Gider Ekle")}</button>
+        </form>
+      </div>
+    );
+    const financialLoanRows = Array.isArray(financialSettingsForm.loanRows) ? financialSettingsForm.loanRows : [];
+    const calculatedLoanRows = getFinancialLoanRows(financialSettingsForm);
+    const totalLoanAmount = calculatedLoanRows.reduce((total, loan) => total + loan.amount, 0);
+    const totalMonthlyLoanPayment = calculatedLoanRows.reduce((total, loan) => total + loan.monthlyPayment, 0);
+    const longestLoanTerm = calculatedLoanRows.reduce((longestTerm, loan) => Math.max(longestTerm, loan.loanTermMonths), 0);
+    const longestGracePeriod = calculatedLoanRows.reduce((longestGrace, loan) => Math.max(longestGrace, loan.gracePeriodMonths), 0);
+    const estimatedLoanInterest = calculatedLoanRows.reduce((total, loan) => (
+      total + Math.max(0, (loan.monthlyPayment * loan.repaymentTermMonths) - loan.amount)
+    ), 0);
+    const renderFinancialLoans = () => (
+      <form className="financial-loan-form" onSubmit={handleSaveFinancialSettings}>
+        <section className="financial-loan-hero">
+          <div>
+            <span>{copy("Financing plan", "Finansman planı")}</span>
+            <h2>{copy("Loans", "Krediler")}</h2>
+            <p>{copy("Add each loan separately, including its no-payment grace period. The feasibility model starts cash payments after the grace months.", "Her krediyi ayrı ekleyin; ilk kaç ay ödeme olmayacağını belirtin. Fizibilite modeli nakit ödemeleri ödemesiz aylar bittikten sonra başlatır.")}</p>
+          </div>
+          <button type="button" onClick={addFinancialLoanRow}>{copy("Add Loan", "Kredi Ekle")}</button>
+        </section>
+
+        <section className="financial-loan-summary-grid">
+          {[
+            [copy("Total loan", "Toplam kredi"), formatLira(totalLoanAmount), copy("financing amount", "finansman tutarı")],
+            [copy("Monthly payment", "Aylık ödeme"), formatLira(totalMonthlyLoanPayment), copy("after grace periods", "ödemesiz aylar sonrası")],
+            [copy("Longest term", "En uzun vade"), `${formatNumber(longestLoanTerm)} ${copy("mo", "ay")}`, copy("including grace", "ödemesiz ay dahil")],
+            [copy("Longest grace", "En uzun ödemesiz"), `${formatNumber(longestGracePeriod)} ${copy("mo", "ay")}`, copy("no cash payment", "nakit ödeme yok")],
+            [copy("Estimated interest", "Tahmini faiz"), formatLira(estimatedLoanInterest), copy("based on current terms", "mevcut koşullara göre")],
+          ].map(([label, value, detail]) => (
+            <article className="financial-loan-summary-card" key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+              <small>{detail}</small>
+            </article>
+          ))}
+        </section>
+
+        <section className="financial-input-section optional financial-loan-section">
+          <div className="financial-input-section-heading">
+            <div>
+              <span>{copy("Loan records", "Kredi kayıtları")}</span>
+              <p>{copy("Every loan row must include amount, annual interest, grace period, and term. Leave this page empty if there is no loan.", "Her kredi satırında tutar, yıllık faiz, ödemesiz ay ve vade girilmelidir. Kredi yoksa bu sayfayı boş bırakabilirsiniz.")}</p>
+            </div>
+            <strong>{financialLoanRows.length}</strong>
+          </div>
+          <div className="financial-loan-list">
+            {financialLoanRows.length ? financialLoanRows.map((loan, index) => {
+              const calculatedLoan = calculatedLoanRows.find((row) => row.id === loan.id) || calculatedLoanRows[index] || {};
+
+              return (
+                <article className="financial-loan-card" key={loan.id || `loan-${index}`}>
+                  <div className="financial-loan-card-heading">
+                    <div>
+                      <span>{copy("Loan", "Kredi")} {index + 1}</span>
+                      <h3>{formatLira(toFiniteNumber(loan.amount))}</h3>
+                    </div>
+                    <button type="button" className="resource-remove-button" onClick={() => removeFinancialLoanRow(index)}>
+                      x
+                    </button>
+                  </div>
+                  <div className="financial-loan-row">
+                    <label className="optional-financial-field">
+                      <span>
+                        {copy("Loan amount", "Kredi tutarı")}
+                        <small>{copy("Required", "Zorunlu")}</small>
+                      </span>
+                      <input
+                        min="0.01"
+                        required
+                        step="1000"
+                        type="number"
+                        value={loan.amount ?? ""}
+                        onChange={(event) => updateFinancialLoanRow(index, "amount", event.target.value)}
+                      />
+                    </label>
+                    <label className="optional-financial-field">
+                      <span>
+                        {copy("Annual interest %", "Yıllık faiz %")}
+                        <small>{copy("Required", "Zorunlu")}</small>
+                      </span>
+                      <input
+                        min="0"
+                        required
+                        step="0.01"
+                        type="number"
+                        value={loan.annualInterestRate ?? ""}
+                        onChange={(event) => updateFinancialLoanRow(index, "annualInterestRate", event.target.value)}
+                      />
+                    </label>
+                    <label className="optional-financial-field">
+                      <span>
+                        {copy("Grace period months", "Ödemesiz ay")}
+                        <small>{copy("Required", "Zorunlu")}</small>
+                      </span>
+                      <input
+                        min="0"
+                        required
+                        step="1"
+                        type="number"
+                        value={loan.gracePeriodMonths ?? 0}
+                        onChange={(event) => updateFinancialLoanRow(index, "gracePeriodMonths", event.target.value)}
+                      />
+                    </label>
+                    <label className="optional-financial-field">
+                      <span>
+                        {copy("Loan term months", "Kredi vadesi ay")}
+                        <small>{copy("Required", "Zorunlu")}</small>
+                      </span>
+                      <input
+                        min="1"
+                        required
+                        step="1"
+                        type="number"
+                        value={loan.loanTermMonths ?? ""}
+                        onChange={(event) => updateFinancialLoanRow(index, "loanTermMonths", event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <div className="financial-loan-card-metrics">
+                    <span>{copy("Payment starts", "Ödeme başlangıcı")}<strong>{formatNumber((calculatedLoan.gracePeriodMonths || 0) + 1)}. {copy("month", "ay")}</strong></span>
+                    <span>{copy("Repayment term", "Ödeme vadesi")}<strong>{formatNumber(calculatedLoan.repaymentTermMonths || 0)} {copy("mo", "ay")}</strong></span>
+                    <span>{copy("Monthly payment", "Aylık ödeme")}<strong>{formatLira(calculatedLoan.monthlyPayment || 0)}</strong></span>
+                  </div>
+                </article>
+              );
+            }) : (
+              <p className="planner-empty-state loan-empty-state">{copy("No loan added. The model will use zero loan.", "Kredi eklenmedi. Model sıfır kredi kullanacak.")}</p>
+            )}
+          </div>
+          <div className="financial-loan-actions">
+            <button type="button" onClick={addFinancialLoanRow}>{copy("Add Loan", "Kredi Ekle")}</button>
+            <button type="submit" disabled={financialLoading}>{copy("Save Loans", "Kredileri Kaydet")}</button>
+          </div>
+        </section>
+      </form>
+    );
+    const renderFinancialTrendCard = () => (
+      <article className="financial-card financial-overview-wide">
+        <div className="financial-card-heading">
+          <h2>{copy("Income, Expense and Net Projection", "Gelir, Gider ve Net Projeksiyonu")}</h2>
+          <div className="mini-tabs">
+            {[
+              ["6m", copy("6 Months", "6 Ay")],
+              ["1y", copy("1 Year", "1 Yıl")],
+              ["5y", copy("5 Years", "5 Yıl")],
+            ].map(([value, label]) => (
+              <button
+                type="button"
+                className={financialHorizon === value ? "active" : ""}
+                onClick={() => {
+                  setFinancialHorizon(value);
+                  loadFinancialData(value);
+                }}
+                key={value}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="chart-legend" aria-label={copy("Chart color legend", "Grafik renk açıklaması")}>
+          <span className="legend-sales">{copy("Income", "Gelir")}</span>
+          <span className="legend-costs">{copy("Expense", "Gider")}</span>
+          <span className="legend-net">{copy("Net", "Net")}</span>
+        </div>
+        <svg className="trend-chart finance-model-chart" viewBox="0 0 560 280" role="img" aria-label={copy("Income, expense, and net projection chart", "Gelir, gider ve net projeksiyon grafiği")}>
+          <text className="axis-label axis-label-y" x="-162" y="18" transform="rotate(-90)">{copy("Amount (TRY)", "Tutar (TRY)")}</text>
+          <text className="axis-label axis-label-x" x="272" y="262">{copy("Projection period", "Projeksiyon dönemi")}</text>
+          <path className="chart-grid" d="M30 40 H500 M30 82.5 H500 M30 125 H500 M30 167.5 H500 M30 210 H500" />
+          <path className="chart-axis" d="M30 30 V210 H500" />
+          <text className="chart-tick" x="30" y="214">0</text>
+          <text className="chart-tick" x="24" y="44">{copy("High", "Yüksek")}</text>
+          <text className="chart-tick" x="30" y="232">{copy("Start", "Başlangıç")}</text>
+          <text className="chart-tick chart-tick-end" x="500" y="232">{copy("End", "Bitiş")}</text>
+          {chart.salesPath && <path className="trend-line sales" d={chart.salesPath} />}
+          {chart.costPath && <path className="trend-line costs" d={chart.costPath} />}
+          {chart.netPath && <path className="trend-line net" d={chart.netPath} />}
+        </svg>
+      </article>
+    );
+    const overviewFinancialRows = [
+      { amount: summary.salesRevenue, id: "salesRevenue", source: copy("Sales Strategy", "Satış Stratejisi"), tone: "income", type: copy("Return", "Getiri") },
+      { amount: summary.investmentGrantAmount, id: "investmentGrant", source: copy("Financial inputs", "Finansal girdiler"), tone: "financing", type: copy("Grant / subsidy", "Hibe / teşvik") },
+      { amount: summary.materialCost, id: "materialCost", source: copy("Operations material plans", "Operations malzeme planları"), tone: "cost", type: copy("Operating input", "Operasyon girdisi") },
+      { amount: summary.workforceCost, id: "workforceCost", source: copy("Operations workforce plan", "Operations işgücü planı"), tone: "cost", type: copy("Operating input", "Operasyon girdisi") },
+      { amount: summary.electricityCost, id: "electricityCost", source: copy("Operations energy x input price", "Operations enerji x girdi fiyatı"), tone: "cost", type: copy("Operating input", "Operasyon girdisi") },
+      { amount: summary.expiredWriteOffCost, id: "writeOffCost", source: copy("Sales returns and spoilage", "Satış iadesi ve fire"), tone: "cost", type: copy("Risk cost", "Risk gideri") },
+      { amount: summary.machinePurchaseCost, id: "machinePurchase", source: copy("Operations machines", "Operations makineleri"), tone: "investment", type: copy("Investment input", "Yatırım girdisi") },
+      { amount: summary.equipmentPurchaseCost, id: "equipmentPurchase", source: copy("Operations equipment", "Operations ekipmanları"), tone: "investment", type: copy("Investment input", "Yatırım girdisi") },
+      { amount: summary.extraInitialCost, id: "extraInitialCost", source: copy("Optional expenses input", "Opsiyonel gider girdisi"), tone: "investment", type: copy("Initial expense", "Başlangıç gideri") },
+      { amount: summary.extraRecurringCost, id: "recurringExtraCost", source: copy("Optional expenses input", "Opsiyonel gider girdisi"), tone: "cost", type: copy("Recurring expense", "Tekrarlayan gider") },
+      { amount: summary.workingCapitalRequirement, id: "workingCapital", source: copy("Financial inputs", "Finansal girdiler"), tone: "investment", type: copy("Working capital", "İşletme sermayesi") },
+      { amount: summary.loanAmount, id: "loanAmount", source: copy("Loans page", "Krediler sayfası"), tone: "financing", type: copy("Financing input", "Finansman girdisi") },
+      { amount: summary.loanInterest, id: "loanInterest", source: copy("Loans page", "Krediler sayfası"), tone: "cost", type: copy("Financing cost", "Finansman gideri") },
+      { amount: summary.loanPaymentTotal, id: "loanPaymentTotal", source: copy("Loans page", "Krediler sayfası"), tone: "cash", type: copy("Cash outflow", "Nakit çıkışı") },
+      { amount: summary.vatPayable, id: "vatPayable", source: copy("Tax inputs", "Vergi girdileri"), tone: "cost", type: copy("Tax", "Vergi") },
+      { amount: summary.incomeTax, id: "incomeTax", source: copy("Tax inputs", "Vergi girdileri"), tone: "cost", type: copy("Tax", "Vergi") },
+      { amount: summary.netIncome, id: "netIncome", label: copy("Net return", "Net getiri"), source: copy("Calculated", "Hesaplanan"), tone: "net", type: copy("Result", "Sonuç") },
+      { amount: summary.totalCashFlow, id: "cashFlow", label: copy("Total cash flow", "Toplam nakit akışı"), source: copy("Calculated", "Hesaplanan"), tone: "cash", type: copy("Result", "Sonuç") },
+    ];
+    const renderOverviewFinancialRows = () => (
+      <article className="financial-card income-card financial-overview-wide">
+        <div className="financial-card-heading">
+          <h2>{copy("Financial Rows", "Finansal Satırlar")}</h2>
+          <span className="financial-row-count">{overviewFinancialRows.length} {copy("rows", "satır")}</span>
+        </div>
+        <div className="income-table overview-income-table">
+          <div className="income-row income-head">
+            <span>{copy("Item", "Kalem")}</span>
+            <span>{copy("Source", "Kaynak")}</span>
+            <span>{copy("Type", "Tip")}</span>
+            <span>{copy("Amount", "Tutar")}</span>
+          </div>
+          {overviewFinancialRows.map((row, index) => (
+            <div className={`income-row ${row.tone || ""}`} key={`${row.id}-${index}`}>
+              <strong>{row.label || getFinancialRowLabel(row)}</strong>
+              <span>{row.source}</span>
+              <span>{row.type}</span>
+              <span>{formatLira(row.amount)}</span>
+            </div>
+          ))}
+        </div>
+      </article>
+    );
+    const renderWidgetMetric = (label, value, detail) => (
+      <div className="financial-widget-metric">
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <small>{detail}</small>
+      </div>
+    );
+    const renderWidgetScenarioList = (rows, emptyLabel) => (
+      <div className="scenario-list">
+        {(rows.length ? rows : [{ id: "empty", name: emptyLabel, costType: "-", amount: 0 }]).map((item) => (
+          <div className="scenario-row" key={item.id || item.name}>
+            <div>
+              <strong>{item.name || getFinancialRowLabel(item)}</strong>
+              <span>{item.costType === "initial" ? copy("Initial expense", "Başlangıç gideri") : item.costType === "recurring" ? copy("Recurring expense", "Tekrarlayan gider") : item.costType || "-"}</span>
+            </div>
+            <strong>{item.id === "empty" ? "-" : formatLira(item.amount)}</strong>
+          </div>
+        ))}
+      </div>
+    );
+    const financialWidgetCatalog = [
+      {
+        detail: copy("Liquidity after current inputs", "Mevcut girdilerle likidite"),
+        id: "cashRunway",
+        render: () => renderWidgetMetric(copy("Cash Runway", "Nakit Dayanma"), `${formatNumber(summary.cashRunwayMonths)} ${copy("months", "ay")}`, copy("Uses initial cash, loans and monthly cash flow", "Başlangıç nakdi, krediler ve aylık nakit akışını kullanır")),
+        title: copy("Cash Runway", "Nakit Dayanma"),
+      },
+      {
+        detail: copy("First profitable operating month", "İlk kârlı operasyon ayı"),
+        id: "breakEven",
+        render: () => renderWidgetMetric(copy("Break-even", "Başa Baş"), formatMonth(summary.breakEvenMonth), copy("Revenue minus operating cost and taxes", "Gelir eksi operasyon maliyeti ve vergiler")),
+        title: copy("Break-even", "Başa Baş"),
+      },
+      {
+        detail: copy("Investment recovery estimate", "Yatırım geri dönüş tahmini"),
+        id: "payback",
+        render: () => renderWidgetMetric(copy("Payback", "Geri Dönüş"), formatMonth(summary.paybackMonth), copy("Investment, working capital and loan effect included", "Yatırım, işletme sermayesi ve kredi etkisi dahil")),
+        title: copy("Payback", "Geri Dönüş"),
+      },
+      {
+        detail: copy("Break-even sales volume", "Başa baş satış hacmi"),
+        id: "requiredSales",
+        render: () => renderWidgetMetric(copy("Required Monthly Sales", "Gerekli Aylık Satış"), formatNumber(summary.requiredMonthlySalesVolume), copy("Based on contribution per unit", "Birim katkı payına göre")),
+        title: copy("Required Sales", "Gerekli Satış"),
+      },
+      {
+        detail: copy("Forecast not sold", "Satışa dönüşmeyen tahmin"),
+        id: "inventoryRisk",
+        render: () => renderWidgetMetric(copy("Unsold Inventory", "Satılmayan Stok"), `${formatNumber(summary.unsoldInventoryUnits)} ${copy("units", "adet")}`, copy("Production above channel sales plan", "Kanal satış planını aşan üretim")),
+        title: copy("Inventory Risk", "Stok Riski"),
+      },
+      {
+        detail: copy("Spoilage and return write-off", "Fire ve iade maliyeti"),
+        id: "writeOff",
+        render: () => renderWidgetMetric(copy("Write-off Value", "Fire / İade Değeri"), formatLira(summary.expiredWriteOffCost), copy("Sales strategy return and spoilage inputs", "Satış stratejisi iade ve fire girdileri")),
+        title: copy("Write-off", "Fire / İade"),
+      },
+      {
+        detail: copy("VAT and income tax", "KDV ve gelir vergisi"),
+        id: "taxLoad",
+        render: () => renderWidgetMetric(copy("Tax Load", "Vergi Yükü"), formatLira(summary.vatPayable + summary.incomeTax), copy("Tax inputs from financial assumptions", "Finansal varsayımlardan gelen vergi girdileri")),
+        title: copy("Tax Load", "Vergi Yükü"),
+      },
+      {
+        detail: copy("Loan payment impact", "Kredi ödeme etkisi"),
+        id: "loanSummary",
+        render: () => (
+          <div className="financial-widget-pair">
+            {renderWidgetMetric(copy("Monthly Payment", "Aylık Ödeme"), formatLira(summary.loanPayment), copy("Current active installments", "Mevcut aktif taksitler"))}
+            {renderWidgetMetric(copy("Total Loan", "Toplam Kredi"), formatLira(summary.loanAmount), copy("Saved in Loans page", "Krediler sayfasında kayıtlı"))}
+          </div>
+        ),
+        title: copy("Loan Summary", "Kredi Özeti"),
+      },
+      {
+        detail: copy("Operations and input cost mix", "Operasyon ve girdi maliyet karması"),
+        id: "costTypes",
+        render: () => renderBreakdownBars(costBreakdownRows, maxCostBreakdownAmount, copy("No cost data yet", "Henüz maliyet verisi yok"), "cost"),
+        title: copy("Cost Types", "Maliyet Türleri"),
+      },
+      {
+        detail: copy("Revenue, net and cash return", "Gelir, net ve nakit getiri"),
+        id: "returnTypes",
+        render: () => renderBreakdownBars(returnBreakdownRows, maxReturnBreakdownAmount, copy("No return data yet", "Henüz getiri verisi yok"), "income"),
+        title: copy("Return Types", "Getiri Türleri"),
+      },
+      {
+        detail: copy("Machine, equipment and working capital", "Makine, ekipman ve işletme sermayesi"),
+        id: "investmentBreakdown",
+        render: () => renderBreakdownBars(investmentBreakdownRows, maxInvestmentBreakdownAmount, copy("No investment data yet", "Henüz yatırım verisi yok"), "investment"),
+        title: copy("Investment Breakdown", "Yatırım Kırılımı"),
+      },
+      {
+        detail: copy("User-entered optional expenses", "Kullanıcının girdiği opsiyonel giderler"),
+        id: "optionalExpenses",
+        render: () => renderWidgetScenarioList(model.extraCosts || [], copy("No optional expense yet", "Henüz opsiyonel gider yok")),
+        title: copy("Optional Expenses", "Opsiyonel Giderler"),
+      },
+    ];
+    const selectedFinancialWidgets = financialOverviewWidgets
+      .map((widgetId) => financialWidgetCatalog.find((widget) => widget.id === widgetId))
+      .filter(Boolean);
+    const renderOverviewWidget = (widget) => (
+      <article className="financial-card financial-widget-card" key={widget.id}>
+        <div className="financial-card-heading">
+          <div>
+            <h2>{widget.title}</h2>
+            <p>{widget.detail}</p>
+          </div>
+          <button type="button" className="widget-remove-button" onClick={() => toggleFinancialOverviewWidget(widget.id)}>
+            x
+          </button>
+        </div>
+        {widget.render()}
+      </article>
+    );
+    const renderWidgetSelector = () => (
+      <article className="financial-card financial-widget-selector">
+        <div className="financial-card-heading">
+          <div>
+            <h2>{copy("Add widgets to this screen", "Bu ekrana widget ekle")}</h2>
+            <p>{copy("Default view stays focused on financial rows and the projection chart. Pick the metrics you want to keep on your saved screen.", "Varsayılan görünüm finansal satırlar ve projeksiyon grafiğine odaklı kalır. Kayıtlı ekranında görmek istediğin metrikleri seç.")}</p>
+          </div>
+          <button type="button" className="primary" onClick={saveFinancialOverviewScreen} disabled={financialLoading}>
+            {copy("Save Screen", "Ekranı Kaydet")}
+          </button>
+        </div>
+        <div className="financial-widget-picker">
+          {financialWidgetCatalog.map((widget) => {
+            const isSelected = financialOverviewWidgets.includes(widget.id);
+
+            return (
+              <button
+                type="button"
+                className={isSelected ? "selected" : ""}
+                onClick={() => toggleFinancialOverviewWidget(widget.id)}
+                key={widget.id}
+              >
+                <strong>{widget.title}</strong>
+                <span>{widget.detail}</span>
+              </button>
+            );
+          })}
+        </div>
+      </article>
+    );
     const visibleIncomeRows = (model.incomeRows || []).filter((row) => {
       if (currentFinancialPage.key === "product-cost") return row.kind !== "income" && row.costType !== "initial";
       if (currentFinancialPage.key === "investment-cost") return row.costType === "initial" || row.id === "workingCapital";
       if (currentFinancialPage.key === "product-return") return row.costType !== "initial";
       return true;
     });
+
+    if (currentFinancialPage.key === "inputs") {
+      return renderDashboardLayout(
+        `financial-modelling/${currentFinancialPage.key}`,
+          <section className="financial-workspace">
+            <div className="financial-header">
+              <div>
+                <span>{currentFinancialPage.group} / {copy("Financial assumptions", "Finansal varsayımlar")}</span>
+                <h1>{financialPageMeta.title}</h1>
+                <p>{financialPageMeta.description}</p>
+              </div>
+              <button type="button" className="primary" onClick={() => loadFinancialData()}>
+                {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
+              </button>
+            </div>
+
+            {renderFinancialInputs()}
+            {financialStatus && <p className="status-message">{financialStatus}</p>}
+
+            <div className="financial-grid">
+              <article className="financial-card scenario-card">
+                <div className="financial-card-heading"><h2>{copy("Saved Optional Expenses", "Kayıtlı Opsiyonel Giderler")}</h2></div>
+                <div className="scenario-list">
+                  {(model.extraCosts?.length ? model.extraCosts : [{ id: "empty", name: copy("No extra cost yet", "Henüz ek gider yok"), costType: "-", amount: 0 }]).map((cost) => (
+                    <div className="scenario-row" key={cost.id}>
+                      <div>
+                        <strong>{cost.name}</strong>
+                        <span>{cost.costType === "initial" ? copy("Initial expense", "Başlangıç gideri") : cost.costType === "recurring" ? copy("Recurring expense", "Tekrarlayan gider") : "-"}</span>
+                      </div>
+                      <strong>{cost.id === "empty" ? "-" : formatLira(cost.amount)}</strong>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+          </section>,
+      );
+    }
+
+    if (currentFinancialPage.key === "loans") {
+      return renderDashboardLayout(
+        `financial-modelling/${currentFinancialPage.key}`,
+          <section className="financial-workspace">
+            <div className="financial-header">
+              <div>
+                <span>{currentFinancialPage.group} / {copy("Financing inputs", "Finansman girdileri")}</span>
+                <h1>{financialPageMeta.title}</h1>
+                <p>{financialPageMeta.description}</p>
+              </div>
+              <button type="button" className="primary" onClick={() => loadFinancialData()}>
+                {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
+              </button>
+            </div>
+
+            {financialStatus && <p className="status-message">{financialStatus}</p>}
+
+            <div className="finance-metric-grid">
+              {[
+                [copy("Loan Count", "Kredi Sayısı"), formatNumber(financialLoanRows.length), copy("separate financing records", "ayrı finansman kaydı")],
+                [copy("Total Loan Amount", "Toplam Kredi Tutarı"), formatLira(totalLoanAmount), copy("included in initial cash", "başlangıç nakdine eklenir")],
+                [copy("Monthly Loan Payment", "Aylık Kredi Ödemesi"), formatLira(totalMonthlyLoanPayment), copy("sum of active installments", "aktif taksitlerin toplamı")],
+                [copy("Longest Term", "En Uzun Vade"), longestLoanTerm ? `${formatNumber(longestLoanTerm)} ${copy("months", "ay")}` : "-", copy("used for repayment schedule", "ödeme planında kullanılır")],
+              ].map(([label, value, detail]) => (
+                <article className="finance-metric-card" key={label}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                  <small>{detail}</small>
+                </article>
+              ))}
+            </div>
+
+            {renderFinancialLoans()}
+          </section>,
+      );
+    }
+
+    if (currentFinancialPage.key === "overview") {
+      return renderDashboardLayout(
+        `financial-modelling/${currentFinancialPage.key}`,
+          <section className="financial-workspace">
+            <div className="financial-header">
+              <div>
+                <span>{currentFinancialPage.group} / {copy("Model connected to Operations data", "Operations verisine bağlı model")}</span>
+                <h1>{financialPageMeta.title}</h1>
+                <p>{financialPageMeta.description}</p>
+              </div>
+              <button type="button" className="primary" onClick={() => loadFinancialData()}>
+                {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
+              </button>
+            </div>
+
+            {financialStatus && <p className="status-message">{financialStatus}</p>}
+
+            {renderWidgetSelector()}
+
+            <div className="financial-overview-grid">
+              {renderOverviewFinancialRows()}
+              {renderFinancialTrendCard()}
+            </div>
+
+            {selectedFinancialWidgets.length > 0 && (
+              <div className="financial-widget-grid">
+                {selectedFinancialWidgets.map(renderOverviewWidget)}
+              </div>
+            )}
+          </section>,
+      );
+    }
 
     return renderDashboardLayout(
       `financial-modelling/${currentFinancialPage.key}`,
@@ -2790,70 +4002,6 @@ function App() {
               {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
             </button>
           </div>
-
-          {isCostPage && (
-            <div className="financial-controls finance-input-panel">
-              <form className="financial-assumption-form" onSubmit={handleSaveFinancialSettings}>
-                {[
-                  ["electricityPricePerKwh", copy("Electricity kWh price", "Elektrik kWh fiyatı"), "0.0001"],
-                  ["workingDaysPerMonth", copy("Working days / month", "Aylık çalışma günü"), "1"],
-                  ["initialCash", copy("Initial cash", "Başlangıç nakdi"), "1000"],
-                  ["loanAmount", copy("Loan amount", "Kredi tutarı"), "1000"],
-                  ["annualInterestRate", copy("Annual interest %", "Yıllık faiz %"), "0.01"],
-                  ["loanTermMonths", copy("Loan term months", "Kredi vadesi ay"), "1"],
-                  ["vatRate", copy("VAT %", "KDV %"), "0.01"],
-                  ["incomeTaxRate", copy("Income tax %", "Gelir vergisi %"), "0.01"],
-                  ["rawMaterialBufferMonths", copy("Material buffer months", "Malzeme tampon ay"), "0.1"],
-                  ["salaryBufferMonths", copy("Salary buffer months", "Maaş tampon ay"), "0.1"],
-                  ["rentBufferMonths", copy("Rent buffer months", "Kira tampon ay"), "0.1"],
-                ].map(([field, label, step]) => (
-                  <label key={field}>
-                    <span>{label}</span>
-                    <input
-                      min="0"
-                      step={step}
-                      type="number"
-                      value={financialSettingsForm[field] ?? ""}
-                      onChange={(event) => setFinancialSettingsForm((current) => ({ ...current, [field]: event.target.value }))}
-                    />
-                  </label>
-                ))}
-                <button type="submit" disabled={financialLoading}>{copy("Save Assumptions", "Varsayımları Kaydet")}</button>
-              </form>
-
-              <form onSubmit={handleSaveFinancialExtraCost}>
-                <label>
-                  <span>{copy("Extra cost name", "Ek gider adı")}</span>
-                  <input
-                    type="text"
-                    value={financialExtraCostForm.name}
-                    onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, name: event.target.value }))}
-                  />
-                </label>
-                <label>
-                  <span>{copy("Type", "Tip")}</span>
-                  <select
-                    value={financialExtraCostForm.costType}
-                    onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, costType: event.target.value }))}
-                  >
-                    <option value="initial">{copy("Initial", "Başlangıç")}</option>
-                    <option value="recurring">{copy("Recurring", "Tekrarlayan")}</option>
-                  </select>
-                </label>
-                <label>
-                  <span>{copy("Amount", "Tutar")}</span>
-                  <input
-                    min="0"
-                    step="0.01"
-                    type="number"
-                    value={financialExtraCostForm.amount}
-                    onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, amount: event.target.value }))}
-                  />
-                </label>
-                <button type="submit" disabled={financialLoading}>{copy("Add Extra Cost", "Ek Gider Ekle")}</button>
-              </form>
-            </div>
-          )}
 
           {financialStatus && <p className="status-message">{financialStatus}</p>}
 
@@ -2870,7 +4018,7 @@ function App() {
           <div className="financial-feasibility-grid">
             {[
               [copy("Forecast Sales", "Tahmini Satış"), formatNumber(summary.forecastSalesUnits), copy("from Sales Strategy monthly inputs", "Satış Stratejisi aylık girdilerinden")],
-              [copy("Unsold Inventory", "Satılmayan Stok"), formatNumber(summary.unsoldInventoryUnits), copy("production above sales forecast", "satış tahminini aşan üretim")],
+              [copy("Unsold Inventory", "Satılmayan Stok"), formatNumber(summary.unsoldInventoryUnits), copy("production above channel sales plan", "kanal satış planını aşan üretim")],
               [copy("Write-off Value", "Fire / İade Değeri"), formatLira(summary.expiredWriteOffCost), copy("spoilage, returns and expired products", "bozulma, iade ve SKT ürünler")],
               [copy("Cash Runway", "Nakit Dayanma"), `${formatNumber(summary.cashRunwayMonths)} ${copy("months", "ay")}`, copy("with entered initial cash", "girilen başlangıç nakdiyle")],
               [copy("Break-even", "Başa Baş"), formatMonth(summary.breakEvenMonth), copy("first profitable operating month", "ilk kârlı operasyon ayı")],
@@ -2878,7 +4026,7 @@ function App() {
               [copy("Initial Cash Needed", "Gerekli Başlangıç Nakdi"), formatLira(summary.initialCashRequired), copy("own cash after loan", "kredi sonrası öz nakit")],
               [copy("Monthly Loan Payment", "Aylık Kredi Ödemesi"), formatLira(summary.loanPayment), copy("principal and interest", "anapara ve faiz")],
               [copy("Required Monthly Sales", "Gerekli Aylık Satış"), formatNumber(summary.requiredMonthlySalesVolume), copy("break-even volume estimate", "başa baş hacim tahmini")],
-              [copy("Retailer Margin", "Kanal Marjı"), formatLira(summary.retailerMarginCost), copy("retailer/distributor deductions", "perakende/distribütör kesintileri")],
+              [copy("Channel Commission", "Kanal Komisyonu"), formatLira(summary.retailerMarginCost), copy("commission deducted from channel sales", "kanal satışlarından düşülen komisyon")],
               [copy("Payment Delay", "Ödeme Vadesi"), `${formatNumber(summary.weightedPaymentDelayDays, 1)} ${copy("days", "gün")}`, copy("weighted channel delay", "ağırlıklı kanal vadesi")],
               [copy("VAT + Tax", "KDV + Vergi"), formatLira(summary.vatPayable + summary.incomeTax), copy("basic tax handling", "temel vergi hesabı")],
             ].map(([label, value, detail]) => (
@@ -3000,33 +4148,79 @@ function App() {
 
   function renderSimulationPage() {
     const variant = activeSimulationVariant || simulationVariants[0];
-    const parameters = variant.parameters;
+    const parameters = variant.parameters || {};
     const numberParam = (field) => Number(parameters[field]) || 0;
+    const positiveParam = (field, fallback = 0) => {
+      const value = Number(parameters[field]);
+      return Number.isFinite(value) && value > 0 ? value : fallback;
+    };
+    const finiteParam = (field, fallback = 0) => {
+      const value = Number(parameters[field]);
+      return Number.isFinite(value) ? value : fallback;
+    };
     const linkedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForm, operationsWorkspace, financialHorizon);
     const linkedSummary = linkedFinancialModel.summary || emptyFinancialModel.summary;
-    const baseRevenue = numberParam("baseRevenue");
+    const defaultHorizonMonths = Math.max(1, getProjectionMonthCount(financialHorizon));
+    const timeHorizonMonths = Math.max(1, Math.round(positiveParam("timeHorizonMonths", defaultHorizonMonths)));
+    const productMap = getOperationProductMap(operationsWorkspace);
+    const firstChannelProduct = salesStrategy.channels.map((channel) => productMap.get(channel.productId) || channel.product).find(Boolean);
+    const defaultSalesUnits = Math.round(
+      toFiniteNumber(linkedSummary.netSoldUnits) / timeHorizonMonths ||
+      getSalesForecastForMonth(salesStrategy, 0),
+    );
+    const defaultUnitSalesPrice = toFiniteNumber(
+      linkedSummary.averageNetPrice,
+      toFiniteNumber(firstChannelProduct?.price, toFiniteNumber(operationsWorkspace.product?.price, toFiniteNumber(operationsWorkspace.products[0]?.price))),
+    );
+    const scenarioSalesUnits = Math.max(0, positiveParam("salesUnits", defaultSalesUnits));
+    const scenarioUnitSalesPrice = Math.max(0, positiveParam("unitSalesPrice", defaultUnitSalesPrice));
+    const scenarioProductionUnits = Math.max(
+      scenarioSalesUnits,
+      positiveParam("productionUnits", Math.round(toFiniteNumber(linkedSummary.totalProduced) / timeHorizonMonths) || scenarioSalesUnits),
+    );
+    const discountPercent = Math.min(100, Math.max(0, finiteParam("discountPercent", 0)));
+    const returnRatePercent = Math.min(100, Math.max(0, finiteParam("returnRatePercent", 0)));
+    const spoilagePercent = Math.min(100, Math.max(0, finiteParam("spoilagePercent", 0)));
+    const discountRate = discountPercent / 100;
+    const returnRate = returnRatePercent / 100;
+    const spoilageRate = spoilagePercent / 100;
+    const netSellableUnits = scenarioSalesUnits * Math.max(0, 1 - returnRate - spoilageRate);
+    const scenarioMonthlyRevenue = netSellableUnits * scenarioUnitSalesPrice * Math.max(0, 1 - discountRate);
+    const scenarioRevenueTotal = scenarioMonthlyRevenue * timeHorizonMonths;
+    const unitProductionCost = Math.max(0, toFiniteNumber(linkedSummary.unitProductionCost));
+    const scenarioProductionCost = scenarioProductionUnits * unitProductionCost * timeHorizonMonths;
+    const baseRevenue = scenarioRevenueTotal || positiveParam("baseRevenue", toFiniteNumber(linkedSummary.salesRevenue));
     const priceEffect = numberParam("priceChange") / 100;
     const demandEffect = numberParam("demandChange") / 100;
     const campaignEffect = numberParam("campaignLift") / 100;
     const efficiencyEffect = numberParam("productionEfficiency") / 100;
     const competitorDrag = numberParam("competitorPressure") / 100;
+    const simulationAlgorithm = normalizeSimulationAlgorithm(parameters.simulationAlgorithm);
+    const simulationAlgorithmOptions = [
+      [simulationAlgorithms.withTendency, copy("FBM Monte Carlo + bull/bear tendency", "FBM Monte Carlo + boğa/ayı eğilimi")],
+      [simulationAlgorithms.withoutTendency, copy("FBM Monte Carlo without tendency", "FBM Monte Carlo eğilimsiz")],
+    ];
+    const simulationAlgorithmLabel = simulationAlgorithmOptions.find(([value]) => value === simulationAlgorithm)?.[1] || simulationAlgorithmOptions[0][1];
     const volatility = numberParam("volatility") / 100;
     const costVolatility = numberParam("costVolatility") / 100;
-    const fixedCost = numberParam("fixedCost");
-    const marketingBudget = numberParam("marketingBudget");
-    const variableCostRatio = numberParam("variableCostRatio") / 100;
-    const grossMargin = numberParam("grossMargin") / 100;
-    const currentPrice = Number(salesStrategy.company.baseSalesPrice) || 0;
-    const trendAdjustedRevenue = baseRevenue * (1 + demandEffect + priceEffect + campaignEffect + efficiencyEffect * 0.42 - competitorDrag * 0.55);
-    const projectedCost = trendAdjustedRevenue * Math.min(variableCostRatio + costVolatility * 0.22, 0.92) + fixedCost + marketingBudget;
-    const mostLikelyNet = trendAdjustedRevenue * grossMargin - fixedCost - marketingBudget;
+    const fixedCost = Math.max(0, positiveParam("fixedCost", toFiniteNumber(linkedSummary.extraRecurringCost)));
+    const marketingBudget = Math.max(0, finiteParam("marketingBudget", 0)) * timeHorizonMonths;
+    const derivedVariableCostRatio = baseRevenue ? Math.min(95, (scenarioProductionCost / baseRevenue) * 100) : 0;
+    const variableCostRatio = Math.min(0.95, Math.max(0, finiteParam("variableCostRatio", derivedVariableCostRatio) / 100));
+    const tendencyEffect = demandEffect + priceEffect + campaignEffect + efficiencyEffect * 0.42 - competitorDrag * 0.55;
+    const appliedTendencyEffect = simulationAlgorithm === simulationAlgorithms.withoutTendency ? 0 : tendencyEffect;
+    const trendAdjustedRevenue = baseRevenue * Math.max(0, 1 + appliedTendencyEffect);
+    const projectedVariableCost = scenarioProductionCost || (trendAdjustedRevenue * Math.min(variableCostRatio + costVolatility * 0.22, 0.92));
     const outcomeSpread = trendAdjustedRevenue * Math.max(volatility + costVolatility * 0.65 + competitorDrag * 0.35, 0.08);
+    const contributionPerUnit = Math.max(0, (scenarioUnitSalesPrice * Math.max(0, 1 - discountRate)) - unitProductionCost);
     const buildOutcome = (key, percentile, label, tone, multiplier) => {
       const revenue = trendAdjustedRevenue + outcomeSpread * multiplier;
-      const cost = projectedCost + outcomeSpread * (multiplier < 0 ? Math.abs(multiplier) * 0.45 : -multiplier * 0.18);
-      const net = revenue * grossMargin - fixedCost - marketingBudget - (multiplier < 0 ? outcomeSpread * Math.abs(multiplier) * 0.28 : 0);
+      const variableCost = projectedVariableCost * (revenue / Math.max(trendAdjustedRevenue, 1));
+      const tailCost = outcomeSpread * (multiplier < 0 ? Math.abs(multiplier) * 0.45 : -multiplier * 0.18);
+      const cost = variableCost + fixedCost + marketingBudget + tailCost;
+      const net = revenue - cost;
       return {
-        breakEvenUnits: Math.max(0, Math.round((fixedCost + marketingBudget) / Math.max(currentPrice * (1 - variableCostRatio), 1))),
+        breakEvenUnits: Math.max(0, Math.round((fixedCost + marketingBudget) / Math.max(contributionPerUnit, 1))),
         cost,
         key,
         label,
@@ -3047,53 +4241,39 @@ function App() {
     const maxNetAbs = Math.max(...outcomes.map((outcome) => Math.abs(outcome.net)), 1);
     const incomeRows = [
       [copy("Sales revenue", "Satış geliri"), likelyOutcome.revenue],
-      [copy("Variable cost", "Değişken gider"), -(likelyOutcome.revenue * variableCostRatio)],
+      [copy("Production cost", "Üretim maliyeti"), -projectedVariableCost],
       [copy("Fixed cost", "Sabit gider"), -fixedCost],
       [copy("Marketing budget", "Pazarlama bütçesi"), -marketingBudget],
       [copy("Projected net", "Projeksiyon net"), likelyOutcome.net],
     ];
-    const parameterGroups = [
+    const editableVariantGroups = [
       {
         fields: [
-          ["demandChange", copy("Demand change (%)", "Talep değişimi (%)"), -30, 40, 1],
-          ["priceChange", copy("Price change (%)", "Fiyat değişimi (%)"), -20, 30, 1],
-          ["campaignLift", copy("Marketing campaign lift (%)", "Pazarlama kampanya etkisi (%)"), -10, 35, 1],
-          ["productionEfficiency", copy("Production efficiency effect (%)", "Üretim verimliliği etkisi (%)"), -20, 30, 1],
-          ["marketShare", copy("Market share (%)", "Pazar payı (%)"), 0, 100, 0.5],
-          ["reputationScore", copy("Reputation score", "İtibar skoru"), 0, 100, 1],
+          ["salesUnits", copy("Monthly sales units", "Aylık satış adedi"), 0, 100000000, 1],
+          ["unitSalesPrice", copy("Unit sales price", "Birim satış fiyatı"), 0, 100000000, 0.01],
+          ["productionUnits", copy("Monthly production units", "Aylık üretim adedi"), 0, 100000000, 1],
         ],
-        title: copy("Trend drivers", "Trend sürücüleri"),
+        title: copy("Product and sales", "Ürün ve satış"),
       },
       {
         fields: [
-          ["volatility", copy("Demand volatility (%)", "Talep oynaklığı (%)"), 0, 60, 1],
-          ["costVolatility", copy("Cost volatility (%)", "Maliyet oynaklığı (%)"), 0, 60, 1],
-          ["competitorPressure", copy("Competitor pressure (%)", "Rakip baskısı (%)"), 0, 50, 1],
+          ["discountPercent", copy("Discount (%)", "İndirim (%)"), 0, 100, 0.1],
+          ["returnRatePercent", copy("Returns (%)", "İade (%)"), 0, 100, 0.1],
+          ["spoilagePercent", copy("Spoilage (%)", "Fire (%)"), 0, 100, 0.1],
+          ["marketingBudget", copy("Monthly marketing budget", "Aylık pazarlama bütçesi"), 0, 20000000, 50000],
         ],
-        title: copy("Risk and uncertainty", "Risk ve belirsizlik"),
-      },
-      {
-        fields: [
-          ["baseRevenue", copy("Base revenue", "Baz gelir"), 0, 100000000, 100000],
-          ["grossMargin", copy("Gross margin (%)", "Brüt marj (%)"), 0, 80, 1],
-          ["variableCostRatio", copy("Variable cost ratio (%)", "Değişken gider oranı (%)"), 0, 95, 1],
-          ["fixedCost", copy("Fixed cost", "Sabit gider"), 0, 50000000, 100000],
-          ["marketingBudget", copy("Marketing budget", "Pazarlama bütçesi"), 0, 20000000, 50000],
-          ["timeHorizonMonths", copy("Time horizon (months)", "Zaman ufku (ay)"), 1, 60, 1],
-        ],
-        title: copy("Financial base", "Finansal temel"),
+        title: copy("Sales conditions", "Satış koşulları"),
       },
     ];
-    const usedParameters = [
-      [copy("Simulation paths", "Simülasyon yolu"), formatNumber(numberParam("simulationCount"))],
-      [copy("Future algorithm", "Gelecek algoritma"), copy("Fractal Brownian motion", "Fractal Brownian motion")],
-      [copy("Sales strategy input", "Satış stratejisi girdisi"), copy("Campaign lift, channel pressure, reputation", "Kampanya etkisi, kanal baskısı, itibar")],
-      [copy("Operations input", "Operasyon girdisi"), copy("Efficiency, cost volatility, capacity sensitivity", "Verimlilik, maliyet oynaklığı, kapasite hassasiyeti")],
-      [copy("Financial input", "Finansal girdi"), copy("Monthly sales forecast, write-off, cash runway", "Aylık satış tahmini, fire, nakit dayanma")],
-      [copy("Linked cash runway", "Bağlı nakit dayanma"), `${formatNumber(linkedSummary.cashRunwayMonths)} ${copy("months", "ay")}`],
-      [copy("Linked payback", "Bağlı geri dönüş"), linkedSummary.paybackMonth ? `${linkedSummary.paybackMonth}. ${copy("month", "ay")}` : "-"],
+    const visibleAssumptions = [
+      [copy("Product", "Ürün"), firstChannelProduct?.name || operationsWorkspace.product?.name || "-"],
+      [copy("Algorithm", "Algoritma"), simulationAlgorithmLabel],
+      [copy("Monthly sales", "Aylık satış"), `${formatNumber(scenarioSalesUnits)} ${copy("units", "adet")}`],
+      [copy("Net sellable units", "Net satılabilir adet"), `${formatNumber(netSellableUnits)} ${copy("units", "adet")}`],
+      [copy("Unit price", "Birim fiyat"), formatLira(scenarioUnitSalesPrice, 2)],
+      [copy("Unit production cost", "Birim üretim maliyeti"), unitProductionCost ? formatLira(unitProductionCost, 2) : "-"],
+      [copy("Projection horizon", "Projeksiyon ufku"), `${formatNumber(timeHorizonMonths)} ${copy("months", "ay")}`],
     ];
-
     return renderDashboardLayout(
       `simulation/${variant.id}`,
         <section className="simulation-workspace monte-carlo-workspace">
@@ -3101,7 +4281,7 @@ function App() {
             <div>
               <span>{dashboardCompanyName} / {copy("Monte Carlo Simulation", "Monte Carlo Simülasyonu")}</span>
               <h1>{variant.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : variant.name}</h1>
-              <p>{copy("Simulation parameters are saved in Supabase. When an assumption is missing, keep it as an editable input; the current output is recalculated from the saved operations, sales, and financial data available now.", "Simülasyon parametreleri Supabase'e kaydedilir. Eksik varsayım varsa düzenlenebilir girdi olarak kalır; mevcut çıktı kayıtlı operasyon, satış ve finans verilerinden yeniden hesaplanır.")}</p>
+              <p>{copy("Variants are saved with simple product and sales assumptions. Outputs are recalculated from the saved operations, sales, and financial data available now.", "Varyantlar basit ürün ve satış varsayımlarıyla kaydedilir. Çıktılar kayıtlı operasyon, satış ve finans verilerinden yeniden hesaplanır.")}</p>
             </div>
             <div className="simulation-header-actions">
               <button type="button" onClick={loadPlanningData} disabled={simulationLoading}>
@@ -3162,14 +4342,25 @@ function App() {
               <div className="simulation-card-heading">
                 <div>
                   <span>{copy("Variant setup", "Varyant kurulumu")}</span>
-                  <h2>{copy("Parameters currently being used", "Şu anda kullanılan parametreler")}</h2>
+                  <h2>{copy("Algorithm and sales assumptions", "Algoritma ve satış varsayımları")}</h2>
                 </div>
               </div>
               <label className="simulation-name-field">
                 <span>{copy("Variant name", "Varyant adı")}</span>
                 <input value={variant.name} onChange={(event) => updateSimulationVariant(variant.id, "name", event.target.value)} />
               </label>
-              {parameterGroups.map((group) => (
+              <label className="simulation-name-field">
+                <span>{copy("Simulation algorithm", "Simülasyon algoritması")}</span>
+                <select
+                  value={simulationAlgorithm}
+                  onChange={(event) => updateSimulationParameter(variant.id, "simulationAlgorithm", event.target.value)}
+                >
+                  {simulationAlgorithmOptions.map(([value, label]) => (
+                    <option value={value} key={value}>{label}</option>
+                  ))}
+                </select>
+              </label>
+              {editableVariantGroups.map((group) => (
                 <div className="parameter-group" key={group.title}>
                   <h3>{group.title}</h3>
                   {group.fields.map(([field, label, min, max, step]) => (
@@ -3180,7 +4371,7 @@ function App() {
                         max={max}
                         step={step}
                         type="number"
-                        value={parameters[field]}
+                        value={parameters[field] ?? ""}
                         onChange={(event) => updateSimulationParameter(variant.id, field, event.target.value)}
                       />
                     </label>
@@ -3273,12 +4464,12 @@ function App() {
               <article className="simulation-card simulation-used-params">
                 <div className="simulation-card-heading">
                   <div>
-                    <span>{copy("Inputs in use", "Kullanılan girdiler")}</span>
-                    <h2>{copy("Parameter sources", "Parametre kaynakları")}</h2>
+                    <span>{copy("Scenario summary", "Senaryo özeti")}</span>
+                    <h2>{copy("Visible assumptions", "Görünen varsayımlar")}</h2>
                   </div>
                 </div>
                 <div className="used-parameter-list">
-                  {usedParameters.map(([label, value]) => (
+                  {visibleAssumptions.map(([label, value]) => (
                     <span key={label}>{label}<strong>{value}</strong></span>
                   ))}
                 </div>
@@ -3287,8 +4478,8 @@ function App() {
               <article className="simulation-card path-preview-card">
                 <div className="simulation-card-heading">
                   <div>
-                    <span>{copy("Path preview", "Yol önizleme")}</span>
-                    <h2>{copy("Future fBM trend adjustment", "Gelecek fBM trend ayarı")}</h2>
+                    <span>{copy("Sales path", "Satış yolu")}</span>
+                    <h2>{copy("Revenue sensitivity preview", "Gelir hassasiyeti önizlemesi")}</h2>
                   </div>
                 </div>
                 <svg className="monte-chart path-preview-chart" viewBox="0 0 420 220" aria-hidden="true">
@@ -3298,7 +4489,7 @@ function App() {
                   <path className="path-likely" d="M28 168 C82 148 124 158 168 128 S248 118 296 90 352 82 392 68" />
                   <path className="path-good" d="M28 142 C78 112 122 120 168 92 S248 74 296 54 350 46 392 34" />
                 </svg>
-                <p>{copy("The visual is a frontend placeholder. Later, 10,000 simulated fractal Brownian paths will drive these percentile bands.", "Bu görsel frontend placeholder. Daha sonra 10.000 fractal Brownian simülasyon yolu bu persentil bantlarını oluşturacak.")}</p>
+                <p>{copy("This preview shows how the selected sales assumptions can move revenue across low, likely, and high outcomes.", "Bu önizleme seçilen satış varsayımlarının geliri düşük, olası ve yüksek çıktılarda nasıl oynatabileceğini gösterir.")}</p>
               </article>
 
               <article className="simulation-card risk-card">
@@ -3313,33 +4504,80 @@ function App() {
   }
 
   function renderSalesStrategyPage() {
-    const company = salesStrategy.company;
-    const average = (items, field) => {
-      if (!items.length) return 0;
-      return items.reduce((total, item) => total + (Number(item[field]) || 0), 0) / items.length;
-    };
-    const findHighest = (items, field) => items.reduce((best, item) => ((Number(item[field]) || 0) > (Number(best?.[field]) || 0) ? item : best), items[0] || {});
+    const monthlyMultipliers = getSalesExpectationMultipliers(salesStrategy);
+    const workingDaysPerMonth = Math.max(1, toFiniteNumber(financialSettingsForm.workingDaysPerMonth, 22));
+    const monthlyProductionByProduct = getMonthlyProductProductionMap(operationsWorkspace, workingDaysPerMonth);
+    const productMap = getOperationProductMap(operationsWorkspace);
+    const baseMonthlySalesUnits = getBaseMonthlySalesUnits(salesStrategy);
+    const expectedAnnualSalesUnits = monthlyMultipliers.reduce((total, _multiplier, index) => total + getSalesForecastForMonth(salesStrategy, index), 0);
+    const averageMultiplier = monthlyMultipliers.reduce((total, multiplier) => total + multiplier, 0) / Math.max(monthlyMultipliers.length, 1);
     const totalCampaignBudget = salesStrategy.campaigns.reduce((total, campaign) => total + (Number(campaign.budget) || 0), 0);
-    const totalChannelBudget = salesStrategy.channels.reduce((total, channel) => total + (Number(channel.budget) || 0), 0);
-    const averageCompetitorPrice = average(salesStrategy.competitors, "salesPrice");
-    const priceGap = (Number(company.baseSalesPrice) || 0) - averageCompetitorPrice;
-    const strongestChannel = findHighest(salesStrategy.channels, "successScore");
-    const strongestCampaign = findHighest(salesStrategy.campaigns, "successScore");
-    const strongestPerson = findHighest(salesStrategy.personnel, "successScore");
-    const competitorToWatch = findHighest(salesStrategy.competitors, "threatScore");
-    const channelScore = Math.round(average(salesStrategy.channels, "successScore"));
-    const campaignScore = Math.round(average(salesStrategy.campaigns, "successScore"));
-    const personnelScore = Math.round(average(salesStrategy.personnel, "successScore"));
-    const reputationScore = Number(company.reputationScore) || 0;
-    const scoreClass = (score) => (Number(score) >= 75 ? "strong" : Number(score) >= 60 ? "watch" : "risk");
-    const monthlyForecast = Array.from({ length: 12 }, (_, index) => toFiniteNumber(company.monthlyForecast?.[index]));
-    const totalForecastUnits = monthlyForecast.reduce((total, units) => total + units, 0);
-    const averageMonthlyForecast = totalForecastUnits / Math.max(monthlyForecast.length, 1);
-    const channelShareTotal = salesStrategy.channels.reduce((total, channel) => total + Math.max(0, toFiniteNumber(channel.revenueShare)), 0) || salesStrategy.channels.length || 1;
-    const weightedChannelValue = (field) => salesStrategy.channels.reduce((total, channel) => {
-      const share = Math.max(0, toFiniteNumber(channel.revenueShare, 100 / Math.max(salesStrategy.channels.length, 1))) / channelShareTotal;
-      return total + (share * toFiniteNumber(channel[field]));
+    const realizedSalesTotal = salesStrategy.personnel.reduce((total, person) => total + toFiniteNumber(person.realizedSalesUnits), 0);
+    const personnelTargetTotal = salesStrategy.personnel.reduce((total, person) => total + toFiniteNumber(person.monthlyTarget), 0);
+    const getProductAvailability = (productId) => {
+      const monthlyProduced = Math.max(0, monthlyProductionByProduct.get(productId) || 0);
+      const plannedSales = salesStrategy.channels.reduce((total, channel) => (
+        channel.productId === productId ? total + Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) : total
+      ), 0);
+
+      return {
+        monthlyProduced,
+        plannedSales,
+        remaining: monthlyProduced - plannedSales,
+      };
+    };
+    const totalReadyUnits = operationsWorkspace.products.reduce((total, product) => total + Math.max(0, getProductAvailability(product.id).remaining), 0);
+    const totalMonthlyCommission = salesStrategy.channels.reduce((total, channel) => {
+      const product = productMap.get(channel.productId) || channel.product || {};
+      const grossRevenue = Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) * Math.max(0, toFiniteNumber(product.price));
+      return total + (grossRevenue * Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100);
     }, 0);
+    const activeProductCount = new Set(salesStrategy.channels.map((channel) => channel.productId).filter(Boolean)).size;
+    const salesChannelTypeOptions = salesStrategy.channelTypes?.length ? salesStrategy.channelTypes : [
+      { averageCommissionPercent: 0, averageCustomerAcquisitionRate: 18, descriptionEn: "Direct sales owned by the company.", descriptionTr: "Şirketin doğrudan yönettiği satış.", id: "direct", nameEn: "Direct sales", nameTr: "Direkt satış" },
+      { averageCommissionPercent: 8, averageCustomerAcquisitionRate: 8, descriptionEn: "Digital storefront or online flow.", descriptionTr: "Dijital mağaza veya online akış.", id: "online", nameEn: "Online", nameTr: "Online" },
+      { averageCommissionPercent: 20, averageCustomerAcquisitionRate: 5, descriptionEn: "Retail shelf or store channel.", descriptionTr: "Perakende raf veya mağaza kanalı.", id: "retail", nameEn: "Retail", nameTr: "Perakende" },
+      { averageCommissionPercent: 25, averageCustomerAcquisitionRate: 4, descriptionEn: "Distributor-led sales route.", descriptionTr: "Distribütör üzerinden satış rotası.", id: "distributor", nameEn: "Distributor", nameTr: "Distribütör" },
+      { averageCommissionPercent: 15, averageCustomerAcquisitionRate: 7, descriptionEn: "Marketplace platform channel.", descriptionTr: "Pazaryeri platform kanalı.", id: "marketplace", nameEn: "Marketplace", nameTr: "Pazaryeri" },
+    ];
+    const campaignTypeOptions = salesStrategy.campaignTypes?.length ? salesStrategy.campaignTypes : [
+      { averageConversionRate: 3, averageCustomerAcquisitionRate: 6, averageDurationDays: 30, descriptionEn: "Paid digital acquisition campaign.", descriptionTr: "Ücretli dijital müşteri kazanım kampanyası.", id: "digital", nameEn: "Digital advertising", nameTr: "Dijital reklam" },
+      { averageConversionRate: 2.5, averageCustomerAcquisitionRate: 5, averageDurationDays: 21, descriptionEn: "Organic and paid social campaign.", descriptionTr: "Organik ve ücretli sosyal medya kampanyası.", id: "social", nameEn: "Social media", nameTr: "Sosyal medya" },
+      { averageConversionRate: 4, averageCustomerAcquisitionRate: 7, averageDurationDays: 14, descriptionEn: "Creator or influencer-led campaign.", descriptionTr: "İçerik üretici veya influencer odaklı kampanya.", id: "influencer", nameEn: "Influencer", nameTr: "Influencer" },
+      { averageConversionRate: 5, averageCustomerAcquisitionRate: 4, averageDurationDays: 30, descriptionEn: "Trade promotion for partners.", descriptionTr: "Ticari iş ortakları için promosyon.", id: "trade", nameEn: "Trade promotion", nameTr: "Ticari promosyon" },
+      { averageConversionRate: 6, averageCustomerAcquisitionRate: 3, averageDurationDays: 7, descriptionEn: "Event, fair, or field activation.", descriptionTr: "Etkinlik, fuar veya saha aktivasyonu.", id: "event", nameEn: "Event / fair", nameTr: "Etkinlik / fuar" },
+      { averageConversionRate: 2, averageCustomerAcquisitionRate: 4, averageDurationDays: 14, descriptionEn: "Email and CRM lifecycle campaign.", descriptionTr: "E-posta ve CRM yaşam döngüsü kampanyası.", id: "email", nameEn: "Email / CRM", nameTr: "E-posta / CRM" },
+    ];
+    const getSalesTypeLabel = (type) => (form.language === "tr" ? type.nameTr || type.nameEn : type.nameEn || type.nameTr) || type.id;
+    const getSalesTypeDescription = (type) => (form.language === "tr" ? type.descriptionTr || type.descriptionEn : type.descriptionEn || type.descriptionTr) || "";
+    const salesChannelRequiredFields = [
+      { field: "startMonth", label: copy("Start month", "Başlangıç Ayı"), min: 1, step: "1" },
+      { field: "monthlySalesUnits", label: copy("First month sales (units)", "İlk Ay Satış (Adet)"), min: 0, step: "1" },
+      { field: "growthMonths1To6Percent", label: copy("Growth (1-6 mo) (%)", "Büyüme (1-6 Ay) (%)"), min: 0, step: "0.01" },
+      { field: "growthMonths7To18Percent", label: copy("Growth (7-18 mo) (%)", "Büyüme (7-18 Ay) (%)"), min: 0, step: "0.01" },
+      { field: "growthMonths19To24Percent", label: copy("Growth (19-24 mo) (%)", "Büyüme (19-24 Ay) (%)"), min: 0, step: "0.01" },
+      { field: "growthYears3To5Percent", label: copy("Year 3-5 growth (%)", "Yıl 3-5 Büyüme (%)"), min: 0, step: "0.01" },
+      { field: "collectionDays", label: copy("Collection (days)", "Tahsilat (Gün)"), min: 0, step: "1" },
+      { field: "customerAcquisitionCost", label: copy("Unit marketing (CAC) TL", "Birim Pazarlama (CAC) TL"), min: 0, step: "0.01" },
+      { field: "commissionPercent", label: copy("Channel commission (%)", "Kanal Komisyonu (%)"), max: 100, min: 0, step: "0.1" },
+    ];
+    const advancedChannelFields = [
+      { field: "basketSize", label: copy("Basket Size", "Sepet Büyüklüğü"), min: 0, step: "0.01" },
+      { field: "conversionRatePercent", label: copy("Conversion Rate (%)", "Dönüşüm Oranı (%)"), min: 0, step: "0.001" },
+      { field: "trafficScore", label: copy("Traffic Score", "Trafik Skoru"), min: 0, step: "0.01" },
+      { field: "repeatRatePercent", label: copy("Repeat Rate (%)", "Tekrar Oranı (%)"), min: 0, step: "0.001" },
+      { field: "churnRatePercent", label: copy("Churn Rate (%)", "Kayıp Oranı (%)"), min: 0, step: "0.001" },
+      { field: "discountRatePercent", label: copy("Discount Rate (%)", "İndirim Oranı (%)"), min: 0, step: "0.01" },
+      { field: "returnRatePercent", label: copy("Return Rate (%)", "İade Oranı (%)"), min: 0, step: "0.001" },
+      { field: "capacityLimit", label: copy("Capacity Limit", "Kapasite Limiti"), min: 0, step: "1" },
+      { field: "launchFee", label: copy("Launch Fee", "Lansman Bedeli"), min: 0, step: "0.01" },
+      { field: "moqMonthly", label: copy("MOQ Monthly", "Aylık MOQ"), min: 0, step: "1" },
+      { field: "failureProbabilityPercent", label: copy("Failure Prob. (%)", "Başarısızlık Olas. (%)"), min: 0, step: "0.001" },
+      { field: "rampUpMonths", label: copy("Ramp-Up Months", "Ramp-Up Ayı"), min: 0, step: "1" },
+    ];
+    const seasonalityMonthLabels = form.language === "tr"
+      ? ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+      : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
     return renderDashboardLayout(
       "sales-strategy",
@@ -3348,7 +4586,7 @@ function App() {
             <div>
               <span>{dashboardCompanyName} / {copy("Sales Strategy", "Satış Stratejisi")}</span>
               <h1>{copy("Sales Strategy", "Satış Stratejisi")}</h1>
-              <p>{copy("Plan monthly sales volume, channel margins, discounts, returns, and payment delays. Financial Modelling uses these assumptions to calculate revenue, inventory risk, cash runway, and payback.", "Aylık satış hacmi, kanal marjları, indirimler, iadeler ve ödeme vadelerini planlayın. Finansal Modelleme bu varsayımları gelir, stok riski, nakit dayanma süresi ve geri dönüş için kullanır.")}</p>
+              <p>{copy("Plan sales channels by product, monthly sales quantity, commission, campaign duration, and monthly expectation multipliers. Financial Modelling reads these product-linked quantities directly.", "Satış kanallarını ürün, aylık satış adedi, komisyon, kampanya süresi ve aylık beklenti çarpanlarıyla planlayın. Finansal Modelleme bu ürün bağlantılı adetleri doğrudan kullanır.")}</p>
             </div>
             <div className="sales-header-actions">
               <button type="button" onClick={loadPlanningData} disabled={salesLoading}>
@@ -3364,10 +4602,10 @@ function App() {
 
           <div className="sales-stat-grid">
             {[
-              [copy("12M Sales Forecast", "12A Satış Tahmini"), formatNumber(totalForecastUnits), copy("monthly volume inputs", "aylık hacim girdileri")],
-              [copy("Avg Monthly Volume", "Ort. Aylık Hacim"), formatNumber(averageMonthlyForecast), copy("feeds financial model", "finansal modeli besler")],
-              [copy("Weighted Return", "Ağırlıklı İade"), `${formatNumber(weightedChannelValue("returnRatePercent"), 1)}%`, copy("channel return assumption", "kanal iade varsayımı")],
-              [copy("Price vs Competitors", "Rakiplere Göre Fiyat"), averageCompetitorPrice ? `${priceGap >= 0 ? "+" : ""}${formatLira(priceGap)}` : "-", copy("average price gap", "ortalama fiyat farkı")],
+              [copy("Monthly channel plan", "Aylık kanal planı"), formatNumber(baseMonthlySalesUnits), copy("sum of channel quantities", "kanal adetleri toplamı")],
+              [copy("12M expected units", "12A beklenen adet"), formatNumber(expectedAnnualSalesUnits), copy("channel plan x monthly multipliers", "kanal planı x aylık çarpanlar")],
+              [copy("Ready to sell", "Satmaya hazır"), formatNumber(totalReadyUnits), copy("remaining after channel quantities", "kanal adetlerinden sonra kalan")],
+              [copy("Monthly commission", "Aylık komisyon"), formatLira(totalMonthlyCommission), copy("based on product prices", "ürün fiyatlarına göre")],
             ].map(([label, value, detail]) => (
               <article className="sales-stat-card" key={label}>
                 <span>{label}</span>
@@ -3378,96 +4616,25 @@ function App() {
           </div>
 
           <div className="sales-grid">
-            <article className="sales-card company-position-card">
-              <div className="sales-card-heading">
-                <div>
-                  <span>{copy("Company position", "Şirket pozisyonu")}</span>
-                  <h2>{copy("Product, price, market share and reputation", "Ürün, fiyat, pazar payı ve itibar")}</h2>
-                </div>
-              </div>
-              <div className="sales-form-grid">
-                <label>
-                  <span>{copy("Product", "Ürün")}</span>
-                  <input value={company.productName} onChange={(event) => updateSalesCompany("productName", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Target segment", "Hedef segment")}</span>
-                  <input value={company.targetSegment} onChange={(event) => updateSalesCompany("targetSegment", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Sales price", "Satış fiyatı")}</span>
-                  <input min="0" step="0.01" type="number" value={company.baseSalesPrice} onChange={(event) => updateSalesCompany("baseSalesPrice", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Monthly sales target", "Aylık satış hedefi")}</span>
-                  <input min="0" type="number" value={company.monthlyTarget} onChange={(event) => updateSalesCompany("monthlyTarget", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Annual sales growth (%)", "Yıllık satış büyümesi (%)")}</span>
-                  <input min="-100" step="0.1" type="number" value={company.annualSalesGrowthPercent} onChange={(event) => updateSalesCompany("annualSalesGrowthPercent", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Spoilage / expiry (%)", "Bozulma / SKT fire (%)")}</span>
-                  <input min="0" max="100" step="0.1" type="number" value={company.spoilageRate} onChange={(event) => updateSalesCompany("spoilageRate", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Market share (%)", "Pazar payı (%)")}</span>
-                  <input min="0" max="100" step="0.1" type="number" value={company.marketShare} onChange={(event) => updateSalesCompany("marketShare", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Reputation score", "İtibar skoru")}</span>
-                  <input min="0" max="100" type="number" value={company.reputationScore} onChange={(event) => updateSalesCompany("reputationScore", event.target.value)} />
-                </label>
-                <label className="wide-field">
-                  <span>{copy("Positioning note", "Konumlandırma notu")}</span>
-                  <textarea value={company.positioning} onChange={(event) => updateSalesCompany("positioning", event.target.value)} />
-                </label>
-              </div>
-            </article>
-
             <article className="sales-card sales-forecast-card">
               <div className="sales-card-heading">
                 <div>
-                  <span>{copy("Monthly volume forecast", "Aylık hacim tahmini")}</span>
-                  <h2>{copy("Sales units by month", "Aylara göre satış adedi")}</h2>
+                  <span>{copy("Monthly expectation multipliers", "Aylık beklenti çarpanları")}</span>
+                  <h2>{copy("Sales expectation multipliers", "Satış beklentisi çarpanları")}</h2>
                 </div>
               </div>
               <div className="sales-forecast-grid">
-                {monthlyForecast.map((units, index) => (
+                {monthlyMultipliers.map((multiplier, index) => (
                   <label key={`forecast-${index}`}>
                     <span>{copy("Month", "Ay")} {index + 1}</span>
                     <input
                       min="0"
-                      step="1"
+                      step="0.01"
                       type="number"
-                      value={units}
+                      value={multiplier}
                       onChange={(event) => updateSalesForecast(index, event.target.value)}
                     />
                   </label>
-                ))}
-              </div>
-            </article>
-
-            <article className="sales-card sales-reflection-card">
-              <div className="sales-card-heading">
-                <div>
-                  <span>{copy("Success reflection", "Başarı yansıması")}</span>
-                  <h2>{copy("What looks strong right now", "Şu an güçlü görünenler")}</h2>
-                </div>
-              </div>
-              <div className="sales-score-list">
-                {[
-                  [copy("Channel health", "Kanal sağlığı"), channelScore, strongestChannel.name],
-                  [copy("Campaign traction", "Kampanya çekişi"), campaignScore, strongestCampaign.name],
-                  [copy("Personnel performance", "Personel performansı"), personnelScore, strongestPerson.name],
-                  [copy("Company reputation", "Şirket itibarı"), reputationScore, company.positioning],
-                ].map(([label, score, detail]) => (
-                  <div className={`sales-score-row ${scoreClass(score)}`} key={label}>
-                    <span>{label}</span>
-                    <strong>{formatNumber(score)}/100</strong>
-                    <div className="sales-score-bar"><i style={{ width: `${Math.min(Number(score) || 0, 100)}%` }} /></div>
-                    <small>{detail}</small>
-                  </div>
                 ))}
               </div>
             </article>
@@ -3476,25 +4643,124 @@ function App() {
               <div className="sales-card-heading">
                 <div>
                   <span>{copy("Sales channels", "Satış kanalları")}</span>
-                  <h2>{copy("Online, retail, distributor and direct sales routes", "Online, retail, distribütör ve direkt satış rotaları")}</h2>
+                  <h2>{copy("Product, monthly quantity and commission", "Ürün, aylık adet ve komisyon")}</h2>
                 </div>
                 <button type="button" onClick={() => addSalesItem("channels")}>{copy("Add Channel", "Kanal Ekle")}</button>
               </div>
               <div className="sales-channel-grid">
                 {salesStrategy.channels.map((channel) => (
                   <div className="sales-edit-card" key={channel.id}>
-                    <label><span>{copy("Channel name", "Kanal adı")}</span><input value={channel.name} onChange={(event) => updateSalesItem("channels", channel.id, "name", event.target.value)} /></label>
-                    <label><span>{copy("Type", "Tip")}</span><input value={channel.type} onChange={(event) => updateSalesItem("channels", channel.id, "type", event.target.value)} /></label>
-                    <label><span>{copy("Sales price", "Satış fiyatı")}</span><input min="0" step="0.01" type="number" value={channel.price} onChange={(event) => updateSalesItem("channels", channel.id, "price", event.target.value)} /></label>
-                    <label><span>{copy("Channel budget", "Kanal bütçesi")}</span><input min="0" step="1000" type="number" value={channel.budget} onChange={(event) => updateSalesItem("channels", channel.id, "budget", event.target.value)} /></label>
-                    <label><span>{copy("Revenue share (%)", "Ciro payı (%)")}</span><input min="0" max="100" type="number" value={channel.revenueShare} onChange={(event) => updateSalesItem("channels", channel.id, "revenueShare", event.target.value)} /></label>
-                    <label><span>{copy("Conversion (%)", "Dönüşüm (%)")}</span><input min="0" max="100" type="number" value={channel.conversionRate} onChange={(event) => updateSalesItem("channels", channel.id, "conversionRate", event.target.value)} /></label>
-                    <label><span>{copy("Retailer margin (%)", "Perakende marjı (%)")}</span><input min="0" max="100" step="0.1" type="number" value={channel.marginPercent} onChange={(event) => updateSalesItem("channels", channel.id, "marginPercent", event.target.value)} /></label>
-                    <label><span>{copy("Discount (%)", "İndirim (%)")}</span><input min="0" max="100" step="0.1" type="number" value={channel.discountPercent} onChange={(event) => updateSalesItem("channels", channel.id, "discountPercent", event.target.value)} /></label>
-                    <label><span>{copy("Returns (%)", "İade (%)")}</span><input min="0" max="100" step="0.1" type="number" value={channel.returnRatePercent} onChange={(event) => updateSalesItem("channels", channel.id, "returnRatePercent", event.target.value)} /></label>
-                    <label><span>{copy("Payment delay days", "Ödeme vadesi gün")}</span><input min="0" step="1" type="number" value={channel.paymentDelayDays} onChange={(event) => updateSalesItem("channels", channel.id, "paymentDelayDays", event.target.value)} /></label>
-                    <label><span>{copy("Success score", "Başarı skoru")}</span><input min="0" max="100" type="number" value={channel.successScore} onChange={(event) => updateSalesItem("channels", channel.id, "successScore", event.target.value)} /></label>
-                    <label className="wide-field"><span>{copy("Channel note", "Kanal notu")}</span><textarea value={channel.note} onChange={(event) => updateSalesItem("channels", channel.id, "note", event.target.value)} /></label>
+                    <div className="sales-channel-title wide-field">
+                      <label><span>{copy("Channel name", "Kanal adı")} *</span><input required value={channel.name} onChange={(event) => updateSalesItem("channels", channel.id, "name", event.target.value)} /></label>
+                      <button type="button" aria-label={copy("Delete channel", "Kanalı sil")} onClick={() => removeSalesItem("channels", channel.id)}>-</button>
+                    </div>
+                    <label>
+                      <span>{copy("Channel type", "Kanal tipi")} *</span>
+                      <select required value={channel.typeId || "direct"} onChange={(event) => updateSalesItem("channels", channel.id, "typeId", event.target.value)}>
+                        {salesChannelTypeOptions.map((type) => (
+                          <option value={type.id} key={type.id}>{getSalesTypeLabel(type)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>{copy("Product to sell", "Satılacak ürün")} *</span>
+                      <select
+                        required
+                        value={channel.productId || ""}
+                        onChange={(event) => {
+                          const product = operationsWorkspace.products.find((item) => item.id === event.target.value);
+                          setSalesStrategy((current) => ({
+                            ...current,
+                            channels: current.channels.map((item) => (
+                              item.id === channel.id
+                                ? { ...item, product: product || null, productId: product?.id || "", productName: product?.name || "" }
+                                : item
+                            )),
+                          }));
+                        }}
+                      >
+                        <option value="">{copy("Select product", "Ürün seç")}</option>
+                        {operationsWorkspace.products.map((product) => (
+                          <option value={product.id} key={product.id}>{product.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    {salesChannelRequiredFields.map((field) => (
+                      <label key={field.field}>
+                        <span>{field.label} *</span>
+                        <input
+                          max={field.max}
+                          min={field.min}
+                          required
+                          step={field.step}
+                          type="number"
+                          value={channel[field.field] ?? ""}
+                          onChange={(event) => updateSalesItem("channels", channel.id, field.field, event.target.value)}
+                        />
+                      </label>
+                    ))}
+                    <details
+                      className="advanced-channel-panel wide-field"
+                      open={channel.advancedOpen ?? true}
+                      onToggle={(event) => updateSalesItem("channels", channel.id, "advancedOpen", event.currentTarget.open)}
+                    >
+                      <summary>{copy("Advanced Channel Parameters", "Gelişmiş Kanal Parametreleri")}</summary>
+                      <div className="advanced-channel-grid">
+                        {advancedChannelFields.map((field) => (
+                          <label key={field.field}>
+                            <span>{field.label}</span>
+                            <input
+                              min={field.min}
+                              step={field.step}
+                              type="number"
+                              value={channel[field.field] ?? ""}
+                              onChange={(event) => updateSalesItem("channels", channel.id, field.field, event.target.value)}
+                            />
+                          </label>
+                        ))}
+                        <div className="seasonality-inputs">
+                          <strong>{copy("Seasonality Curve (Jan-Dec multipliers):", "Sezonluk Eğri (Oca-Ara çarpanları):")}</strong>
+                          <div>
+                            {seasonalityMonthLabels.map((month, index) => (
+                              <label key={`${channel.id}-season-${month}`}>
+                                <span>{month}</span>
+                                <input
+                                  min="0"
+                                  step="0.01"
+                                  type="number"
+                                  value={(Array.isArray(channel.seasonalityCurve) ? channel.seasonalityCurve[index] : "") ?? ""}
+                                  onChange={(event) => updateSalesChannelSeasonality(channel.id, index, event.target.value)}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                    {(() => {
+                      const product = productMap.get(channel.productId) || channel.product || {};
+                      const availability = getProductAvailability(channel.productId);
+                      const unit = product.unit || copy("units", "adet");
+
+                      return (
+                        <div className="sales-channel-capacity wide-field">
+                          <span>{copy("Monthly produced", "Aylık üretilen")}<strong>{formatNumber(availability.monthlyProduced, 2)} {unit}</strong></span>
+                          <span>{copy("Planned in channels", "Kanallarda planlanan")}<strong>{formatNumber(availability.plannedSales, 2)} {unit}</strong></span>
+                          <span>{copy("Ready to sell remaining", "Satmaya hazır kalan")}<strong>{formatNumber(Math.max(0, availability.remaining), 2)} {unit}</strong></span>
+                        </div>
+                      );
+                    })()}
+                    {(() => {
+                      const selectedType = salesChannelTypeOptions.find((type) => type.id === (channel.typeId || "direct"));
+
+                      return selectedType ? (
+                        <div className="sales-type-info wide-field">
+                          <span>{copy("Avg acquisition", "Ort. müşteri kazanımı")}<strong>{formatNumber(selectedType.averageCustomerAcquisitionRate, 1)}%</strong></span>
+                          <span>{copy("Avg commission", "Ort. komisyon")}<strong>{formatNumber(selectedType.averageCommissionPercent, 1)}%</strong></span>
+                          <small>{getSalesTypeDescription(selectedType)}</small>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 ))}
               </div>
@@ -3504,50 +4770,45 @@ function App() {
               <div className="sales-card-heading">
                 <div>
                   <span>{copy("Marketing campaigns", "Pazarlama kampanyaları")}</span>
-                  <h2>{copy("Budget, campaign type, duration and target channel", "Bütçe, kampanya tipi, süre ve hedef kanal")}</h2>
+                  <h2>{copy("Budget, campaign type, duration in days and target channel", "Bütçe, kampanya tipi, gün bazlı süre ve hedef kanal")}</h2>
                 </div>
                 <button type="button" onClick={() => addSalesItem("campaigns")}>{copy("Add Campaign", "Kampanya Ekle")}</button>
               </div>
               <div className="sales-table">
-                <div className="sales-table-row sales-table-head"><span>{copy("Campaign", "Kampanya")}</span><span>{copy("Type", "Tip")}</span><span>{copy("Channel", "Kanal")}</span><span>{copy("Budget", "Bütçe")}</span><span>{copy("Duration", "Süre")}</span><span>{copy("Success", "Başarı")}</span></div>
+                <div className="sales-table-row sales-table-head campaign-row-layout"><span>{copy("Campaign", "Kampanya")}</span><span>{copy("Type", "Tip")}</span><span>{copy("Channel", "Kanal")}</span><span>{copy("Budget", "Bütçe")}</span><span>{copy("Duration days", "Süre gün")}</span></div>
                 {salesStrategy.campaigns.map((campaign) => (
-                  <div className="sales-table-row campaign-row" key={campaign.id}>
+                  <div className="sales-table-row campaign-row campaign-row-layout" key={campaign.id}>
                     <label><input value={campaign.name} onChange={(event) => updateSalesItem("campaigns", campaign.id, "name", event.target.value)} /></label>
-                    <label><input value={campaign.type} onChange={(event) => updateSalesItem("campaigns", campaign.id, "type", event.target.value)} /></label>
-                    <label><input value={campaign.channel} onChange={(event) => updateSalesItem("campaigns", campaign.id, "channel", event.target.value)} /></label>
+                    <label>
+                      <select value={campaign.typeId || "digital"} onChange={(event) => updateSalesItem("campaigns", campaign.id, "typeId", event.target.value)}>
+                        {campaignTypeOptions.map((type) => (
+                          <option value={type.id} key={type.id}>{getSalesTypeLabel(type)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <select value={campaign.channel || ""} onChange={(event) => updateSalesItem("campaigns", campaign.id, "channel", event.target.value)}>
+                        <option value="">{copy("Select channel", "Kanal seç")}</option>
+                        {salesStrategy.channels.map((channel) => (
+                          <option value={channel.name || channel.id} key={channel.id}>{channel.name || channel.id}</option>
+                        ))}
+                      </select>
+                    </label>
                     <label><input min="0" step="1000" type="number" value={campaign.budget} onChange={(event) => updateSalesItem("campaigns", campaign.id, "budget", event.target.value)} /></label>
-                    <label><input min="0" type="number" value={campaign.durationWeeks} onChange={(event) => updateSalesItem("campaigns", campaign.id, "durationWeeks", event.target.value)} /></label>
-                    <label><input min="0" max="100" type="number" value={campaign.successScore} onChange={(event) => updateSalesItem("campaigns", campaign.id, "successScore", event.target.value)} /></label>
-                    <textarea value={campaign.goal} onChange={(event) => updateSalesItem("campaigns", campaign.id, "goal", event.target.value)} />
-                  </div>
-                ))}
-              </div>
-            </article>
+                    <label><input min="0" step="1" type="number" value={campaign.durationDays} onChange={(event) => updateSalesItem("campaigns", campaign.id, "durationDays", event.target.value)} /></label>
+                    {(() => {
+                      const selectedType = campaignTypeOptions.find((type) => type.id === (campaign.typeId || "digital"));
 
-            <article className="sales-card competitors-card">
-              <div className="sales-card-heading">
-                <div>
-                  <span>{copy("Competitor intelligence", "Rakip bilgisi")}</span>
-                  <h2>{copy("Manual competitor price, campaign and strategy inputs", "Manuel rakip fiyat, kampanya ve strateji girdileri")}</h2>
-                </div>
-                <button type="button" onClick={() => addSalesItem("competitors")}>{copy("Add Competitor", "Rakip Ekle")}</button>
-              </div>
-              <div className="competitor-grid">
-                {salesStrategy.competitors.map((competitor) => (
-                  <div className="competitor-card" key={competitor.id}>
-                    <div className="competitor-title">
-                      <input value={competitor.name} onChange={(event) => updateSalesItem("competitors", competitor.id, "name", event.target.value)} />
-                      <mark className={scoreClass(competitor.threatScore)}>{copy("Threat", "Tehdit")} {formatNumber(competitor.threatScore)}</mark>
-                    </div>
-                    <div className="sales-form-grid compact">
-                      <label><span>{copy("Sales price", "Satış fiyatı")}</span><input min="0" step="0.01" type="number" value={competitor.salesPrice} onChange={(event) => updateSalesItem("competitors", competitor.id, "salesPrice", event.target.value)} /></label>
-                      <label><span>{copy("Market share", "Pazar payı")}</span><input min="0" max="100" type="number" value={competitor.marketShare} onChange={(event) => updateSalesItem("competitors", competitor.id, "marketShare", event.target.value)} /></label>
-                      <label><span>{copy("Reputation", "İtibar")}</span><input min="0" max="100" type="number" value={competitor.reputationScore} onChange={(event) => updateSalesItem("competitors", competitor.id, "reputationScore", event.target.value)} /></label>
-                      <label><span>{copy("Marketing budget", "Pazarlama bütçesi")}</span><input min="0" step="1000" type="number" value={competitor.marketingBudget} onChange={(event) => updateSalesItem("competitors", competitor.id, "marketingBudget", event.target.value)} /></label>
-                      <label><span>{copy("Threat score", "Tehdit skoru")}</span><input min="0" max="100" type="number" value={competitor.threatScore} onChange={(event) => updateSalesItem("competitors", competitor.id, "threatScore", event.target.value)} /></label>
-                      <label><span>{copy("Campaign type", "Kampanya tipi")}</span><input value={competitor.campaignType} onChange={(event) => updateSalesItem("competitors", competitor.id, "campaignType", event.target.value)} /></label>
-                      <label className="wide-field"><span>{copy("Strategy", "Strateji")}</span><textarea value={competitor.strategy} onChange={(event) => updateSalesItem("competitors", competitor.id, "strategy", event.target.value)} /></label>
-                    </div>
+                      return selectedType ? (
+                        <div className="sales-type-info campaign-type-info">
+                          <span>{copy("Avg acquisition", "Ort. müşteri kazanımı")}<strong>{formatNumber(selectedType.averageCustomerAcquisitionRate, 1)}%</strong></span>
+                          <span>{copy("Avg conversion", "Ort. dönüşüm")}<strong>{formatNumber(selectedType.averageConversionRate, 1)}%</strong></span>
+                          <span>{copy("Avg duration", "Ort. süre")}<strong>{formatNumber(selectedType.averageDurationDays, 0)} {copy("days", "gün")}</strong></span>
+                          <small>{getSalesTypeDescription(selectedType)}</small>
+                        </div>
+                      ) : null;
+                    })()}
+                    <textarea value={campaign.goal} onChange={(event) => updateSalesItem("campaigns", campaign.id, "goal", event.target.value)} />
                   </div>
                 ))}
               </div>
@@ -3557,21 +4818,26 @@ function App() {
               <div className="sales-card-heading">
                 <div>
                   <span>{copy("Sales personnel", "Satış personeli")}</span>
-                  <h2>{copy("Ownership, pipeline, target and performance", "Sahiplik, pipeline, hedef ve performans")}</h2>
+                  <h2>{copy("Ownership, target and realized sales quantity", "Sahiplik, hedef ve gerçekleşen satış adedi")}</h2>
                 </div>
                 <button type="button" onClick={() => addSalesItem("personnel")}>{copy("Add Person", "Personel Ekle")}</button>
               </div>
               <div className="sales-table personnel-table">
-                <div className="sales-table-row sales-table-head"><span>{copy("Person", "Kişi")}</span><span>{copy("Role", "Rol")}</span><span>{copy("Channel", "Kanal")}</span><span>{copy("Target", "Hedef")}</span><span>{copy("Pipeline", "Pipeline")}</span><span>{copy("Win rate", "Kazanım")}</span><span>{copy("Success", "Başarı")}</span></div>
+                <div className="sales-table-row sales-table-head personnel-row-layout"><span>{copy("Person", "Kişi")}</span><span>{copy("Role", "Rol")}</span><span>{copy("Channel", "Kanal")}</span><span>{copy("Target", "Hedef")}</span><span>{copy("Realized sales", "Gerçekleşen satış")}</span></div>
                 {salesStrategy.personnel.map((person) => (
-                  <div className="sales-table-row personnel-row" key={person.id}>
+                  <div className="sales-table-row personnel-row personnel-row-layout" key={person.id}>
                     <label><input value={person.name} onChange={(event) => updateSalesItem("personnel", person.id, "name", event.target.value)} /></label>
                     <label><input value={person.role} onChange={(event) => updateSalesItem("personnel", person.id, "role", event.target.value)} /></label>
-                    <label><input value={person.assignedChannel} onChange={(event) => updateSalesItem("personnel", person.id, "assignedChannel", event.target.value)} /></label>
+                    <label>
+                      <select value={person.assignedChannel || ""} onChange={(event) => updateSalesItem("personnel", person.id, "assignedChannel", event.target.value)}>
+                        <option value="">{copy("Select channel", "Kanal seç")}</option>
+                        {salesStrategy.channels.map((channel) => (
+                          <option value={channel.name || channel.id} key={channel.id}>{channel.name || channel.id}</option>
+                        ))}
+                      </select>
+                    </label>
                     <label><input min="0" type="number" value={person.monthlyTarget} onChange={(event) => updateSalesItem("personnel", person.id, "monthlyTarget", event.target.value)} /></label>
-                    <label><input min="0" step="1000" type="number" value={person.pipelineValue} onChange={(event) => updateSalesItem("personnel", person.id, "pipelineValue", event.target.value)} /></label>
-                    <label><input min="0" max="100" type="number" value={person.winRate} onChange={(event) => updateSalesItem("personnel", person.id, "winRate", event.target.value)} /></label>
-                    <label><input min="0" max="100" type="number" value={person.successScore} onChange={(event) => updateSalesItem("personnel", person.id, "successScore", event.target.value)} /></label>
+                    <label><input min="0" step="1" type="number" value={person.realizedSalesUnits ?? ""} onChange={(event) => updateSalesItem("personnel", person.id, "realizedSalesUnits", event.target.value)} /></label>
                   </div>
                 ))}
               </div>
@@ -3585,12 +4851,12 @@ function App() {
                 </div>
               </div>
               <div className="sales-signal-grid">
-                <span>{copy("Best channel", "En iyi kanal")} <strong>{strongestChannel.name || "-"}</strong><small>{formatNumber(strongestChannel.successScore)}/100</small></span>
-                <span>{copy("Best campaign", "En iyi kampanya")} <strong>{strongestCampaign.name || "-"}</strong><small>{formatLira(totalCampaignBudget)} {copy("total budget", "toplam bütçe")}</small></span>
-                <span>{copy("Top salesperson", "En iyi satışçı")} <strong>{strongestPerson.name || "-"}</strong><small>{formatLira(strongestPerson.pipelineValue)} pipeline</small></span>
-                <span>{copy("Competitor to watch", "Takip edilecek rakip")} <strong>{competitorToWatch.name || "-"}</strong><small>{competitorToWatch.campaignType || "-"}</small></span>
-                <span>{copy("Channel deductions", "Kanal kesintileri")} <strong>{formatNumber(weightedChannelValue("marginPercent") + weightedChannelValue("discountPercent"), 1)}%</strong><small>{copy("margin plus discount", "marj artı indirim")}</small></span>
-                <span>{copy("Monthly target", "Aylık hedef")} <strong>{formatNumber(averageMonthlyForecast)}</strong><small>{copy("average from monthly forecast", "aylık tahmin ortalaması")}</small></span>
+                <span>{copy("Products in channels", "Kanallardaki ürün")} <strong>{formatNumber(activeProductCount)}</strong><small>{copy("selected from Operations products", "Operations ürünlerinden seçildi")}</small></span>
+                <span>{copy("Campaign budget", "Kampanya bütçesi")} <strong>{formatLira(totalCampaignBudget)}</strong><small>{copy("total planned marketing spend", "toplam planlanan pazarlama bütçesi")}</small></span>
+                <span>{copy("Personnel target", "Personel hedefi")} <strong>{formatNumber(personnelTargetTotal)}</strong><small>{copy("monthly target units", "aylık hedef adet")}</small></span>
+                <span>{copy("Realized sales", "Gerçekleşen satış")} <strong>{formatNumber(realizedSalesTotal)}</strong><small>{copy("entered by sales personnel", "satış personeli tarafından girildi")}</small></span>
+                <span>{copy("Average multiplier", "Ortalama çarpan")} <strong>{formatNumber(averageMultiplier, 2)}x</strong><small>{copy("across 12 months", "12 ay genelinde")}</small></span>
+                <span>{copy("Ready remaining", "Hazır kalan")} <strong>{formatNumber(totalReadyUnits)}</strong><small>{copy("after planned channel quantities", "planlanan kanal adetlerinden sonra")}</small></span>
               </div>
             </article>
           </div>
@@ -3639,6 +4905,92 @@ function App() {
     );
   }
 
+  function renderMachinesEquipmentPage() {
+    const machineFields = [
+      { name: "name", label: copy("Machine name", "Makine adı") },
+      { name: "price", label: copy("Machine price", "Makine fiyatı"), step: "0.01", type: "number" },
+      { name: "hourlyEnergyConsumptionKwh", label: copy("Hourly energy consumption", "Saatlik enerji tüketimi"), step: "0.01", type: "number" },
+    ];
+    const equipmentFields = [
+      { name: "name", label: copy("Equipment name", "Ekipman adı") },
+      { name: "price", label: copy("Equipment price", "Ekipman fiyatı"), step: "0.01", type: "number" },
+      { name: "quantity", label: copy("Equipment quantity", "Ekipman miktarı"), step: "1", type: "number" },
+    ];
+    const machineColumns = [
+      { header: copy("Machine", "Makine"), render: (row) => row.name },
+      { header: copy("Price", "Fiyat"), render: (row) => formatLira(row.price) },
+      { header: copy("Hourly Energy", "Saatlik Enerji"), render: (row) => `${formatNumber(row.hourly_energy_consumption_kwh, 2)} kWh` },
+    ];
+    const equipmentColumns = [
+      { header: copy("Equipment", "Ekipman"), render: (row) => row.name },
+      { header: copy("Price", "Fiyat"), render: (row) => formatLira(row.price) },
+      { header: copy("Quantity", "Miktar"), render: (row) => formatNumber(row.quantity) },
+    ];
+
+    return renderDashboardLayout(
+      `operations/${activeOperationsSubmodule.key}`,
+        <section className="operations-workspace operations-modern">
+          <div className="operations-header">
+            <div>
+              <span>Operations / {copy("Machines & Equipment", "Makine & Ekipman")}</span>
+              <h1>{copy("Machines & Equipment", "Makine & Ekipman")}</h1>
+              <p>{copy("Keep machines used in production plans separate from simple equipment records.", "Üretim planlarında kullanılacak makineleri sade ekipman kayıtlarından ayrı tutun.")}</p>
+            </div>
+            <div className="operations-actions">
+              <button type="button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
+            </div>
+          </div>
+
+          <div className="machine-equipment-grid">
+            <div className="operation-data-grid compact">
+              {renderOperationRecordForm("machine", machineFields)}
+              <article className="operation-card operation-data-table-card">
+                <div className="operation-card-heading">
+                  <h2>{copy("Machines", "Makineler")}</h2>
+                  <span>{operationsWorkspace.machines.length} {copy("records", "kayıt")}</span>
+                </div>
+                <div className="operation-data-table">
+                  <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: `repeat(${machineColumns.length}, minmax(120px, 1fr))` }}>
+                    {machineColumns.map((column) => <span key={column.header}>{column.header}</span>)}
+                  </div>
+                  {(operationsWorkspace.machines.length ? operationsWorkspace.machines : [{ id: "empty" }]).map((row) => (
+                    <div className="operation-data-row" style={{ gridTemplateColumns: `repeat(${machineColumns.length}, minmax(120px, 1fr))` }} key={row.id}>
+                      {machineColumns.map((column) => (
+                        <span key={column.header}>{row.id === "empty" ? "-" : column.render(row)}</span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+
+            <div className="operation-data-grid compact">
+              {renderOperationRecordForm("equipment", equipmentFields)}
+              <article className="operation-card operation-data-table-card">
+                <div className="operation-card-heading">
+                  <h2>{copy("Equipment", "Ekipman")}</h2>
+                  <span>{(operationsWorkspace.equipment || []).length} {copy("records", "kayıt")}</span>
+                </div>
+                <div className="operation-data-table">
+                  <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: `repeat(${equipmentColumns.length}, minmax(120px, 1fr))` }}>
+                    {equipmentColumns.map((column) => <span key={column.header}>{column.header}</span>)}
+                  </div>
+                  {((operationsWorkspace.equipment || []).length ? operationsWorkspace.equipment : [{ id: "empty" }]).map((row) => (
+                    <div className="operation-data-row" style={{ gridTemplateColumns: `repeat(${equipmentColumns.length}, minmax(120px, 1fr))` }} key={row.id}>
+                      {equipmentColumns.map((column) => (
+                        <span key={column.header}>{row.id === "empty" ? "-" : column.render(row)}</span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+          </div>
+          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
+        </section>,
+    );
+  }
+
   const references = [];
 
   const personas = [
@@ -3676,8 +5028,8 @@ function App() {
     { key: "operations", path: "/operations", label: "Operations" },
     { key: "product-plus", path: "/product-plus", label: "Ürün +" },
     { key: "human-resources-plus", path: "/human-resources-plus", label: copy("Human Resources +", "İnsan Kaynağı +") },
-    { key: "financial-modelling", path: "/financial-modelling", label: copy("Financial Modelling", "Finansal Modelleme") },
     { key: "sales-strategy", path: "/sales-strategy", label: copy("Sales Strategy", "Satış Stratejisi") },
+    { key: "financial-modelling", path: "/financial-modelling", label: copy("Financial Modelling", "Finansal Modelleme") },
     { key: "simulation", path: "/simulation", label: copy("Simulation", "Simülasyon") },
     { key: "ai-insights", path: "/ai-insights", label: copy("AI Insights", "AI İçgörüleri") },
     { key: "reports", path: "/reports", label: copy("Reports", "Raporlar") },
@@ -3694,21 +5046,27 @@ function App() {
     { key: "product-tree", path: "/product-plus/product-tree", label: copy("Product Tree", "Ürün Ağacı") },
   ];
   const financialSubmodules = [
-    { group: "Maliyet Hesaplama", key: "product-cost", path: "/financial-modelling/maliyet-hesaplama/urun-maliyeti", label: "Ürün Maliyeti" },
-    { group: "Maliyet Hesaplama", key: "investment-cost", path: "/financial-modelling/maliyet-hesaplama/yatirim-maliyeti", label: "Yatırım Maliyeti" },
-    { group: "Getiri Hesaplama", key: "product-return", path: "/financial-modelling/getiri-hesaplama/urun-getirisi", label: "Ürün Getirisi" },
-    { group: "Getiri Hesaplama", key: "investment-return", path: "/financial-modelling/getiri-hesaplama/yatirim-getirisi", label: "Yatırım Getirisi" },
+    { group: "Girdiler", key: "inputs", path: "/financial-modelling/girdiler", label: "Girdiler" },
+    { group: "Krediler", key: "loans", path: "/financial-modelling/krediler", label: "Krediler" },
+    { group: "Analiz", key: "overview", path: "/financial-modelling/analiz", label: "Maliyet & Getiri" },
   ];
 
   const activeModule = dashboardModules.find((module) => module.path === path);
   const activeOperationsSubmodule = operationsSubmodules.find((module) => module.path === path);
   const activeProductPlusSubmodule = productPlusSubmodules.find((module) => module.path === path);
   const activeFinancialSubmodule = financialSubmodules.find((module) => module.path === path);
+  const isLegacyFinancialDetailPath = [
+    "/financial-modelling/maliyet-hesaplama/urun-maliyeti",
+    "/financial-modelling/maliyet-hesaplama/yatirim-maliyeti",
+    "/financial-modelling/getiri-hesaplama/urun-getirisi",
+    "/financial-modelling/getiri-hesaplama/yatirim-getirisi",
+  ].includes(path);
   const activeSimulationVariant = simulationVariants.find((variant) => variant.path === path);
   const isOperationsRoute = path === "/operations" || path.startsWith("/operations/");
   const isProductPlusRoute = path === "/product-plus" || path.startsWith("/product-plus/");
   const isFinancialRoute = path === "/financial-modelling" || path.startsWith("/financial-modelling/");
   const isSimulationRoute = path === "/simulation" || path.startsWith("/simulation/");
+  const editableAuthorizationRoles = roles.filter((role) => !isAdminRole(role));
   const moduleLabelByKey = Object.fromEntries(dashboardModules.map((module) => [module.key, module.label]));
   const getModuleLabel = (module) => moduleLabelByKey[module.module_key] || module.name;
   const projectedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForm, operationsWorkspace, financialHorizon);
@@ -3721,11 +5079,14 @@ function App() {
   const totalDailyProduction = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.producedQuantity), 0);
   const totalDailyTrackedCost = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.totalTrackedDailyCost), 0);
   const totalDailyEnergy = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.energyConsumptionKwh), 0);
-  const dashboardProductName = operationsWorkspace.product?.name || salesStrategy.company?.productName || copy("Product input needed", "Ürün girdisi gerekli");
+  const dashboardProductName = operationsWorkspace.product?.name || operationsWorkspace.products[0]?.name || copy("Product input needed", "Ürün girdisi gerekli");
   const dashboardCompanyName = currentProfile?.company?.name || currentProfile?.company_id || "Atera";
-  const dashboardProductContext = operationsWorkspace.product?.product_group || operationsWorkspace.product?.name || salesStrategy.company?.productName || copy("No product selected", "Ürün seçilmedi");
+  const dashboardProductContext = operationsWorkspace.product?.product_group || operationsWorkspace.product?.name || operationsWorkspace.products[0]?.name || copy("No product selected", "Ürün seçilmedi");
   const hasOperationData = Boolean(operationsWorkspace.products.length || operationsWorkspace.machines.length || operationsWorkspace.materials.length || operationsWorkspace.workforce.length || activePlanResults.length);
-  const hasSalesForecast = (salesStrategy.company?.monthlyForecast || []).some((item) => toFiniteNumber(item) > 0);
+  const dashboardMonthlyMultipliers = getSalesExpectationMultipliers(salesStrategy);
+  const dashboardBaseMonthlySalesUnits = getBaseMonthlySalesUnits(salesStrategy);
+  const dashboardExpectedSalesUnits = dashboardMonthlyMultipliers.reduce((total, multiplier) => total + (dashboardBaseMonthlySalesUnits * multiplier), 0);
+  const hasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
   const hasFinancialSourceData = Boolean(activePlanResults.length && hasSalesForecast);
   const noDataValue = "-";
   const moneyOrMissing = (value) => (hasFinancialSourceData ? formatLira(value) : noDataValue);
@@ -3735,7 +5096,7 @@ function App() {
   const dashboardStats = [
     { label: copy("Daily Production", "Günlük Üretim"), value: activePlanResults.length ? `${formatNumber(totalDailyProduction, 2)} ${latestPlanResult?.productUnit || operationsWorkspace.product?.unit || copy("units", "adet")}` : noDataValue, delta: copy("Supabase", "Supabase"), detail: copy("active process result", "aktif süreç sonucu") },
     { label: copy("Active Plans", "Aktif Plan"), value: formatNumber(operationsWorkspace.activePlans.length), delta: copy("Supabase", "Supabase"), detail: copy("saved process plans", "kayıtlı süreç planları") },
-    { label: copy("Monthly Revenue", "Aylık Ciro"), value: moneyOrMissing(monthlyRevenue), delta: copy("calculated", "hesaplandı"), detail: copy("from sales forecast", "satış tahmininden") },
+    { label: copy("Monthly Revenue", "Aylık Ciro"), value: moneyOrMissing(monthlyRevenue), delta: copy("calculated", "hesaplandı"), detail: copy("from channel sales plan", "kanal satış planından") },
     { label: copy("Cash Runway", "Nakit Dayanma"), value: hasFinancialSourceData ? `${formatNumber(financialSummary.cashRunwayMonths)} ${copy("mo", "ay")}` : noDataValue, delta: copy("calculated", "hesaplandı"), detail: copy("from current cash", "mevcut nakitten") },
   ];
   const factoryLines = operationsWorkspace.machines.slice(0, 5).map((machine, index) => ({
@@ -3759,7 +5120,7 @@ function App() {
     [copy("Spoilage / returns", "Fire / iade"), hasFinancialSourceData ? formatLira(financialSummary.expiredWriteOffCost) : noDataValue],
     [copy("Working capital", "İşletme sermayesi"), hasFinancialSourceData ? formatLira(financialSummary.workingCapitalRequirement) : noDataValue],
   ];
-  const operationUnitSalePrice = toFiniteNumber(latestPlanResult?.productPrice, toFiniteNumber(operationsWorkspace.product?.price, toFiniteNumber(salesStrategy.company?.baseSalesPrice)));
+  const operationUnitSalePrice = toFiniteNumber(latestPlanResult?.productPrice, toFiniteNumber(operationsWorkspace.product?.price, toFiniteNumber(operationsWorkspace.products[0]?.price)));
   const operationUnitCost = toFiniteNumber(latestPlanResult?.producedQuantity)
     ? toFiniteNumber(latestPlanResult.totalTrackedDailyCost) / toFiniteNumber(latestPlanResult.producedQuantity)
     : toFiniteNumber(financialSummary.unitProductionCost);
@@ -3800,8 +5161,8 @@ function App() {
       ? { title: copy("Process result loaded", "Süreç sonucu yüklendi"), copy: `${formatNumber(totalDailyProduction, 2)} ${latestPlanResult?.productUnit || copy("units", "adet")} / ${formatLira(totalDailyTrackedCost)}`, tone: "cyan" }
       : { title: copy("Process result needed", "Süreç sonucu gerekli"), copy: copy("Save a process plan so production and cost numbers are calculated from Supabase.", "Üretim ve maliyet sayıları Supabase'ten hesaplansın diye süreç planı kaydedin."), tone: "amber" },
     hasSalesForecast
-      ? { title: copy("Sales forecast loaded", "Satış tahmini yüklendi"), copy: `${formatNumber((salesStrategy.company.monthlyForecast || []).reduce((total, item) => total + toFiniteNumber(item), 0))} ${copy("units across 12 months", "adet / 12 ay")}`, tone: "teal" }
-      : { title: copy("Sales forecast needed", "Satış tahmini gerekli"), copy: copy("Enter monthly sales volume in Sales Strategy to unlock revenue, inventory, and runway calculations.", "Ciro, stok ve nakit hesapları için Satış Stratejisi'nde aylık satış hacmi girin."), tone: "amber" },
+      ? { title: copy("Sales plan loaded", "Satış planı yüklendi"), copy: `${formatNumber(dashboardExpectedSalesUnits)} ${copy("expected units across 12 months", "12 ay beklenen adet")}`, tone: "teal" }
+      : { title: copy("Sales plan needed", "Satış planı gerekli"), copy: copy("Add product-linked channel quantities in Sales Strategy to unlock revenue, inventory, and runway calculations.", "Ciro, stok ve nakit hesapları için Satış Stratejisi'nde ürüne bağlı kanal adetleri girin."), tone: "amber" },
     hasFinancialSourceData
       ? { title: copy("Payback signal", "Geri dönüş sinyali"), copy: financialSummary.paybackMonth ? `${financialSummary.paybackMonth}. ${copy("month", "ay")}` : copy("Payback is not reached in the selected horizon.", "Seçilen ufukta geri dönüş oluşmuyor."), tone: financialSummary.paybackMonth ? "teal" : "clay" }
       : { title: copy("Financial inputs needed", "Finansal girdi gerekli"), copy: copy("Complete operations, sales, and financial assumptions for real feasibility output.", "Gerçek fizibilite çıktısı için operasyon, satış ve finans varsayımlarını tamamlayın."), tone: "clay" },
@@ -3834,7 +5195,7 @@ function App() {
       copy("Sales Strategy Snapshot", "Satış Stratejisi Anlık Görünümü"),
       copy("Sales Reports", "Satış Raporları"),
       new Date().toLocaleString(locale),
-      copy("12 month forecast", "12 aylık tahmin"),
+      copy("12 month sales plan", "12 aylık satış planı"),
       reportAuthor,
     ],
   ].filter(Boolean);
@@ -3898,7 +5259,7 @@ function App() {
                 <button
                   type="button"
                   className={activePage === module.key || (module.key === "operations" && activePage.startsWith("operations/")) || (module.key === "product-plus" && activePage.startsWith("product-plus/")) || (module.key === "financial-modelling" && activePage.startsWith("financial-modelling/")) || (module.key === "simulation" && activePage.startsWith("simulation/")) ? "active" : ""}
-                  onClick={() => goTo(module.key === "operations" ? "/operations/data-entry" : module.key === "product-plus" ? "/product-plus/product-tree" : module.key === "financial-modelling" ? "/financial-modelling/maliyet-hesaplama/urun-maliyeti" : module.key === "simulation" ? "/simulation/current-situation" : module.path, "login")}
+                  onClick={() => goTo(module.key === "operations" ? "/operations/data-entry" : module.key === "product-plus" ? "/product-plus/product-tree" : module.key === "financial-modelling" ? "/financial-modelling/girdiler" : module.key === "simulation" ? "/simulation/current-situation" : module.path, "login")}
                 >
                   {module.label}
                 </button>
@@ -4341,7 +5702,7 @@ function App() {
             <div className="summary-grid">
               {[
                 [copy("Production", "Üretim"), activePlanResults.length ? `${formatNumber(totalDailyProduction, 2)} ${latestPlanResult?.productUnit || copy("units", "adet")} ${copy("daily output is calculated from saved process plans.", "günlük çıktı kayıtlı süreç planlarından hesaplandı.")}` : copy("Save a process plan to calculate daily output from backend data.", "Günlük çıktıyı backend verisinden hesaplamak için süreç planı kaydedin.")],
-                [copy("Profitability", "Karlılık"), hasFinancialSourceData ? `${copy("Monthly net estimate:", "Aylık net tahmin:")} ${formatLira(monthlyNet)}.` : copy("Enter monthly sales forecast and cost assumptions to calculate profitability.", "Karlılığı hesaplamak için aylık satış tahmini ve maliyet varsayımlarını girin.")],
+                [copy("Profitability", "Karlılık"), hasFinancialSourceData ? `${copy("Monthly net estimate:", "Aylık net tahmin:")} ${formatLira(monthlyNet)}.` : copy("Enter product-linked sales channels and cost assumptions to calculate profitability.", "Karlılığı hesaplamak için ürüne bağlı satış kanallarını ve maliyet varsayımlarını girin.")],
                 [copy("Risk", "Risk"), hasFinancialSourceData ? `${copy("Unsold inventory:", "Satılmayan stok:")} ${formatNumber(financialSummary.unsoldInventoryUnits)} ${copy("units", "adet")}.` : copy("Inventory and write-off risk appears after sales and production data exist.", "Stok ve fire riski satış ve üretim verisi oluşunca görünür.")],
                 [copy("Recommendation", "Öneri"), hasFinancialSourceData ? copy("Review cash runway, working capital, and payback before committing investment.", "Yatırıma girmeden önce nakit dayanma, işletme sermayesi ve geri dönüşü kontrol edin.") : copy("Complete missing inputs before treating the feasibility result as decision-ready.", "Fizibilite sonucunu karar seviyesinde kullanmadan önce eksik girdileri tamamlayın.")],
               ].map(([title, summary]) => (
@@ -4425,22 +5786,7 @@ function App() {
     }
 
     if (activeOperationsSubmodule?.key === "machines-equipment") {
-      return renderOperationDataPage({
-        columns: [
-          { header: copy("Machine", "Makine"), render: (row) => row.name },
-          { header: copy("Price", "Fiyat"), render: (row) => formatLira(row.price) },
-          { header: copy("Hourly Energy", "Saatlik Enerji"), render: (row) => `${formatNumber(row.hourly_energy_consumption_kwh, 2)} kWh` },
-        ],
-        description: copy("Keep only the name, price, and hourly energy consumption for the machine selected in production.", "Sadece üretimde seçilecek makinenin adını, fiyatını ve saatlik enerji tüketimini tutun."),
-        entity: "machine",
-        fields: [
-          { name: "name", label: copy("Machine name", "Makine adı") },
-          { name: "price", label: copy("Machine price", "Makine fiyatı"), step: "0.01", type: "number" },
-          { name: "hourlyEnergyConsumptionKwh", label: copy("Hourly energy consumption", "Saatlik enerji tüketimi"), step: "0.01", type: "number" },
-        ],
-        rows: operationsWorkspace.machines,
-        title: copy("Machines & Equipment", "Makine & Ekipman"),
-      });
+      return renderMachinesEquipmentPage();
     }
 
     if (activeOperationsSubmodule?.key === "products") {
@@ -4622,12 +5968,12 @@ function App() {
     }
 
     if (path === "/financial-modelling") {
-      goTo("/financial-modelling/maliyet-hesaplama/urun-maliyeti", "login");
+      goTo("/financial-modelling/girdiler", "login");
       return null;
     }
 
     if (isFinancialRoute && !activeFinancialSubmodule) {
-      goTo("/financial-modelling/maliyet-hesaplama/urun-maliyeti", "login");
+      goTo(isLegacyFinancialDetailPath ? "/financial-modelling/analiz" : "/financial-modelling/girdiler", "login");
       return null;
     }
 
@@ -4729,7 +6075,7 @@ function App() {
                   {[
                     [copy("Product record", "Ürün kaydı"), operationsWorkspace.product ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                     [copy("Process backend result", "Süreç backend sonucu"), activePlanResults.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
-                    [copy("Monthly sales forecast", "Aylık satış tahmini"), hasSalesForecast ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
+                    [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                     [copy("Financial assumptions", "Finansal varsayımlar"), financialModel.settings ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                   ].map(([item, state]) => (
                     <div className="schedule-row" key={item}>
@@ -4892,7 +6238,7 @@ function App() {
                           value={managedUserForm.accessLevel}
                           onChange={(event) => updateManagedUserForm("accessLevel", event.target.value)}
                         >
-                          {roles.map((role) => (
+                          {editableAuthorizationRoles.map((role) => (
                             <option value={role.name} key={role.id}>
                               {role.name}
                             </option>
@@ -4982,7 +6328,7 @@ function App() {
                         <span>{labels.readPermission}</span>
                         <span>{labels.writePermission}</span>
                       </div>
-                      {roles.map((role) =>
+                      {editableAuthorizationRoles.map((role) =>
                         modules.map((module) => {
                           const permission = role.permissions[module.module_key] || {};
                           return (

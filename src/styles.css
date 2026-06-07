@@ -2492,6 +2492,15 @@ select {
   grid-template-columns: minmax(320px, 0.78fr) minmax(0, 1.22fr);
 }
 
+.machine-equipment-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.operation-data-grid.compact {
+  grid-template-columns: minmax(280px, 0.68fr) minmax(0, 1.32fr);
+}
+
 .resource-definition-grid {
   align-items: start;
   display: grid;
@@ -2563,6 +2572,17 @@ select {
   outline: none;
   padding: 0 10px;
   width: 100%;
+}
+
+.cycle-time-control {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(104px, 0.62fr);
+}
+
+.cycle-time-control input,
+.cycle-time-control select {
+  min-width: 0;
 }
 
 .operation-data-fields textarea {
@@ -3310,7 +3330,254 @@ select {
 }
 
 .finance-input-panel .financial-assumption-form {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.financial-input-section {
+  background: color-mix(in srgb, var(--color-section) 66%, var(--color-surface));
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.financial-input-section.optional {
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+}
+
+.financial-input-section-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.financial-input-section-heading div {
+  display: grid;
+  gap: 4px;
+}
+
+.financial-input-section-heading span {
+  color: var(--color-heading);
+  font-size: 0.84rem;
+  font-weight: 950;
+  text-transform: none;
+}
+
+.financial-input-section-heading p {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin: 0;
+  text-transform: none;
+}
+
+.financial-input-section-heading strong {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-teal) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 28%, var(--color-line));
+  border-radius: 999px;
+  color: var(--color-teal-strong);
+  display: inline-flex;
+  font-size: 0.78rem;
+  min-height: 30px;
+  padding: 0 11px;
+}
+
+.financial-input-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.financial-loan-list {
+  display: grid;
+  gap: 10px;
+}
+
+.financial-loan-form {
+  display: grid;
+  gap: 14px;
+}
+
+.financial-loan-hero {
+  align-items: center;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-teal) 16%, var(--color-surface)), color-mix(in srgb, var(--color-amber) 10%, var(--color-section)));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 22%, var(--color-line));
+  border-radius: 8px;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 18px;
+}
+
+.financial-loan-hero div {
+  display: grid;
+  gap: 6px;
+}
+
+.financial-loan-hero span {
+  color: var(--color-teal-strong);
+  font-size: 0.76rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.financial-loan-hero h2 {
+  color: var(--color-heading);
+  font-size: 1.55rem;
+  margin: 0;
+}
+
+.financial-loan-hero p {
+  color: var(--color-muted);
+  font-weight: 750;
+  margin: 0;
+  max-width: 720px;
+}
+
+.financial-loan-summary-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.financial-loan-summary-card {
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 13px;
+}
+
+.financial-loan-summary-card span {
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.financial-loan-summary-card strong {
+  color: var(--color-heading);
+  font-size: 1rem;
+}
+
+.financial-loan-summary-card small {
+  color: var(--color-muted);
+  font-weight: 750;
+}
+
+.financial-loan-section {
+  background: color-mix(in srgb, var(--color-section) 76%, var(--color-surface));
+}
+
+.financial-loan-card {
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.financial-loan-card-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.financial-loan-card-heading div {
+  display: grid;
+  gap: 4px;
+}
+
+.financial-loan-card-heading span {
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.financial-loan-card-heading h3 {
+  color: var(--color-heading);
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.financial-loan-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.financial-loan-card-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.financial-loan-card-metrics span {
+  background: color-mix(in srgb, var(--color-teal) 8%, var(--color-section));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 18%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-muted);
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 900;
+  gap: 4px;
+  padding: 10px;
+  text-transform: uppercase;
+}
+
+.financial-loan-card-metrics strong {
+  color: var(--color-heading);
+  font-size: 0.9rem;
+}
+
+.loan-empty-state {
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  border: 1px dashed var(--color-line);
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.financial-loan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.financial-controls label > span {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.financial-controls label small {
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 950;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.required-financial-field small {
+  background: color-mix(in srgb, var(--color-amber) 18%, var(--color-surface));
+  color: var(--color-clay);
+}
+
+.optional-financial-field small {
+  background: color-mix(in srgb, var(--color-teal) 12%, var(--color-surface));
+  color: var(--color-teal-strong);
 }
 
 .financial-controls label {
@@ -3428,6 +3695,16 @@ select {
   grid-template-columns: minmax(420px, 1.05fr) minmax(420px, 0.95fr);
 }
 
+.financial-overview-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(360px, 1fr));
+}
+
+.financial-overview-wide {
+  grid-column: 1 / -1;
+}
+
 .financial-card {
   display: grid;
   gap: 14px;
@@ -3457,6 +3734,125 @@ select {
   display: flex;
   gap: 12px;
   justify-content: space-between;
+}
+
+.financial-card-heading p {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+.financial-widget-selector {
+  gap: 16px;
+}
+
+.financial-widget-picker {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.financial-widget-picker button {
+  background: color-mix(in srgb, var(--color-section) 70%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-ink);
+  cursor: pointer;
+  display: grid;
+  gap: 5px;
+  min-height: 84px;
+  padding: 12px;
+  text-align: left;
+}
+
+.financial-widget-picker button.selected {
+  background: color-mix(in srgb, var(--color-teal) 11%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-teal) 36%, var(--color-line));
+}
+
+.financial-widget-picker strong {
+  color: var(--color-heading);
+  font-size: 0.86rem;
+}
+
+.financial-widget-picker span {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.financial-widget-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(280px, 1fr));
+}
+
+.financial-widget-card {
+  align-content: start;
+  min-height: 220px;
+}
+
+.widget-remove-button {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-section) 82%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  color: var(--color-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 950;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.financial-widget-metric {
+  background: color-mix(in srgb, var(--color-section) 62%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-height: 132px;
+  padding: 14px;
+}
+
+.financial-widget-metric span {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.financial-widget-metric strong {
+  color: var(--color-heading);
+  font-size: clamp(1.55rem, 2vw, 2.2rem);
+  line-height: 1;
+}
+
+.financial-widget-metric small {
+  color: var(--color-teal);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.financial-widget-pair {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.financial-widget-empty {
+  align-items: center;
+  color: var(--color-muted);
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 96px;
+  text-align: center;
+}
+
+.financial-widget-empty strong {
+  color: var(--color-heading);
 }
 
 .mini-tabs {
@@ -3490,6 +3886,37 @@ select {
 
 .simplified-income-table .income-row {
   grid-template-columns: 1.3fr 0.8fr 1fr;
+}
+
+.overview-income-table .income-row {
+  grid-template-columns: minmax(180px, 1.2fr) minmax(180px, 1fr) minmax(120px, 0.75fr) minmax(120px, 0.7fr);
+}
+
+.overview-income-table .income-row.income {
+  background: color-mix(in srgb, var(--color-teal) 7%, transparent);
+}
+
+.overview-income-table .income-row.investment {
+  background: color-mix(in srgb, var(--color-cyan) 7%, transparent);
+}
+
+.overview-income-table .income-row.financing {
+  background: color-mix(in srgb, var(--color-green) 7%, transparent);
+}
+
+.overview-income-table .income-row.net,
+.overview-income-table .income-row.cash {
+  background: color-mix(in srgb, var(--color-amber) 9%, transparent);
+}
+
+.financial-row-count {
+  background: color-mix(in srgb, var(--color-teal) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 24%, var(--color-line));
+  border-radius: 999px;
+  color: var(--color-teal-strong);
+  font-size: 0.74rem;
+  font-weight: 900;
+  padding: 5px 10px;
 }
 
 .income-total {
@@ -3628,6 +4055,60 @@ select {
 .scenario-list {
   display: grid;
   gap: 8px;
+}
+
+.financial-bar-list {
+  display: grid;
+  gap: 10px;
+}
+
+.financial-bar-row {
+  background: color-mix(in srgb, var(--color-section) 62%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-height: 62px;
+  padding: 10px;
+}
+
+.financial-bar-row div {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.financial-bar-row span {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.financial-bar-row strong {
+  color: var(--color-heading);
+  font-size: 0.86rem;
+}
+
+.financial-bar-row i {
+  background: linear-gradient(90deg, var(--color-amber), var(--color-clay));
+  border-radius: 999px;
+  display: block;
+  height: 9px;
+  min-width: 0;
+}
+
+.financial-bar-row.income i {
+  background: linear-gradient(90deg, var(--color-cyan), var(--color-teal));
+}
+
+.financial-bar-row.net i,
+.financial-bar-row.cash i {
+  background: linear-gradient(90deg, var(--color-teal), var(--color-green));
+}
+
+.financial-bar-row.investment i {
+  background: linear-gradient(90deg, var(--color-navy-soft), var(--color-cyan));
 }
 
 .cost-list span,
@@ -4235,6 +4716,7 @@ select {
 }
 
 .simulation-name-field input,
+.simulation-name-field select,
 .sim-input-row input {
   background: color-mix(in srgb, var(--color-section) 58%, transparent);
   border: 1px solid var(--color-line);
@@ -4575,6 +5057,7 @@ select {
 
 .sales-forecast-card {
   align-content: start;
+  grid-column: 1 / -1;
 }
 
 .sales-forecast-grid {
@@ -4612,8 +5095,10 @@ select {
 .sales-form-grid textarea,
 .sales-forecast-grid input,
 .sales-edit-card input,
+.sales-edit-card select,
 .sales-edit-card textarea,
 .sales-table input,
+.sales-table select,
 .sales-table textarea,
 .competitor-title input {
   background: color-mix(in srgb, var(--color-section) 58%, transparent);
@@ -4692,7 +5177,7 @@ select {
 .competitor-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .sales-edit-card,
@@ -4704,6 +5189,142 @@ select {
 
 .sales-edit-card {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sales-channel-title {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 34px;
+}
+
+.sales-channel-title button {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-clay) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-clay) 22%, transparent);
+  border-radius: 999px;
+  color: var(--color-clay);
+  display: inline-grid;
+  font-size: 1rem;
+  font-weight: 900;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  width: 34px;
+}
+
+.sales-channel-capacity {
+  background: color-mix(in srgb, var(--color-section) 56%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 10px;
+}
+
+.sales-channel-capacity span {
+  color: var(--color-muted);
+  display: grid;
+  font-size: 0.74rem;
+  font-weight: 900;
+  gap: 4px;
+  text-transform: uppercase;
+}
+
+.sales-channel-capacity strong {
+  color: var(--color-heading);
+  font-size: 0.86rem;
+}
+
+.sales-type-info {
+  background: color-mix(in srgb, var(--color-teal) 7%, var(--color-section));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 24%, var(--color-line));
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 10px;
+}
+
+.sales-type-info span {
+  color: var(--color-muted);
+  display: grid;
+  font-size: 0.74rem;
+  font-weight: 900;
+  gap: 4px;
+  text-transform: uppercase;
+}
+
+.sales-type-info strong {
+  color: var(--color-heading);
+  font-size: 0.86rem;
+}
+
+.sales-type-info small {
+  color: var(--color-muted);
+  grid-column: 1 / -1;
+  line-height: 1.4;
+}
+
+.campaign-type-info {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.advanced-channel-panel {
+  border-top: 1px solid var(--color-line);
+  display: grid;
+  padding-top: 8px;
+}
+
+.advanced-channel-panel summary {
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  list-style-position: outside;
+  padding: 6px 0;
+}
+
+.advanced-channel-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-top: 8px;
+}
+
+.seasonality-inputs {
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.seasonality-inputs strong {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.seasonality-inputs div {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(12, minmax(34px, 1fr));
+}
+
+.seasonality-inputs label {
+  gap: 4px;
+}
+
+.seasonality-inputs label span {
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.seasonality-inputs input {
+  min-width: 0;
+  padding: 9px 4px;
+  text-align: center;
 }
 
 .sales-table {
@@ -4746,6 +5367,16 @@ select {
 .personnel-table .sales-table-row {
   grid-template-columns: repeat(7, minmax(140px, 1fr));
   min-width: 1060px;
+}
+
+.campaign-row-layout {
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  min-width: 820px;
+}
+
+.personnel-table .personnel-row-layout {
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  min-width: 820px;
 }
 
 .competitor-title {
@@ -5532,9 +6163,17 @@ select {
   .finance-input-panel,
   .finance-input-panel form,
   .financial-assumption-form,
+  .financial-input-grid,
+  .financial-loan-summary-grid,
+  .financial-loan-row,
+  .financial-loan-card-metrics,
+  .financial-widget-grid,
+  .financial-widget-picker,
+  .financial-widget-pair,
   .finance-metric-grid,
   .financial-feasibility-grid,
   .financial-grid,
+  .financial-overview-grid,
   .cost-body,
   .cash-chart,
   .scenario-management,
@@ -5556,6 +6195,7 @@ select {
   .sales-forecast-grid,
   .sales-channel-grid,
   .sales-edit-card,
+  .advanced-channel-grid,
   .competitor-grid,
   .sales-signal-grid,
   .distribution-body,
@@ -5573,6 +6213,16 @@ select {
   .process-metrics,
   .process-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .financial-loan-hero,
+  .financial-loan-card-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .seasonality-inputs div {
+    grid-template-columns: repeat(6, minmax(36px, 1fr));
   }
 
   .financial-workspace,
@@ -5703,6 +6353,14 @@ select {
   .finance-metric-grid,
   .financial-feasibility-grid,
   .financial-grid,
+  .financial-overview-grid,
+  .financial-input-grid,
+  .financial-loan-summary-grid,
+  .financial-loan-row,
+  .financial-loan-card-metrics,
+  .financial-widget-grid,
+  .financial-widget-picker,
+  .financial-widget-pair,
   .scenario-management,
   .simulation-grid,
   .simulation-bottom,
@@ -5720,9 +6378,14 @@ select {
   .sales-forecast-grid,
   .sales-channel-grid,
   .sales-edit-card,
+  .advanced-channel-grid,
   .competitor-grid,
   .sales-signal-grid {
     grid-template-columns: 1fr;
+  }
+
+  .seasonality-inputs div {
+    grid-template-columns: repeat(6, minmax(36px, 1fr));
   }
 
   .impact-summary,

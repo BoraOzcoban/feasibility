@@ -1,19 +1,11 @@
 export const emptySalesStrategy = {
+  campaignTypes: [],
+  channelTypes: [],
   company: {
-    annualSalesGrowthPercent: 0,
-    baseSalesPrice: 0,
-    marketShare: 0,
-    monthlyForecast: Array.from({ length: 12 }, () => 0),
-    monthlyTarget: 0,
-    positioning: "",
-    productName: "",
-    reputationScore: 0,
-    spoilageRate: 0,
-    targetSegment: "",
+    monthlyMultipliers: Array.from({ length: 12 }, () => 1),
   },
   campaigns: [],
   channels: [],
-  competitors: [],
   personnel: [],
 };
 
@@ -23,15 +15,22 @@ export const defaultSimulationParameters = {
   competitorPressure: 0,
   costVolatility: 0,
   demandChange: 0,
+  discountPercent: 0,
   fixedCost: 0,
   grossMargin: 0,
   marketingBudget: 0,
   marketShare: 0,
   priceChange: 0,
+  productionUnits: 0,
   productionEfficiency: 0,
   reputationScore: 0,
+  returnRatePercent: 0,
+  simulationAlgorithm: "fbm_with_tendency",
+  salesUnits: 0,
   simulationCount: 0,
+  spoilagePercent: 0,
   timeHorizonMonths: 12,
+  unitSalesPrice: 0,
   variableCostRatio: 0,
   volatility: 0,
 };
@@ -49,9 +48,51 @@ function normalizeNumber(value, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
-function normalizeMonthlyForecast(value) {
+function normalizeOptionalNumber(value) {
+  if (value === "" || value === null || value === undefined) return "";
+  const number = Number(value);
+  return Number.isFinite(number) ? number : "";
+}
+
+function nullableNumber(value) {
+  const normalized = normalizeOptionalNumber(value);
+  return normalized === "" ? null : normalized;
+}
+
+function normalizeMonthlyMultipliers(value) {
   const rows = Array.isArray(value) ? value : [];
-  return Array.from({ length: 12 }, (_, index) => normalizeNumber(rows[index]));
+  return Array.from({ length: 12 }, (_, index) => normalizeNumber(rows[index], 1));
+}
+
+function normalizeSeasonalityCurve(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return Array.from({ length: 12 }, (_, index) => normalizeOptionalNumber(rows[index]));
+}
+
+function nullableSeasonalityCurve(value) {
+  const curve = normalizeSeasonalityCurve(value).map(nullableNumber);
+  return curve.some((item) => item !== null) ? curve : null;
+}
+
+function mapSalesType(row) {
+  return {
+    averageCommissionPercent: normalizeNumber(row.average_commission_percent),
+    averageConversionRate: normalizeNumber(row.average_conversion_rate),
+    averageCustomerAcquisitionRate: normalizeNumber(row.average_customer_acquisition_rate),
+    averageDurationDays: normalizeNumber(row.average_duration_days),
+    descriptionEn: row.description_en || "",
+    descriptionTr: row.description_tr || "",
+    id: row.id,
+    nameEn: row.name_en || row.id,
+    nameTr: row.name_tr || row.name_en || row.id,
+    sortOrder: normalizeNumber(row.sort_order),
+  };
+}
+
+function getSalesTypeId(value, fallback) {
+  if (typeof value === "string" && value) return value;
+  if (value?.id) return value.id;
+  return fallback;
 }
 
 function throwPlanningError(error) {
@@ -70,110 +111,106 @@ function throwPlanningError(error) {
 
 export async function loadSalesStrategy(supabase) {
   const [
+    { data: channelTypeRows, error: channelTypesError },
+    { data: campaignTypeRows, error: campaignTypesError },
     { data: settingsRows, error: settingsError },
     { data: channelRows, error: channelsError },
     { data: campaignRows, error: campaignsError },
-    { data: competitorRows, error: competitorsError },
     { data: personnelRows, error: personnelError },
   ] = await Promise.all([
+    supabase.from("sales_channel_types").select("*").order("sort_order", { ascending: true }),
+    supabase.from("sales_campaign_types").select("*").order("sort_order", { ascending: true }),
     supabase.from("sales_strategy_settings").select("*").maybeSingle(),
-    supabase.from("sales_channels").select("*").order("created_at", { ascending: true }),
-    supabase.from("sales_campaigns").select("*").order("created_at", { ascending: true }),
-    supabase.from("sales_competitors").select("*").order("created_at", { ascending: true }),
+    supabase
+      .from("sales_channels")
+      .select("*, product:operation_products(id, name, unit, price), type:sales_channel_types(*)")
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("sales_campaigns")
+      .select("*, type:sales_campaign_types(*)")
+      .order("created_at", { ascending: true }),
     supabase.from("sales_personnel").select("*").order("created_at", { ascending: true }),
   ]);
 
+  if (channelTypesError) throwPlanningError(channelTypesError);
+  if (campaignTypesError) throwPlanningError(campaignTypesError);
   if (settingsError) throwPlanningError(settingsError);
   if (channelsError) throwPlanningError(channelsError);
   if (campaignsError) throwPlanningError(campaignsError);
-  if (competitorsError) throwPlanningError(competitorsError);
   if (personnelError) throwPlanningError(personnelError);
 
   const settings = settingsRows || {};
 
   return {
+    campaignTypes: (campaignTypeRows || []).map(mapSalesType),
+    channelTypes: (channelTypeRows || []).map(mapSalesType),
     company: {
-      annualSalesGrowthPercent: normalizeNumber(settings.annual_sales_growth_percent),
-      baseSalesPrice: normalizeNumber(settings.base_sales_price),
-      marketShare: normalizeNumber(settings.market_share),
-      monthlyForecast: normalizeMonthlyForecast(settings.monthly_forecast),
-      monthlyTarget: normalizeNumber(settings.monthly_target),
-      positioning: settings.positioning || "",
-      productName: settings.product_name || "",
-      reputationScore: normalizeNumber(settings.reputation_score),
-      spoilageRate: normalizeNumber(settings.spoilage_rate),
-      targetSegment: settings.target_segment || "",
+      monthlyMultipliers: normalizeMonthlyMultipliers(settings.monthly_multipliers),
     },
     campaigns: (campaignRows || []).map((row) => ({
       budget: normalizeNumber(row.budget),
       channel: row.channel || "",
-      durationWeeks: normalizeNumber(row.duration_weeks),
+      durationDays: normalizeNumber(row.duration_days),
       goal: row.goal || "",
       id: row.id,
       name: row.name || "",
-      successScore: normalizeNumber(row.success_score),
-      type: row.type || "",
+      type: row.type || null,
+      typeId: row.type_id || row.type?.id || "",
     })),
     channels: (channelRows || []).map((row) => ({
-      budget: normalizeNumber(row.budget),
-      conversionRate: normalizeNumber(row.conversion_rate),
-      discountPercent: normalizeNumber(row.discount_percent),
+      basketSize: normalizeOptionalNumber(row.basket_size),
+      capacityLimit: normalizeOptionalNumber(row.capacity_limit),
+      churnRatePercent: normalizeOptionalNumber(row.churn_rate_percent),
+      commissionPercent: normalizeNumber(row.commission_percent),
+      conversionRatePercent: normalizeOptionalNumber(row.conversion_rate_percent),
+      customerAcquisitionCost: normalizeNumber(row.customer_acquisition_cost),
+      collectionDays: normalizeNumber(row.collection_days, 30),
+      discountRatePercent: normalizeOptionalNumber(row.discount_rate_percent),
+      failureProbabilityPercent: normalizeOptionalNumber(row.failure_probability_percent),
+      growthMonths1To6Percent: normalizeNumber(row.growth_months_1_6_percent),
+      growthMonths7To18Percent: normalizeNumber(row.growth_months_7_18_percent),
+      growthMonths19To24Percent: normalizeNumber(row.growth_months_19_24_percent),
+      growthYears3To5Percent: normalizeNumber(row.growth_years_3_5_percent),
       id: row.id,
-      marginPercent: normalizeNumber(row.margin_percent),
+      launchFee: normalizeOptionalNumber(row.launch_fee),
+      moqMonthly: normalizeOptionalNumber(row.moq_monthly),
+      monthlySalesUnits: normalizeNumber(row.monthly_sales_units),
       name: row.name || "",
-      note: row.note || "",
-      paymentDelayDays: normalizeNumber(row.payment_delay_days),
-      price: normalizeNumber(row.price),
-      returnRatePercent: normalizeNumber(row.return_rate_percent),
-      revenueShare: normalizeNumber(row.revenue_share),
-      successScore: normalizeNumber(row.success_score),
-      type: row.type || "",
-    })),
-    competitors: (competitorRows || []).map((row) => ({
-      campaignType: row.campaign_type || "",
-      id: row.id,
-      marketShare: normalizeNumber(row.market_share),
-      marketingBudget: normalizeNumber(row.marketing_budget),
-      name: row.name || "",
-      reputationScore: normalizeNumber(row.reputation_score),
-      salesPrice: normalizeNumber(row.sales_price),
-      strategy: row.strategy || "",
-      threatScore: normalizeNumber(row.threat_score),
+      product: row.product || null,
+      productId: row.product_id || "",
+      productName: row.product?.name || "",
+      rampUpMonths: normalizeOptionalNumber(row.ramp_up_months),
+      repeatRatePercent: normalizeOptionalNumber(row.repeat_rate_percent),
+      returnRatePercent: normalizeOptionalNumber(row.return_rate_percent),
+      seasonalityCurve: normalizeSeasonalityCurve(row.seasonality_curve),
+      startMonth: normalizeNumber(row.start_month, 1) || 1,
+      trafficScore: normalizeOptionalNumber(row.traffic_score),
+      type: row.type || null,
+      typeId: row.type_id || row.type?.id || "",
     })),
     personnel: (personnelRows || []).map((row) => ({
       assignedChannel: row.assigned_channel || "",
       id: row.id,
       monthlyTarget: normalizeNumber(row.monthly_target),
       name: row.name || "",
-      pipelineValue: normalizeNumber(row.pipeline_value),
+      realizedSalesUnits: normalizeNumber(row.realized_sales_units),
       role: row.role || "",
-      successScore: normalizeNumber(row.success_score),
-      winRate: normalizeNumber(row.win_rate),
     })),
   };
 }
 
 export async function saveSalesStrategy(supabase, companyId, strategy) {
   const company = strategy.company || emptySalesStrategy.company;
-  const monthlyForecast = normalizeMonthlyForecast(company.monthlyForecast);
+  const monthlyMultipliers = normalizeMonthlyMultipliers(company.monthlyMultipliers);
 
   const { error: settingsError } = await supabase.from("sales_strategy_settings").upsert({
-    annual_sales_growth_percent: normalizeNumber(company.annualSalesGrowthPercent),
-    base_sales_price: normalizeNumber(company.baseSalesPrice),
     company_id: companyId,
-    market_share: normalizeNumber(company.marketShare),
-    monthly_forecast: monthlyForecast,
-    monthly_target: normalizeNumber(company.monthlyTarget),
-    positioning: company.positioning || "",
-    product_name: company.productName || "",
-    reputation_score: normalizeNumber(company.reputationScore),
-    spoilage_rate: normalizeNumber(company.spoilageRate),
-    target_segment: company.targetSegment || "",
+    monthly_multipliers: monthlyMultipliers,
   }, { onConflict: "company_id" });
 
   if (settingsError) throwPlanningError(settingsError);
 
-  const tables = ["sales_channels", "sales_campaigns", "sales_competitors", "sales_personnel"];
+  const tables = ["sales_channels", "sales_campaigns", "sales_personnel"];
   for (const table of tables) {
     const { error } = await supabase.from(table).delete().eq("company_id", companyId);
     if (error) throwPlanningError(error);
@@ -181,20 +218,33 @@ export async function saveSalesStrategy(supabase, companyId, strategy) {
 
   if (strategy.channels?.length) {
     const { error } = await supabase.from("sales_channels").insert(strategy.channels.map((channel) => ({
-      budget: normalizeNumber(channel.budget),
+      basket_size: nullableNumber(channel.basketSize),
+      capacity_limit: nullableNumber(channel.capacityLimit),
+      churn_rate_percent: nullableNumber(channel.churnRatePercent),
       company_id: companyId,
-      conversion_rate: normalizeNumber(channel.conversionRate),
-      discount_percent: normalizeNumber(channel.discountPercent),
+      commission_percent: normalizeNumber(channel.commissionPercent),
+      conversion_rate_percent: nullableNumber(channel.conversionRatePercent),
+      customer_acquisition_cost: normalizeNumber(channel.customerAcquisitionCost),
+      collection_days: normalizeNumber(channel.collectionDays, 30),
+      discount_rate_percent: nullableNumber(channel.discountRatePercent),
+      failure_probability_percent: nullableNumber(channel.failureProbabilityPercent),
+      growth_months_1_6_percent: normalizeNumber(channel.growthMonths1To6Percent),
+      growth_months_7_18_percent: normalizeNumber(channel.growthMonths7To18Percent),
+      growth_months_19_24_percent: normalizeNumber(channel.growthMonths19To24Percent),
+      growth_years_3_5_percent: normalizeNumber(channel.growthYears3To5Percent),
       id: channel.id,
-      margin_percent: normalizeNumber(channel.marginPercent),
+      launch_fee: nullableNumber(channel.launchFee),
+      moq_monthly: nullableNumber(channel.moqMonthly),
+      monthly_sales_units: normalizeNumber(channel.monthlySalesUnits),
       name: channel.name || "",
-      note: channel.note || "",
-      payment_delay_days: normalizeNumber(channel.paymentDelayDays),
-      price: normalizeNumber(channel.price),
-      return_rate_percent: normalizeNumber(channel.returnRatePercent),
-      revenue_share: normalizeNumber(channel.revenueShare),
-      success_score: normalizeNumber(channel.successScore),
-      type: channel.type || "",
+      product_id: channel.productId || null,
+      ramp_up_months: nullableNumber(channel.rampUpMonths),
+      repeat_rate_percent: nullableNumber(channel.repeatRatePercent),
+      return_rate_percent: nullableNumber(channel.returnRatePercent),
+      seasonality_curve: nullableSeasonalityCurve(channel.seasonalityCurve),
+      start_month: Math.max(1, Math.round(normalizeNumber(channel.startMonth, 1))),
+      traffic_score: nullableNumber(channel.trafficScore),
+      type_id: getSalesTypeId(channel.typeId || channel.type, "direct"),
     })));
     if (error) throwPlanningError(error);
   }
@@ -204,28 +254,11 @@ export async function saveSalesStrategy(supabase, companyId, strategy) {
       budget: normalizeNumber(campaign.budget),
       channel: campaign.channel || "",
       company_id: companyId,
-      duration_weeks: normalizeNumber(campaign.durationWeeks),
+      duration_days: normalizeNumber(campaign.durationDays),
       goal: campaign.goal || "",
       id: campaign.id,
       name: campaign.name || "",
-      success_score: normalizeNumber(campaign.successScore),
-      type: campaign.type || "",
-    })));
-    if (error) throwPlanningError(error);
-  }
-
-  if (strategy.competitors?.length) {
-    const { error } = await supabase.from("sales_competitors").insert(strategy.competitors.map((competitor) => ({
-      campaign_type: competitor.campaignType || "",
-      company_id: companyId,
-      id: competitor.id,
-      market_share: normalizeNumber(competitor.marketShare),
-      marketing_budget: normalizeNumber(competitor.marketingBudget),
-      name: competitor.name || "",
-      reputation_score: normalizeNumber(competitor.reputationScore),
-      sales_price: normalizeNumber(competitor.salesPrice),
-      strategy: competitor.strategy || "",
-      threat_score: normalizeNumber(competitor.threatScore),
+      type_id: getSalesTypeId(campaign.typeId || campaign.type, "digital"),
     })));
     if (error) throwPlanningError(error);
   }
@@ -237,10 +270,8 @@ export async function saveSalesStrategy(supabase, companyId, strategy) {
       id: person.id,
       monthly_target: normalizeNumber(person.monthlyTarget),
       name: person.name || "",
-      pipeline_value: normalizeNumber(person.pipelineValue),
+      realized_sales_units: normalizeNumber(person.realizedSalesUnits),
       role: person.role || "",
-      success_score: normalizeNumber(person.successScore),
-      win_rate: normalizeNumber(person.winRate),
     })));
     if (error) throwPlanningError(error);
   }

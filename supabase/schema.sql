@@ -47,13 +47,15 @@ create table if not exists public.profiles (
   profile_picture_url text,
   language text not null default 'en',
   theme text not null default 'light' check (theme in ('light', 'dark')),
+  financial_overview_widgets jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.profiles
   add column if not exists company_id uuid references public.companies(id),
-  add column if not exists theme text not null default 'light';
+  add column if not exists theme text not null default 'light',
+  add column if not exists financial_overview_widgets jsonb not null default '[]'::jsonb;
 
 do $$
 begin
@@ -122,8 +124,8 @@ begin
       values (
         role_record.id,
         module_record.id,
-        role_record.name = 'admin' and module_record.module_key in ('authorization', 'operations'),
-        role_record.name = 'admin' and module_record.module_key in ('authorization', 'operations')
+        role_record.name = 'admin',
+        role_record.name = 'admin'
       )
       on conflict (role_id, module_id) do nothing;
     end loop;
@@ -161,6 +163,12 @@ as $$
   select exists (
     select 1
     from public.profiles p
+    where p.id = auth.uid()
+      and lower(p.access_level) = 'admin'
+  )
+  or exists (
+    select 1
+    from public.profiles p
     join public.company_roles r
       on r.company_id = p.company_id
      and lower(r.name) = lower(p.access_level)
@@ -183,8 +191,7 @@ set can_read = true,
 from public.company_roles r, public.app_modules m
 where rp.role_id = r.id
   and rp.module_id = m.id
-  and r.name = 'admin'
-  and m.module_key in ('authorization', 'operations');
+  and r.name = 'admin';
 
 grant execute on function public.current_profile_company_id() to authenticated;
 grant execute on function public.current_profile_access_level() to authenticated;
@@ -452,6 +459,7 @@ create table if not exists public.operation_products (
   unit text not null default 'adet',
   price numeric(14, 4) not null default 0,
   cycle_time_minutes numeric(12, 4) not null default 1,
+  cycle_time_unit text not null default 'minute',
   description text,
   quality_grade text,
   weight_kg numeric(12, 3) not null default 0,
@@ -470,7 +478,8 @@ create table if not exists public.operation_products (
 alter table public.operation_products
   add column if not exists unit text not null default 'adet',
   add column if not exists price numeric(14, 4) not null default 0,
-  add column if not exists cycle_time_minutes numeric(12, 4) not null default 1;
+  add column if not exists cycle_time_minutes numeric(12, 4) not null default 1,
+  add column if not exists cycle_time_unit text not null default 'minute';
 
 create table if not exists public.operation_machines (
   id uuid primary key default gen_random_uuid(),
@@ -523,6 +532,21 @@ begin
   end if;
 end;
 $$;
+
+create table if not exists public.operation_equipment (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id) on delete cascade,
+  name text not null,
+  price numeric(14, 2) not null default 0,
+  quantity numeric(14, 4) not null default 1,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (company_id, name)
+);
+
+alter table public.operation_equipment
+  add column if not exists price numeric(14, 2) not null default 0,
+  add column if not exists quantity numeric(14, 4) not null default 1;
 
 create table if not exists public.operation_materials (
   id uuid primary key default gen_random_uuid(),
@@ -667,11 +691,29 @@ create table if not exists public.financial_model_settings (
   electricity_price_per_kwh numeric(14, 4) not null default 0,
   working_days_per_month numeric(5, 2) not null default 22,
   initial_cash numeric(14, 2) not null default 0,
+  investment_grant_amount numeric(14, 2) not null default 0,
   loan_amount numeric(14, 2) not null default 0,
+  loan_rows jsonb not null default '[]'::jsonb,
   annual_interest_rate numeric(8, 4) not null default 0,
   loan_term_months integer not null default 24,
   vat_rate numeric(8, 4) not null default 20,
-  income_tax_rate numeric(8, 4) not null default 20,
+  sales_vat_rate numeric(8, 4) not null default 20,
+  expense_vat_rate numeric(8, 4) not null default 20,
+  income_tax_rate numeric(8, 4) not null default 25,
+  tax_payment_delay_months integer not null default 3,
+  receivables_collection_days numeric(8, 2) not null default 30,
+  raw_material_stock_days numeric(8, 2) not null default 0,
+  supplier_payment_days numeric(8, 2) not null default 45,
+  initial_capacity_units numeric(14, 3) not null default 0,
+  monthly_currency_increase_percent numeric(8, 4) not null default 0,
+  monthly_inflation_percent numeric(8, 4) not null default 0,
+  monthly_energy_price_increase_percent numeric(8, 4) not null default 0,
+  monthly_wage_increase_percent numeric(8, 4) not null default 0,
+  cogs_inflation_annual_percent numeric(8, 4) not null default 0,
+  opex_inflation_annual_percent numeric(8, 4) not null default 0,
+  price_increase_annual_percent numeric(8, 4) not null default 0,
+  asset_value_increase_annual_percent numeric(8, 4) not null default 0,
+  increase_frequency text not null default 'semiannual' check (increase_frequency in ('monthly', 'quarterly', 'semiannual', 'annual')),
   raw_material_buffer_months numeric(6, 2) not null default 1,
   salary_buffer_months numeric(6, 2) not null default 1,
   rent_buffer_months numeric(6, 2) not null default 1,
@@ -683,14 +725,44 @@ create table if not exists public.financial_model_settings (
 alter table public.financial_model_settings
   add column if not exists working_days_per_month numeric(5, 2) not null default 22,
   add column if not exists initial_cash numeric(14, 2) not null default 0,
+  add column if not exists investment_grant_amount numeric(14, 2) not null default 0,
   add column if not exists loan_amount numeric(14, 2) not null default 0,
+  add column if not exists loan_rows jsonb not null default '[]'::jsonb,
   add column if not exists annual_interest_rate numeric(8, 4) not null default 0,
   add column if not exists loan_term_months integer not null default 24,
   add column if not exists vat_rate numeric(8, 4) not null default 20,
-  add column if not exists income_tax_rate numeric(8, 4) not null default 20,
+  add column if not exists sales_vat_rate numeric(8, 4) not null default 20,
+  add column if not exists expense_vat_rate numeric(8, 4) not null default 20,
+  add column if not exists income_tax_rate numeric(8, 4) not null default 25,
+  add column if not exists tax_payment_delay_months integer not null default 3,
+  add column if not exists receivables_collection_days numeric(8, 2) not null default 30,
+  add column if not exists raw_material_stock_days numeric(8, 2) not null default 0,
+  add column if not exists supplier_payment_days numeric(8, 2) not null default 45,
+  add column if not exists initial_capacity_units numeric(14, 3) not null default 0,
+  add column if not exists monthly_currency_increase_percent numeric(8, 4) not null default 0,
+  add column if not exists monthly_inflation_percent numeric(8, 4) not null default 0,
+  add column if not exists monthly_energy_price_increase_percent numeric(8, 4) not null default 0,
+  add column if not exists monthly_wage_increase_percent numeric(8, 4) not null default 0,
+  add column if not exists cogs_inflation_annual_percent numeric(8, 4) not null default 0,
+  add column if not exists opex_inflation_annual_percent numeric(8, 4) not null default 0,
+  add column if not exists price_increase_annual_percent numeric(8, 4) not null default 0,
+  add column if not exists asset_value_increase_annual_percent numeric(8, 4) not null default 0,
+  add column if not exists increase_frequency text not null default 'semiannual',
   add column if not exists raw_material_buffer_months numeric(6, 2) not null default 1,
   add column if not exists salary_buffer_months numeric(6, 2) not null default 1,
   add column if not exists rent_buffer_months numeric(6, 2) not null default 1;
+
+update public.financial_model_settings
+set sales_vat_rate = vat_rate
+where sales_vat_rate = 20 and vat_rate is not null;
+
+update public.financial_model_settings
+set expense_vat_rate = vat_rate
+where expense_vat_rate = 20 and vat_rate is not null;
+
+update public.financial_model_settings
+set increase_frequency = 'semiannual'
+where increase_frequency not in ('monthly', 'quarterly', 'semiannual', 'annual');
 
 create table if not exists public.financial_extra_costs (
   id uuid primary key default gen_random_uuid(),
@@ -705,71 +777,309 @@ create table if not exists public.financial_extra_costs (
 
 create table if not exists public.sales_strategy_settings (
   company_id uuid primary key references public.companies(id) on delete cascade,
-  product_name text not null default '',
-  target_segment text not null default '',
-  base_sales_price numeric(14, 4) not null default 0,
-  monthly_target numeric(14, 3) not null default 0,
-  monthly_forecast jsonb not null default '[]'::jsonb,
-  annual_sales_growth_percent numeric(8, 4) not null default 0,
-  spoilage_rate numeric(8, 4) not null default 0,
-  market_share numeric(8, 4) not null default 0,
-  reputation_score numeric(8, 4) not null default 0,
-  positioning text not null default '',
+  monthly_multipliers jsonb not null default '[1,1,1,1,1,1,1,1,1,1,1,1]'::jsonb,
   updated_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+alter table public.sales_strategy_settings
+  add column if not exists monthly_multipliers jsonb not null default '[1,1,1,1,1,1,1,1,1,1,1,1]'::jsonb,
+  drop column if exists product_name,
+  drop column if exists target_segment,
+  drop column if exists base_sales_price,
+  drop column if exists monthly_target,
+  drop column if exists monthly_forecast,
+  drop column if exists annual_sales_growth_percent,
+  drop column if exists spoilage_rate,
+  drop column if exists market_share,
+  drop column if exists reputation_score,
+  drop column if exists positioning;
+
+create table if not exists public.sales_channel_types (
+  id text primary key,
+  name_en text not null default '',
+  name_tr text not null default '',
+  average_customer_acquisition_rate numeric(8, 4) not null default 0,
+  average_conversion_rate numeric(8, 4) not null default 0,
+  average_commission_percent numeric(8, 4) not null default 0,
+  average_duration_days numeric(8, 2) not null default 0,
+  description_en text not null default '',
+  description_tr text not null default '',
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.sales_campaign_types (
+  id text primary key,
+  name_en text not null default '',
+  name_tr text not null default '',
+  average_customer_acquisition_rate numeric(8, 4) not null default 0,
+  average_conversion_rate numeric(8, 4) not null default 0,
+  average_commission_percent numeric(8, 4) not null default 0,
+  average_duration_days numeric(8, 2) not null default 0,
+  description_en text not null default '',
+  description_tr text not null default '',
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+insert into public.sales_channel_types (
+  id, name_en, name_tr, average_customer_acquisition_rate, average_conversion_rate,
+  average_commission_percent, average_duration_days, description_en, description_tr, sort_order
+) values
+  ('direct', 'Direct sales', 'Direkt satış', 18, 12, 0, 0, 'Direct sales owned by the company.', 'Şirketin doğrudan yönettiği satış.', 10),
+  ('online', 'Online', 'Online', 8, 4, 8, 0, 'Digital storefront or online flow.', 'Dijital mağaza veya online akış.', 20),
+  ('retail', 'Retail', 'Perakende', 5, 3, 20, 0, 'Retail shelf or store channel.', 'Perakende raf veya mağaza kanalı.', 30),
+  ('distributor', 'Distributor', 'Distribütör', 4, 2.5, 25, 0, 'Distributor-led sales route.', 'Distribütör üzerinden satış rotası.', 40),
+  ('marketplace', 'Marketplace', 'Pazaryeri', 7, 3.5, 15, 0, 'Marketplace platform channel.', 'Pazaryeri platform kanalı.', 50)
+on conflict (id) do update set
+  name_en = excluded.name_en,
+  name_tr = excluded.name_tr,
+  average_customer_acquisition_rate = excluded.average_customer_acquisition_rate,
+  average_conversion_rate = excluded.average_conversion_rate,
+  average_commission_percent = excluded.average_commission_percent,
+  average_duration_days = excluded.average_duration_days,
+  description_en = excluded.description_en,
+  description_tr = excluded.description_tr,
+  sort_order = excluded.sort_order;
+
+insert into public.sales_campaign_types (
+  id, name_en, name_tr, average_customer_acquisition_rate, average_conversion_rate,
+  average_commission_percent, average_duration_days, description_en, description_tr, sort_order
+) values
+  ('digital', 'Digital advertising', 'Dijital reklam', 6, 3, 0, 30, 'Paid digital acquisition campaign.', 'Ücretli dijital müşteri kazanım kampanyası.', 10),
+  ('social', 'Social media', 'Sosyal medya', 5, 2.5, 0, 21, 'Organic and paid social campaign.', 'Organik ve ücretli sosyal medya kampanyası.', 20),
+  ('influencer', 'Influencer', 'Influencer', 7, 4, 0, 14, 'Creator or influencer-led campaign.', 'İçerik üretici veya influencer odaklı kampanya.', 30),
+  ('trade', 'Trade promotion', 'Ticari promosyon', 4, 5, 0, 30, 'Trade promotion for partners.', 'Ticari iş ortakları için promosyon.', 40),
+  ('event', 'Event / fair', 'Etkinlik / fuar', 3, 6, 0, 7, 'Event, fair, or field activation.', 'Etkinlik, fuar veya saha aktivasyonu.', 50),
+  ('email', 'Email / CRM', 'E-posta / CRM', 4, 2, 0, 14, 'Email and CRM lifecycle campaign.', 'E-posta ve CRM yaşam döngüsü kampanyası.', 60)
+on conflict (id) do update set
+  name_en = excluded.name_en,
+  name_tr = excluded.name_tr,
+  average_customer_acquisition_rate = excluded.average_customer_acquisition_rate,
+  average_conversion_rate = excluded.average_conversion_rate,
+  average_commission_percent = excluded.average_commission_percent,
+  average_duration_days = excluded.average_duration_days,
+  description_en = excluded.description_en,
+  description_tr = excluded.description_tr,
+  sort_order = excluded.sort_order;
+
 create table if not exists public.sales_channels (
   company_id uuid not null references public.companies(id) on delete cascade,
   id text not null,
   name text not null default '',
-  type text not null default '',
-  price numeric(14, 4) not null default 0,
-  budget numeric(14, 2) not null default 0,
-  revenue_share numeric(8, 4) not null default 0,
-  conversion_rate numeric(8, 4) not null default 0,
-  margin_percent numeric(8, 4) not null default 0,
-  discount_percent numeric(8, 4) not null default 0,
-  return_rate_percent numeric(8, 4) not null default 0,
-  payment_delay_days numeric(8, 2) not null default 0,
-  success_score numeric(8, 4) not null default 0,
-  note text not null default '',
+  type_id text not null default 'direct' references public.sales_channel_types(id),
+  product_id uuid references public.operation_products(id) on delete set null,
+  start_month integer not null default 1,
+  monthly_sales_units numeric(14, 3) not null default 0,
+  growth_months_1_6_percent numeric(8, 4) not null default 0,
+  growth_months_7_18_percent numeric(8, 4) not null default 0,
+  growth_months_19_24_percent numeric(8, 4) not null default 0,
+  growth_years_3_5_percent numeric(8, 4) not null default 0,
+  collection_days numeric(8, 2) not null default 30,
+  customer_acquisition_cost numeric(14, 2) not null default 0,
+  commission_percent numeric(8, 4) not null default 0,
+  basket_size numeric(12, 4),
+  conversion_rate_percent numeric(8, 4),
+  traffic_score numeric(10, 4),
+  repeat_rate_percent numeric(8, 4),
+  churn_rate_percent numeric(8, 4),
+  discount_rate_percent numeric(8, 4),
+  return_rate_percent numeric(8, 4),
+  capacity_limit numeric(14, 3),
+  launch_fee numeric(14, 2),
+  moq_monthly numeric(14, 3),
+  failure_probability_percent numeric(8, 4),
+  ramp_up_months numeric(8, 2),
+  seasonality_curve jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (company_id, id)
 );
 
+alter table public.sales_channels
+  add column if not exists type_id text not null default 'direct',
+  add column if not exists product_id uuid references public.operation_products(id) on delete set null,
+  add column if not exists start_month integer not null default 1,
+  add column if not exists monthly_sales_units numeric(14, 3) not null default 0,
+  add column if not exists growth_months_1_6_percent numeric(8, 4) not null default 0,
+  add column if not exists growth_months_7_18_percent numeric(8, 4) not null default 0,
+  add column if not exists growth_months_19_24_percent numeric(8, 4) not null default 0,
+  add column if not exists growth_years_3_5_percent numeric(8, 4) not null default 0,
+  add column if not exists collection_days numeric(8, 2) not null default 30,
+  add column if not exists customer_acquisition_cost numeric(14, 2) not null default 0,
+  add column if not exists commission_percent numeric(8, 4) not null default 0,
+  add column if not exists basket_size numeric(12, 4),
+  add column if not exists conversion_rate_percent numeric(8, 4),
+  add column if not exists traffic_score numeric(10, 4),
+  add column if not exists repeat_rate_percent numeric(8, 4),
+  add column if not exists churn_rate_percent numeric(8, 4),
+  add column if not exists discount_rate_percent numeric(8, 4),
+  add column if not exists return_rate_percent numeric(8, 4),
+  add column if not exists capacity_limit numeric(14, 3),
+  add column if not exists launch_fee numeric(14, 2),
+  add column if not exists moq_monthly numeric(14, 3),
+  add column if not exists failure_probability_percent numeric(8, 4),
+  add column if not exists ramp_up_months numeric(8, 2),
+  add column if not exists seasonality_curve jsonb,
+  drop column if exists price,
+  drop column if exists budget,
+  drop column if exists revenue_share,
+  drop column if exists margin_percent,
+  drop column if exists success_score,
+  drop column if exists note;
+
+alter table public.sales_channels
+  alter column return_rate_percent drop not null;
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'sales_channels' and column_name = 'conversion_rate'
+  ) then
+    execute 'update public.sales_channels set conversion_rate_percent = conversion_rate where conversion_rate_percent is null';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'sales_channels' and column_name = 'discount_percent'
+  ) then
+    execute 'update public.sales_channels set discount_rate_percent = discount_percent where discount_rate_percent is null';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'sales_channels' and column_name = 'payment_delay_days'
+  ) then
+    execute 'update public.sales_channels set collection_days = payment_delay_days where collection_days = 30';
+  end if;
+end;
+$$;
+
+update public.sales_channels
+set start_month = 1
+where start_month is null or start_month < 1;
+
+alter table public.sales_channels
+  drop column if exists conversion_rate,
+  drop column if exists discount_percent,
+  drop column if exists payment_delay_days;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'sales_channels'
+      and column_name = 'type'
+  ) then
+    execute $migration$
+      update public.sales_channels c
+      set type_id = coalesce((
+        select t.id
+        from public.sales_channel_types t
+        where lower(t.id) = lower(c.type)
+           or lower(t.name_en) = lower(c.type)
+           or lower(t.name_tr) = lower(c.type)
+        limit 1
+      ), 'direct')
+    $migration$;
+  end if;
+end;
+$$;
+
+update public.sales_channels
+set type_id = 'direct'
+where type_id is null
+   or not exists (select 1 from public.sales_channel_types t where t.id = sales_channels.type_id);
+
+alter table public.sales_channels
+  drop column if exists type;
+
+alter table public.sales_channels
+  drop constraint if exists sales_channels_type_id_fkey;
+
+alter table public.sales_channels
+  add constraint sales_channels_type_id_fkey foreign key (type_id) references public.sales_channel_types(id);
+
 create table if not exists public.sales_campaigns (
   company_id uuid not null references public.companies(id) on delete cascade,
   id text not null,
   name text not null default '',
-  type text not null default '',
+  type_id text not null default 'digital' references public.sales_campaign_types(id),
   channel text not null default '',
   budget numeric(14, 2) not null default 0,
-  duration_weeks numeric(8, 2) not null default 0,
-  success_score numeric(8, 4) not null default 0,
+  duration_days numeric(8, 2) not null default 0,
   goal text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (company_id, id)
 );
 
-create table if not exists public.sales_competitors (
-  company_id uuid not null references public.companies(id) on delete cascade,
-  id text not null,
-  name text not null default '',
-  sales_price numeric(14, 4) not null default 0,
-  market_share numeric(8, 4) not null default 0,
-  reputation_score numeric(8, 4) not null default 0,
-  marketing_budget numeric(14, 2) not null default 0,
-  threat_score numeric(8, 4) not null default 0,
-  campaign_type text not null default '',
-  strategy text not null default '',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (company_id, id)
-);
+alter table public.sales_campaigns
+  add column if not exists type_id text not null default 'digital',
+  add column if not exists duration_days numeric(8, 2) not null default 0;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'sales_campaigns'
+      and column_name = 'duration_weeks'
+  ) then
+    execute 'update public.sales_campaigns set duration_days = duration_weeks * 7 where duration_days = 0';
+  end if;
+end;
+$$;
+
+alter table public.sales_campaigns
+  drop column if exists duration_weeks,
+  drop column if exists success_score;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'sales_campaigns'
+      and column_name = 'type'
+  ) then
+    execute $migration$
+      update public.sales_campaigns c
+      set type_id = coalesce((
+        select t.id
+        from public.sales_campaign_types t
+        where lower(t.id) = lower(c.type)
+           or lower(t.name_en) = lower(c.type)
+           or lower(t.name_tr) = lower(c.type)
+        limit 1
+      ), 'digital')
+    $migration$;
+  end if;
+end;
+$$;
+
+update public.sales_campaigns
+set type_id = 'digital'
+where type_id is null
+   or not exists (select 1 from public.sales_campaign_types t where t.id = sales_campaigns.type_id);
+
+alter table public.sales_campaigns
+  drop column if exists type;
+
+alter table public.sales_campaigns
+  drop constraint if exists sales_campaigns_type_id_fkey;
+
+alter table public.sales_campaigns
+  add constraint sales_campaigns_type_id_fkey foreign key (type_id) references public.sales_campaign_types(id);
 
 create table if not exists public.sales_personnel (
   company_id uuid not null references public.companies(id) on delete cascade,
@@ -778,13 +1088,29 @@ create table if not exists public.sales_personnel (
   role text not null default '',
   assigned_channel text not null default '',
   monthly_target numeric(14, 3) not null default 0,
-  pipeline_value numeric(14, 2) not null default 0,
-  win_rate numeric(8, 4) not null default 0,
-  success_score numeric(8, 4) not null default 0,
+  realized_sales_units numeric(14, 3) not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (company_id, id)
 );
+
+alter table public.sales_personnel
+  add column if not exists realized_sales_units numeric(14, 3) not null default 0,
+  drop column if exists pipeline_value,
+  drop column if exists win_rate,
+  drop column if exists success_score;
+
+do $$
+begin
+  if to_regclass('public.sales_competitors') is not null then
+    execute 'drop trigger if exists sales_competitors_set_updated_at on public.sales_competitors';
+    execute 'drop policy if exists "sales_competitors_select_company" on public.sales_competitors';
+    execute 'drop policy if exists "sales_competitors_write_company" on public.sales_competitors';
+  end if;
+end;
+$$;
+
+drop table if exists public.sales_competitors;
 
 create table if not exists public.simulation_variants (
   company_id uuid not null references public.companies(id) on delete cascade,
@@ -818,6 +1144,7 @@ alter table public.operation_plan_materials
 alter table public.operation_products enable row level security;
 alter table public.operation_product_materials enable row level security;
 alter table public.operation_machines enable row level security;
+alter table public.operation_equipment enable row level security;
 alter table public.operation_materials enable row level security;
 alter table public.operation_workforce_resources enable row level security;
 alter table public.operation_notes enable row level security;
@@ -828,9 +1155,10 @@ alter table public.operation_plan_materials enable row level security;
 alter table public.financial_model_settings enable row level security;
 alter table public.financial_extra_costs enable row level security;
 alter table public.sales_strategy_settings enable row level security;
+alter table public.sales_channel_types enable row level security;
+alter table public.sales_campaign_types enable row level security;
 alter table public.sales_channels enable row level security;
 alter table public.sales_campaigns enable row level security;
-alter table public.sales_competitors enable row level security;
 alter table public.sales_personnel enable row level security;
 alter table public.simulation_variants enable row level security;
 
@@ -840,6 +1168,8 @@ drop policy if exists "operation_product_materials_select_company" on public.ope
 drop policy if exists "operation_product_materials_write_company" on public.operation_product_materials;
 drop policy if exists "operation_machines_select_company" on public.operation_machines;
 drop policy if exists "operation_machines_write_company" on public.operation_machines;
+drop policy if exists "operation_equipment_select_company" on public.operation_equipment;
+drop policy if exists "operation_equipment_write_company" on public.operation_equipment;
 drop policy if exists "operation_materials_select_company" on public.operation_materials;
 drop policy if exists "operation_materials_write_company" on public.operation_materials;
 drop policy if exists "operation_workforce_select_company" on public.operation_workforce_resources;
@@ -857,12 +1187,12 @@ drop policy if exists "financial_extra_costs_select_company" on public.financial
 drop policy if exists "financial_extra_costs_write_company" on public.financial_extra_costs;
 drop policy if exists "sales_strategy_settings_select_company" on public.sales_strategy_settings;
 drop policy if exists "sales_strategy_settings_write_company" on public.sales_strategy_settings;
+drop policy if exists "sales_channel_types_select_authenticated" on public.sales_channel_types;
+drop policy if exists "sales_campaign_types_select_authenticated" on public.sales_campaign_types;
 drop policy if exists "sales_channels_select_company" on public.sales_channels;
 drop policy if exists "sales_channels_write_company" on public.sales_channels;
 drop policy if exists "sales_campaigns_select_company" on public.sales_campaigns;
 drop policy if exists "sales_campaigns_write_company" on public.sales_campaigns;
-drop policy if exists "sales_competitors_select_company" on public.sales_competitors;
-drop policy if exists "sales_competitors_write_company" on public.sales_competitors;
 drop policy if exists "sales_personnel_select_company" on public.sales_personnel;
 drop policy if exists "sales_personnel_write_company" on public.sales_personnel;
 drop policy if exists "simulation_variants_select_company" on public.simulation_variants;
@@ -929,6 +1259,17 @@ using (company_id = public.current_profile_company_id() and public.has_module_pe
 
 create policy "operation_machines_write_company"
 on public.operation_machines
+for all
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
+with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
+
+create policy "operation_equipment_select_company"
+on public.operation_equipment
+for select
+using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
+
+create policy "operation_equipment_write_company"
+on public.operation_equipment
 for all
 using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
 with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
@@ -1072,6 +1413,16 @@ for all
 using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
 with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
 
+create policy "sales_channel_types_select_authenticated"
+on public.sales_channel_types
+for select
+using (auth.uid() is not null);
+
+create policy "sales_campaign_types_select_authenticated"
+on public.sales_campaign_types
+for select
+using (auth.uid() is not null);
+
 create policy "sales_channels_select_company"
 on public.sales_channels
 for select
@@ -1090,17 +1441,6 @@ using (company_id = public.current_profile_company_id() and public.has_module_pe
 
 create policy "sales_campaigns_write_company"
 on public.sales_campaigns
-for all
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
-with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
-
-create policy "sales_competitors_select_company"
-on public.sales_competitors
-for select
-using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'read'));
-
-create policy "sales_competitors_write_company"
-on public.sales_competitors
 for all
 using (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'))
 with check (company_id = public.current_profile_company_id() and public.has_module_permission('operations', 'write'));
@@ -1142,6 +1482,11 @@ create trigger operation_machines_set_updated_at
 before update on public.operation_machines
 for each row execute function public.set_updated_at();
 
+drop trigger if exists operation_equipment_set_updated_at on public.operation_equipment;
+create trigger operation_equipment_set_updated_at
+before update on public.operation_equipment
+for each row execute function public.set_updated_at();
+
 drop trigger if exists operation_materials_set_updated_at on public.operation_materials;
 create trigger operation_materials_set_updated_at
 before update on public.operation_materials
@@ -1167,6 +1512,16 @@ create trigger sales_strategy_settings_set_updated_at
 before update on public.sales_strategy_settings
 for each row execute function public.set_updated_at();
 
+drop trigger if exists sales_channel_types_set_updated_at on public.sales_channel_types;
+create trigger sales_channel_types_set_updated_at
+before update on public.sales_channel_types
+for each row execute function public.set_updated_at();
+
+drop trigger if exists sales_campaign_types_set_updated_at on public.sales_campaign_types;
+create trigger sales_campaign_types_set_updated_at
+before update on public.sales_campaign_types
+for each row execute function public.set_updated_at();
+
 drop trigger if exists sales_channels_set_updated_at on public.sales_channels;
 create trigger sales_channels_set_updated_at
 before update on public.sales_channels
@@ -1175,11 +1530,6 @@ for each row execute function public.set_updated_at();
 drop trigger if exists sales_campaigns_set_updated_at on public.sales_campaigns;
 create trigger sales_campaigns_set_updated_at
 before update on public.sales_campaigns
-for each row execute function public.set_updated_at();
-
-drop trigger if exists sales_competitors_set_updated_at on public.sales_competitors;
-create trigger sales_competitors_set_updated_at
-before update on public.sales_competitors
 for each row execute function public.set_updated_at();
 
 drop trigger if exists sales_personnel_set_updated_at on public.sales_personnel;
@@ -1491,9 +1841,28 @@ begin
     return v_row;
   end if;
 
+  if p_entity = 'equipment' then
+    insert into public.operation_equipment (
+      company_id, name, price, quantity
+    )
+    values (
+      v_company_id,
+      nullif(trim(p_input->>'name'), ''),
+      greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+      greatest(0, coalesce(nullif(p_input->>'quantity', '')::numeric, 1))
+    )
+    on conflict (company_id, name) do update set
+      price = excluded.price,
+      quantity = excluded.quantity
+    returning id into v_record_id;
+
+    select to_jsonb(e.*) into v_row from public.operation_equipment e where e.id = v_record_id;
+    return v_row;
+  end if;
+
   if p_entity = 'product' then
     insert into public.operation_products (
-      company_id, product_code, name, unit, price, cycle_time_minutes, product_group, revision, status, description
+      company_id, product_code, name, unit, price, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
     )
     values (
       v_company_id,
@@ -1502,6 +1871,10 @@ begin
       coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
       greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
       greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
+      case
+        when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
+        else 'minute'
+      end,
       'Basit Üretim',
       'A',
       'Aktif',
@@ -1512,6 +1885,7 @@ begin
       unit = excluded.unit,
       price = excluded.price,
       cycle_time_minutes = excluded.cycle_time_minutes,
+      cycle_time_unit = excluded.cycle_time_unit,
       product_group = excluded.product_group,
       status = excluded.status,
       description = excluded.description
@@ -1601,6 +1975,19 @@ set search_path = public
 as $$
 declare
   v_company_id uuid := public.current_profile_company_id();
+  v_annual_interest_rate numeric := 0;
+  v_clean_loan_rows jsonb := '[]'::jsonb;
+  v_loan_amount numeric := 0;
+  v_loan_entry jsonb;
+  v_loan_entry_amount numeric;
+  v_loan_entry_grace integer;
+  v_loan_entry_interest numeric;
+  v_loan_entry_term integer;
+  v_loan_interest_weight numeric := 0;
+  v_loan_rows jsonb := '[]'::jsonb;
+  v_loan_term_months integer := 0;
+  v_required_key text;
+  v_required_label text;
   v_row jsonb;
 begin
   if v_company_id is null then
@@ -1611,16 +1998,190 @@ begin
     raise exception 'Operations write permission is required.';
   end if;
 
+  if p_input is null or jsonb_typeof(p_input) <> 'object' then
+    raise exception 'Financial settings input is required.';
+  end if;
+
+  for v_required_key, v_required_label in
+    select key, label
+    from (values
+      ('electricityPricePerKwh', 'Electricity kWh price'),
+      ('workingDaysPerMonth', 'Working days per month'),
+      ('initialCash', 'Initial cash'),
+      ('investmentGrantAmount', 'Investment grant / subsidy'),
+      ('vatRate', 'VAT rate'),
+      ('salesVatRate', 'Sales VAT rate'),
+      ('expenseVatRate', 'Expense VAT rate'),
+      ('incomeTaxRate', 'Income tax rate'),
+      ('taxPaymentDelayMonths', 'Tax payment delay months'),
+      ('receivablesCollectionDays', 'Receivables collection days'),
+      ('rawMaterialStockDays', 'Raw material stock days'),
+      ('supplierPaymentDays', 'Supplier payment days'),
+      ('initialCapacityUnits', 'Initial capacity units'),
+      ('cogsInflationAnnualPercent', 'COGS inflation'),
+      ('opexInflationAnnualPercent', 'OpEx inflation'),
+      ('priceIncreaseAnnualPercent', 'Price increase policy'),
+      ('assetValueIncreaseAnnualPercent', 'Asset value increase'),
+      ('increaseFrequency', 'Increase frequency'),
+      ('rawMaterialBufferMonths', 'Material buffer months'),
+      ('salaryBufferMonths', 'Salary buffer months'),
+      ('rentBufferMonths', 'Rent buffer months')
+    ) as required_fields(key, label)
+  loop
+    if not (p_input ? v_required_key) or nullif(trim(p_input->>v_required_key), '') is null then
+      raise exception '% is required.', v_required_label;
+    end if;
+  end loop;
+
+  if nullif(trim(p_input->>'workingDaysPerMonth'), '')::numeric < 1 then
+    raise exception 'Working days per month must be at least 1.';
+  end if;
+
+  for v_required_key, v_required_label in
+    select key, label
+    from (values
+      ('electricityPricePerKwh', 'Electricity kWh price'),
+      ('initialCash', 'Initial cash'),
+      ('investmentGrantAmount', 'Investment grant / subsidy'),
+      ('loanAmount', 'Loan amount'),
+      ('annualInterestRate', 'Annual interest rate'),
+      ('vatRate', 'VAT rate'),
+      ('salesVatRate', 'Sales VAT rate'),
+      ('expenseVatRate', 'Expense VAT rate'),
+      ('incomeTaxRate', 'Income tax rate'),
+      ('taxPaymentDelayMonths', 'Tax payment delay months'),
+      ('receivablesCollectionDays', 'Receivables collection days'),
+      ('rawMaterialStockDays', 'Raw material stock days'),
+      ('supplierPaymentDays', 'Supplier payment days'),
+      ('initialCapacityUnits', 'Initial capacity units'),
+      ('monthlyCurrencyIncreasePercent', 'Monthly FX increase'),
+      ('monthlyInflationPercent', 'Monthly inflation'),
+      ('monthlyEnergyPriceIncreasePercent', 'Monthly energy price increase'),
+      ('monthlyWageIncreasePercent', 'Monthly wage increase'),
+      ('cogsInflationAnnualPercent', 'COGS inflation'),
+      ('opexInflationAnnualPercent', 'OpEx inflation'),
+      ('priceIncreaseAnnualPercent', 'Price increase policy'),
+      ('assetValueIncreaseAnnualPercent', 'Asset value increase'),
+      ('rawMaterialBufferMonths', 'Material buffer months'),
+      ('salaryBufferMonths', 'Salary buffer months'),
+      ('rentBufferMonths', 'Rent buffer months')
+    ) as numeric_fields(key, label)
+  loop
+    if (p_input ? v_required_key) and nullif(trim(p_input->>v_required_key), '') is not null and nullif(trim(p_input->>v_required_key), '')::numeric < 0 then
+      raise exception '% cannot be negative.', v_required_label;
+    end if;
+  end loop;
+
+  if (p_input ? 'loanTermMonths') and nullif(trim(p_input->>'loanTermMonths'), '') is not null and nullif(trim(p_input->>'loanTermMonths'), '')::integer < 1 then
+    raise exception 'Loan term months must be at least 1.';
+  end if;
+
+  if (p_input ? 'loanRows') and jsonb_typeof(p_input->'loanRows') <> 'array' then
+    raise exception 'Loan rows must be an array.';
+  end if;
+
+  if coalesce(nullif(trim(p_input->>'increaseFrequency'), ''), 'semiannual') not in ('monthly', 'quarterly', 'semiannual', 'annual') then
+    raise exception 'Increase frequency is invalid.';
+  end if;
+
+  v_loan_rows := case when jsonb_typeof(p_input->'loanRows') = 'array' then p_input->'loanRows' else '[]'::jsonb end;
+
+  if v_loan_rows = '[]'::jsonb and nullif(trim(p_input->>'loanAmount'), '') is not null and nullif(trim(p_input->>'loanAmount'), '')::numeric > 0 then
+    v_loan_rows := jsonb_build_array(jsonb_build_object(
+      'id', 'legacy-loan',
+      'amount', nullif(p_input->>'loanAmount', '')::numeric,
+      'annualInterestRate', coalesce(nullif(p_input->>'annualInterestRate', '')::numeric, 0),
+      'gracePeriodMonths', greatest(0, coalesce(nullif(p_input->>'gracePeriodMonths', '')::integer, 0)),
+      'loanTermMonths', greatest(1, coalesce(nullif(p_input->>'loanTermMonths', '')::integer, 24))
+    ));
+  end if;
+
+  for v_loan_entry in select value from jsonb_array_elements(v_loan_rows) loop
+    if jsonb_typeof(v_loan_entry) <> 'object' then
+      raise exception 'Each loan row must be an object.';
+    end if;
+
+    if nullif(trim(v_loan_entry->>'amount'), '') is null then
+      raise exception 'Loan amount is required for every loan.';
+    end if;
+
+    if nullif(trim(v_loan_entry->>'annualInterestRate'), '') is null then
+      raise exception 'Annual interest rate is required for every loan.';
+    end if;
+
+    if nullif(trim(v_loan_entry->>'loanTermMonths'), '') is null then
+      raise exception 'Loan term months is required for every loan.';
+    end if;
+
+    v_loan_entry_amount := nullif(v_loan_entry->>'amount', '')::numeric;
+    v_loan_entry_grace := greatest(0, coalesce(nullif(v_loan_entry->>'gracePeriodMonths', '')::integer, 0));
+    v_loan_entry_interest := nullif(v_loan_entry->>'annualInterestRate', '')::numeric;
+    v_loan_entry_term := nullif(v_loan_entry->>'loanTermMonths', '')::integer;
+
+    if v_loan_entry_amount <= 0 then
+      raise exception 'Loan amount must be greater than zero.';
+    end if;
+
+    if v_loan_entry_interest < 0 then
+      raise exception 'Annual interest rate cannot be negative.';
+    end if;
+
+    if v_loan_entry_term < 1 then
+      raise exception 'Loan term months must be at least 1.';
+    end if;
+
+    if v_loan_entry_grace >= v_loan_entry_term then
+      raise exception 'Grace period months must be less than loan term months.';
+    end if;
+
+    v_loan_amount := v_loan_amount + v_loan_entry_amount;
+    v_loan_interest_weight := v_loan_interest_weight + (v_loan_entry_amount * v_loan_entry_interest);
+    v_loan_term_months := greatest(v_loan_term_months, v_loan_entry_term);
+    v_clean_loan_rows := v_clean_loan_rows || jsonb_build_array(jsonb_build_object(
+      'id', coalesce(nullif(trim(v_loan_entry->>'id'), ''), gen_random_uuid()::text),
+      'amount', v_loan_entry_amount,
+      'annualInterestRate', v_loan_entry_interest,
+      'gracePeriodMonths', v_loan_entry_grace,
+      'loanTermMonths', v_loan_entry_term
+    ));
+  end loop;
+
+  if v_loan_amount > 0 then
+    v_annual_interest_rate := v_loan_interest_weight / v_loan_amount;
+  end if;
+
+  if v_loan_term_months < 1 then
+    v_loan_term_months := 24;
+  end if;
+
   insert into public.financial_model_settings (
     company_id,
     electricity_price_per_kwh,
     working_days_per_month,
     initial_cash,
+    investment_grant_amount,
     loan_amount,
+    loan_rows,
     annual_interest_rate,
     loan_term_months,
     vat_rate,
+    sales_vat_rate,
+    expense_vat_rate,
     income_tax_rate,
+    tax_payment_delay_months,
+    receivables_collection_days,
+    raw_material_stock_days,
+    supplier_payment_days,
+    initial_capacity_units,
+    monthly_currency_increase_percent,
+    monthly_inflation_percent,
+    monthly_energy_price_increase_percent,
+    monthly_wage_increase_percent,
+    cogs_inflation_annual_percent,
+    opex_inflation_annual_percent,
+    price_increase_annual_percent,
+    asset_value_increase_annual_percent,
+    increase_frequency,
     raw_material_buffer_months,
     salary_buffer_months,
     rent_buffer_months,
@@ -1628,28 +2189,64 @@ begin
   )
   values (
     v_company_id,
-    greatest(0, coalesce(nullif(p_input->>'electricityPricePerKwh', '')::numeric, 0)),
-    greatest(1, coalesce(nullif(p_input->>'workingDaysPerMonth', '')::numeric, 22)),
-    greatest(0, coalesce(nullif(p_input->>'initialCash', '')::numeric, 0)),
-    greatest(0, coalesce(nullif(p_input->>'loanAmount', '')::numeric, 0)),
-    greatest(0, coalesce(nullif(p_input->>'annualInterestRate', '')::numeric, 0)),
-    greatest(1, coalesce(nullif(p_input->>'loanTermMonths', '')::integer, 24)),
-    greatest(0, coalesce(nullif(p_input->>'vatRate', '')::numeric, 20)),
-    greatest(0, coalesce(nullif(p_input->>'incomeTaxRate', '')::numeric, 20)),
-    greatest(0, coalesce(nullif(p_input->>'rawMaterialBufferMonths', '')::numeric, 1)),
-    greatest(0, coalesce(nullif(p_input->>'salaryBufferMonths', '')::numeric, 1)),
-    greatest(0, coalesce(nullif(p_input->>'rentBufferMonths', '')::numeric, 1)),
+    greatest(0, nullif(p_input->>'electricityPricePerKwh', '')::numeric),
+    greatest(1, nullif(p_input->>'workingDaysPerMonth', '')::numeric),
+    greatest(0, nullif(p_input->>'initialCash', '')::numeric),
+    greatest(0, nullif(p_input->>'investmentGrantAmount', '')::numeric),
+    v_loan_amount,
+    v_clean_loan_rows,
+    v_annual_interest_rate,
+    v_loan_term_months,
+    greatest(0, nullif(p_input->>'vatRate', '')::numeric),
+    greatest(0, coalesce(nullif(p_input->>'salesVatRate', '')::numeric, nullif(p_input->>'vatRate', '')::numeric)),
+    greatest(0, coalesce(nullif(p_input->>'expenseVatRate', '')::numeric, nullif(p_input->>'vatRate', '')::numeric)),
+    greatest(0, nullif(p_input->>'incomeTaxRate', '')::numeric),
+    greatest(0, nullif(p_input->>'taxPaymentDelayMonths', '')::integer),
+    greatest(0, nullif(p_input->>'receivablesCollectionDays', '')::numeric),
+    greatest(0, nullif(p_input->>'rawMaterialStockDays', '')::numeric),
+    greatest(0, nullif(p_input->>'supplierPaymentDays', '')::numeric),
+    greatest(0, nullif(p_input->>'initialCapacityUnits', '')::numeric),
+    greatest(0, coalesce(nullif(p_input->>'monthlyCurrencyIncreasePercent', '')::numeric, 0)),
+    greatest(0, coalesce(nullif(p_input->>'monthlyInflationPercent', '')::numeric, 0)),
+    greatest(0, coalesce(nullif(p_input->>'monthlyEnergyPriceIncreasePercent', '')::numeric, 0)),
+    greatest(0, coalesce(nullif(p_input->>'monthlyWageIncreasePercent', '')::numeric, 0)),
+    greatest(0, nullif(p_input->>'cogsInflationAnnualPercent', '')::numeric),
+    greatest(0, nullif(p_input->>'opexInflationAnnualPercent', '')::numeric),
+    greatest(0, nullif(p_input->>'priceIncreaseAnnualPercent', '')::numeric),
+    greatest(0, nullif(p_input->>'assetValueIncreaseAnnualPercent', '')::numeric),
+    coalesce(nullif(trim(p_input->>'increaseFrequency'), ''), 'semiannual'),
+    greatest(0, nullif(p_input->>'rawMaterialBufferMonths', '')::numeric),
+    greatest(0, nullif(p_input->>'salaryBufferMonths', '')::numeric),
+    greatest(0, nullif(p_input->>'rentBufferMonths', '')::numeric),
     auth.uid()
   )
   on conflict (company_id) do update set
     electricity_price_per_kwh = excluded.electricity_price_per_kwh,
     working_days_per_month = excluded.working_days_per_month,
     initial_cash = excluded.initial_cash,
+    investment_grant_amount = excluded.investment_grant_amount,
     loan_amount = excluded.loan_amount,
+    loan_rows = excluded.loan_rows,
     annual_interest_rate = excluded.annual_interest_rate,
     loan_term_months = excluded.loan_term_months,
     vat_rate = excluded.vat_rate,
+    sales_vat_rate = excluded.sales_vat_rate,
+    expense_vat_rate = excluded.expense_vat_rate,
     income_tax_rate = excluded.income_tax_rate,
+    tax_payment_delay_months = excluded.tax_payment_delay_months,
+    receivables_collection_days = excluded.receivables_collection_days,
+    raw_material_stock_days = excluded.raw_material_stock_days,
+    supplier_payment_days = excluded.supplier_payment_days,
+    initial_capacity_units = excluded.initial_capacity_units,
+    monthly_currency_increase_percent = excluded.monthly_currency_increase_percent,
+    monthly_inflation_percent = excluded.monthly_inflation_percent,
+    monthly_energy_price_increase_percent = excluded.monthly_energy_price_increase_percent,
+    monthly_wage_increase_percent = excluded.monthly_wage_increase_percent,
+    cogs_inflation_annual_percent = excluded.cogs_inflation_annual_percent,
+    opex_inflation_annual_percent = excluded.opex_inflation_annual_percent,
+    price_increase_annual_percent = excluded.price_increase_annual_percent,
+    asset_value_increase_annual_percent = excluded.asset_value_increase_annual_percent,
+    increase_frequency = excluded.increase_frequency,
     raw_material_buffer_months = excluded.raw_material_buffer_months,
     salary_buffer_months = excluded.salary_buffer_months,
     rent_buffer_months = excluded.rent_buffer_months,
@@ -1722,6 +2319,7 @@ declare
   v_working_days_per_month numeric := 22;
   v_initial_cash numeric := 0;
   v_loan_amount numeric := 0;
+  v_loan_rows jsonb := '[]'::jsonb;
   v_annual_interest_rate numeric := 0;
   v_loan_term_months integer := 24;
   v_vat_rate numeric := 20;
@@ -1729,6 +2327,10 @@ declare
   v_raw_material_buffer_months numeric := 1;
   v_salary_buffer_months numeric := 1;
   v_rent_buffer_months numeric := 1;
+  v_monthly_currency_increase_rate numeric := 0;
+  v_monthly_inflation_rate numeric := 0;
+  v_monthly_energy_price_increase_rate numeric := 0;
+  v_monthly_wage_increase_rate numeric := 0;
   v_base_sales_revenue numeric := 0;
   v_base_material_cost numeric := 0;
   v_base_electricity_cost numeric := 0;
@@ -1773,28 +2375,38 @@ begin
 
   select
     coalesce(electricity_price_per_kwh, 0),
-    coalesce(working_days_per_month, 22),
-    coalesce(initial_cash, 0),
-    coalesce(loan_amount, 0),
-    coalesce(annual_interest_rate, 0),
+	    coalesce(working_days_per_month, 22),
+	    coalesce(initial_cash, 0),
+	    coalesce(loan_amount, 0),
+	    coalesce(loan_rows, '[]'::jsonb),
+	    coalesce(annual_interest_rate, 0),
     coalesce(loan_term_months, 24),
     coalesce(vat_rate, 20),
     coalesce(income_tax_rate, 20),
     coalesce(raw_material_buffer_months, 1),
     coalesce(salary_buffer_months, 1),
-    coalesce(rent_buffer_months, 1)
+    coalesce(rent_buffer_months, 1),
+    coalesce(monthly_currency_increase_percent, 0),
+    coalesce(monthly_inflation_percent, 0),
+    coalesce(monthly_energy_price_increase_percent, 0),
+    coalesce(monthly_wage_increase_percent, 0)
     into
       v_electricity_price,
-      v_working_days_per_month,
-      v_initial_cash,
-      v_loan_amount,
-      v_annual_interest_rate,
+	      v_working_days_per_month,
+	      v_initial_cash,
+	      v_loan_amount,
+	      v_loan_rows,
+	      v_annual_interest_rate,
       v_loan_term_months,
       v_vat_rate,
       v_income_tax_rate,
       v_raw_material_buffer_months,
       v_salary_buffer_months,
-      v_rent_buffer_months
+      v_rent_buffer_months,
+      v_monthly_currency_increase_rate,
+      v_monthly_inflation_rate,
+      v_monthly_energy_price_increase_rate,
+      v_monthly_wage_increase_rate
   from public.financial_model_settings
   where company_id = v_company_id;
 
@@ -1802,13 +2414,27 @@ begin
   v_working_days_per_month := coalesce(v_working_days_per_month, 22);
   v_initial_cash := coalesce(v_initial_cash, 0);
   v_loan_amount := coalesce(v_loan_amount, 0);
+  v_loan_rows := coalesce(v_loan_rows, '[]'::jsonb);
   v_annual_interest_rate := coalesce(v_annual_interest_rate, 0);
   v_loan_term_months := coalesce(v_loan_term_months, 24);
+  if v_loan_rows = '[]'::jsonb and v_loan_amount > 0 then
+    v_loan_rows := jsonb_build_array(jsonb_build_object(
+      'id', 'legacy-loan',
+      'amount', v_loan_amount,
+      'annualInterestRate', v_annual_interest_rate,
+      'gracePeriodMonths', 0,
+      'loanTermMonths', v_loan_term_months
+    ));
+  end if;
   v_vat_rate := coalesce(v_vat_rate, 20);
   v_income_tax_rate := coalesce(v_income_tax_rate, 20);
   v_raw_material_buffer_months := coalesce(v_raw_material_buffer_months, 1);
   v_salary_buffer_months := coalesce(v_salary_buffer_months, 1);
   v_rent_buffer_months := coalesce(v_rent_buffer_months, 1);
+  v_monthly_currency_increase_rate := greatest(0, coalesce(v_monthly_currency_increase_rate, 0)) / 100;
+  v_monthly_inflation_rate := greatest(0, coalesce(v_monthly_inflation_rate, 0)) / 100;
+  v_monthly_energy_price_increase_rate := greatest(0, coalesce(v_monthly_energy_price_increase_rate, 0)) / 100;
+  v_monthly_wage_increase_rate := greatest(0, coalesce(v_monthly_wage_increase_rate, 0)) / 100;
   v_month_count := case
     when p_horizon = '5y' then 60
     when p_horizon = '1y' then 12
@@ -1876,12 +2502,18 @@ begin
     period_start,
     v_base_produced_quantity * period_days,
     v_base_sales_revenue * period_days,
-    v_base_material_cost * period_days,
-    v_base_electricity_cost * period_days,
-    (v_base_material_cost * period_days) + (v_base_electricity_cost * period_days) + v_extra_recurring_cost,
-    (v_base_sales_revenue * period_days) - ((v_base_material_cost * period_days) + (v_base_electricity_cost * period_days) + v_extra_recurring_cost)
+    v_base_material_cost * period_days * power(1 + v_monthly_currency_increase_rate, month_index) * power(1 + v_monthly_inflation_rate, month_index),
+    v_base_electricity_cost * period_days * power(1 + case when v_monthly_energy_price_increase_rate > 0 then v_monthly_energy_price_increase_rate else v_monthly_inflation_rate end, month_index),
+    (v_base_material_cost * period_days * power(1 + v_monthly_currency_increase_rate, month_index) * power(1 + v_monthly_inflation_rate, month_index))
+      + (v_base_electricity_cost * period_days * power(1 + case when v_monthly_energy_price_increase_rate > 0 then v_monthly_energy_price_increase_rate else v_monthly_inflation_rate end, month_index))
+      + (v_extra_recurring_cost * power(1 + v_monthly_inflation_rate, month_index)),
+    (v_base_sales_revenue * period_days)
+      - ((v_base_material_cost * period_days * power(1 + v_monthly_currency_increase_rate, month_index) * power(1 + v_monthly_inflation_rate, month_index))
+        + (v_base_electricity_cost * period_days * power(1 + case when v_monthly_energy_price_increase_rate > 0 then v_monthly_energy_price_increase_rate else v_monthly_inflation_rate end, month_index))
+        + (v_extra_recurring_cost * power(1 + v_monthly_inflation_rate, month_index)))
   from (
     select
+      month_index,
       (date_trunc('month', current_date)::date + (month_index || ' months')::interval)::date as period_start,
       extract(day from (
         date_trunc('month', current_date)::date
@@ -1991,12 +2623,17 @@ begin
     'settings', jsonb_build_object(
       'electricityPricePerKwh', v_electricity_price,
       'workingDaysPerMonth', v_working_days_per_month,
-      'initialCash', v_initial_cash,
-      'loanAmount', v_loan_amount,
-      'annualInterestRate', v_annual_interest_rate,
+	      'initialCash', v_initial_cash,
+	      'loanAmount', v_loan_amount,
+	      'loanRows', v_loan_rows,
+	      'annualInterestRate', v_annual_interest_rate,
       'loanTermMonths', v_loan_term_months,
       'vatRate', v_vat_rate,
       'incomeTaxRate', v_income_tax_rate,
+      'monthlyCurrencyIncreasePercent', v_monthly_currency_increase_rate * 100,
+      'monthlyInflationPercent', v_monthly_inflation_rate * 100,
+      'monthlyEnergyPriceIncreasePercent', v_monthly_energy_price_increase_rate * 100,
+      'monthlyWageIncreasePercent', v_monthly_wage_increase_rate * 100,
       'rawMaterialBufferMonths', v_raw_material_buffer_months,
       'salaryBufferMonths', v_salary_buffer_months,
       'rentBufferMonths', v_rent_buffer_months

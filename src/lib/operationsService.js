@@ -24,13 +24,19 @@ export const emptyPlanRows = {
 };
 
 export const emptyOperationForms = {
+  equipment: {
+    name: "",
+    price: 0,
+    quantity: 1,
+  },
   machine: {
     hourlyEnergyConsumptionKwh: 0,
     name: "",
     price: 0,
   },
   product: {
-    cycleTimeMinutes: 1,
+    cycleTimeUnit: "minute",
+    cycleTimeValue: 1,
     materialRows: [],
     name: "",
     price: 0,
@@ -49,6 +55,7 @@ export const emptyOperationForms = {
 
 export async function loadOperationsWorkspace(supabase) {
   const [
+    { data: equipment, error: equipmentError },
     { data: products, error: productError },
     { data: machines, error: machinesError },
     { data: materials, error: materialsError },
@@ -56,6 +63,7 @@ export async function loadOperationsWorkspace(supabase) {
     { data: workforce, error: workforceError },
   ] =
     await Promise.all([
+      supabase.from("operation_equipment").select("*").order("name", { ascending: true }),
       supabase
         .from("operation_products")
         .select("*, material_rows:operation_product_materials(*, material:operation_materials(*))")
@@ -64,12 +72,13 @@ export async function loadOperationsWorkspace(supabase) {
       supabase.from("operation_materials").select("*").order("name", { ascending: true }),
       supabase
         .from("operation_resource_plans")
-        .select("*, product:operation_products(id, name, unit, price, cycle_time_minutes)")
+        .select("*, product:operation_products(id, name, unit, price, cycle_time_minutes, cycle_time_unit)")
         .order("created_at", { ascending: false })
         .limit(50),
       supabase.from("operation_workforce_resources").select("*").order("role_name", { ascending: true }),
     ]);
 
+  if (equipmentError) throw equipmentError;
   if (productError) throw productError;
   if (machinesError) throw machinesError;
   if (materialsError) throw materialsError;
@@ -108,6 +117,7 @@ export async function loadOperationsWorkspace(supabase) {
 
   return {
     activePlans: activePlans || [],
+    equipment: equipment || [],
     latestPlan,
     machines: machines || [],
     materials: materials || [],
