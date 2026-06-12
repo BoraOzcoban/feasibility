@@ -27,12 +27,14 @@ export const emptyOperationForms = {
   equipment: {
     name: "",
     price: 0,
+    priceCurrency: "TRY",
     quantity: 1,
   },
   machine: {
     hourlyEnergyConsumptionKwh: 0,
     name: "",
     price: 0,
+    priceCurrency: "TRY",
   },
   product: {
     cycleTimeUnit: "minute",
@@ -41,15 +43,18 @@ export const emptyOperationForms = {
     materialRows: [],
     name: "",
     price: 0,
+    priceCurrency: "TRY",
     unit: "adet",
   },
   material: {
     name: "",
     pricePerUnit: 0,
+    priceCurrency: "TRY",
     unit: "kg",
   },
   workforce: {
     hourlyCost: 250,
+    hourlyCostCurrency: "TRY",
     roleName: "",
   },
 };
@@ -73,7 +78,7 @@ export async function loadOperationsWorkspace(supabase) {
       supabase.from("operation_materials").select("*").order("name", { ascending: true }),
       supabase
         .from("operation_resource_plans")
-        .select("*, product:operation_products(id, name, unit, price, cycle_time_minutes, cycle_time_unit)")
+        .select("*, product:operation_products(id, name, unit, price, price_currency, cycle_time_minutes, cycle_time_unit)")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(50),

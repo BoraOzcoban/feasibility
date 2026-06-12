@@ -3,10 +3,10 @@ export const emptySalesStrategy = {
   channelTypes: [],
   company: {
     monthlyMultipliers: Array.from({ length: 12 }, () => 1),
+    multiplierPeriod: "monthly",
   },
   campaigns: [],
   channels: [],
-  personnel: [],
 };
 
 export const defaultSimulationParameters = {
@@ -54,9 +54,18 @@ function normalizeOptionalNumber(value) {
   return Number.isFinite(number) ? number : "";
 }
 
-function normalizeMonthlyMultipliers(value) {
+function normalizeMonthlyMultipliers(value, multiplierPeriod = "monthly") {
   const rows = Array.isArray(value) ? value : [];
+
+  if (multiplierPeriod === "quarterly" && rows.length === 4) {
+    return Array.from({ length: 12 }, (_, index) => normalizeNumber(rows[Math.floor(index / 3)], 1));
+  }
+
   return Array.from({ length: 12 }, (_, index) => normalizeNumber(rows[index], 1));
+}
+
+function normalizeMultiplierPeriod(value) {
+  return value === "quarterly" ? "quarterly" : "monthly";
 }
 
 function normalizeSeasonalityCurve(value) {
@@ -100,7 +109,6 @@ export async function loadSalesStrategy(supabase) {
     { data: settingsRows, error: settingsError },
     { data: channelRows, error: channelsError },
     { data: campaignRows, error: campaignsError },
-    { data: personnelRows, error: personnelError },
   ] = await Promise.all([
     supabase.from("sales_channel_types").select("*").order("sort_order", { ascending: true }),
     supabase.from("sales_campaign_types").select("*").order("sort_order", { ascending: true }),
@@ -113,7 +121,6 @@ export async function loadSalesStrategy(supabase) {
       .from("sales_campaigns")
       .select("*, type:sales_campaign_types(*)")
       .order("created_at", { ascending: true }),
-    supabase.from("sales_personnel").select("*").order("created_at", { ascending: true }),
   ]);
 
   if (channelTypesError) throwPlanningError(channelTypesError);
@@ -121,15 +128,16 @@ export async function loadSalesStrategy(supabase) {
   if (settingsError) throwPlanningError(settingsError);
   if (channelsError) throwPlanningError(channelsError);
   if (campaignsError) throwPlanningError(campaignsError);
-  if (personnelError) throwPlanningError(personnelError);
 
   const settings = settingsRows || {};
+  const multiplierPeriod = normalizeMultiplierPeriod(settings.multiplier_period);
 
   return {
     campaignTypes: (campaignTypeRows || []).map(mapSalesType),
     channelTypes: (channelTypeRows || []).map(mapSalesType),
     company: {
-      monthlyMultipliers: normalizeMonthlyMultipliers(settings.monthly_multipliers),
+      monthlyMultipliers: normalizeMonthlyMultipliers(settings.monthly_multipliers, multiplierPeriod),
+      multiplierPeriod,
     },
     campaigns: (campaignRows || []).map((row) => ({
       budget: normalizeNumber(row.budget),
@@ -172,24 +180,18 @@ export async function loadSalesStrategy(supabase) {
       type: row.type || null,
       typeId: row.type_id || row.type?.id || "",
     })),
-    personnel: (personnelRows || []).map((row) => ({
-      assignedChannel: row.assigned_channel || "",
-      id: row.id,
-      monthlyTarget: normalizeNumber(row.monthly_target),
-      name: row.name || "",
-      realizedSalesUnits: normalizeNumber(row.realized_sales_units),
-      role: row.role || "",
-    })),
   };
 }
 
 export async function saveSalesStrategy(supabase, companyId, strategy) {
+  const multiplierPeriod = normalizeMultiplierPeriod(strategy.company?.multiplierPeriod);
   const { data, error } = await supabase.rpc("save_sales_strategy", {
     p_input: {
       ...strategy,
       company: {
         ...(strategy.company || {}),
-        monthlyMultipliers: normalizeMonthlyMultipliers(strategy.company?.monthlyMultipliers),
+        monthlyMultipliers: normalizeMonthlyMultipliers(strategy.company?.monthlyMultipliers, multiplierPeriod),
+        multiplierPeriod,
       },
     },
   });

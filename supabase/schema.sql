@@ -464,6 +464,7 @@ create table if not exists public.operation_products (
   status text not null default 'Aktif',
   unit text not null default 'adet',
   price numeric(14, 4) not null default 0,
+  price_currency text not null default 'TRY' check (price_currency in ('TRY', 'USD', 'EUR')),
   cycle_time_minutes numeric(12, 4) not null default 1,
   cycle_time_unit text not null default 'minute',
   description text,
@@ -484,14 +485,20 @@ create table if not exists public.operation_products (
 alter table public.operation_products
   add column if not exists unit text not null default 'adet',
   add column if not exists price numeric(14, 4) not null default 0,
+  add column if not exists price_currency text not null default 'TRY',
   add column if not exists cycle_time_minutes numeric(12, 4) not null default 1,
   add column if not exists cycle_time_unit text not null default 'minute';
+
+update public.operation_products
+set price_currency = 'TRY'
+where price_currency not in ('TRY', 'USD', 'EUR');
 
 create table if not exists public.operation_machines (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
   name text not null,
   price numeric(14, 2) not null default 0,
+  price_currency text not null default 'TRY' check (price_currency in ('TRY', 'USD', 'EUR')),
   hourly_energy_consumption_kwh numeric(14, 4) not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -500,7 +507,12 @@ create table if not exists public.operation_machines (
 
 alter table public.operation_machines
   add column if not exists price numeric(14, 2) not null default 0,
+  add column if not exists price_currency text not null default 'TRY',
   add column if not exists hourly_energy_consumption_kwh numeric(14, 4) not null default 0;
+
+update public.operation_machines
+set price_currency = 'TRY'
+where price_currency not in ('TRY', 'USD', 'EUR');
 
 do $$
 begin
@@ -544,6 +556,7 @@ create table if not exists public.operation_equipment (
   company_id uuid not null references public.companies(id) on delete cascade,
   name text not null,
   price numeric(14, 2) not null default 0,
+  price_currency text not null default 'TRY' check (price_currency in ('TRY', 'USD', 'EUR')),
   quantity numeric(14, 4) not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -552,7 +565,12 @@ create table if not exists public.operation_equipment (
 
 alter table public.operation_equipment
   add column if not exists price numeric(14, 2) not null default 0,
+  add column if not exists price_currency text not null default 'TRY',
   add column if not exists quantity numeric(14, 4) not null default 1;
+
+update public.operation_equipment
+set price_currency = 'TRY'
+where price_currency not in ('TRY', 'USD', 'EUR');
 
 create table if not exists public.operation_materials (
   id uuid primary key default gen_random_uuid(),
@@ -560,13 +578,19 @@ create table if not exists public.operation_materials (
   name text not null,
   unit text not null default 'kg',
   price_per_unit numeric(14, 4) not null default 0,
+  price_currency text not null default 'TRY' check (price_currency in ('TRY', 'USD', 'EUR')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (company_id, name)
 );
 
 alter table public.operation_materials
-  add column if not exists price_per_unit numeric(14, 4) not null default 0;
+  add column if not exists price_per_unit numeric(14, 4) not null default 0,
+  add column if not exists price_currency text not null default 'TRY';
+
+update public.operation_materials
+set price_currency = 'TRY'
+where price_currency not in ('TRY', 'USD', 'EUR');
 
 do $$
 begin
@@ -621,16 +645,22 @@ create table if not exists public.operation_workforce_resources (
   company_id uuid not null references public.companies(id) on delete cascade,
   role_name text not null,
   hourly_cost numeric(14, 2) not null default 0,
+  hourly_cost_currency text not null default 'TRY' check (hourly_cost_currency in ('TRY', 'USD', 'EUR')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (company_id, role_name)
 );
 
 alter table public.operation_workforce_resources
+  add column if not exists hourly_cost_currency text not null default 'TRY',
   drop column if exists available_people,
   drop column if exists productive_hours_per_shift,
   drop column if exists efficiency_percent,
   drop column if exists status;
+
+update public.operation_workforce_resources
+set hourly_cost_currency = 'TRY'
+where hourly_cost_currency not in ('TRY', 'USD', 'EUR');
 
 create table if not exists public.operation_notes (
   id uuid primary key default gen_random_uuid(),
@@ -783,6 +813,106 @@ update public.financial_model_settings
 set increase_frequency = 'semiannual'
 where increase_frequency not in ('monthly', 'quarterly', 'semiannual', 'annual');
 
+create table if not exists public.financial_loans (
+  id text not null default gen_random_uuid()::text,
+  company_id uuid not null references public.companies(id) on delete cascade,
+  name text not null default 'Kredi',
+  amount numeric(14, 2) not null default 0 check (amount >= 0),
+  currency text not null default 'TRY' check (currency in ('TRY', 'USD', 'EUR')),
+  annual_interest_rate numeric(8, 4) not null default 0 check (annual_interest_rate >= 0),
+  grace_period_months integer not null default 0 check (grace_period_months >= 0),
+  loan_term_months integer not null default 24 check (loan_term_months >= 1 and grace_period_months < loan_term_months),
+  received_date date not null default current_date,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (company_id, id)
+);
+
+alter table public.financial_loans
+  add column if not exists name text not null default 'Kredi',
+  add column if not exists amount numeric(14, 2) not null default 0,
+  add column if not exists currency text not null default 'TRY',
+  add column if not exists annual_interest_rate numeric(8, 4) not null default 0,
+  add column if not exists grace_period_months integer not null default 0,
+  add column if not exists loan_term_months integer not null default 24,
+  add column if not exists received_date date not null default current_date,
+  add column if not exists created_by uuid references auth.users(id);
+
+update public.financial_loans
+set currency = upper(currency)
+where currency <> upper(currency);
+
+update public.financial_loans
+set currency = 'TRY'
+where currency not in ('TRY', 'USD', 'EUR');
+
+alter table public.financial_loans
+  drop constraint if exists financial_loans_currency_check;
+
+alter table public.financial_loans
+  add constraint financial_loans_currency_check
+  check (currency in ('TRY', 'USD', 'EUR'));
+
+insert into public.financial_loans (
+  id,
+  company_id,
+  name,
+  amount,
+  currency,
+  annual_interest_rate,
+  grace_period_months,
+  loan_term_months,
+  received_date,
+  created_by
+)
+select
+  coalesce(nullif(trim(loan_entry.value->>'id'), ''), gen_random_uuid()::text),
+  s.company_id,
+  coalesce(nullif(trim(loan_entry.value->>'name'), ''), 'Kredi ' || loan_entry.ordinality),
+  greatest(0, nullif(loan_entry.value->>'amount', '')::numeric),
+  case
+    when upper(coalesce(nullif(trim(loan_entry.value->>'currency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR')
+      then upper(coalesce(nullif(trim(loan_entry.value->>'currency'), ''), 'TRY'))
+    else 'TRY'
+  end,
+  greatest(0, nullif(loan_entry.value->>'annualInterestRate', '')::numeric),
+  greatest(0, coalesce(nullif(loan_entry.value->>'gracePeriodMonths', '')::integer, 0)),
+  greatest(1, nullif(loan_entry.value->>'loanTermMonths', '')::integer),
+  coalesce(
+    nullif(loan_entry.value->>'receivedDate', '')::date,
+    nullif(loan_entry.value->>'received_date', '')::date,
+    current_date
+  ),
+  s.updated_by
+from public.financial_model_settings s
+cross join lateral jsonb_array_elements(coalesce(s.loan_rows, '[]'::jsonb)) with ordinality as loan_entry(value, ordinality)
+where not exists (
+  select 1
+  from public.financial_loans existing_loans
+  where existing_loans.company_id = s.company_id
+)
+  and jsonb_typeof(loan_entry.value) = 'object'
+  and nullif(trim(loan_entry.value->>'amount'), '') is not null
+  and nullif(trim(loan_entry.value->>'annualInterestRate'), '') is not null
+  and nullif(trim(loan_entry.value->>'loanTermMonths'), '') is not null
+  and greatest(0, coalesce(nullif(loan_entry.value->>'gracePeriodMonths', '')::integer, 0)) < greatest(1, nullif(loan_entry.value->>'loanTermMonths', '')::integer)
+on conflict (company_id, id) do nothing;
+
+create table if not exists public.financial_exchange_rates (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id) on delete cascade,
+  currency text not null check (currency in ('USD', 'EUR')),
+  rate_to_try numeric(18, 6) not null check (rate_to_try > 0),
+  source text not null default 'TCMB',
+  fetched_at timestamptz not null default now(),
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists financial_exchange_rates_company_currency_fetched_idx
+on public.financial_exchange_rates (company_id, currency, fetched_at desc);
+
 create table if not exists public.financial_extra_costs (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
@@ -797,6 +927,7 @@ create table if not exists public.financial_extra_costs (
 create table if not exists public.sales_strategy_settings (
   company_id uuid primary key references public.companies(id) on delete cascade,
   monthly_multipliers jsonb not null default '[1,1,1,1,1,1,1,1,1,1,1,1]'::jsonb,
+  multiplier_period text not null default 'monthly' check (multiplier_period in ('monthly', 'quarterly')),
   updated_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -804,6 +935,7 @@ create table if not exists public.sales_strategy_settings (
 
 alter table public.sales_strategy_settings
   add column if not exists monthly_multipliers jsonb not null default '[1,1,1,1,1,1,1,1,1,1,1,1]'::jsonb,
+  add column if not exists multiplier_period text not null default 'monthly',
   drop column if exists product_name,
   drop column if exists target_segment,
   drop column if exists base_sales_price,
@@ -814,6 +946,13 @@ alter table public.sales_strategy_settings
   drop column if exists market_share,
   drop column if exists reputation_score,
   drop column if exists positioning;
+
+alter table public.sales_strategy_settings
+  drop constraint if exists sales_strategy_settings_multiplier_period_check;
+
+alter table public.sales_strategy_settings
+  add constraint sales_strategy_settings_multiplier_period_check
+  check (multiplier_period in ('monthly', 'quarterly'));
 
 create table if not exists public.sales_channel_types (
   id text primary key,
@@ -1100,24 +1239,17 @@ alter table public.sales_campaigns
 alter table public.sales_campaigns
   add constraint sales_campaigns_type_id_fkey foreign key (type_id) references public.sales_campaign_types(id);
 
-create table if not exists public.sales_personnel (
-  company_id uuid not null references public.companies(id) on delete cascade,
-  id text not null,
-  name text not null default '',
-  role text not null default '',
-  assigned_channel text not null default '',
-  monthly_target numeric(14, 3) not null default 0,
-  realized_sales_units numeric(14, 3) not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (company_id, id)
-);
+do $$
+begin
+  if to_regclass('public.sales_personnel') is not null then
+    execute 'drop trigger if exists sales_personnel_set_updated_at on public.sales_personnel';
+    execute 'drop policy if exists "sales_personnel_select_company" on public.sales_personnel';
+    execute 'drop policy if exists "sales_personnel_write_company" on public.sales_personnel';
+  end if;
+end;
+$$;
 
-alter table public.sales_personnel
-  add column if not exists realized_sales_units numeric(14, 3) not null default 0,
-  drop column if exists pipeline_value,
-  drop column if exists win_rate,
-  drop column if exists success_score;
+drop table if exists public.sales_personnel;
 
 do $$
 begin
@@ -1172,13 +1304,14 @@ alter table public.operation_plan_machines enable row level security;
 alter table public.operation_plan_workforce enable row level security;
 alter table public.operation_plan_materials enable row level security;
 alter table public.financial_model_settings enable row level security;
+alter table public.financial_loans enable row level security;
+alter table public.financial_exchange_rates enable row level security;
 alter table public.financial_extra_costs enable row level security;
 alter table public.sales_strategy_settings enable row level security;
 alter table public.sales_channel_types enable row level security;
 alter table public.sales_campaign_types enable row level security;
 alter table public.sales_channels enable row level security;
 alter table public.sales_campaigns enable row level security;
-alter table public.sales_personnel enable row level security;
 alter table public.simulation_variants enable row level security;
 
 drop policy if exists "operation_products_select_company" on public.operation_products;
@@ -1202,6 +1335,10 @@ drop policy if exists "operation_plan_workforce_select_company" on public.operat
 drop policy if exists "operation_plan_materials_select_company" on public.operation_plan_materials;
 drop policy if exists "financial_model_settings_select_company" on public.financial_model_settings;
 drop policy if exists "financial_model_settings_write_company" on public.financial_model_settings;
+drop policy if exists "financial_loans_select_company" on public.financial_loans;
+drop policy if exists "financial_loans_write_company" on public.financial_loans;
+drop policy if exists "financial_exchange_rates_select_company" on public.financial_exchange_rates;
+drop policy if exists "financial_exchange_rates_write_company" on public.financial_exchange_rates;
 drop policy if exists "financial_extra_costs_select_company" on public.financial_extra_costs;
 drop policy if exists "financial_extra_costs_write_company" on public.financial_extra_costs;
 drop policy if exists "sales_strategy_settings_select_company" on public.sales_strategy_settings;
@@ -1212,8 +1349,6 @@ drop policy if exists "sales_channels_select_company" on public.sales_channels;
 drop policy if exists "sales_channels_write_company" on public.sales_channels;
 drop policy if exists "sales_campaigns_select_company" on public.sales_campaigns;
 drop policy if exists "sales_campaigns_write_company" on public.sales_campaigns;
-drop policy if exists "sales_personnel_select_company" on public.sales_personnel;
-drop policy if exists "sales_personnel_write_company" on public.sales_personnel;
 drop policy if exists "simulation_variants_select_company" on public.simulation_variants;
 drop policy if exists "simulation_variants_write_company" on public.simulation_variants;
 
@@ -1428,6 +1563,57 @@ with check (
   )
 );
 
+create policy "financial_loans_select_company"
+on public.financial_loans
+for select
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'read')
+    or public.has_module_permission('operations', 'read')
+  )
+);
+
+create policy "financial_loans_write_company"
+on public.financial_loans
+for all
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+)
+with check (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+);
+
+create policy "financial_exchange_rates_select_company"
+on public.financial_exchange_rates
+for select
+using (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'read')
+    or public.has_module_permission('operations', 'read')
+  )
+);
+
+create policy "financial_exchange_rates_write_company"
+on public.financial_exchange_rates
+for insert
+with check (
+  company_id = public.current_profile_company_id()
+  and (
+    public.has_module_permission('financial-modelling', 'write')
+    or public.has_module_permission('operations', 'write')
+  )
+);
+
 create policy "financial_extra_costs_select_company"
 on public.financial_extra_costs
 for select
@@ -1554,35 +1740,6 @@ with check (
   )
 );
 
-create policy "sales_personnel_select_company"
-on public.sales_personnel
-for select
-using (
-  company_id = public.current_profile_company_id()
-  and (
-    public.has_module_permission('sales-strategy', 'read')
-    or public.has_module_permission('operations', 'read')
-  )
-);
-
-create policy "sales_personnel_write_company"
-on public.sales_personnel
-for all
-using (
-  company_id = public.current_profile_company_id()
-  and (
-    public.has_module_permission('sales-strategy', 'write')
-    or public.has_module_permission('operations', 'write')
-  )
-)
-with check (
-  company_id = public.current_profile_company_id()
-  and (
-    public.has_module_permission('sales-strategy', 'write')
-    or public.has_module_permission('operations', 'write')
-  )
-);
-
 create policy "simulation_variants_select_company"
 on public.simulation_variants
 for select
@@ -1647,6 +1804,11 @@ create trigger financial_model_settings_set_updated_at
 before update on public.financial_model_settings
 for each row execute function public.set_updated_at();
 
+drop trigger if exists financial_loans_set_updated_at on public.financial_loans;
+create trigger financial_loans_set_updated_at
+before update on public.financial_loans
+for each row execute function public.set_updated_at();
+
 drop trigger if exists financial_extra_costs_set_updated_at on public.financial_extra_costs;
 create trigger financial_extra_costs_set_updated_at
 before update on public.financial_extra_costs
@@ -1675,11 +1837,6 @@ for each row execute function public.set_updated_at();
 drop trigger if exists sales_campaigns_set_updated_at on public.sales_campaigns;
 create trigger sales_campaigns_set_updated_at
 before update on public.sales_campaigns
-for each row execute function public.set_updated_at();
-
-drop trigger if exists sales_personnel_set_updated_at on public.sales_personnel;
-create trigger sales_personnel_set_updated_at
-before update on public.sales_personnel
 for each row execute function public.set_updated_at();
 
 drop trigger if exists simulation_variants_set_updated_at on public.simulation_variants;
@@ -1719,6 +1876,7 @@ declare
   v_material_cost numeric := 0;
   v_product_unit text := 'adet';
   v_product_price numeric := 0;
+  v_product_price_currency text := 'TRY';
   v_product_cycle_time_minutes numeric := 1;
   v_product_material_count integer := 0;
   v_primary_machine_daily_hours numeric := 0;
@@ -1748,8 +1906,8 @@ begin
     raise exception 'Selected product was not found for your company.';
   end if;
 
-  select name, unit, price, cycle_time_minutes
-    into v_product_name, v_product_unit, v_product_price, v_product_cycle_time_minutes
+  select name, unit, price, price_currency, cycle_time_minutes
+    into v_product_name, v_product_unit, v_product_price, v_product_price_currency, v_product_cycle_time_minutes
   from public.operation_products
   where id = v_product_id
     and company_id = v_company_id;
@@ -1775,7 +1933,8 @@ begin
       'dailyHours', v_daily_hours,
       'hourlyEnergyConsumptionKwh', v_machine.hourly_energy_consumption_kwh,
       'energyConsumptionKwh', v_daily_hours * greatest(v_machine.hourly_energy_consumption_kwh, 0),
-      'price', v_machine.price
+      'price', v_machine.price,
+      'priceCurrency', coalesce(v_machine.price_currency, 'TRY')
     ));
   end loop;
 
@@ -1807,6 +1966,7 @@ begin
       'dailyHours', v_daily_hours,
       'hoursUsed', v_people * v_daily_hours,
       'hourlyCost', v_workforce.hourly_cost,
+      'hourlyCostCurrency', coalesce(v_workforce.hourly_cost_currency, 'TRY'),
       'cost', v_people * v_daily_hours * greatest(v_workforce.hourly_cost, 0)
     ));
   end loop;
@@ -1826,6 +1986,7 @@ begin
         m.name,
         m.unit,
         m.price_per_unit,
+        m.price_currency,
         pm.quantity_per_unit
       from public.operation_product_materials pm
       join public.operation_materials m on m.id = pm.material_id
@@ -1842,6 +2003,7 @@ begin
         'producedQuantity', v_produced_quantity,
         'dailyQuantity', v_daily_quantity,
         'pricePerUnit', v_material.price_per_unit,
+        'priceCurrency', coalesce(v_material.price_currency, 'TRY'),
         'cost', v_daily_quantity * greatest(v_material.price_per_unit, 0)
       ));
     end loop;
@@ -1864,6 +2026,7 @@ begin
         'unit', v_material.unit,
         'dailyQuantity', v_daily_quantity,
         'pricePerUnit', v_material.price_per_unit,
+        'priceCurrency', coalesce(v_material.price_currency, 'TRY'),
         'cost', v_daily_quantity * greatest(v_material.price_per_unit, 0)
       ));
     end loop;
@@ -1883,6 +2046,7 @@ begin
     'productName', v_product_name,
     'productUnit', coalesce(v_product_unit, 'adet'),
     'productPrice', coalesce(v_product_price, 0),
+    'productPriceCurrency', coalesce(v_product_price_currency, 'TRY'),
     'cycleTimeMinutes', v_product_cycle_time_minutes,
     'primaryMachineDailyHours', v_primary_machine_daily_hours,
     'producedQuantity', v_produced_quantity,
@@ -1969,16 +2133,18 @@ begin
 
   if p_entity = 'machine' then
     insert into public.operation_machines (
-      company_id, name, price, hourly_energy_consumption_kwh
+      company_id, name, price, price_currency, hourly_energy_consumption_kwh
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'name'), ''),
       greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+      case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end,
       greatest(0, coalesce(nullif(p_input->>'hourlyEnergyConsumptionKwh', '')::numeric, 0))
     )
     on conflict (company_id, name) do update set
       price = excluded.price,
+      price_currency = excluded.price_currency,
       hourly_energy_consumption_kwh = excluded.hourly_energy_consumption_kwh
     returning id into v_record_id;
 
@@ -1988,16 +2154,18 @@ begin
 
   if p_entity = 'equipment' then
     insert into public.operation_equipment (
-      company_id, name, price, quantity
+      company_id, name, price, price_currency, quantity
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'name'), ''),
       greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+      case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end,
       greatest(0, coalesce(nullif(p_input->>'quantity', '')::numeric, 1))
     )
     on conflict (company_id, name) do update set
       price = excluded.price,
+      price_currency = excluded.price_currency,
       quantity = excluded.quantity
     returning id into v_record_id;
 
@@ -2019,6 +2187,7 @@ begin
         name = nullif(trim(p_input->>'name'), ''),
         unit = coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
         price = greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+        price_currency = case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end,
         cycle_time_minutes = greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
         cycle_time_unit = case
           when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
@@ -2028,7 +2197,7 @@ begin
         and company_id = v_company_id;
     else
       insert into public.operation_products (
-        company_id, product_code, name, unit, price, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
+        company_id, product_code, name, unit, price, price_currency, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
       )
       values (
         v_company_id,
@@ -2036,6 +2205,7 @@ begin
         nullif(trim(p_input->>'name'), ''),
         coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
         greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+        case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end,
         greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
         case
           when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
@@ -2050,6 +2220,7 @@ begin
         name = excluded.name,
         unit = excluded.unit,
         price = excluded.price,
+        price_currency = excluded.price_currency,
         cycle_time_minutes = excluded.cycle_time_minutes,
         cycle_time_unit = excluded.cycle_time_unit,
         product_group = excluded.product_group,
@@ -2094,17 +2265,19 @@ begin
 
   if p_entity = 'material' then
     insert into public.operation_materials (
-      company_id, name, unit, price_per_unit
+      company_id, name, unit, price_per_unit, price_currency
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'name'), ''),
       coalesce(nullif(trim(p_input->>'unit'), ''), 'kg'),
-      greatest(0, coalesce(nullif(p_input->>'pricePerUnit', '')::numeric, 0))
+      greatest(0, coalesce(nullif(p_input->>'pricePerUnit', '')::numeric, 0)),
+      case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end
     )
     on conflict (company_id, name) do update set
       unit = excluded.unit,
-      price_per_unit = excluded.price_per_unit
+      price_per_unit = excluded.price_per_unit,
+      price_currency = excluded.price_currency
     returning id into v_record_id;
 
     select to_jsonb(m.*) into v_row from public.operation_materials m where m.id = v_record_id;
@@ -2113,15 +2286,17 @@ begin
 
   if p_entity = 'workforce' then
     insert into public.operation_workforce_resources (
-      company_id, role_name, hourly_cost
+      company_id, role_name, hourly_cost, hourly_cost_currency
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'roleName'), ''),
-      greatest(0, coalesce(nullif(p_input->>'hourlyCost', '')::numeric, 0))
+      greatest(0, coalesce(nullif(p_input->>'hourlyCost', '')::numeric, 0)),
+      case when upper(coalesce(nullif(trim(p_input->>'hourlyCostCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'hourlyCostCurrency'), ''), 'TRY')) else 'TRY' end
     )
     on conflict (company_id, role_name) do update set
-      hourly_cost = excluded.hourly_cost
+      hourly_cost = excluded.hourly_cost,
+      hourly_cost_currency = excluded.hourly_cost_currency
     returning id into v_record_id;
 
     select to_jsonb(w.*) into v_row from public.operation_workforce_resources w where w.id = v_record_id;
@@ -2164,6 +2339,7 @@ begin
   insert into public.sales_strategy_settings (
     company_id,
     monthly_multipliers,
+    multiplier_period,
     updated_by
   )
   values (
@@ -2172,13 +2348,17 @@ begin
       when jsonb_typeof(p_input->'company'->'monthlyMultipliers') = 'array' then p_input->'company'->'monthlyMultipliers'
       else '[1,1,1,1,1,1,1,1,1,1,1,1]'::jsonb
     end,
+    case
+      when p_input->'company'->>'multiplierPeriod' in ('monthly', 'quarterly') then p_input->'company'->>'multiplierPeriod'
+      else 'monthly'
+    end,
     auth.uid()
   )
   on conflict (company_id) do update set
     monthly_multipliers = excluded.monthly_multipliers,
+    multiplier_period = excluded.multiplier_period,
     updated_by = excluded.updated_by;
 
-  delete from public.sales_personnel where company_id = v_company_id;
   delete from public.sales_campaigns where company_id = v_company_id;
   delete from public.sales_channels where company_id = v_company_id;
 
@@ -2292,30 +2472,6 @@ begin
     );
   end loop;
 
-  for v_entry in
-    select value
-    from jsonb_array_elements(case when jsonb_typeof(p_input->'personnel') = 'array' then p_input->'personnel' else '[]'::jsonb end)
-  loop
-    insert into public.sales_personnel (
-      company_id,
-      id,
-      name,
-      role,
-      assigned_channel,
-      monthly_target,
-      realized_sales_units
-    )
-    values (
-      v_company_id,
-      coalesce(nullif(v_entry->>'id', ''), gen_random_uuid()::text),
-      coalesce(v_entry->>'name', ''),
-      coalesce(v_entry->>'role', ''),
-      coalesce(v_entry->>'assignedChannel', ''),
-      greatest(0, coalesce(nullif(v_entry->>'monthlyTarget', '')::numeric, 0)),
-      greatest(0, coalesce(nullif(v_entry->>'realizedSalesUnits', '')::numeric, 0))
-    );
-  end loop;
-
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -2335,10 +2491,14 @@ declare
   v_loan_amount numeric := 0;
   v_loan_entry jsonb;
   v_loan_entry_amount numeric;
+  v_loan_entry_currency text;
   v_loan_entry_grace integer;
   v_loan_entry_interest numeric;
+  v_loan_entry_name text;
+  v_loan_entry_received_date date;
   v_loan_entry_term integer;
   v_loan_interest_weight numeric := 0;
+  v_loan_index integer := 0;
   v_loan_rows jsonb := '[]'::jsonb;
   v_loan_term_months integer := 0;
   v_required_key text;
@@ -2449,12 +2609,17 @@ begin
       'id', 'legacy-loan',
       'amount', nullif(p_input->>'loanAmount', '')::numeric,
       'annualInterestRate', coalesce(nullif(p_input->>'annualInterestRate', '')::numeric, 0),
+      'currency', upper(coalesce(nullif(trim(p_input->>'loanCurrency'), ''), 'TRY')),
       'gracePeriodMonths', greatest(0, coalesce(nullif(p_input->>'gracePeriodMonths', '')::integer, 0)),
-      'loanTermMonths', greatest(1, coalesce(nullif(p_input->>'loanTermMonths', '')::integer, 24))
+      'loanTermMonths', greatest(1, coalesce(nullif(p_input->>'loanTermMonths', '')::integer, 24)),
+      'name', 'Legacy loan',
+      'receivedDate', coalesce(nullif(p_input->>'loanReceivedDate', '')::date, current_date)
     ));
   end if;
 
   for v_loan_entry in select value from jsonb_array_elements(v_loan_rows) loop
+    v_loan_index := v_loan_index + 1;
+
     if jsonb_typeof(v_loan_entry) <> 'object' then
       raise exception 'Each loan row must be an object.';
     end if;
@@ -2472,8 +2637,15 @@ begin
     end if;
 
     v_loan_entry_amount := nullif(v_loan_entry->>'amount', '')::numeric;
+    v_loan_entry_currency := upper(coalesce(nullif(trim(v_loan_entry->>'currency'), ''), 'TRY'));
     v_loan_entry_grace := greatest(0, coalesce(nullif(v_loan_entry->>'gracePeriodMonths', '')::integer, 0));
     v_loan_entry_interest := nullif(v_loan_entry->>'annualInterestRate', '')::numeric;
+    v_loan_entry_name := coalesce(nullif(trim(v_loan_entry->>'name'), ''), 'Kredi ' || v_loan_index);
+    v_loan_entry_received_date := coalesce(
+      nullif(v_loan_entry->>'receivedDate', '')::date,
+      nullif(v_loan_entry->>'received_date', '')::date,
+      current_date
+    );
     v_loan_entry_term := nullif(v_loan_entry->>'loanTermMonths', '')::integer;
 
     if v_loan_entry_amount <= 0 then
@@ -2482,6 +2654,10 @@ begin
 
     if v_loan_entry_interest < 0 then
       raise exception 'Annual interest rate cannot be negative.';
+    end if;
+
+    if v_loan_entry_currency not in ('TRY', 'USD', 'EUR') then
+      raise exception 'Loan currency must be TRY, USD, or EUR.';
     end if;
 
     if v_loan_entry_term < 1 then
@@ -2499,8 +2675,11 @@ begin
       'id', coalesce(nullif(trim(v_loan_entry->>'id'), ''), gen_random_uuid()::text),
       'amount', v_loan_entry_amount,
       'annualInterestRate', v_loan_entry_interest,
+      'currency', v_loan_entry_currency,
       'gracePeriodMonths', v_loan_entry_grace,
-      'loanTermMonths', v_loan_entry_term
+      'loanTermMonths', v_loan_entry_term,
+      'name', v_loan_entry_name,
+      'receivedDate', v_loan_entry_received_date
     ));
   end loop;
 
@@ -2610,6 +2789,34 @@ begin
     rent_buffer_months = excluded.rent_buffer_months,
     updated_by = excluded.updated_by;
 
+  delete from public.financial_loans
+  where company_id = v_company_id;
+
+  insert into public.financial_loans (
+    id,
+    company_id,
+    name,
+    amount,
+    currency,
+    annual_interest_rate,
+    grace_period_months,
+    loan_term_months,
+    received_date,
+    created_by
+  )
+  select
+    loan_entry.value->>'id',
+    v_company_id,
+    loan_entry.value->>'name',
+    (loan_entry.value->>'amount')::numeric,
+    loan_entry.value->>'currency',
+    (loan_entry.value->>'annualInterestRate')::numeric,
+    (loan_entry.value->>'gracePeriodMonths')::integer,
+    (loan_entry.value->>'loanTermMonths')::integer,
+    (loan_entry.value->>'receivedDate')::date,
+    auth.uid()
+  from jsonb_array_elements(v_clean_loan_rows) as loan_entry(value);
+
   select to_jsonb(s.*)
     into v_row
   from public.financial_model_settings s
@@ -2681,6 +2888,7 @@ declare
   v_initial_cash numeric := 0;
   v_loan_amount numeric := 0;
   v_loan_rows jsonb := '[]'::jsonb;
+  v_table_loan_rows jsonb := '[]'::jsonb;
   v_annual_interest_rate numeric := 0;
   v_loan_term_months integer := 24;
   v_vat_rate numeric := 20;
@@ -2774,11 +2982,32 @@ begin
   from public.financial_model_settings
   where company_id = v_company_id;
 
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', id,
+    'amount', amount,
+    'annualInterestRate', annual_interest_rate,
+    'currency', currency,
+    'gracePeriodMonths', grace_period_months,
+    'loanTermMonths', loan_term_months,
+    'name', name,
+    'receivedDate', received_date
+  ) order by received_date, created_at), '[]'::jsonb)
+    into v_table_loan_rows
+  from public.financial_loans
+  where company_id = v_company_id;
+
   v_electricity_price := coalesce(v_electricity_price, 0);
   v_working_days_per_month := coalesce(v_working_days_per_month, 22);
   v_initial_cash := coalesce(v_initial_cash, 0);
   v_loan_amount := coalesce(v_loan_amount, 0);
-  v_loan_rows := coalesce(v_loan_rows, '[]'::jsonb);
+  v_loan_rows := case when v_table_loan_rows <> '[]'::jsonb then v_table_loan_rows else coalesce(v_loan_rows, '[]'::jsonb) end;
+  if v_table_loan_rows <> '[]'::jsonb then
+    select
+      coalesce(sum((loan_entry.value->>'amount')::numeric), 0),
+      coalesce(max((loan_entry.value->>'loanTermMonths')::integer), 24)
+      into v_loan_amount, v_loan_term_months
+    from jsonb_array_elements(v_loan_rows) as loan_entry(value);
+  end if;
   v_annual_interest_rate := coalesce(v_annual_interest_rate, 0);
   v_loan_term_months := coalesce(v_loan_term_months, 24);
   if v_loan_rows = '[]'::jsonb and v_loan_amount > 0 then
@@ -2786,8 +3015,11 @@ begin
       'id', 'legacy-loan',
       'amount', v_loan_amount,
       'annualInterestRate', v_annual_interest_rate,
+      'currency', 'TRY',
       'gracePeriodMonths', 0,
-      'loanTermMonths', v_loan_term_months
+      'loanTermMonths', v_loan_term_months,
+      'name', 'Legacy loan',
+      'receivedDate', current_date
     ));
   end if;
   v_vat_rate := coalesce(v_vat_rate, 20);

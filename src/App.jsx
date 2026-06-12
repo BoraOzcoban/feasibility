@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabaseClient";
 import {
+  createDemoFinancialLoanRows,
   defaultFinancialSettings,
   emptyFinancialExtraCostForm,
   emptyFinancialModel,
+  financialLoanCurrencyOptions,
   generalFinancialAssumptionFields,
   inflationRevaluationFinancialFields,
   loadFinancialModel,
@@ -73,6 +75,239 @@ function formatLira(value, maximumFractionDigits = 0) {
   }).format(value || 0);
 }
 
+function InfoTip({ label = "Info", text }) {
+  if (!text) return null;
+
+  return (
+    <span className="info-tip">
+      <button type="button" aria-label={label}>i</button>
+      <span className="info-tip-panel" role="tooltip">{text}</span>
+    </span>
+  );
+}
+
+function normalizeCurrencyCode(value) {
+  const currency = String(value || "TRY").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(currency) ? currency : "TRY";
+}
+
+function formatCurrencyAmount(value, currency = "TRY", maximumFractionDigits = 0) {
+  const locale = document.documentElement.lang === "tr" ? "tr-TR" : "en-US";
+  const currencyCode = normalizeCurrencyCode(currency);
+
+  try {
+    return new Intl.NumberFormat(locale, {
+      currency: currencyCode,
+      maximumFractionDigits,
+      style: "currency",
+    }).format(value || 0);
+  } catch {
+    return `${formatNumber(value, maximumFractionDigits)} ${currencyCode}`;
+  }
+}
+
+const operationCurrencyOptions = ["TRY", "USD", "EUR"];
+
+const defaultExchangeRates = {
+  error: "",
+  EUR: 0,
+  source: "TCMB",
+  sourceDetail: "",
+  status: "idle",
+  TRY: 1,
+  USD: 0,
+  updatedAt: null,
+};
+
+function getCurrencyRateToTry(exchangeRates, currency = "TRY") {
+  const currencyCode = normalizeCurrencyCode(currency);
+  if (currencyCode === "TRY") return 1;
+  if (!["USD", "EUR"].includes(currencyCode)) return 0;
+
+  const rate = Number(exchangeRates?.[currencyCode]);
+  return Number.isFinite(rate) && rate > 0 ? rate : 0;
+}
+
+function convertMoneyToTry(value, currency = "TRY", exchangeRates = defaultExchangeRates) {
+  return Math.max(0, toFiniteNumber(value)) * getCurrencyRateToTry(exchangeRates, currency);
+}
+
+function hasUsableExchangeRates(exchangeRates) {
+  return ["USD", "EUR"].every((currency) => getCurrencyRateToTry(exchangeRates, currency) > 0);
+}
+
+function formatOperationMoney(value, currency = "TRY", exchangeRates = defaultExchangeRates, maximumFractionDigits = 2) {
+  const currencyCode = normalizeCurrencyCode(currency);
+  const originalValue = Math.max(0, toFiniteNumber(value));
+  const originalLabel = formatCurrencyAmount(originalValue, currencyCode, maximumFractionDigits);
+
+  if (currencyCode === "TRY") return originalLabel;
+
+  return `${originalLabel} / ${formatLira(convertMoneyToTry(originalValue, currencyCode, exchangeRates), maximumFractionDigits)}`;
+}
+
+function getTcmBRatesFromXml(xmlText) {
+  const documentXml = new DOMParser().parseFromString(xmlText, "application/xml");
+  const parserError = documentXml.querySelector("parsererror");
+  if (parserError) {
+    throw new Error("TCMB rate XML could not be parsed.");
+  }
+
+  const getRate = (currency) => {
+    const row = documentXml.querySelector(`Currency[CurrencyCode="${currency}"]`);
+    const value = Number(row?.querySelector("ForexSelling")?.textContent || row?.querySelector("ForexBuying")?.textContent);
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new Error(`TCMB ${currency}/TRY rate was not available.`);
+    }
+    return value;
+  };
+
+  return {
+    ...defaultExchangeRates,
+    EUR: getRate("EUR"),
+    source: "TCMB",
+    status: "ready",
+    TRY: 1,
+    USD: getRate("USD"),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+async function fetchTcmBExchangeRates(signal) {
+  const isLocalDev = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+  const url = isLocalDev
+    ? `/tcmb-rates/kurlar/today.xml?_=${Date.now()}`
+    : `https://www.tcmb.gov.tr/kurlar/today.xml?_=${Date.now()}`;
+  const response = await fetch(url, {
+    headers: { Accept: "application/xml,text/xml,*/*" },
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`TCMB ${response.status}`);
+  }
+
+  return getTcmBRatesFromXml(await response.text());
+}
+
+async function fetchExchangeRates(signal) {
+  return fetchTcmBExchangeRates(signal);
+}
+
+function isMissingExchangeRatesTableError(error) {
+  if (!error) return false;
+  const message = String(error.message || "").toLowerCase();
+  return error.code === "42P01" || (message.includes("financial_exchange_rates") && message.includes("does not exist"));
+}
+
+function mapExchangeRateRowsToState(rows = []) {
+  const latestByCurrency = new Map();
+
+  rows.forEach((row) => {
+    const currency = normalizeCurrencyCode(row.currency);
+    if (!["USD", "EUR"].includes(currency) || latestByCurrency.has(currency)) return;
+    latestByCurrency.set(currency, row);
+  });
+
+  const usd = Number(latestByCurrency.get("USD")?.rate_to_try);
+  const eur = Number(latestByCurrency.get("EUR")?.rate_to_try);
+  const latestRow = rows[0];
+
+  if (!Number.isFinite(usd) || usd <= 0 || !Number.isFinite(eur) || eur <= 0) {
+    return null;
+  }
+
+  return {
+    ...defaultExchangeRates,
+    EUR: eur,
+    source: latestRow?.source || "TCMB",
+    sourceDetail: "Supabase latest",
+    status: "ready",
+    TRY: 1,
+    USD: usd,
+    updatedAt: latestRow?.fetched_at || latestRow?.created_at || null,
+  };
+}
+
+async function loadLatestExchangeRatesFromSupabase(supabaseClient, companyId) {
+  const { data, error } = await supabaseClient
+    .from("financial_exchange_rates")
+    .select("currency, rate_to_try, source, fetched_at, created_at")
+    .eq("company_id", companyId)
+    .in("currency", ["USD", "EUR"])
+    .order("fetched_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    if (isMissingExchangeRatesTableError(error)) return null;
+    throw error;
+  }
+
+  return mapExchangeRateRowsToState(data || []);
+}
+
+async function saveExchangeRatesToSupabase(supabaseClient, companyId, rates) {
+  const fetchedAt = rates.updatedAt || new Date().toISOString();
+  const rows = ["USD", "EUR"].map((currency) => ({
+    company_id: companyId,
+    currency,
+    fetched_at: fetchedAt,
+    rate_to_try: rates[currency],
+    source: rates.source || "TCMB",
+  }));
+  const { error } = await supabaseClient
+    .from("financial_exchange_rates")
+    .insert(rows);
+
+  if (error) throw error;
+}
+
+function withTryOperationWorkspace(workspace = {}, exchangeRates = defaultExchangeRates) {
+  const convertPriceRow = (row, valueKey = "price", currencyKey = "price_currency") => {
+    if (!row) return row;
+
+    const currency = normalizeCurrencyCode(row[currencyKey]);
+    const originalValue = Math.max(0, toFiniteNumber(row[valueKey]));
+
+    return {
+      ...row,
+      [`${currencyKey}_original`]: currency,
+      [`${valueKey}_original`]: originalValue,
+      [valueKey]: convertMoneyToTry(originalValue, currency, exchangeRates),
+      [currencyKey]: "TRY",
+    };
+  };
+  const convertProduct = (product) => {
+    if (!product) return product;
+    const convertedProduct = convertPriceRow(product);
+
+    return {
+      ...convertedProduct,
+      material_rows: Array.isArray(product.material_rows)
+        ? product.material_rows.map((row) => ({
+            ...row,
+            material: convertPriceRow(row.material, "price_per_unit", "price_currency"),
+          }))
+        : product.material_rows,
+    };
+  };
+
+  return {
+    ...workspace,
+    activePlans: (workspace.activePlans || []).map((plan) => ({
+      ...plan,
+      product: convertProduct(plan.product),
+    })),
+    equipment: (workspace.equipment || []).map((row) => convertPriceRow(row)),
+    latestPlan: workspace.latestPlan ? { ...workspace.latestPlan, product: convertProduct(workspace.latestPlan.product) } : workspace.latestPlan,
+    machines: (workspace.machines || []).map((row) => convertPriceRow(row)),
+    materials: (workspace.materials || []).map((row) => convertPriceRow(row, "price_per_unit", "price_currency")),
+    product: convertProduct(workspace.product),
+    products: (workspace.products || []).map(convertProduct),
+    workforce: (workspace.workforce || []).map((row) => convertPriceRow(row, "hourly_cost", "hourly_cost_currency")),
+  };
+}
+
 function toFiniteNumber(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -136,6 +371,51 @@ function getProjectionMonthCount(horizon) {
   return 6;
 }
 
+function getTodayDateInputValue() {
+  return formatDateInputValue(new Date());
+}
+
+function parseDateInput(value) {
+  if (!value) return null;
+
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDateInputValue(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function getDateInputValue(value, fallback = getTodayDateInputValue()) {
+  const date = parseDateInput(value) || parseDateInput(fallback) || new Date();
+  return formatDateInputValue(date);
+}
+
+function getMonthStart(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addMonths(date, months) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+function getMonthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthDifference(startDate, endDate) {
+  return ((endDate.getFullYear() - startDate.getFullYear()) * 12) + (endDate.getMonth() - startDate.getMonth());
+}
+
+function formatMonthLabel(date) {
+  const locale = document.documentElement.lang === "tr" ? "tr-TR" : "en-US";
+  return new Intl.DateTimeFormat(locale, { month: "short", year: "numeric" }).format(date);
+}
+
 function getMonthlyLoanPayment(amount, annualInterestRate, termMonths) {
   const principal = Math.max(0, toFiniteNumber(amount));
   const term = Math.max(1, Math.round(toFiniteNumber(termMonths, 1)));
@@ -188,11 +468,17 @@ function getFinancialLoanRows(settings = {}) {
     .map((row, index) => {
       const amount = Math.max(0, toFiniteNumber(row.amount));
       const annualInterestRate = Math.max(0, toFiniteNumber(row.annualInterestRate));
+      const currency = normalizeCurrencyCode(row.currency);
       const loanTermMonths = Math.max(1, Math.round(toFiniteNumber(row.loanTermMonths, 24)));
       const gracePeriodMonths = Math.min(
         loanTermMonths - 1,
         Math.max(0, Math.round(toFiniteNumber(row.gracePeriodMonths))),
       );
+      const name = String(row.name || `${document.documentElement.lang === "tr" ? "Kredi" : "Loan"} ${index + 1}`).trim();
+      const receivedDate = getDateInputValue(row.receivedDate || row.received_date);
+      const receivedMonth = getMonthStart(parseDateInput(receivedDate) || new Date());
+      const paymentStartMonth = addMonths(receivedMonth, gracePeriodMonths);
+      const paymentEndMonth = addMonths(receivedMonth, loanTermMonths - 1);
       const monthlyRate = annualInterestRate / 100 / 12;
       const principalAfterGrace = monthlyRate ? amount * ((1 + monthlyRate) ** gracePeriodMonths) : amount;
       const repaymentTermMonths = Math.max(1, loanTermMonths - gracePeriodMonths);
@@ -200,15 +486,74 @@ function getFinancialLoanRows(settings = {}) {
       return {
         amount,
         annualInterestRate,
+        currency,
         gracePeriodMonths,
         id: row.id || `loan-${index + 1}`,
         loanTermMonths,
         monthlyPayment: getMonthlyLoanPayment(principalAfterGrace, annualInterestRate, repaymentTermMonths),
+        name,
+        paymentEndDate: formatDateInputValue(paymentEndMonth),
+        paymentStartDate: formatDateInputValue(paymentStartMonth),
         principalAfterGrace,
+        receivedDate,
         repaymentTermMonths,
       };
     })
     .filter((row) => row.amount > 0);
+}
+
+const loanCalendarTones = ["yellow", "red", "teal", "blue", "green", "clay"];
+
+function buildFinancialLoanPaymentCalendar(loans = []) {
+  const currentMonth = getMonthStart(new Date());
+  const latestLoanEndMonth = loans.reduce((latestMonth, loan) => {
+    const paymentEndMonth = getMonthStart(parseDateInput(loan.paymentEndDate) || currentMonth);
+    return paymentEndMonth > latestMonth ? paymentEndMonth : latestMonth;
+  }, currentMonth);
+  const monthCount = Math.max(12, getMonthDifference(currentMonth, latestLoanEndMonth) + 1);
+  const months = Array.from({ length: monthCount }, (_, index) => {
+    const date = addMonths(currentMonth, index);
+
+    return {
+      date,
+      key: getMonthKey(date),
+      label: formatMonthLabel(date),
+      totals: new Map(),
+    };
+  });
+  const rows = loans.map((loan, loanIndex) => {
+    const paymentStartMonth = getMonthStart(parseDateInput(loan.paymentStartDate) || currentMonth);
+    const paymentEndMonth = getMonthStart(parseDateInput(loan.paymentEndDate) || currentMonth);
+    const tone = loanCalendarTones[loanIndex % loanCalendarTones.length];
+    const payments = months.map((month) => {
+      const isActive = month.date >= paymentStartMonth && month.date <= paymentEndMonth;
+
+      if (isActive) {
+        const currentTotal = month.totals.get(loan.currency) || 0;
+        month.totals.set(loan.currency, currentTotal + loan.monthlyPayment);
+      }
+
+      return {
+        amount: isActive ? loan.monthlyPayment : 0,
+        isActive,
+        monthKey: month.key,
+      };
+    });
+
+    return {
+      loan,
+      payments,
+      tone,
+    };
+  });
+
+  return {
+    months: months.map((month) => ({
+      ...month,
+      totals: Array.from(month.totals.entries()).map(([currency, amount]) => ({ amount, currency })),
+    })),
+    rows,
+  };
 }
 
 function getSalesExpectationMultipliers(salesStrategy) {
@@ -217,7 +562,41 @@ function getSalesExpectationMultipliers(salesStrategy) {
     ? company.monthlyMultipliers
     : (Array.isArray(company.monthlyForecast) ? company.monthlyForecast : []);
 
+  if (getSalesMultiplierPeriod(salesStrategy) === "quarterly") {
+    const quarterlyMultipliers = getQuarterlySalesExpectationMultipliers(source);
+
+    return Array.from({ length: 12 }, (_, index) => quarterlyMultipliers[Math.floor(index / 3)] ?? 1);
+  }
+
   return Array.from({ length: 12 }, (_, index) => Math.max(0, toFiniteNumber(source[index], 1)));
+}
+
+function getSalesMultiplierPeriod(salesStrategy) {
+  return salesStrategy.company?.multiplierPeriod === "quarterly" ? "quarterly" : "monthly";
+}
+
+function getQuarterlySalesExpectationMultipliers(source) {
+  const rows = Array.isArray(source) ? source : [];
+
+  if (rows.length === 4) {
+    return Array.from({ length: 4 }, (_, index) => Math.max(0, toFiniteNumber(rows[index], 1)));
+  }
+
+  return Array.from({ length: 4 }, (_, quarterIndex) => {
+    const quarterValues = Array.from({ length: 3 }, (_, offset) => Math.max(0, toFiniteNumber(rows[(quarterIndex * 3) + offset], 1)));
+    return quarterValues.reduce((total, value) => total + value, 0) / quarterValues.length;
+  });
+}
+
+function getSalesExpectationInputMultipliers(salesStrategy) {
+  const company = salesStrategy.company || {};
+  const source = Array.isArray(company.monthlyMultipliers)
+    ? company.monthlyMultipliers
+    : (Array.isArray(company.monthlyForecast) ? company.monthlyForecast : []);
+
+  return getSalesMultiplierPeriod(salesStrategy) === "quarterly"
+    ? getQuarterlySalesExpectationMultipliers(source)
+    : getSalesExpectationMultipliers(salesStrategy);
 }
 
 function getSalesExpectationMultiplier(salesStrategy, monthIndex) {
@@ -426,8 +805,26 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
   const extraRecurringCost = extraCosts.reduce((total, cost) => total + (cost.costType === "recurring" ? Math.max(0, toFiniteNumber(cost.amount)) : 0), 0);
   const monthlyMaterialCost = dailyMaterialCost * workingDaysPerMonth;
   const monthlyWorkforceCost = dailyWorkforceCost * workingDaysPerMonth;
-  const loanRows = getFinancialLoanRows(settings);
+  const projectionStartMonth = getMonthStart(new Date());
+  const loanRows = getFinancialLoanRows(settings).map((loan) => ({
+    ...loan,
+    amount: convertMoneyToTry(loan.amount, loan.currency, settings.exchangeRates),
+    currency: "TRY",
+    monthlyPayment: convertMoneyToTry(loan.monthlyPayment, loan.currency, settings.exchangeRates),
+    originalAmount: loan.amount,
+    originalCurrency: loan.currency,
+    originalMonthlyPayment: loan.monthlyPayment,
+  })).map((loan) => {
+    const receivedMonth = getMonthStart(parseDateInput(loan.receivedDate) || projectionStartMonth);
+    const receivedMonthIndex = Math.max(0, getMonthDifference(projectionStartMonth, receivedMonth));
+
+    return {
+      ...loan,
+      receivedMonthIndex,
+    };
+  });
   const loanAmount = loanRows.reduce((total, row) => total + row.amount, 0);
+  const initialLoanFunding = loanRows.reduce((total, row) => (row.receivedMonthIndex === 0 ? total + row.amount : total), 0);
   const monthlyLoanPayment = loanRows.reduce((total, row) => total + row.monthlyPayment, 0);
   const monthlyCurrencyIncreaseRate = Math.max(0, toFiniteNumber(settings.monthlyCurrencyIncreasePercent)) / 100;
   const monthlyEnergyPriceIncreaseRate = Math.max(0, toFiniteNumber(settings.monthlyEnergyPriceIncreasePercent)) / 100;
@@ -453,13 +850,19 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
     (monthlyWorkforceCost * Math.max(0, toFiniteNumber(settings.salaryBufferMonths, 1))) +
     (extraRecurringCost * Math.max(0, toFiniteNumber(settings.rentBufferMonths, 1)));
   const workingCapitalRequirement = adjustedWorkingCapitalRequirement;
-  const requiredOwnCash = Math.max(0, initialInvestment + adjustedWorkingCapitalRequirement - loanAmount - investmentGrantAmount);
+  const requiredOwnCash = Math.max(0, initialInvestment + adjustedWorkingCapitalRequirement - initialLoanFunding - investmentGrantAmount);
   const cashReceipts = Array.from({ length: monthCount + 24 }, () => 0);
+  const loanReceipts = Array.from({ length: monthCount + 24 }, () => 0);
+  loanRows.forEach((loan) => {
+    if (loan.receivedMonthIndex > 0 && loan.receivedMonthIndex < loanReceipts.length) {
+      loanReceipts[loan.receivedMonthIndex] += loan.amount;
+    }
+  });
   const taxPayments = Array.from({ length: monthCount + taxPaymentDelayMonths + 24 }, () => 0);
   const rows = [];
   const loanBalances = loanRows.map((row) => row.amount);
-  let cashBalance = initialCash + loanAmount + investmentGrantAmount - initialInvestment - adjustedWorkingCapitalRequirement;
-  let cumulativePayback = -initialInvestment - adjustedWorkingCapitalRequirement + loanAmount + investmentGrantAmount;
+  let cashBalance = initialCash + initialLoanFunding + investmentGrantAmount - initialInvestment - adjustedWorkingCapitalRequirement;
+  let cumulativePayback = -initialInvestment - adjustedWorkingCapitalRequirement + initialLoanFunding + investmentGrantAmount;
   let cashRunwayMonths = cashBalance < 0 ? 0 : monthCount;
   let breakEvenMonth = null;
   let paybackMonth = null;
@@ -516,11 +919,16 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
     const workforceCost = producedUnits * monthlyUnitWorkforceCost;
     const electricityCost = producedUnits * monthlyUnitElectricityCost;
     const loanMonth = loanRows.reduce((total, loan, loanIndex) => {
+      const monthsSinceReceived = index - loan.receivedMonthIndex;
+      if (monthsSinceReceived < 0 || monthsSinceReceived >= loan.loanTermMonths) {
+        return total;
+      }
+
       const balance = loanBalances[loanIndex] || 0;
       const monthlyRate = loan.annualInterestRate / 100 / 12;
-      const interest = index < loan.loanTermMonths ? balance * monthlyRate : 0;
-      const isGraceMonth = index < loan.gracePeriodMonths;
-      const payment = index < loan.loanTermMonths && !isGraceMonth ? Math.min(loan.monthlyPayment, balance + interest) : 0;
+      const interest = balance * monthlyRate;
+      const isGraceMonth = monthsSinceReceived < loan.gracePeriodMonths;
+      const payment = !isGraceMonth ? Math.min(loan.monthlyPayment, balance + interest) : 0;
       const principal = Math.max(0, payment - interest);
 
       loanBalances[loanIndex] = isGraceMonth
@@ -543,7 +951,7 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
       }
     });
 
-    const cashIn = cashReceipts[index] || 0;
+    const cashIn = (cashReceipts[index] || 0) + (loanReceipts[index] || 0);
     const outputVat = channelMonth.revenue * salesVatRate;
     const inputVat = Math.max(0, (materialCost + electricityCost + monthlyExtraRecurringCost) * expenseVatRate);
     const vatPayable = Math.max(0, outputVat - inputVat);
@@ -985,6 +1393,7 @@ function App() {
   const [financialStatus, setFinancialStatus] = useState("");
   const [financialLoading, setFinancialLoading] = useState(false);
   const [financialOverviewWidgets, setFinancialOverviewWidgets] = useState([]);
+  const [exchangeRates, setExchangeRates] = useState(defaultExchangeRates);
   const [financeWindow, setFinanceWindow] = useState("today");
   const [financeDateRange, setFinanceDateRange] = useState({ start: "", end: "" });
   const [reportsFilterOpen, setReportsFilterOpen] = useState(false);
@@ -1100,6 +1509,7 @@ function App() {
       setFinancialExtraCostForm(emptyFinancialExtraCostForm);
       setFinancialStatus("");
       setFinancialOverviewWidgets([]);
+      setExchangeRates(defaultExchangeRates);
       setSalesStrategy(emptySalesStrategy);
       setSalesStatus("");
       setSimulationVariants([emptySimulationVariant]);
@@ -1111,6 +1521,59 @@ function App() {
     loadFinancialData();
     loadPlanningData();
   }, [session]);
+
+  useEffect(() => {
+    if (!supabase || !currentProfile?.company_id) return;
+
+    let isCurrent = true;
+    const controller = new AbortController();
+
+    async function loadExchangeRates() {
+      try {
+        const latestRates = await loadLatestExchangeRatesFromSupabase(supabase, currentProfile.company_id);
+
+        if (!isCurrent) return;
+
+        if (hasUsableExchangeRates(latestRates)) {
+          setExchangeRates(latestRates);
+          return;
+        }
+
+        setExchangeRates((current) => ({ ...current, error: "", status: "loading" }));
+
+        const nextRates = await fetchExchangeRates(controller.signal);
+
+        if (!isCurrent) return;
+
+        let sourceDetail = "Auto fetched";
+        try {
+          await saveExchangeRatesToSupabase(supabase, currentProfile.company_id, nextRates);
+          sourceDetail = "Saved to Supabase";
+        } catch (saveError) {
+          sourceDetail = isMissingExchangeRatesTableError(saveError) ? "Auto fetched" : `Auto fetched, save failed: ${saveError.message}`;
+        }
+
+        setExchangeRates({
+          ...nextRates,
+          sourceDetail,
+        });
+      } catch (error) {
+        if (!isCurrent || error.name === "AbortError") return;
+        setExchangeRates((current) => ({
+          ...current,
+          error: error.message,
+          status: current.status === "idle" ? "error" : current.status,
+        }));
+      }
+    }
+
+    loadExchangeRates();
+
+    return () => {
+      isCurrent = false;
+      controller.abort();
+    };
+  }, [currentProfile?.company_id]);
 
   function goTo(pathname, nextMode) {
     window.history.pushState({}, "", pathname);
@@ -1133,22 +1596,30 @@ function App() {
   function updateSalesCompany(field, value) {
     setSalesStrategy((current) => ({
       ...current,
-      company: { ...current.company, [field]: value },
+      company: { ...(current.company || {}), [field]: value },
     }));
   }
 
   function updateSalesForecast(index, value) {
     setSalesStrategy((current) => {
-      const monthlyMultipliers = Array.isArray(current.company.monthlyMultipliers)
+      const multiplierPeriod = getSalesMultiplierPeriod(current);
+      const monthlyMultipliers = Array.isArray(current.company?.monthlyMultipliers)
         ? [...current.company.monthlyMultipliers]
         : Array.from({ length: 12 }, () => 1);
 
-      monthlyMultipliers[index] = value;
+      if (multiplierPeriod === "quarterly") {
+        const startIndex = index * 3;
+        for (let offset = 0; offset < 3; offset += 1) {
+          monthlyMultipliers[startIndex + offset] = value;
+        }
+      } else {
+        monthlyMultipliers[index] = value;
+      }
 
       return {
         ...current,
         company: {
-          ...current.company,
+          ...(current.company || {}),
           monthlyMultipliers,
         },
       };
@@ -1227,14 +1698,6 @@ function App() {
         trafficScore: "",
         typeId: salesStrategy.channelTypes?.[0]?.id || "direct",
       },
-      personnel: {
-        assignedChannel: "",
-        id: nextId,
-        monthlyTarget: 0,
-        name: copy("New sales person", "Yeni satış personeli"),
-        realizedSalesUnits: 0,
-        role: copy("Sales role", "Satış rolü"),
-      },
     };
 
     if (!templates[collection]) return;
@@ -1296,9 +1759,12 @@ function App() {
         {
           amount: "",
           annualInterestRate: "",
+          currency: "TRY",
           gracePeriodMonths: 0,
           id: `loan-${Date.now()}`,
           loanTermMonths: "",
+          name: "",
+          receivedDate: getTodayDateInputValue(),
         },
       ],
     }));
@@ -1340,7 +1806,7 @@ function App() {
   }
 
   function addSimulationVariant() {
-    const linkedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForm, operationsWorkspace, financialHorizon);
+    const linkedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, financialHorizon);
     const linkedSummary = linkedFinancialModel.summary || emptyFinancialModel.summary;
     const horizonMonths = Math.max(1, getProjectionMonthCount(financialHorizon));
     const monthlySalesUnits = Math.round(
@@ -1353,7 +1819,7 @@ function App() {
     );
     const unitSalesPrice = toFiniteNumber(
       linkedSummary.averageNetPrice,
-      toFiniteNumber(operationsWorkspace.product?.price, toFiniteNumber(operationsWorkspace.products[0]?.price)),
+      toFiniteNumber(operationsWorkspaceForFinance.product?.price, toFiniteNumber(operationsWorkspaceForFinance.products[0]?.price)),
     );
     const nextIndex = simulationVariants.length + 1;
     const nextId = `variant-${Date.now()}`;
@@ -1448,6 +1914,33 @@ function App() {
   function updateFinanceDateRange(field, value) {
     setFinanceDateRange((current) => ({ ...current, [field]: value }));
     setFinanceWindow("custom");
+  }
+
+  async function handleFetchExchangeRates() {
+    setExchangeRates((current) => ({ ...current, error: "", status: "loading" }));
+
+    try {
+      const nextRates = await fetchExchangeRates();
+      let sourceDetail = "";
+      if (supabase && currentProfile?.company_id) {
+        try {
+          await saveExchangeRatesToSupabase(supabase, currentProfile.company_id, nextRates);
+          sourceDetail = "Saved to Supabase";
+        } catch (saveError) {
+          sourceDetail = isMissingExchangeRatesTableError(saveError) ? "" : `Save failed: ${saveError.message}`;
+        }
+      }
+      setExchangeRates({
+        ...nextRates,
+        sourceDetail,
+      });
+    } catch (error) {
+      setExchangeRates((current) => ({
+        ...current,
+        error: error.message,
+        status: "error",
+      }));
+    }
   }
 
   function updateOperationPlan(field, value) {
@@ -1698,12 +2191,15 @@ function App() {
         ...defaultFinancialSettings,
         ...(nextModel.settings || {}),
       };
+      const loadedLoanRows = Array.isArray(nextSettings.loanRows) && nextSettings.loanRows.length
+        ? nextSettings.loanRows
+        : getFinancialLoanRows(nextSettings);
+      const loanRowsForForm = loadedLoanRows.length ? loadedLoanRows : createDemoFinancialLoanRows();
+
       setFinancialModel(nextModel);
       setFinancialSettingsForm({
         ...nextSettings,
-        loanRows: Array.isArray(nextSettings.loanRows) && nextSettings.loanRows.length
-          ? nextSettings.loanRows
-          : getFinancialLoanRows(nextSettings),
+        loanRows: loanRowsForForm,
       });
     } catch (error) {
       setFinancialStatus(`${copy("Financial model could not be loaded:", "Finansal model yüklenemedi:")} ${error.message}`);
@@ -2289,7 +2785,9 @@ function App() {
   }
 
   function renderOperationPlanner() {
-    const result = operationPlanResult;
+    const result = operationPlanResult
+      ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, operationsWorkspaceForFinance)
+      : null;
     const latestProcess = operationsWorkspace.activePlans?.[0] || operationsWorkspace.latestPlan;
     const latestProcessName = latestProcess?.plan_name || latestProcess?.input?.planName || result?.planName || "";
     const machineRows = operationPlan.machineRows || [];
@@ -2356,7 +2854,7 @@ function App() {
                     <option value={product.id} key={product.id}>{product.name}</option>
                   ))}
                 </select>
-                <small>{selectedProduct ? `${formatLira(selectedProduct.price, 2)} / ${selectedProduct.unit || copy("pcs", "adet")}` : copy("Select a record from the Products screen", "Ürünler ekranından kayıt seçin")}</small>
+                <small>{selectedProduct ? `${formatOperationMoney(selectedProduct.price, selectedProduct.price_currency, exchangeRates, 2)} / ${selectedProduct.unit || copy("pcs", "adet")}` : copy("Select a record from the Products screen", "Ürünler ekranından kayıt seçin")}</small>
               </div>
             </label>
           </div>
@@ -2400,7 +2898,7 @@ function App() {
                     </label>
                     <div className="resource-row-meta">
                       <strong>{selectedMachine ? `${formatNumber(selectedMachine.hourly_energy_consumption_kwh, 2)} ${copy("kWh/hour", "kWh/saat")}` : "-"}</strong>
-                      <small>{selectedMachine ? `${copy("Machine price", "Makine fiyatı")} ${formatLira(selectedMachine.price)}` : copy("No record selected", "Kayıt seçilmedi")}</small>
+                      <small>{selectedMachine ? `${copy("Machine price", "Makine fiyatı")} ${formatOperationMoney(selectedMachine.price, selectedMachine.price_currency, exchangeRates)}` : copy("No record selected", "Kayıt seçilmedi")}</small>
                     </div>
                     <button type="button" className="resource-remove-button" onClick={() => removeOperationPlanRow("machineRows", index)}>
                       {copy("Delete", "Sil")}
@@ -2461,7 +2959,7 @@ function App() {
                       />
                     </label>
                     <div className="resource-row-meta">
-                      <strong>{selectedWorkforce ? `${formatLira(selectedWorkforce.hourly_cost)} / ${copy("hour", "saat")}` : "-"}</strong>
+                      <strong>{selectedWorkforce ? `${formatOperationMoney(selectedWorkforce.hourly_cost, selectedWorkforce.hourly_cost_currency, exchangeRates)} / ${copy("hour", "saat")}` : "-"}</strong>
                       <small>{selectedWorkforce ? copy("Hourly cost is read from the Supabase record", "Saatlik maliyet Supabase kaydından okunur") : copy("No record selected", "Kayıt seçilmedi")}</small>
                     </div>
                     <button type="button" className="resource-remove-button" onClick={() => removeOperationPlanRow("workforceRows", index)}>
@@ -2490,7 +2988,7 @@ function App() {
                       <small>{formatNumber(row.quantity_per_unit, 4)} {row.material?.unit || ""} / {selectedProduct.unit || copy("pcs", "adet")}</small>
                     </div>
                     <div className="resource-row-meta">
-                      <strong>{formatLira(row.material?.price_per_unit, 2)}</strong>
+                      <strong>{formatOperationMoney(row.material?.price_per_unit, row.material?.price_currency, exchangeRates, 2)}</strong>
                       <small>{copy("Unit price", "Birim fiyat")}</small>
                     </div>
                   </div>
@@ -2524,7 +3022,7 @@ function App() {
             <>
               <div className="planner-summary-grid">
                 <span>{copy("Product", "Ürün")} <strong>{result.productName || "-"}</strong></span>
-                <span>{copy("Unit Price", "Birim Fiyat")} <strong>{formatLira(result.productPrice, 2)} / {result.productUnit || copy("pcs", "adet")}</strong></span>
+                <span>{copy("Unit Price", "Birim Fiyat")} <strong>{formatOperationMoney(result.productPrice, result.productPriceCurrency, exchangeRates, 2)} / {result.productUnit || copy("pcs", "adet")}</strong></span>
                 <span>{copy("Quantity to Produce", "Üretilecek Miktar")} <strong>{formatNumber(result.producedQuantity, 2)} {result.productUnit || copy("pcs", "adet")}</strong></span>
                 <span>{copy("Cycle Time", "Çevrim Süresi")} <strong>{formatCycleTime(result.cycleTimeMinutes, selectedProduct?.cycle_time_unit || "minute")}</strong></span>
                 <span>{copy("Electricity Consumption", "Elektrik Tüketimi")} <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
@@ -2579,12 +3077,18 @@ function App() {
         <div className="operation-data-fields">
           {fields.map((field) => (
             <label key={field.name}>
-              <span>{field.label}</span>
+              <span className="label-with-info">
+                {field.label}
+                {field.info && <InfoTip label={`${field.label} ${copy("info", "bilgi")}`} text={field.info} />}
+              </span>
               {field.type === "select" ? (
                 <select value={operationForms[entity][field.name]} onChange={(event) => updateOperationForm(entity, field.name, event.target.value)}>
-                  {field.options.map((option) => (
-                    <option value={option} key={option}>{option}</option>
-                  ))}
+                  {field.options.map((option) => {
+                    const value = Array.isArray(option) ? option[0] : option.value ?? option;
+                    const label = Array.isArray(option) ? option[1] : option.label ?? option;
+
+                    return <option value={value} key={value}>{label}</option>;
+                  })}
                 </select>
               ) : field.type === "textarea" ? (
                 <textarea value={operationForms[entity][field.name]} onChange={(event) => updateOperationForm(entity, field.name, event.target.value)} />
@@ -2644,8 +3148,29 @@ function App() {
                   </select>
                 </label>
                 <label>
-                  <span>{copy("Unit price", "Birim fiyat")}</span>
+                  <span className="label-with-info">
+                    {copy("Unit price", "Birim fiyat")}
+                    <InfoTip
+                      label={copy("Material unit price info", "Malzeme birim fiyat bilgisi")}
+                      text={copy(
+                        "Material cost is unit price x required quantity. If the price is USD/EUR, financial analysis first converts it to TRY with the current rate.",
+                        "Malzeme maliyeti birim fiyat x gereken miktar olarak hesaplanır. Fiyat USD/EUR ise finansal analiz önce güncel kurla TL'ye çevirir.",
+                      )}
+                    />
+                  </span>
                   <input min="0" step="0.01" type="number" value={operationForms.material.pricePerUnit} onChange={(event) => updateOperationForm("material", "pricePerUnit", event.target.value)} />
+                </label>
+                <label>
+                  <span className="label-with-info">
+                    {copy("Currency", "Para birimi")}
+                    <InfoTip
+                      label={copy("Material currency info", "Malzeme para birimi bilgisi")}
+                      text={copy("TRY stays as entered. USD and EUR are multiplied by their TRY rates before cost and feasibility calculations.", "TL girildiği gibi kalır. USD ve EUR, maliyet ve fizibilite hesaplarından önce ilgili TL kuru ile çarpılır.")}
+                    />
+                  </span>
+                  <select value={operationForms.material.priceCurrency} onChange={(event) => updateOperationForm("material", "priceCurrency", event.target.value)}>
+                    {operationCurrencyOptions.map((currency) => <option value={currency} key={currency}>{currency}</option>)}
+                  </select>
                 </label>
               </div>
               <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
@@ -2662,7 +3187,7 @@ function App() {
                 {(operationsWorkspace.materials.length ? operationsWorkspace.materials : [{ id: "empty" }]).map((material) => (
                   <span key={material.id}>
                     <strong>{material.id === "empty" ? "-" : material.name}</strong>
-                    <small>{material.id === "empty" ? "-" : `${formatLira(material.price_per_unit, 2)} / ${material.unit}`}</small>
+                    <small>{material.id === "empty" ? "-" : `${formatOperationMoney(material.price_per_unit, material.price_currency, exchangeRates, 2)} / ${material.unit}`}</small>
                   </span>
                 ))}
               </div>
@@ -2681,8 +3206,26 @@ function App() {
                   <input type="text" value={operationForms.workforce.roleName} onChange={(event) => updateOperationForm("workforce", "roleName", event.target.value)} />
                 </label>
                 <label>
-                  <span>{copy("Hourly cost", "Saatlik maliyet")}</span>
+                  <span className="label-with-info">
+                    {copy("Hourly cost", "Saatlik maliyet")}
+                    <InfoTip
+                      label={copy("Hourly cost info", "Saatlik maliyet bilgisi")}
+                      text={copy("Workforce cost is hourly cost x assigned people x daily hours. It then rolls into daily and monthly production cost.", "İşçilik maliyeti saatlik maliyet x atanmış kişi x günlük saat olarak hesaplanır. Sonra günlük ve aylık üretim maliyetine girer.")}
+                    />
+                  </span>
                   <input min="0" step="1" type="number" value={operationForms.workforce.hourlyCost} onChange={(event) => updateOperationForm("workforce", "hourlyCost", event.target.value)} />
+                </label>
+                <label>
+                  <span className="label-with-info">
+                    {copy("Currency", "Para birimi")}
+                    <InfoTip
+                      label={copy("Workforce currency info", "İşçilik para birimi bilgisi")}
+                      text={copy("Select the currency used for hourly cost. USD/EUR are converted to TRY for financial outputs.", "Saatlik maliyetin para birimini seçin. USD/EUR finans çıktılarında TL'ye çevrilir.")}
+                    />
+                  </span>
+                  <select value={operationForms.workforce.hourlyCostCurrency} onChange={(event) => updateOperationForm("workforce", "hourlyCostCurrency", event.target.value)}>
+                    {operationCurrencyOptions.map((currency) => <option value={currency} key={currency}>{currency}</option>)}
+                  </select>
                 </label>
               </div>
               <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
@@ -2699,7 +3242,7 @@ function App() {
                 {(operationsWorkspace.workforce.length ? operationsWorkspace.workforce : [{ id: "empty" }]).map((workforce) => (
                   <span key={workforce.id}>
                     <strong>{workforce.id === "empty" ? "-" : workforce.role_name}</strong>
-                    <small>{workforce.id === "empty" ? "-" : `${formatLira(workforce.hourly_cost, 2)} / ${copy("hour", "saat")}`}</small>
+                    <small>{workforce.id === "empty" ? "-" : `${formatOperationMoney(workforce.hourly_cost, workforce.hourly_cost_currency, exchangeRates, 2)} / ${copy("hour", "saat")}`}</small>
                   </span>
                 ))}
               </div>
@@ -2783,7 +3326,13 @@ function App() {
                   </select>
                 </label>
                 <label>
-                  <span>{copy("Price", "Fiyat")}</span>
+                  <span className="label-with-info">
+                    {copy("Price", "Fiyat")}
+                    <InfoTip
+                      label={copy("Product price info", "Ürün fiyatı bilgisi")}
+                      text={copy("Sales revenue uses this product price x sold units, then applies channel discounts, commissions, and collection timing.", "Satış cirosu bu ürün fiyatı x satılan adet ile başlar; sonra kanal indirimi, komisyonu ve tahsilat zamanlaması uygulanır.")}
+                    />
+                  </span>
                   <input
                     min="0"
                     step="0.01"
@@ -2793,7 +3342,30 @@ function App() {
                   />
                 </label>
                 <label>
-                  <span>{copy("Cycle time", "Çevrim süresi")}</span>
+                  <span className="label-with-info">
+                    {copy("Currency", "Para birimi")}
+                    <InfoTip
+                      label={copy("Product currency info", "Ürün para birimi bilgisi")}
+                      text={copy("Choose the currency for the sales price. Financial analysis converts USD/EUR product prices to TRY before revenue calculations.", "Satış fiyatının para birimini seçin. Finansal analiz USD/EUR ürün fiyatlarını ciro hesaplarından önce TL'ye çevirir.")}
+                    />
+                  </span>
+                  <select
+                    value={operationForms.product.priceCurrency}
+                    onChange={(event) => updateOperationForm("product", "priceCurrency", event.target.value)}
+                  >
+                    {operationCurrencyOptions.map((currency) => (
+                      <option value={currency} key={currency}>{currency}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span className="label-with-info">
+                    {copy("Cycle time", "Çevrim süresi")}
+                    <InfoTip
+                      label={copy("Cycle time info", "Çevrim süresi bilgisi")}
+                      text={copy("Cycle time defines how long one unit takes. Capacity is roughly available machine minutes divided by cycle time.", "Çevrim süresi bir ürünün ne kadar sürdüğünü belirtir. Kapasite kabaca kullanılabilir makine dakikası / çevrim süresi olarak hesaplanır.")}
+                    />
+                  </span>
                   <div className="cycle-time-control">
                     <input
                       min="0.0001"
@@ -2850,7 +3422,7 @@ function App() {
                         </label>
                         <div className="resource-row-meta">
                           <strong>{selectedMaterial?.unit || "-"}</strong>
-                          <small>{selectedMaterial ? `${formatLira(selectedMaterial.price_per_unit, 2)} / ${selectedMaterial.unit}` : copy("No record selected", "Kayıt seçilmedi")}</small>
+                          <small>{selectedMaterial ? `${formatOperationMoney(selectedMaterial.price_per_unit, selectedMaterial.price_currency, exchangeRates, 2)} / ${selectedMaterial.unit}` : copy("No record selected", "Kayıt seçilmedi")}</small>
                         </div>
                         <button type="button" className="resource-remove-button" onClick={() => removeProductMaterialRow(index)}>
                           {copy("Delete", "Sil")}
@@ -2901,6 +3473,7 @@ function App() {
                           })),
                           name: product.name || "",
                           price: product.price || 0,
+                          priceCurrency: product.price_currency || "TRY",
                           unit: product.unit || "adet",
                         },
                       }));
@@ -2908,7 +3481,7 @@ function App() {
                   >
                     <span>{product.id === "empty" ? "-" : product.name}</span>
                     <span>{product.id === "empty" ? "-" : product.unit || "adet"}</span>
-                    <span>{product.id === "empty" ? "-" : formatLira(product.price, 2)}</span>
+                    <span>{product.id === "empty" ? "-" : formatOperationMoney(product.price, product.price_currency, exchangeRates, 2)}</span>
                     <span>{product.id === "empty" ? "-" : formatCycleTime(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute")}</span>
                     <span>{product.id === "empty" ? "-" : (product.material_rows || []).map((row) => `${row.material?.name || "-"}: ${formatNumber(row.quantity_per_unit, 4)} ${row.material?.unit || ""}`).join(", ") || "-"}</span>
                   </button>
@@ -2922,7 +3495,7 @@ function App() {
   }
 
   function renderActiveProcessesPage() {
-    const activePlans = getCurrentOperationPlans(operationsWorkspace);
+    const activePlans = getCurrentOperationPlans(operationsWorkspaceForFinance);
 
     return renderDashboardLayout(
       `operations/${activeOperationsSubmodule.key}`,
@@ -3014,7 +3587,7 @@ function App() {
   }
 
   function renderFinancialModellingPage() {
-    const model = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForm, operationsWorkspace, financialHorizon);
+    const model = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, financialHorizon);
     const summary = model.summary || emptyFinancialModel.summary;
     const chart = model.trendChart || emptyFinancialModel.trendChart;
     const currentFinancialPage = activeFinancialSubmodule || financialSubmodules[0];
@@ -3147,24 +3720,24 @@ function App() {
         ],
         type: "select",
       },
-      initialCash: { label: copy("Initial cash", "Başlangıç nakdi"), min: "0", step: "1000" },
+      initialCash: { info: copy("Cash available at the start of the model. Loans and grants are added separately, so do not include them here unless they are already in the bank.", "Model başlangıcındaki hazır nakit. Krediler ve hibeler ayrıca eklenir; bankada hazır değilse burada tekrar yazmayın."), label: copy("Initial cash", "Başlangıç nakdi"), min: "0", step: "1000" },
       initialCapacityUnits: { label: copy("Initial capacity (month 1)", "Başlangıç kapasitesi (Ay 1)"), min: "0", step: "1" },
-      investmentGrantAmount: { label: copy("Investment / grant to receive", "Alınacak yatırım / hibe"), min: "0", step: "1000" },
-      monthlyCurrencyIncreasePercent: { label: copy("Monthly FX increase %", "Aylık döviz artışı %"), min: "0", step: "0.01" },
-      monthlyEnergyPriceIncreasePercent: { label: copy("Monthly energy price increase %", "Aylık enerji fiyat artışı %"), min: "0", step: "0.01" },
-      monthlyInflationPercent: { label: copy("Monthly inflation %", "Aylık enflasyon %"), min: "0", step: "0.01" },
+      investmentGrantAmount: { info: copy("Non-loan funding that enters cash as support. It reduces required own cash but does not create monthly repayments.", "Kredi olmayan destek/hibe/yatırım girişi. Gerekli öz kaynağı azaltır ama aylık ödeme oluşturmaz."), label: copy("Investment / grant to receive", "Alınacak yatırım / hibe"), min: "0", step: "1000" },
+      monthlyCurrencyIncreasePercent: { info: copy("Applied as a monthly multiplier to currency-sensitive material costs. Example: 2% means next month is cost x 1.02 before other inflation assumptions.", "Dövize hassas malzeme maliyetlerine aylık çarpan olarak uygulanır. Örn. %2, sonraki ay diğer enflasyon varsayımlarından önce maliyet x 1,02 demektir."), label: copy("Monthly FX increase %", "Aylık döviz artışı %"), min: "0", step: "0.01" },
+      monthlyEnergyPriceIncreasePercent: { info: copy("Raises electricity cost month by month. If left at zero, the model falls back to the general monthly inflation assumption.", "Elektrik maliyetini aylık artırır. Sıfır kalırsa model genel aylık enflasyon varsayımını kullanır."), label: copy("Monthly energy price increase %", "Aylık enerji fiyat artışı %"), min: "0", step: "0.01" },
+      monthlyInflationPercent: { info: copy("General monthly cost pressure used for overheads and fallback cost increases. It compounds over the selected projection horizon.", "Genel aylık maliyet baskısıdır; genel giderlerde ve yedek maliyet artışlarında kullanılır. Seçilen projeksiyon dönemi boyunca bileşik işler."), label: copy("Monthly inflation %", "Aylık enflasyon %"), min: "0", step: "0.01" },
       monthlyWageIncreasePercent: { label: copy("Monthly wage increase %", "Aylık ücret artışı %"), min: "0", step: "0.01" },
       opexInflationAnnualPercent: { label: copy("OpEx inflation % / year", "OpEx enflasyonu (% yıllık)"), min: "0", step: "0.01" },
       priceIncreaseAnnualPercent: { label: copy("Price increase policy % / year", "Fiyat artış politikası (% yıllık)"), min: "0", step: "0.01" },
       rawMaterialBufferMonths: { label: copy("Material buffer months", "Malzeme tampon ay"), min: "0", step: "0.1" },
-      rawMaterialStockDays: { label: copy("Raw material stock holding days", "Hammadde stok tutma süresi (gün)"), min: "0", step: "1" },
-      receivablesCollectionDays: { label: copy("Receivables collection days", "Alacak tahsil süresi (gün)"), min: "0", step: "1" },
+      rawMaterialStockDays: { info: copy("Extra days of material held before sale. More stock days increase working capital need.", "Satıştan önce elde tutulan ek hammadde günü. Gün arttıkça işletme sermayesi ihtiyacı yükselir."), label: copy("Raw material stock holding days", "Hammadde stok tutma süresi (gün)"), min: "0", step: "1" },
+      receivablesCollectionDays: { info: copy("Average delay before sales cash is collected. 45 days means revenue usually enters cash roughly two model months later.", "Satış nakdinin ortalama tahsil gecikmesi. 45 gün, cironun nakde yaklaşık iki model ayı sonra girmesi demektir."), label: copy("Receivables collection days", "Alacak tahsil süresi (gün)"), min: "0", step: "1" },
       rentBufferMonths: { label: copy("Rent buffer months", "Kira tampon ay"), min: "0", step: "0.1" },
       salaryBufferMonths: { label: copy("Salary buffer months", "Maaş tampon ay"), min: "0", step: "0.1" },
       salesVatRate: { label: copy("Average sales VAT %", "Ortalama satış KDV oranı (%)"), min: "0", step: "0.01" },
       supplierPaymentDays: { label: copy("Supplier payment days", "Tedarikçi ödeme süresi (gün)"), min: "0", step: "1" },
       taxPaymentDelayMonths: { label: copy("Tax payment delay months", "Vergi ödeme gecikmesi (ay)"), min: "0", step: "1" },
-      workingDaysPerMonth: { label: copy("Working days / month", "Aylık çalışma günü"), min: "1", step: "1" },
+      workingDaysPerMonth: { info: copy("Daily production and daily costs are multiplied by this number to create monthly production capacity and monthly operating cost.", "Günlük üretim ve günlük maliyetler bu değerle çarpılarak aylık kapasite ve aylık operasyon maliyeti hesaplanır."), label: copy("Working days / month", "Aylık çalışma günü"), min: "1", step: "1" },
     };
     const renderFinancialField = (field, isRequired) => {
       const config = financialInputConfig[field];
@@ -3172,7 +3745,10 @@ function App() {
       return (
         <label className={isRequired ? "required-financial-field" : "optional-financial-field"} key={field}>
           <span>
-            {config.label}
+            <span className="label-with-info">
+              {config.label}
+              {config.info && <InfoTip label={`${config.label} ${copy("info", "bilgi")}`} text={config.info} />}
+            </span>
             <small>{isRequired ? copy("Required", "Zorunlu") : copy("Optional", "Opsiyonel")}</small>
           </span>
           {config.type === "select" ? (
@@ -3200,9 +3776,56 @@ function App() {
         </label>
       );
     };
+    const renderExchangeRatePanel = () => (
+      <section className="financial-input-section exchange-rate-section">
+        <div className="financial-input-section-heading">
+          <div>
+            <span className="heading-with-info">
+              {copy("TCMB FX rates", "TCMB döviz kurları")}
+              <InfoTip
+                label={copy("FX rate calculation info", "Döviz kuru hesaplama bilgisi")}
+                text={copy(
+                  "USD/EUR amounts are converted to TRY with amount x current USD/TRY or EUR/TRY. TRY amounts stay unchanged.",
+                  "USD/EUR tutarlar TL'ye tutar x güncel USD/TRY veya EUR/TRY olarak çevrilir. TL tutarlar aynen kalır.",
+                )}
+              />
+            </span>
+            <p>
+              {exchangeRates.status === "loading"
+                ? copy("USD/TRY and EUR/TRY are being refreshed from TCMB.", "USD/TRY ve EUR/TRY TCMB'den yenileniyor.")
+                : exchangeRates.error
+                  ? `${copy("Rates could not be refreshed:", "Kurlar yenilenemedi:")} ${exchangeRates.error}`
+                : exchangeRates.status === "ready"
+                    ? `${copy("Rates loaded from", "Kurlar şu kaynaktan alındı")}: ${exchangeRates.sourceDetail || exchangeRates.source}. ${copy("Operations prices entered in USD/EUR are converted to TRY in financial analysis.", "Operations tarafında USD/EUR girilen fiyatlar finansal analizde TL'ye çevrilir.")}`
+                    : copy("Latest Supabase rates appear here first. Click fetch prices to refresh USD/TRY and EUR/TRY from TCMB and save them.", "Önce Supabase'deki son kurlar burada görünür. USD/TRY ve EUR/TRY değerlerini TCMB'den yenileyip kaydetmek için fiyatları çek butonuna basın.")}
+            </p>
+          </div>
+          <div className="exchange-rate-actions">
+            <button type="button" onClick={handleFetchExchangeRates} disabled={exchangeRates.status === "loading"}>
+              {exchangeRates.status === "loading" ? copy("Fetching...", "Çekiliyor...") : copy("Fetch Prices", "Fiyatları Çek")}
+            </button>
+            <strong>{exchangeRates.status === "ready" ? exchangeRates.source : exchangeRates.status === "loading" ? copy("Loading", "Yükleniyor") : copy("Manual", "Manuel")}</strong>
+          </div>
+        </div>
+        <div className="exchange-rate-grid">
+          {[
+            ["USD", exchangeRates.USD],
+            ["EUR", exchangeRates.EUR],
+          ].map(([currency, rate]) => (
+            <article className="exchange-rate-card" key={currency}>
+              <span>{currency}/TRY</span>
+              <strong>{rate && rate !== 1 ? formatLira(rate, 4) : "-"}</strong>
+              <small>{exchangeRates.updatedAt ? new Date(exchangeRates.updatedAt).toLocaleString(locale) : copy("Waiting for saved or fetched rate", "Kayıtlı veya çekilmiş kur bekleniyor")}</small>
+            </article>
+          ))}
+        </div>
+      </section>
+    );
     const renderFinancialInputs = () => (
       <div className="financial-controls finance-input-panel">
         <form className="financial-assumption-form" onSubmit={handleSaveFinancialSettings}>
+          {renderExchangeRatePanel()}
+
           <section className="financial-input-section">
             <div className="financial-input-section-heading">
               <div>
@@ -3293,18 +3916,132 @@ function App() {
     );
     const financialLoanRows = Array.isArray(financialSettingsForm.loanRows) ? financialSettingsForm.loanRows : [];
     const calculatedLoanRows = getFinancialLoanRows(financialSettingsForm);
-    const totalLoanAmount = calculatedLoanRows.reduce((total, loan) => total + loan.amount, 0);
-    const totalMonthlyLoanPayment = calculatedLoanRows.reduce((total, loan) => total + loan.monthlyPayment, 0);
     const longestLoanTerm = calculatedLoanRows.reduce((longestTerm, loan) => Math.max(longestTerm, loan.loanTermMonths), 0);
     const longestGracePeriod = calculatedLoanRows.reduce((longestGrace, loan) => Math.max(longestGrace, loan.gracePeriodMonths), 0);
-    const estimatedLoanInterest = calculatedLoanRows.reduce((total, loan) => (
-      total + Math.max(0, (loan.monthlyPayment * loan.repaymentTermMonths) - loan.amount)
+    const getLoanCurrencyTotals = (selector) => {
+      const totals = calculatedLoanRows.reduce((groupedTotals, loan) => {
+        const currency = normalizeCurrencyCode(loan.currency);
+        groupedTotals.set(currency, (groupedTotals.get(currency) || 0) + Math.max(0, selector(loan)));
+        return groupedTotals;
+      }, new Map());
+
+      return Array.from(totals.entries())
+        .map(([currency, amount]) => ({ amount, currency }))
+        .sort((first, second) => {
+          const firstIndex = financialLoanCurrencyOptions.indexOf(first.currency);
+          const secondIndex = financialLoanCurrencyOptions.indexOf(second.currency);
+          return (firstIndex === -1 ? 999 : firstIndex) - (secondIndex === -1 ? 999 : secondIndex)
+            || first.currency.localeCompare(second.currency);
+        });
+    };
+    const formatLoanCurrencyTotals = (totals) => (
+      totals.length
+        ? totals.map((total) => formatCurrencyAmount(total.amount, total.currency)).join(" / ")
+        : "-"
+    );
+    const loanAmountTotals = getLoanCurrencyTotals((loan) => loan.amount);
+    const monthlyLoanPaymentTotals = getLoanCurrencyTotals((loan) => loan.monthlyPayment);
+    const estimatedLoanInterestTotals = getLoanCurrencyTotals((loan) => (
+      Math.max(0, (loan.monthlyPayment * loan.repaymentTermMonths) - loan.amount)
+    ));
+    const totalLoanAmountTry = calculatedLoanRows.reduce((total, loan) => (
+      total + convertMoneyToTry(loan.amount, loan.currency, exchangeRates)
     ), 0);
+    const totalMonthlyLoanPaymentTry = calculatedLoanRows.reduce((total, loan) => (
+      total + convertMoneyToTry(loan.monthlyPayment, loan.currency, exchangeRates)
+    ), 0);
+    const estimatedLoanInterestTry = calculatedLoanRows.reduce((total, loan) => (
+      total + convertMoneyToTry(Math.max(0, (loan.monthlyPayment * loan.repaymentTermMonths) - loan.amount), loan.currency, exchangeRates)
+    ), 0);
+    const hasForeignCurrencyLoan = calculatedLoanRows.some((loan) => normalizeCurrencyCode(loan.currency) !== "TRY");
+    const canConvertLoanCurrencies = !hasForeignCurrencyLoan || hasUsableExchangeRates(exchangeRates);
+    const loanTryDetail = canConvertLoanCurrencies
+      ? copy("TRY + USD x USD/TRY + EUR x EUR/TRY", "TL + USD x USD/TRY + EUR x EUR/TRY")
+      : exchangeRates.status === "loading"
+        ? copy("FX rates are loading", "kurlar yükleniyor")
+        : copy("USD/EUR rate needed", "USD/EUR kuru gerekli");
+    const formatLoanTryTotal = (value) => canConvertLoanCurrencies
+      ? formatLira(value)
+      : copy("FX rate needed", "Kur gerekli");
+    const loanPaymentCalendar = buildFinancialLoanPaymentCalendar(calculatedLoanRows);
+    const renderFinancialLoanPaymentCalendar = () => (
+      <section className="financial-input-section optional financial-loan-calendar-section">
+        <div className="financial-input-section-heading">
+          <div>
+            <span>{copy("Payment calendar", "Ödeme takvimi")}</span>
+            <p>{copy("Months start from the current month. Colored cells show which loan has a payment in that month and the required amount.", "Aylar içinde bulunduğunuz aydan başlar. Renkli hücreler o ay hangi kredinin ödemesi olduğunu ve gereken tutarı gösterir.")}</p>
+          </div>
+          <strong>{loanPaymentCalendar.months.length} {copy("mo", "ay")}</strong>
+        </div>
+        <div className="financial-loan-calendar-scroll">
+          <div
+            className="financial-loan-calendar-grid"
+            style={{ gridTemplateColumns: `minmax(190px, 0.9fr) repeat(${loanPaymentCalendar.months.length}, minmax(136px, 1fr))` }}
+          >
+            <div className="loan-calendar-cell loan-calendar-corner">{copy("Loan", "Kredi")}</div>
+            {loanPaymentCalendar.months.map((month) => (
+              <div className="loan-calendar-cell loan-calendar-month" key={month.key}>
+                <strong>{month.label}</strong>
+              </div>
+            ))}
+
+            {loanPaymentCalendar.rows.length ? loanPaymentCalendar.rows.map((row, rowIndex) => (
+              <React.Fragment key={row.loan.id || `calendar-loan-${rowIndex}`}>
+                <div className="loan-calendar-cell loan-calendar-loan">
+                  <strong>{row.loan.name || `${copy("Loan", "Kredi")} ${rowIndex + 1}`}</strong>
+                  <span>{row.loan.currency} / {formatCurrencyAmount(row.loan.amount, row.loan.currency)}</span>
+                </div>
+                {row.payments.map((payment) => (
+                  <div className="loan-calendar-cell loan-calendar-payment-cell" key={`${row.loan.id}-${payment.monthKey}`}>
+                    {payment.isActive && (
+                      <div className={`loan-calendar-payment tone-${row.tone}`}>
+                        <strong>{formatCurrencyAmount(payment.amount, row.loan.currency)}</strong>
+                        <span>{row.loan.name || `${copy("Loan", "Kredi")} ${rowIndex + 1}`}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </React.Fragment>
+            )) : (
+              <>
+                <div className="loan-calendar-cell loan-calendar-loan">
+                  <strong>{copy("No loan", "Kredi yok")}</strong>
+                  <span>{copy("Add a loan to see payments.", "Ödemeleri görmek için kredi ekleyin.")}</span>
+                </div>
+                {loanPaymentCalendar.months.map((month) => (
+                  <div className="loan-calendar-cell loan-calendar-payment-cell" key={`empty-${month.key}`} />
+                ))}
+              </>
+            )}
+
+            <div className="loan-calendar-cell loan-calendar-total-label">
+              <strong>{copy("Monthly total", "Aylık toplam")}</strong>
+            </div>
+            {loanPaymentCalendar.months.map((month) => (
+              <div className="loan-calendar-cell loan-calendar-total" key={`total-${month.key}`}>
+                {month.totals.length ? month.totals.map((total) => (
+                  <span key={total.currency}>{formatCurrencyAmount(total.amount, total.currency)}</span>
+                )) : <span>-</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
     const renderFinancialLoans = () => (
       <form className="financial-loan-form" onSubmit={handleSaveFinancialSettings}>
         <section className="financial-loan-hero">
           <div>
-            <span>{copy("Financing plan", "Finansman planı")}</span>
+            <span className="heading-with-info">
+              {copy("Financing plan", "Finansman planı")}
+              <InfoTip
+                label={copy("Loan calculation info", "Kredi hesaplama bilgisi")}
+                text={copy(
+                  "TRY-based loan total is calculated as TRY loans + USD loans x USD/TRY + EUR loans x EUR/TRY. Monthly payments use the same currency conversion.",
+                  "TL bazlı kredi toplamı TL krediler + USD krediler x USD/TRY + EUR krediler x EUR/TRY olarak hesaplanır. Aylık ödemelerde de aynı dönüşüm kullanılır.",
+                )}
+              />
+            </span>
             <h2>{copy("Loans", "Krediler")}</h2>
             <p>{copy("Add each loan separately, including its no-payment grace period. The feasibility model starts cash payments after the grace months.", "Her krediyi ayrı ekleyin; ilk kaç ay ödeme olmayacağını belirtin. Fizibilite modeli nakit ödemeleri ödemesiz aylar bittikten sonra başlatır.")}</p>
           </div>
@@ -3313,11 +4050,14 @@ function App() {
 
         <section className="financial-loan-summary-grid">
           {[
-            [copy("Total loan", "Toplam kredi"), formatLira(totalLoanAmount), copy("financing amount", "finansman tutarı")],
-            [copy("Monthly payment", "Aylık ödeme"), formatLira(totalMonthlyLoanPayment), copy("after grace periods", "ödemesiz aylar sonrası")],
+            [copy("Total loan", "Toplam kredi"), formatLoanCurrencyTotals(loanAmountTotals), copy("by currency", "döviz bazında")],
+            [copy("Total loan in TRY", "TL bazlı toplam kredi"), formatLoanTryTotal(totalLoanAmountTry), loanTryDetail],
+            [copy("Monthly payment", "Aylık ödeme"), formatLoanCurrencyTotals(monthlyLoanPaymentTotals), copy("after grace periods", "ödemesiz aylar sonrası")],
+            [copy("Monthly payment in TRY", "TL bazlı aylık ödeme"), formatLoanTryTotal(totalMonthlyLoanPaymentTry), loanTryDetail],
             [copy("Longest term", "En uzun vade"), `${formatNumber(longestLoanTerm)} ${copy("mo", "ay")}`, copy("including grace", "ödemesiz ay dahil")],
             [copy("Longest grace", "En uzun ödemesiz"), `${formatNumber(longestGracePeriod)} ${copy("mo", "ay")}`, copy("no cash payment", "nakit ödeme yok")],
-            [copy("Estimated interest", "Tahmini faiz"), formatLira(estimatedLoanInterest), copy("based on current terms", "mevcut koşullara göre")],
+            [copy("Estimated interest", "Tahmini faiz"), formatLoanCurrencyTotals(estimatedLoanInterestTotals), copy("based on current terms", "mevcut koşullara göre")],
+            [copy("Estimated interest in TRY", "TL bazlı tahmini faiz"), formatLoanTryTotal(estimatedLoanInterestTry), loanTryDetail],
           ].map(([label, value, detail]) => (
             <article className="financial-loan-summary-card" key={label}>
               <span>{label}</span>
@@ -3325,6 +4065,23 @@ function App() {
               <small>{detail}</small>
             </article>
           ))}
+        </section>
+
+        <section className="financial-loan-currency-section" aria-label={copy("Loan currency breakdown", "Kredi döviz kırılımı")}>
+          {(loanAmountTotals.length ? loanAmountTotals : [{ amount: 0, currency: "TRY" }]).map((total) => {
+            const monthlyTotal = monthlyLoanPaymentTotals.find((item) => item.currency === total.currency)?.amount || 0;
+            const loanCount = calculatedLoanRows.filter((loan) => normalizeCurrencyCode(loan.currency) === total.currency).length;
+
+            return (
+              <article className="financial-loan-currency-card" key={total.currency}>
+                <span>{total.currency}</span>
+                <strong>{total.amount ? formatCurrencyAmount(total.amount, total.currency) : "-"}</strong>
+                <small>
+                  {loanCount ? `${formatNumber(loanCount)} ${copy("loan", "kredi")} / ${formatCurrencyAmount(monthlyTotal, total.currency)} ${copy("monthly", "aylık")}` : copy("No loan yet", "Henüz kredi yok")}
+                </small>
+              </article>
+            );
+          })}
         </section>
 
         <section className="financial-input-section optional financial-loan-section">
@@ -3343,14 +4100,52 @@ function App() {
                 <article className="financial-loan-card" key={loan.id || `loan-${index}`}>
                   <div className="financial-loan-card-heading">
                     <div>
-                      <span>{copy("Loan", "Kredi")} {index + 1}</span>
-                      <h3>{formatLira(toFiniteNumber(loan.amount))}</h3>
+                      <span>{loan.name?.trim() || `${copy("Loan", "Kredi")} ${index + 1}`}</span>
+                      <h3>{formatCurrencyAmount(toFiniteNumber(loan.amount), loan.currency)}</h3>
                     </div>
                     <button type="button" className="resource-remove-button" onClick={() => removeFinancialLoanRow(index)}>
                       x
                     </button>
                   </div>
                   <div className="financial-loan-row">
+                    <label className="optional-financial-field">
+                      <span>
+                        {copy("Loan name", "Kredi adı")}
+                        <small>{copy("Optional", "Opsiyonel")}</small>
+                      </span>
+                      <input
+                        type="text"
+                        value={loan.name ?? ""}
+                        onChange={(event) => updateFinancialLoanRow(index, "name", event.target.value)}
+                      />
+                    </label>
+                    <label className="optional-financial-field">
+                      <span>
+                        {copy("Currency", "Döviz")}
+                        <small>{copy("Required", "Zorunlu")}</small>
+                      </span>
+                      <select
+                        required
+                        value={normalizeCurrencyCode(loan.currency)}
+                        onChange={(event) => updateFinancialLoanRow(index, "currency", event.target.value)}
+                      >
+                        {financialLoanCurrencyOptions.map((currency) => (
+                          <option value={currency} key={currency}>{currency}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="optional-financial-field">
+                      <span>
+                        {copy("Received date", "Alınma tarihi")}
+                        <small>{copy("Required", "Zorunlu")}</small>
+                      </span>
+                      <input
+                        required
+                        type="date"
+                        value={loan.receivedDate || loan.received_date || getTodayDateInputValue()}
+                        onChange={(event) => updateFinancialLoanRow(index, "receivedDate", event.target.value)}
+                      />
+                    </label>
                     <label className="optional-financial-field">
                       <span>
                         {copy("Loan amount", "Kredi tutarı")}
@@ -3409,9 +4204,10 @@ function App() {
                     </label>
                   </div>
                   <div className="financial-loan-card-metrics">
-                    <span>{copy("Payment starts", "Ödeme başlangıcı")}<strong>{formatNumber((calculatedLoan.gracePeriodMonths || 0) + 1)}. {copy("month", "ay")}</strong></span>
+                    <span>{copy("Payment starts", "Ödeme başlangıcı")}<strong>{calculatedLoan.paymentStartDate ? formatMonthLabel(parseDateInput(calculatedLoan.paymentStartDate)) : "-"}</strong></span>
+                    <span>{copy("Payment ends", "Ödeme bitişi")}<strong>{calculatedLoan.paymentEndDate ? formatMonthLabel(parseDateInput(calculatedLoan.paymentEndDate)) : "-"}</strong></span>
                     <span>{copy("Repayment term", "Ödeme vadesi")}<strong>{formatNumber(calculatedLoan.repaymentTermMonths || 0)} {copy("mo", "ay")}</strong></span>
-                    <span>{copy("Monthly payment", "Aylık ödeme")}<strong>{formatLira(calculatedLoan.monthlyPayment || 0)}</strong></span>
+                    <span>{copy("Monthly payment", "Aylık ödeme")}<strong>{formatCurrencyAmount(calculatedLoan.monthlyPayment || 0, calculatedLoan.currency)}</strong></span>
                   </div>
                 </article>
               );
@@ -3419,11 +4215,12 @@ function App() {
               <p className="planner-empty-state loan-empty-state">{copy("No loan added. The model will use zero loan.", "Kredi eklenmedi. Model sıfır kredi kullanacak.")}</p>
             )}
           </div>
-          <div className="financial-loan-actions">
-            <button type="button" onClick={addFinancialLoanRow}>{copy("Add Loan", "Kredi Ekle")}</button>
-            <button type="submit" disabled={financialLoading}>{copy("Save Loans", "Kredileri Kaydet")}</button>
-          </div>
         </section>
+        {renderFinancialLoanPaymentCalendar()}
+        <div className="financial-loan-actions">
+          <button type="button" onClick={addFinancialLoanRow}>{copy("Add Loan", "Kredi Ekle")}</button>
+          <button type="submit" disabled={financialLoading}>{copy("Save Loans", "Kredileri Kaydet")}</button>
+        </div>
       </form>
     );
     const renderFinancialTrendCard = () => (
@@ -3666,6 +4463,169 @@ function App() {
       if (currentFinancialPage.key === "product-return") return row.costType !== "initial";
       return true;
     });
+    const overviewMonthCount = Math.max(1, getProjectionMonthCount(financialHorizon));
+    const overviewTrendRows = model.trendRows || [];
+    const overviewHasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
+    const overviewIsDecisionReady = Boolean(summary.planCount && overviewHasSalesForecast && financialModel.settingsSaved);
+    const overviewMonthlyRevenue = toFiniteNumber(summary.salesRevenue) / overviewMonthCount;
+    const overviewMonthlyCost = toFiniteNumber(summary.totalCost) / overviewMonthCount;
+    const overviewMonthlyNet = toFiniteNumber(summary.netIncome) / overviewMonthCount;
+    const overviewProductionCost = toFiniteNumber(summary.materialCost) + toFiniteNumber(summary.workforceCost) + toFiniteNumber(summary.electricityCost) + toFiniteNumber(summary.expiredWriteOffCost);
+    const overviewTaxAndFinanceCost = toFiniteNumber(summary.vatPayable) + toFiniteNumber(summary.incomeTax) + toFiniteNumber(summary.loanInterest);
+    const overviewUnmetSalesUnits = Math.max(0, toFiniteNumber(summary.forecastSalesUnits) - toFiniteNumber(summary.netSoldUnits));
+    const overviewInvestmentBase = Math.max(0, investmentTotal);
+    const overviewRoiPercent = overviewInvestmentBase ? (toFiniteNumber(summary.netIncome) / overviewInvestmentBase) * 100 : 0;
+    const overviewMarginPercent = summary.salesRevenue ? (toFiniteNumber(summary.netIncome) / toFiniteNumber(summary.salesRevenue)) * 100 : 0;
+    const overviewCashRunwayLimit = Math.min(overviewMonthCount, 6);
+    const overviewVerdict = !overviewIsDecisionReady
+      ? {
+          action: copy("Complete missing inputs", "Eksik girdileri tamamla"),
+          body: copy("The model needs an active process plan, product-linked sales forecast, and saved finance assumptions before it should be used for a customer decision.", "Modelin müşteri kararı için kullanılmadan önce aktif süreç planı, ürüne bağlı satış tahmini ve kayıtlı finans varsayımlarına ihtiyacı var."),
+          path: !summary.planCount ? "/operations/data-entry" : !overviewHasSalesForecast ? "/sales-strategy" : "/financial-modelling/girdiler",
+          title: copy("Not ready for decision", "Karar için hazır değil"),
+          tone: "amber",
+        }
+      : (overviewMonthlyNet > 0 && summary.cashRunwayMonths >= overviewCashRunwayLimit && overviewUnmetSalesUnits <= 0)
+        ? {
+            action: copy("Open simulation", "Simülasyonu aç"),
+            body: copy("The current plan is profitable in the selected horizon, cash stays alive, and the sales promise is covered by available production.", "Mevcut plan seçilen ufukta kârlı, nakit ayakta kalıyor ve satış sözü mevcut üretimle karşılanıyor."),
+            path: "/simulation/current-situation",
+            title: copy("Looks decision-ready", "Karara yakın görünüyor"),
+            tone: "teal",
+          }
+        : overviewMonthlyNet > 0
+          ? {
+              action: copy("Review risks", "Riskleri incele"),
+              body: copy("Profitability is positive, but cash runway, inventory, or sales-capacity balance needs attention before committing.", "Kârlılık pozitif; ancak karar vermeden önce nakit dayanma, stok veya satış-kapasite dengesi kontrol edilmeli."),
+              path: "/financial-modelling/analiz",
+              title: copy("Feasible with watchouts", "Dikkatle fizibl"),
+              tone: "amber",
+            }
+          : {
+              action: copy("Improve plan", "Planı iyileştir"),
+              body: copy("The current assumptions do not yet support a healthy return. Start with price, production cost, channel commission, or financing.", "Mevcut varsayımlar sağlıklı getiri üretmiyor. Fiyat, üretim maliyeti, kanal komisyonu veya finansmandan başlayın."),
+              path: "/financial-modelling/analiz",
+              title: copy("High risk", "Yüksek risk"),
+              tone: "clay",
+            };
+    const overviewDecisionMetrics = [
+      {
+        detail: copy("Average of the selected projection horizon", "Seçili projeksiyon ufkunun aylık ortalaması"),
+        label: copy("Monthly net", "Aylık net"),
+        tone: overviewMonthlyNet >= 0 ? "good" : "risk",
+        value: overviewIsDecisionReady ? formatLira(overviewMonthlyNet) : "-",
+      },
+      {
+        detail: copy("Revenue after channel effects", "Kanal etkilerinden sonra gelir"),
+        label: copy("Monthly revenue", "Aylık ciro"),
+        tone: "neutral",
+        value: overviewIsDecisionReady ? formatLira(overviewMonthlyRevenue) : "-",
+      },
+      {
+        detail: copy("First month where cash turns negative", "Nakit negatifleşene kadar geçen süre"),
+        label: copy("Cash runway", "Nakit dayanma"),
+        tone: summary.cashRunwayMonths >= overviewCashRunwayLimit ? "good" : "risk",
+        value: overviewIsDecisionReady ? `${formatNumber(summary.cashRunwayMonths)} ${copy("mo", "ay")}` : "-",
+      },
+      {
+        detail: copy("Net income divided by investment base", "Net kazancın yatırım tabanına oranı"),
+        label: copy("ROI", "Yatırım getirisi"),
+        tone: overviewRoiPercent >= 0 ? "good" : "risk",
+        value: overviewIsDecisionReady && overviewInvestmentBase ? `${formatNumber(overviewRoiPercent, 1)}%` : "-",
+      },
+    ];
+    const overviewActionItems = [
+      !summary.planCount && {
+        action: copy("Open Operations", "Operations'a Git"),
+        detail: copy("Save a daily process plan so production capacity, material, labor, and energy costs become real.", "Üretim kapasitesi, malzeme, işçilik ve enerji maliyetleri gerçek hesaplansın diye günlük süreç planı kaydedin."),
+        path: "/operations/data-entry",
+        title: copy("Process plan is missing", "Süreç planı eksik"),
+        tone: "amber",
+      },
+      !overviewHasSalesForecast && {
+        action: copy("Open Sales", "Satışa Git"),
+        detail: copy("Add product-linked channels with monthly units so revenue, stock, and collection timing can be calculated.", "Ciro, stok ve tahsilat vadesi hesaplansın diye ürüne bağlı aylık satış kanalları ekleyin."),
+        path: "/sales-strategy",
+        title: copy("Sales forecast is missing", "Satış tahmini eksik"),
+        tone: "amber",
+      },
+      !financialModel.settingsSaved && {
+        action: copy("Open Inputs", "Girdilere Git"),
+        detail: copy("Save tax, cash, working capital, inflation, and payment assumptions before reading the output as final.", "Çıktıyı nihai okumadan önce vergi, nakit, işletme sermayesi, enflasyon ve vade varsayımlarını kaydedin."),
+        path: "/financial-modelling/girdiler",
+        title: copy("Finance assumptions are not saved", "Finans varsayımları kaydedilmemiş"),
+        tone: "amber",
+      },
+      overviewIsDecisionReady && overviewUnmetSalesUnits > 0 && {
+        action: copy("Balance capacity", "Kapasiteyi dengele"),
+        detail: copy("Forecast demand is above sellable production. Increase capacity, reduce sales promise, or add outsourcing.", "Talep satılabilir üretimin üstünde. Kapasiteyi artırın, satış sözünü azaltın veya dış üretim ekleyin."),
+        path: "/operations/data-entry",
+        title: copy("Sales demand exceeds capacity", "Satış talebi kapasiteyi aşıyor"),
+        tone: "clay",
+      },
+      overviewIsDecisionReady && summary.unsoldInventoryUnits > 0 && {
+        action: copy("Review sales plan", "Satış planını incele"),
+        detail: copy("Production is above sales. Reduce output, add channels, or finance inventory explicitly.", "Üretim satışın üstünde. Çıktıyı azaltın, kanal ekleyin veya stoku açıkça finanse edin."),
+        path: "/sales-strategy",
+        title: copy("Unsold inventory risk", "Satılmayan stok riski"),
+        tone: "amber",
+      },
+      overviewIsDecisionReady && overviewMonthlyNet <= 0 && {
+        action: copy("Open cost rows", "Maliyet satırlarını aç"),
+        detail: copy("Net is negative. Check unit price, material cost, labor hours, energy, taxes, and channel commission first.", "Net negatif. Önce birim fiyat, malzeme maliyeti, işçilik saati, enerji, vergi ve kanal komisyonunu kontrol edin."),
+        path: "/financial-modelling/analiz",
+        title: copy("Profitability is weak", "Kârlılık zayıf"),
+        tone: "clay",
+      },
+      overviewIsDecisionReady && summary.cashRunwayMonths < Math.min(overviewMonthCount, 3) && {
+        action: copy("Review cash", "Nakti incele"),
+        detail: copy("Cash runway is short. Increase initial cash, adjust loan timing, or defer non-critical initial spend.", "Nakit dayanma kısa. Başlangıç nakdini artırın, kredi zamanlamasını düzeltin veya kritik olmayan başlangıç harcamasını erteleyin."),
+        path: "/financial-modelling/girdiler",
+        title: copy("Cash runway is short", "Nakit dayanma kısa"),
+        tone: "clay",
+      },
+    ].filter(Boolean).slice(0, 5);
+    const overviewMoneyFlowRows = [
+      {
+        amount: summary.salesRevenue,
+        detail: copy("Product-linked channel forecast", "Ürüne bağlı kanal tahmini"),
+        label: copy("Sales revenue", "Satış geliri"),
+        tone: "income",
+      },
+      {
+        amount: -overviewProductionCost,
+        detail: copy("Material, labor, energy, write-off", "Malzeme, işçilik, enerji, fire/iade"),
+        label: copy("Production cost", "Üretim maliyeti"),
+        tone: "cost",
+      },
+      {
+        amount: -toFiniteNumber(summary.extraRecurringCost),
+        detail: copy("Recurring optional expenses", "Tekrarlayan opsiyonel giderler"),
+        label: copy("Overhead", "Genel gider"),
+        tone: "cost",
+      },
+      {
+        amount: -overviewTaxAndFinanceCost,
+        detail: copy("VAT, income tax and loan interest", "KDV, gelir vergisi ve kredi faizi"),
+        label: copy("Tax and finance", "Vergi ve finansman"),
+        tone: "cost",
+      },
+      {
+        amount: summary.netIncome,
+        detail: copy("Revenue minus tracked costs", "Gelir eksi takip edilen maliyetler"),
+        label: copy("Net return", "Net getiri"),
+        tone: "net",
+      },
+    ];
+    const overviewTimelineRows = overviewTrendRows.slice(0, financialHorizon === "5y" ? 12 : 6);
+    const overviewCostBreakdownRows = [
+      { amount: overviewProductionCost, id: "productionCost", label: copy("Production cost", "Üretim maliyeti"), tone: "cost" },
+      { amount: summary.extraRecurringCost, id: "recurringExtraCost", label: copy("Recurring overhead", "Tekrarlayan genel gider"), tone: "cost" },
+      { amount: overviewTaxAndFinanceCost, id: "taxFinance", label: copy("Tax and finance", "Vergi ve finansman"), tone: "cost" },
+      { amount: summary.machinePurchaseCost + summary.equipmentPurchaseCost + summary.extraInitialCost, id: "initialInvestment", label: copy("Initial investment", "Başlangıç yatırımı"), tone: "investment" },
+      { amount: summary.workingCapitalRequirement, id: "workingCapital", label: copy("Working capital", "İşletme sermayesi"), tone: "investment" },
+    ].filter((item) => toFiniteNumber(item.amount) > 0);
+    const overviewMaxCostBreakdownAmount = Math.max(1, ...overviewCostBreakdownRows.map((item) => toFiniteNumber(item.amount)));
 
     if (currentFinancialPage.key === "inputs") {
       return renderDashboardLayout(
@@ -3725,8 +4685,10 @@ function App() {
             <div className="finance-metric-grid">
               {[
                 [copy("Loan Count", "Kredi Sayısı"), formatNumber(financialLoanRows.length), copy("separate financing records", "ayrı finansman kaydı")],
-                [copy("Total Loan Amount", "Toplam Kredi Tutarı"), formatLira(totalLoanAmount), copy("included in initial cash", "başlangıç nakdine eklenir")],
-                [copy("Monthly Loan Payment", "Aylık Kredi Ödemesi"), formatLira(totalMonthlyLoanPayment), copy("sum of active installments", "aktif taksitlerin toplamı")],
+                [copy("Total Loan Amount", "Toplam Kredi Tutarı"), formatLoanCurrencyTotals(loanAmountTotals), copy("by loan currency", "kredi dövizine göre")],
+                [copy("Total Loan in TRY", "TL Bazlı Toplam Kredi"), formatLoanTryTotal(totalLoanAmountTry), loanTryDetail],
+                [copy("Monthly Loan Payment", "Aylık Kredi Ödemesi"), formatLoanCurrencyTotals(monthlyLoanPaymentTotals), copy("sum of active installments", "aktif taksitlerin toplamı")],
+                [copy("Monthly Payment in TRY", "TL Bazlı Aylık Ödeme"), formatLoanTryTotal(totalMonthlyLoanPaymentTry), loanTryDetail],
                 [copy("Longest Term", "En Uzun Vade"), longestLoanTerm ? `${formatNumber(longestLoanTerm)} ${copy("months", "ay")}` : "-", copy("used for repayment schedule", "ödeme planında kullanılır")],
               ].map(([label, value, detail]) => (
                 <article className="finance-metric-card" key={label}>
@@ -3759,11 +4721,165 @@ function App() {
 
             {financialStatus && <p className="status-message">{financialStatus}</p>}
 
-            {renderWidgetSelector()}
+            <section className={`financial-decision-hero ${overviewVerdict.tone}`}>
+              <div className="financial-decision-copy">
+                <span>{copy("Decision summary", "Karar özeti")}</span>
+                <h2>{overviewVerdict.title}</h2>
+                <p>{overviewVerdict.body}</p>
+                <div className="financial-hero-actions">
+                  <button type="button" className="primary" onClick={() => goTo(overviewVerdict.path, "login")}>
+                    {overviewVerdict.action}
+                  </button>
+                  <div className="mini-tabs financial-horizon-control">
+                    {[
+                      ["6m", copy("6 Months", "6 Ay")],
+                      ["1y", copy("1 Year", "1 Yıl")],
+                      ["5y", copy("5 Years", "5 Yıl")],
+                    ].map(([value, label]) => (
+                      <button
+                        type="button"
+                        className={financialHorizon === value ? "active" : ""}
+                        onClick={() => {
+                          setFinancialHorizon(value);
+                          loadFinancialData(value);
+                        }}
+                        key={value}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="financial-decision-score">
+                <span>{copy("Model readiness", "Model hazırlığı")}</span>
+                <strong>{overviewIsDecisionReady ? copy("Ready", "Hazır") : copy("Incomplete", "Eksik")}</strong>
+                <small>
+                  {copy("Operations, Sales and Finance data", "Operations, Satış ve Finans verisi")}
+                </small>
+              </div>
+            </section>
+
+            <div className="financial-decision-metrics">
+              {overviewDecisionMetrics.map((metric) => (
+                <article className={`financial-decision-card ${metric.tone}`} key={metric.label}>
+                  <span>{metric.label}</span>
+                  <strong>{metric.value}</strong>
+                  <small>{metric.detail}</small>
+                </article>
+              ))}
+            </div>
+
+            <div className="financial-overview-layout">
+              <article className="financial-panel financial-priority-panel">
+                <div className="financial-panel-heading">
+                  <div>
+                    <span>{copy("What to fix first", "Önce ne düzeltilmeli")}</span>
+                    <h2>{copy("Action list", "Aksiyon listesi")}</h2>
+                  </div>
+                  <strong>{overviewActionItems.length || copy("OK", "Tamam")}</strong>
+                </div>
+                <div className="financial-action-list">
+                  {(overviewActionItems.length ? overviewActionItems : [{
+                    action: copy("Open Simulation", "Simülasyonu Aç"),
+                    detail: copy("No critical blocker is visible in the selected horizon. Use simulation to test price, demand, and cost sensitivity.", "Seçili ufukta kritik engel görünmüyor. Fiyat, talep ve maliyet hassasiyetini test etmek için simülasyonu kullanın."),
+                    path: "/simulation/current-situation",
+                    title: copy("No urgent blocker", "Acil engel yok"),
+                    tone: "teal",
+                  }]).map((item) => (
+                    <button type="button" className={`financial-action-item ${item.tone}`} onClick={() => goTo(item.path, "login")} key={item.title}>
+                      <span>{item.title}</span>
+                      <p>{item.detail}</p>
+                      <strong>{item.action}</strong>
+                    </button>
+                  ))}
+                </div>
+              </article>
+
+              <article className="financial-panel financial-flow-panel">
+                <div className="financial-panel-heading">
+                  <div>
+                    <span>{copy("Money flow", "Para akışı")}</span>
+                    <h2>{copy("From sales to net return", "Satıştan net getiriye")}</h2>
+                  </div>
+                  <strong>{overviewIsDecisionReady ? `${formatNumber(overviewMarginPercent, 1)}%` : "-"}</strong>
+                </div>
+                <div className="financial-flow-grid">
+                  {overviewMoneyFlowRows.map((row) => (
+                    <div className={`financial-flow-card ${row.tone}`} key={row.label}>
+                      <span>{row.label}</span>
+                      <strong>{overviewIsDecisionReady ? formatLira(row.amount) : "-"}</strong>
+                      <small>{row.detail}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+
+            <div className="financial-overview-layout secondary">
+              <article className="financial-panel financial-timeline-panel">
+                <div className="financial-panel-heading">
+                  <div>
+                    <span>{copy("Monthly projection", "Aylık projeksiyon")}</span>
+                    <h2>{copy("Cash and profit by month", "Ay bazında nakit ve kâr")}</h2>
+                  </div>
+                  <strong>{overviewTimelineRows.length} {copy("mo", "ay")}</strong>
+                </div>
+                <div className="financial-month-table">
+                  <div className="financial-month-row financial-month-head">
+                    <span>{copy("Month", "Ay")}</span>
+                    <span>{copy("Revenue", "Ciro")}</span>
+                    <span>{copy("Cost", "Maliyet")}</span>
+                    <span>{copy("Net", "Net")}</span>
+                    <span>{copy("Cash", "Nakit")}</span>
+                  </div>
+                  {(overviewTimelineRows.length ? overviewTimelineRows : [{ period: "-", salesRevenue: 0, totalCost: 0, netIncome: 0, cashBalance: 0 }]).map((row) => (
+                    <div className={`financial-month-row ${toFiniteNumber(row.netIncome) >= 0 ? "positive" : "negative"}`} key={row.period}>
+                      <strong>{row.period === "-" ? "-" : `${row.period}. ${copy("mo", "ay")}`}</strong>
+                      <span>{overviewIsDecisionReady ? formatLira(row.salesRevenue) : "-"}</span>
+                      <span>{overviewIsDecisionReady ? formatLira(row.totalCost) : "-"}</span>
+                      <span>{overviewIsDecisionReady ? formatLira(row.netIncome) : "-"}</span>
+                      <span>{overviewIsDecisionReady ? formatLira(row.cashBalance) : "-"}</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="financial-panel financial-breakdown-panel">
+                <div className="financial-panel-heading">
+                  <div>
+                    <span>{copy("Cost pressure", "Maliyet baskısı")}</span>
+                    <h2>{copy("Largest cash needs", "En büyük nakit ihtiyaçları")}</h2>
+                  </div>
+                  <strong>{overviewIsDecisionReady ? formatLira(overviewMonthlyCost) : "-"}</strong>
+                </div>
+                {renderBreakdownBars(
+                  overviewCostBreakdownRows,
+                  overviewMaxCostBreakdownAmount,
+                  copy("No cost data yet", "Henüz maliyet verisi yok"),
+                  "cost",
+                )}
+              </article>
+            </div>
+
+            <div className="financial-quick-grid">
+              {[
+                [copy("Produced / Sold", "Üretilen / Satılan"), overviewIsDecisionReady ? `${formatNumber(summary.totalProduced)} / ${formatNumber(summary.netSoldUnits)}` : "-", copy("selected horizon units", "seçili ufuk adedi")],
+                [copy("Unsold Inventory", "Satılmayan Stok"), overviewIsDecisionReady ? `${formatNumber(summary.unsoldInventoryUnits)} ${copy("units", "adet")}` : "-", copy("production above sales", "satışı aşan üretim")],
+                [copy("Required Cash", "Gerekli Nakit"), overviewIsDecisionReady ? formatLira(summary.initialCashRequired) : "-", copy("after initial loan and grant", "başlangıç kredi ve hibe sonrası")],
+                [copy("Payback", "Geri Dönüş"), overviewIsDecisionReady ? formatMonth(summary.paybackMonth) : "-", copy("investment recovery month", "yatırımın geri dönüş ayı")],
+              ].map(([label, value, detail]) => (
+                <article className="financial-quick-card" key={label}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                  <small>{detail}</small>
+                </article>
+              ))}
+            </div>
 
             <div className="financial-overview-grid">
-              {renderOverviewFinancialRows()}
               {renderFinancialTrendCard()}
+              {renderOverviewFinancialRows()}
             </div>
 
             {selectedFinancialWidgets.length > 0 && (
@@ -3771,6 +4887,8 @@ function App() {
                 {selectedFinancialWidgets.map(renderOverviewWidget)}
               </div>
             )}
+
+            {renderWidgetSelector()}
           </section>,
       );
     }
@@ -3944,11 +5062,11 @@ function App() {
       const value = Number(parameters[field]);
       return Number.isFinite(value) ? value : fallback;
     };
-    const linkedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForm, operationsWorkspace, financialHorizon);
+    const linkedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, financialHorizon);
     const linkedSummary = linkedFinancialModel.summary || emptyFinancialModel.summary;
     const defaultHorizonMonths = Math.max(1, getProjectionMonthCount(financialHorizon));
     const timeHorizonMonths = Math.max(1, Math.round(positiveParam("timeHorizonMonths", defaultHorizonMonths)));
-    const productMap = getOperationProductMap(operationsWorkspace);
+    const productMap = getOperationProductMap(operationsWorkspaceForFinance);
     const firstChannelProduct = salesStrategy.channels.map((channel) => productMap.get(channel.productId) || channel.product).find(Boolean);
     const defaultSalesUnits = Math.round(
       toFiniteNumber(linkedSummary.netSoldUnits) / timeHorizonMonths ||
@@ -3956,7 +5074,7 @@ function App() {
     );
     const defaultUnitSalesPrice = toFiniteNumber(
       linkedSummary.averageNetPrice,
-      toFiniteNumber(firstChannelProduct?.price, toFiniteNumber(operationsWorkspace.product?.price, toFiniteNumber(operationsWorkspace.products[0]?.price))),
+      toFiniteNumber(firstChannelProduct?.price, toFiniteNumber(operationsWorkspaceForFinance.product?.price, toFiniteNumber(operationsWorkspaceForFinance.products[0]?.price))),
     );
     const scenarioSalesUnits = Math.max(0, positiveParam("salesUnits", defaultSalesUnits));
     const scenarioUnitSalesPrice = Math.max(0, positiveParam("unitSalesPrice", defaultUnitSalesPrice));
@@ -4291,6 +5409,8 @@ function App() {
 
   function renderSalesStrategyPage() {
     const monthlyMultipliers = getSalesExpectationMultipliers(salesStrategy);
+    const multiplierPeriod = getSalesMultiplierPeriod(salesStrategy);
+    const multiplierInputs = getSalesExpectationInputMultipliers(salesStrategy);
     const workingDaysPerMonth = Math.max(1, toFiniteNumber(financialSettingsForm.workingDaysPerMonth, 22));
     const monthlyProductionByProduct = getMonthlyProductProductionMap(operationsWorkspace, workingDaysPerMonth);
     const productMap = getOperationProductMap(operationsWorkspace);
@@ -4298,8 +5418,6 @@ function App() {
     const expectedAnnualSalesUnits = monthlyMultipliers.reduce((total, _multiplier, index) => total + getSalesForecastForMonth(salesStrategy, index), 0);
     const averageMultiplier = monthlyMultipliers.reduce((total, multiplier) => total + multiplier, 0) / Math.max(monthlyMultipliers.length, 1);
     const totalCampaignBudget = salesStrategy.campaigns.reduce((total, campaign) => total + (Number(campaign.budget) || 0), 0);
-    const realizedSalesTotal = salesStrategy.personnel.reduce((total, person) => total + toFiniteNumber(person.realizedSalesUnits), 0);
-    const personnelTargetTotal = salesStrategy.personnel.reduce((total, person) => total + toFiniteNumber(person.monthlyTarget), 0);
     const getProductAvailability = (productId) => {
       const monthlyProduced = Math.max(0, monthlyProductionByProduct.get(productId) || 0);
       const plannedSales = salesStrategy.channels.reduce((total, channel) => (
@@ -4315,7 +5433,8 @@ function App() {
     const totalReadyUnits = operationsWorkspace.products.reduce((total, product) => total + Math.max(0, getProductAvailability(product.id).remaining), 0);
     const totalMonthlyCommission = salesStrategy.channels.reduce((total, channel) => {
       const product = productMap.get(channel.productId) || channel.product || {};
-      const grossRevenue = Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) * Math.max(0, toFiniteNumber(product.price));
+      const productPriceTry = convertMoneyToTry(product.price, product.price_currency, exchangeRates);
+      const grossRevenue = Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) * Math.max(0, productPriceTry);
       return total + (grossRevenue * Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100);
     }, 0);
     const activeProductCount = new Set(salesStrategy.channels.map((channel) => channel.productId).filter(Boolean)).size;
@@ -4337,25 +5456,25 @@ function App() {
     const getSalesTypeLabel = (type) => (form.language === "tr" ? type.nameTr || type.nameEn : type.nameEn || type.nameTr) || type.id;
     const getSalesTypeDescription = (type) => (form.language === "tr" ? type.descriptionTr || type.descriptionEn : type.descriptionEn || type.descriptionTr) || "";
     const salesChannelRequiredFields = [
-      { field: "startMonth", label: copy("Start month", "Başlangıç Ayı"), min: 1, step: "1" },
-      { field: "monthlySalesUnits", label: copy("First month sales (units)", "İlk Ay Satış (Adet)"), min: 0, step: "1" },
-      { field: "growthMonths1To6Percent", label: copy("Growth (1-6 mo) (%)", "Büyüme (1-6 Ay) (%)"), min: 0, step: "0.01" },
-      { field: "growthMonths7To18Percent", label: copy("Growth (7-18 mo) (%)", "Büyüme (7-18 Ay) (%)"), min: 0, step: "0.01" },
-      { field: "growthMonths19To24Percent", label: copy("Growth (19-24 mo) (%)", "Büyüme (19-24 Ay) (%)"), min: 0, step: "0.01" },
-      { field: "growthYears3To5Percent", label: copy("Year 3-5 growth (%)", "Yıl 3-5 Büyüme (%)"), min: 0, step: "0.01" },
-      { field: "collectionDays", label: copy("Collection (days)", "Tahsilat (Gün)"), min: 0, step: "1" },
+      { field: "startMonth", info: copy("The first model month where this channel can sell. Earlier months contribute zero sales for this channel.", "Bu kanalın satışa başlayacağı ilk model ayı. Önceki aylar bu kanal için sıfır satış üretir."), label: copy("Start month", "Başlangıç Ayı"), min: 1, step: "1" },
+      { field: "monthlySalesUnits", info: copy("Base sales promise for the first active month. Forecast then applies growth, expectation multiplier, seasonality, traffic score, returns, and limits.", "İlk aktif ay için temel satış vaadi. Tahmin sonrasında büyüme, beklenti çarpanı, sezonsallık, trafik skoru, iadeler ve limitler uygulanır."), label: copy("First month sales (units)", "İlk Ay Satış (Adet)"), min: 0, step: "1" },
+      { field: "growthMonths1To6Percent", info: copy("Monthly growth applied after launch for elapsed months 1-6.", "Lansmandan sonra geçen 1-6. aylar için uygulanan aylık büyüme oranı."), label: copy("Growth (1-6 mo) (%)", "Büyüme (1-6 Ay) (%)"), min: 0, step: "0.01" },
+      { field: "growthMonths7To18Percent", info: copy("Monthly growth applied for elapsed months 7-18 after the channel start.", "Kanal başlangıcından sonra geçen 7-18. aylar için uygulanan aylık büyüme oranı."), label: copy("Growth (7-18 mo) (%)", "Büyüme (7-18 Ay) (%)"), min: 0, step: "0.01" },
+      { field: "growthMonths19To24Percent", info: copy("Monthly growth applied for elapsed months 19-24 after the channel start.", "Kanal başlangıcından sonra geçen 19-24. aylar için uygulanan aylık büyüme oranı."), label: copy("Growth (19-24 mo) (%)", "Büyüme (19-24 Ay) (%)"), min: 0, step: "0.01" },
+      { field: "growthYears3To5Percent", info: copy("Monthly growth used after month 24 when longer horizons are selected.", "24. aydan sonra, daha uzun projeksiyonlarda kullanılan aylık büyüme oranı."), label: copy("Year 3-5 growth (%)", "Yıl 3-5 Büyüme (%)"), min: 0, step: "0.01" },
+      { field: "collectionDays", info: copy("Average delay before channel revenue becomes cash. The model shifts cash receipts by this delay.", "Kanal cirosunun nakde dönüşme ortalama gecikmesi. Model nakit girişini bu gecikmeye göre kaydırır."), label: copy("Collection (days)", "Tahsilat (Gün)"), min: 0, step: "1" },
       { field: "customerAcquisitionCost", label: copy("Unit marketing (CAC) TL", "Birim Pazarlama (CAC) TL"), min: 0, step: "0.01" },
-      { field: "commissionPercent", label: copy("Channel commission (%)", "Kanal Komisyonu (%)"), max: 100, min: 0, step: "0.1" },
+      { field: "commissionPercent", info: copy("Commission is deducted from gross channel revenue before net revenue is reported.", "Komisyon, net ciro raporlanmadan önce brüt kanal cirosundan düşülür."), label: copy("Channel commission (%)", "Kanal Komisyonu (%)"), max: 100, min: 0, step: "0.1" },
     ];
     const advancedChannelFields = [
       { field: "basketSize", label: copy("Basket Size", "Sepet Büyüklüğü"), min: 0, step: "0.01" },
       { field: "conversionRatePercent", label: copy("Conversion Rate (%)", "Dönüşüm Oranı (%)"), min: 0, step: "0.001" },
-      { field: "trafficScore", label: copy("Traffic Score", "Trafik Skoru"), min: 0, step: "0.01" },
+      { field: "trafficScore", info: copy("A simple demand strength multiplier. 1 keeps demand unchanged, 1.2 lifts it by 20%, 0.8 lowers it by 20%.", "Basit talep gücü çarpanı. 1 talebi değiştirmez, 1,2 %20 artırır, 0,8 %20 düşürür."), label: copy("Traffic Score", "Trafik Skoru"), min: 0, step: "0.01" },
       { field: "repeatRatePercent", label: copy("Repeat Rate (%)", "Tekrar Oranı (%)"), min: 0, step: "0.001" },
       { field: "churnRatePercent", label: copy("Churn Rate (%)", "Kayıp Oranı (%)"), min: 0, step: "0.001" },
       { field: "discountRatePercent", label: copy("Discount Rate (%)", "İndirim Oranı (%)"), min: 0, step: "0.01" },
       { field: "returnRatePercent", label: copy("Return Rate (%)", "İade Oranı (%)"), min: 0, step: "0.001" },
-      { field: "capacityLimit", label: copy("Capacity Limit", "Kapasite Limiti"), min: 0, step: "1" },
+      { field: "capacityLimit", info: copy("Maximum units this channel can sell in a month after all multipliers are applied.", "Tüm çarpanlardan sonra bu kanalın bir ayda satabileceği maksimum adet."), label: copy("Capacity Limit", "Kapasite Limiti"), min: 0, step: "1" },
       { field: "launchFee", label: copy("Launch Fee", "Lansman Bedeli"), min: 0, step: "0.01" },
       { field: "moqMonthly", label: copy("MOQ Monthly", "Aylık MOQ"), min: 0, step: "1" },
       { field: "failureProbabilityPercent", label: copy("Failure Prob. (%)", "Başarısızlık Olas. (%)"), min: 0, step: "0.001" },
@@ -4372,7 +5491,7 @@ function App() {
             <div>
               <span>{dashboardCompanyName} / {copy("Sales Strategy", "Satış Stratejisi")}</span>
               <h1>{copy("Sales Strategy", "Satış Stratejisi")}</h1>
-              <p>{copy("Plan sales channels by product, monthly sales quantity, commission, campaign duration, and monthly expectation multipliers. Financial Modelling reads these product-linked quantities directly.", "Satış kanallarını ürün, aylık satış adedi, komisyon, kampanya süresi ve aylık beklenti çarpanlarıyla planlayın. Finansal Modelleme bu ürün bağlantılı adetleri doğrudan kullanır.")}</p>
+              <p>{copy("Plan sales channels by product, monthly sales quantity, commission, campaign duration, and monthly or quarterly expectation multipliers. Financial Modelling reads these product-linked quantities directly.", "Satış kanallarını ürün, aylık satış adedi, komisyon, kampanya süresi ve aylık ya da çeyreklik beklenti çarpanlarıyla planlayın. Finansal Modelleme bu ürün bağlantılı adetleri doğrudan kullanır.")}</p>
             </div>
             <div className="sales-header-actions">
               <button type="button" onClick={loadPlanningData} disabled={salesLoading}>
@@ -4389,7 +5508,7 @@ function App() {
           <div className="sales-stat-grid">
             {[
               [copy("Monthly channel plan", "Aylık kanal planı"), formatNumber(baseMonthlySalesUnits), copy("sum of channel quantities", "kanal adetleri toplamı")],
-              [copy("12M expected units", "12A beklenen adet"), formatNumber(expectedAnnualSalesUnits), copy("channel plan x monthly multipliers", "kanal planı x aylık çarpanlar")],
+              [copy("12M expected units", "12A beklenen adet"), formatNumber(expectedAnnualSalesUnits), multiplierPeriod === "quarterly" ? copy("channel plan x quarterly multipliers", "kanal planı x çeyreklik çarpanlar") : copy("channel plan x monthly multipliers", "kanal planı x aylık çarpanlar")],
               [copy("Ready to sell", "Satmaya hazır"), formatNumber(totalReadyUnits), copy("remaining after channel quantities", "kanal adetlerinden sonra kalan")],
               [copy("Monthly commission", "Aylık komisyon"), formatLira(totalMonthlyCommission), copy("based on product prices", "ürün fiyatlarına göre")],
             ].map(([label, value, detail]) => (
@@ -4405,14 +5524,38 @@ function App() {
             <article className="sales-card sales-forecast-card">
               <div className="sales-card-heading">
                 <div>
-                  <span>{copy("Monthly expectation multipliers", "Aylık beklenti çarpanları")}</span>
+                  <span className="heading-with-info">
+                    {copy("Expectation multiplier period", "Beklenti çarpanı periyodu")}
+                    <InfoTip
+                      label={copy("Sales expectation multiplier info", "Satış beklenti çarpanı bilgisi")}
+                      text={copy(
+                        "A multiplier scales the channel sales forecast. Monthly mode uses each month directly: month sales = channel units x that month's multiplier. Quarterly mode repeats each quarter value for its 3 months: Q1 applies to months 1-3, Q2 to 4-6, and so on.",
+                        "Çarpan, kanal satış tahminini ölçekler. Aylık modda formül: aylık satış = kanal adedi x o ayın çarpanı. Çeyreklik modda her çeyrek değeri 3 aya yayılır: Q1 ay 1-3'e, Q2 ay 4-6'ya uygulanır.",
+                      )}
+                    />
+                  </span>
                   <h2>{copy("Sales expectation multipliers", "Satış beklentisi çarpanları")}</h2>
+                </div>
+                <div className="sales-period-toggle" aria-label={copy("Expectation multiplier period", "Beklenti çarpanı periyodu")}>
+                  {[
+                    ["monthly", copy("Monthly", "Aylık")],
+                    ["quarterly", copy("Quarterly", "Çeyreklik")],
+                  ].map(([period, label]) => (
+                    <button
+                      className={period === multiplierPeriod ? "active" : ""}
+                      key={period}
+                      type="button"
+                      onClick={() => updateSalesCompany("multiplierPeriod", period)}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="sales-forecast-grid">
-                {monthlyMultipliers.map((multiplier, index) => (
+                {multiplierInputs.map((multiplier, index) => (
                   <label key={`forecast-${index}`}>
-                    <span>{copy("Month", "Ay")} {index + 1}</span>
+                    <span>{multiplierPeriod === "quarterly" ? copy("Quarter", "Çeyrek") : copy("Month", "Ay")} {index + 1}</span>
                     <input
                       min="0"
                       step="0.01"
@@ -4473,7 +5616,10 @@ function App() {
                     </label>
                     {salesChannelRequiredFields.map((field) => (
                       <label key={field.field}>
-                        <span>{field.label} *</span>
+                        <span className="label-with-info">
+                          {field.label} *
+                          {field.info && <InfoTip label={`${field.label} ${copy("info", "bilgi")}`} text={field.info} />}
+                        </span>
                         <input
                           max={field.max}
                           min={field.min}
@@ -4494,7 +5640,10 @@ function App() {
                       <div className="advanced-channel-grid">
                         {advancedChannelFields.map((field) => (
                           <label key={field.field}>
-                            <span>{field.label}</span>
+                            <span className="label-with-info">
+                              {field.label}
+                              {field.info && <InfoTip label={`${field.label} ${copy("info", "bilgi")}`} text={field.info} />}
+                            </span>
                             <input
                               min={field.min}
                               step={field.step}
@@ -4600,35 +5749,6 @@ function App() {
               </div>
             </article>
 
-            <article className="sales-card personnel-card">
-              <div className="sales-card-heading">
-                <div>
-                  <span>{copy("Sales personnel", "Satış personeli")}</span>
-                  <h2>{copy("Ownership, target and realized sales quantity", "Sahiplik, hedef ve gerçekleşen satış adedi")}</h2>
-                </div>
-                <button type="button" onClick={() => addSalesItem("personnel")}>{copy("Add Person", "Personel Ekle")}</button>
-              </div>
-              <div className="sales-table personnel-table">
-                <div className="sales-table-row sales-table-head personnel-row-layout"><span>{copy("Person", "Kişi")}</span><span>{copy("Role", "Rol")}</span><span>{copy("Channel", "Kanal")}</span><span>{copy("Target", "Hedef")}</span><span>{copy("Realized sales", "Gerçekleşen satış")}</span></div>
-                {salesStrategy.personnel.map((person) => (
-                  <div className="sales-table-row personnel-row personnel-row-layout" key={person.id}>
-                    <label><input value={person.name} onChange={(event) => updateSalesItem("personnel", person.id, "name", event.target.value)} /></label>
-                    <label><input value={person.role} onChange={(event) => updateSalesItem("personnel", person.id, "role", event.target.value)} /></label>
-                    <label>
-                      <select value={person.assignedChannel || ""} onChange={(event) => updateSalesItem("personnel", person.id, "assignedChannel", event.target.value)}>
-                        <option value="">{copy("Select channel", "Kanal seç")}</option>
-                        {salesStrategy.channels.map((channel) => (
-                          <option value={channel.name || channel.id} key={channel.id}>{channel.name || channel.id}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label><input min="0" type="number" value={person.monthlyTarget} onChange={(event) => updateSalesItem("personnel", person.id, "monthlyTarget", event.target.value)} /></label>
-                    <label><input min="0" step="1" type="number" value={person.realizedSalesUnits ?? ""} onChange={(event) => updateSalesItem("personnel", person.id, "realizedSalesUnits", event.target.value)} /></label>
-                  </div>
-                ))}
-              </div>
-            </article>
-
             <article className="sales-card sales-decision-card">
               <div className="sales-card-heading">
                 <div>
@@ -4639,9 +5759,7 @@ function App() {
               <div className="sales-signal-grid">
                 <span>{copy("Products in channels", "Kanallardaki ürün")} <strong>{formatNumber(activeProductCount)}</strong><small>{copy("selected from Operations products", "Operations ürünlerinden seçildi")}</small></span>
                 <span>{copy("Campaign budget", "Kampanya bütçesi")} <strong>{formatLira(totalCampaignBudget)}</strong><small>{copy("total planned marketing spend", "toplam planlanan pazarlama bütçesi")}</small></span>
-                <span>{copy("Personnel target", "Personel hedefi")} <strong>{formatNumber(personnelTargetTotal)}</strong><small>{copy("monthly target units", "aylık hedef adet")}</small></span>
-                <span>{copy("Realized sales", "Gerçekleşen satış")} <strong>{formatNumber(realizedSalesTotal)}</strong><small>{copy("entered by sales personnel", "satış personeli tarafından girildi")}</small></span>
-                <span>{copy("Average multiplier", "Ortalama çarpan")} <strong>{formatNumber(averageMultiplier, 2)}x</strong><small>{copy("across 12 months", "12 ay genelinde")}</small></span>
+                <span>{copy("Average multiplier", "Ortalama çarpan")} <strong>{formatNumber(averageMultiplier, 2)}x</strong><small>{multiplierPeriod === "quarterly" ? copy("quarterly values expanded to 12 months", "çeyrek değerleri 12 aya yayıldı") : copy("across 12 months", "12 ay genelinde")}</small></span>
                 <span>{copy("Ready remaining", "Hazır kalan")} <strong>{formatNumber(totalReadyUnits)}</strong><small>{copy("after planned channel quantities", "planlanan kanal adetlerinden sonra")}</small></span>
               </div>
             </article>
@@ -4694,22 +5812,24 @@ function App() {
   function renderMachinesEquipmentPage() {
     const machineFields = [
       { name: "name", label: copy("Machine name", "Makine adı") },
-      { name: "price", label: copy("Machine price", "Makine fiyatı"), step: "0.01", type: "number" },
+      { info: copy("Purchase value of the selected machine. If currency is USD/EUR, financial analysis converts it to TRY using the current FX rate.", "Seçili makinenin alım değeri. Para birimi USD/EUR ise finansal analiz güncel kurla TL'ye çevirir."), name: "price", label: copy("Machine price", "Makine fiyatı"), step: "0.01", type: "number" },
+      { info: copy("Choose the currency the price is entered in. TRY stays unchanged; USD/EUR are multiplied by their TRY rates in financial outputs.", "Fiyatın girildiği para birimini seçin. TL aynen kalır; USD/EUR finans çıktılarında ilgili TL kuru ile çarpılır."), name: "priceCurrency", label: copy("Currency", "Para birimi"), options: operationCurrencyOptions, type: "select" },
       { name: "hourlyEnergyConsumptionKwh", label: copy("Hourly energy consumption", "Saatlik enerji tüketimi"), step: "0.01", type: "number" },
     ];
     const equipmentFields = [
       { name: "name", label: copy("Equipment name", "Ekipman adı") },
-      { name: "price", label: copy("Equipment price", "Ekipman fiyatı"), step: "0.01", type: "number" },
+      { info: copy("Purchase value per equipment item. Quantity multiplies this value in investment cost.", "Ekipman başına alım değeri. Yatırım maliyetinde adet ile çarpılır."), name: "price", label: copy("Equipment price", "Ekipman fiyatı"), step: "0.01", type: "number" },
+      { info: copy("Choose the currency the equipment price is entered in. USD/EUR are converted to TRY in financial analysis.", "Ekipman fiyatının girildiği para birimini seçin. USD/EUR finansal analizde TL'ye çevrilir."), name: "priceCurrency", label: copy("Currency", "Para birimi"), options: operationCurrencyOptions, type: "select" },
       { name: "quantity", label: copy("Equipment quantity", "Ekipman miktarı"), step: "1", type: "number" },
     ];
     const machineColumns = [
       { header: copy("Machine", "Makine"), render: (row) => row.name },
-      { header: copy("Price", "Fiyat"), render: (row) => formatLira(row.price) },
+      { header: copy("Price", "Fiyat"), render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates) },
       { header: copy("Hourly Energy", "Saatlik Enerji"), render: (row) => `${formatNumber(row.hourly_energy_consumption_kwh, 2)} kWh` },
     ];
     const equipmentColumns = [
       { header: copy("Equipment", "Ekipman"), render: (row) => row.name },
-      { header: copy("Price", "Fiyat"), render: (row) => formatLira(row.price) },
+      { header: copy("Price", "Fiyat"), render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates) },
       { header: copy("Quantity", "Miktar"), render: (row) => formatNumber(row.quantity) },
     ];
 
@@ -4851,14 +5971,18 @@ function App() {
   const editableAuthorizationRoles = roles.filter((role) => !isAdminRole(role));
   const moduleLabelByKey = Object.fromEntries(dashboardModules.map((module) => [module.key, module.label]));
   const getModuleLabel = (module) => moduleLabelByKey[module.module_key] || module.name;
-  const projectedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForm, operationsWorkspace, financialHorizon);
+  const operationsWorkspaceForFinance = withTryOperationWorkspace(operationsWorkspace, exchangeRates);
+  const financialSettingsForModel = { ...financialSettingsForm, exchangeRates };
+  const projectedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, financialHorizon);
   const financialSummary = projectedFinancialModel.summary || emptyFinancialModel.summary;
   const financialTrendRows = projectedFinancialModel.trendRows || [];
   const financialMonthCount = getProjectionMonthCount(financialHorizon);
-  const currentOperationPlans = getCurrentOperationPlans(operationsWorkspace);
+  const currentOperationPlans = getCurrentOperationPlans(operationsWorkspaceForFinance);
   const activePlanResults = currentOperationPlans.map((plan) => plan.result || {}).filter(hasViablePlanResult);
-  const latestPlan = currentOperationPlans[0] || operationsWorkspace.latestPlan || null;
-  const latestPlanResult = operationPlanResult || latestPlan?.result || null;
+  const latestPlan = currentOperationPlans[0] || operationsWorkspaceForFinance.latestPlan || null;
+  const latestPlanResult = latestPlan?.result || (operationPlanResult
+    ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, operationsWorkspaceForFinance)
+    : null);
   const totalDailyProduction = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.producedQuantity), 0);
   const totalDailyTrackedCost = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.totalTrackedDailyCost), 0);
   const totalDailyEnergy = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.energyConsumptionKwh), 0);
@@ -4866,9 +5990,8 @@ function App() {
   const dashboardCompanyName = currentProfile?.company?.name || currentProfile?.company_id || "Atera";
   const dashboardProductContext = operationsWorkspace.product?.product_group || operationsWorkspace.product?.name || operationsWorkspace.products[0]?.name || copy("No product selected", "Ürün seçilmedi");
   const hasOperationData = Boolean(operationsWorkspace.products.length || operationsWorkspace.machines.length || operationsWorkspace.materials.length || operationsWorkspace.workforce.length || activePlanResults.length);
-  const dashboardMonthlyMultipliers = getSalesExpectationMultipliers(salesStrategy);
-  const dashboardBaseMonthlySalesUnits = getBaseMonthlySalesUnits(salesStrategy);
-  const dashboardExpectedSalesUnits = dashboardMonthlyMultipliers.reduce((total, multiplier) => total + (dashboardBaseMonthlySalesUnits * multiplier), 0);
+  const dashboardExpectedSalesUnits = Array.from({ length: 12 }, (_, index) => index)
+    .reduce((total, index) => total + getSalesForecastForMonth(salesStrategy, index), 0);
   const hasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
   const hasFinancialSourceData = Boolean(activePlanResults.length && hasSalesForecast && financialModel.settingsSaved);
   const noDataValue = "-";
@@ -4884,7 +6007,7 @@ function App() {
   ];
   const factoryLines = operationsWorkspace.machines.slice(0, 5).map((machine, index) => ({
     name: machine.name,
-    status: `${formatLira(machine.price)} / ${formatNumber(machine.hourly_energy_consumption_kwh, 2)} kWh`,
+    status: `${formatOperationMoney(machine.price, machine.price_currency, exchangeRates)} / ${formatNumber(machine.hourly_energy_consumption_kwh, 2)} kWh`,
     tone: ["teal", "cyan", "amber", "navy", "green"][index % 5],
   }));
   const factoryMetrics = [
@@ -4903,7 +6026,10 @@ function App() {
     [copy("Spoilage / returns", "Fire / iade"), hasFinancialSourceData ? formatLira(financialSummary.expiredWriteOffCost) : noDataValue],
     [copy("Working capital", "İşletme sermayesi"), hasFinancialSourceData ? formatLira(financialSummary.workingCapitalRequirement) : noDataValue],
   ];
-  const operationUnitSalePrice = toFiniteNumber(latestPlanResult?.productPrice, toFiniteNumber(operationsWorkspace.product?.price, toFiniteNumber(operationsWorkspace.products[0]?.price)));
+  const operationUnitSalePrice = toFiniteNumber(
+    latestPlanResult?.productPrice,
+    toFiniteNumber(operationsWorkspaceForFinance.product?.price, toFiniteNumber(operationsWorkspaceForFinance.products[0]?.price)),
+  );
   const operationUnitCost = toFiniteNumber(latestPlanResult?.producedQuantity)
     ? toFiniteNumber(latestPlanResult.totalTrackedDailyCost) / toFiniteNumber(latestPlanResult.producedQuantity)
     : toFiniteNumber(financialSummary.unitProductionCost);
@@ -5799,7 +6925,7 @@ function App() {
                   {operationsWorkspace.machines.map((machine) => (
                     <div className="machine-row" key={machine.id}>
                       <strong>{machine.name}</strong>
-                      <span>{formatLira(machine.price)}</span>
+                      <span>{formatOperationMoney(machine.price, machine.price_currency, exchangeRates)}</span>
                       <span>{formatNumber(machine.hourly_energy_consumption_kwh, 2)} {copy("kWh/hour", "kWh/saat")}</span>
                       <mark className="ok">{copy("Defined", "Tanımlı")}</mark>
                     </div>

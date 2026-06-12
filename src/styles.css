@@ -68,6 +68,67 @@ select {
   font: inherit;
 }
 
+.info-tip {
+  display: inline-flex;
+  line-height: 1.35;
+  position: relative;
+  vertical-align: middle;
+  z-index: 4;
+}
+
+.info-tip button {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-teal) 14%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 38%, var(--color-line));
+  border-radius: 999px;
+  color: var(--color-teal-strong);
+  cursor: help;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 950;
+  height: 19px;
+  justify-content: center;
+  padding: 0;
+  width: 19px;
+}
+
+.info-tip .info-tip-panel {
+  background: var(--color-heading);
+  border: 1px solid color-mix(in srgb, var(--color-teal) 34%, var(--color-heading));
+  border-radius: 8px;
+  box-shadow: var(--shadow-strong);
+  color: var(--color-surface);
+  font-size: 0.74rem;
+  font-weight: 750;
+  left: 50%;
+  max-width: min(320px, calc(100vw - 42px));
+  opacity: 0;
+  padding: 9px 10px;
+  pointer-events: none;
+  position: absolute;
+  text-transform: none;
+  top: calc(100% + 8px);
+  transform: translate(-50%, -4px);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+  width: max-content;
+  z-index: 80;
+}
+
+.info-tip:hover .info-tip-panel,
+.info-tip:focus-within .info-tip-panel {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.heading-with-info,
+.label-with-info {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
 .landing-page {
   background: var(--color-page);
   color: var(--color-ink);
@@ -3503,6 +3564,50 @@ select {
   background: color-mix(in srgb, var(--color-surface) 88%, transparent);
 }
 
+.exchange-rate-section {
+  background: color-mix(in srgb, var(--color-teal) 9%, var(--color-surface));
+}
+
+.exchange-rate-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.exchange-rate-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.exchange-rate-card {
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-teal) 20%, var(--color-line));
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.exchange-rate-card span {
+  color: var(--color-teal-strong);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.exchange-rate-card strong {
+  color: var(--color-heading);
+  font-size: 1.1rem;
+}
+
+.exchange-rate-card small {
+  color: var(--color-muted);
+  font-weight: 750;
+}
+
 .financial-input-section-heading {
   align-items: center;
   display: flex;
@@ -3598,7 +3703,7 @@ select {
 .financial-loan-summary-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .financial-loan-summary-card {
@@ -3620,9 +3725,43 @@ select {
 .financial-loan-summary-card strong {
   color: var(--color-heading);
   font-size: 1rem;
+  overflow-wrap: anywhere;
 }
 
 .financial-loan-summary-card small {
+  color: var(--color-muted);
+  font-weight: 750;
+}
+
+.financial-loan-currency-section {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.financial-loan-currency-card {
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-teal) 18%, var(--color-line));
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 13px;
+}
+
+.financial-loan-currency-card span {
+  color: var(--color-teal-strong);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.financial-loan-currency-card strong {
+  color: var(--color-heading);
+  font-size: 1.06rem;
+  overflow-wrap: anywhere;
+}
+
+.financial-loan-currency-card small {
   color: var(--color-muted);
   font-weight: 750;
 }
@@ -3670,13 +3809,13 @@ select {
   align-items: end;
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .financial-loan-card-metrics {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .financial-loan-card-metrics span {
@@ -3709,6 +3848,177 @@ select {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.financial-loan-calendar-section {
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+}
+
+.financial-loan-calendar-scroll {
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  overflow-x: auto;
+  width: 100%;
+}
+
+.financial-loan-calendar-grid {
+  display: grid;
+  min-width: max-content;
+}
+
+.loan-calendar-cell {
+  align-items: stretch;
+  border-bottom: 1px solid var(--color-line);
+  border-right: 1px solid var(--color-line);
+  display: grid;
+  min-height: 58px;
+  padding: 8px;
+}
+
+.loan-calendar-cell:last-child {
+  border-right: 0;
+}
+
+.loan-calendar-corner,
+.loan-calendar-month,
+.loan-calendar-total-label,
+.loan-calendar-total {
+  background: color-mix(in srgb, var(--color-section) 70%, var(--color-surface));
+}
+
+.loan-calendar-corner,
+.loan-calendar-month {
+  min-height: 44px;
+}
+
+.loan-calendar-month strong,
+.loan-calendar-total-label strong {
+  color: var(--color-heading);
+  font-size: 0.78rem;
+}
+
+.loan-calendar-loan {
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  left: 0;
+  position: sticky;
+  z-index: 1;
+}
+
+.loan-calendar-corner {
+  left: 0;
+  position: sticky;
+  z-index: 2;
+}
+
+.loan-calendar-loan strong {
+  color: var(--color-heading);
+  font-size: 0.84rem;
+}
+
+.loan-calendar-loan span {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.loan-calendar-payment-cell {
+  background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+}
+
+.loan-calendar-payment {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+}
+
+.loan-calendar-payment strong {
+  color: var(--color-heading);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.loan-calendar-payment span {
+  color: var(--color-muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loan-calendar-payment.tone-yellow {
+  background: #fff4c2;
+  border-color: #e2b92f;
+}
+
+.loan-calendar-payment.tone-red {
+  background: #ffe1dc;
+  border-color: #d96a58;
+}
+
+.loan-calendar-payment.tone-teal {
+  background: #dff6ef;
+  border-color: #42b39d;
+}
+
+.loan-calendar-payment.tone-blue {
+  background: #dff0ff;
+  border-color: #5a9bd8;
+}
+
+.loan-calendar-payment.tone-green {
+  background: #e4f6dc;
+  border-color: #72b65d;
+}
+
+.loan-calendar-payment.tone-clay {
+  background: #f4e3dc;
+  border-color: var(--color-clay);
+}
+
+:root[data-theme="dark"] .loan-calendar-payment.tone-yellow {
+  background: #4c3e13;
+}
+
+:root[data-theme="dark"] .loan-calendar-payment.tone-red {
+  background: #4a211d;
+}
+
+:root[data-theme="dark"] .loan-calendar-payment.tone-teal {
+  background: #123f38;
+}
+
+:root[data-theme="dark"] .loan-calendar-payment.tone-blue {
+  background: #17364d;
+}
+
+:root[data-theme="dark"] .loan-calendar-payment.tone-green {
+  background: #203f22;
+}
+
+:root[data-theme="dark"] .loan-calendar-payment.tone-clay {
+  background: #3f2b24;
+}
+
+.loan-calendar-total-label {
+  left: 0;
+  position: sticky;
+  z-index: 1;
+}
+
+.loan-calendar-total {
+  align-content: start;
+  gap: 4px;
+}
+
+.loan-calendar-total span {
+  color: var(--color-heading);
+  font-size: 0.74rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .financial-controls label > span {
@@ -3897,6 +4207,344 @@ select {
   font-size: 0.78rem;
   font-weight: 700;
   margin: 4px 0 0;
+}
+
+.financial-decision-hero {
+  align-items: stretch;
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.28fr);
+  padding: 18px;
+}
+
+.financial-decision-hero.teal {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-teal) 14%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 92%, transparent));
+  border-color: color-mix(in srgb, var(--color-teal) 34%, var(--color-line));
+}
+
+.financial-decision-hero.amber {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-amber) 14%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 92%, transparent));
+  border-color: color-mix(in srgb, var(--color-amber) 36%, var(--color-line));
+}
+
+.financial-decision-hero.clay {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-clay) 12%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 92%, transparent));
+  border-color: color-mix(in srgb, var(--color-clay) 40%, var(--color-line));
+}
+
+.financial-decision-copy {
+  display: grid;
+  gap: 9px;
+}
+
+.financial-decision-copy span,
+.financial-panel-heading span {
+  color: var(--color-teal-strong);
+  font-size: 0.74rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.financial-decision-copy h2 {
+  color: var(--color-heading);
+  font-size: clamp(1.35rem, 2vw, 2rem);
+  line-height: 1.05;
+  margin: 0;
+}
+
+.financial-decision-copy p {
+  color: var(--color-muted);
+  font-weight: 760;
+  line-height: 1.45;
+  margin: 0;
+  max-width: 920px;
+}
+
+.financial-hero-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 3px;
+}
+
+.financial-hero-actions .primary {
+  background: color-mix(in srgb, var(--color-cyan) 14%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 32%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-heading);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 950;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.financial-horizon-control {
+  width: max-content;
+}
+
+.financial-decision-score {
+  align-content: center;
+  background: color-mix(in srgb, var(--color-section) 68%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+}
+
+.financial-decision-score span {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.financial-decision-score strong {
+  color: var(--color-heading);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.financial-decision-score small {
+  color: var(--color-muted);
+  font-weight: 780;
+}
+
+.financial-decision-metrics,
+.financial-quick-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.financial-decision-card,
+.financial-quick-card,
+.financial-panel {
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+}
+
+.financial-decision-card,
+.financial-quick-card {
+  display: grid;
+  gap: 7px;
+  min-height: 118px;
+  padding: 15px;
+}
+
+.financial-decision-card.good {
+  border-color: color-mix(in srgb, var(--color-teal) 30%, var(--color-line));
+}
+
+.financial-decision-card.risk {
+  border-color: color-mix(in srgb, var(--color-clay) 38%, var(--color-line));
+}
+
+.financial-decision-card span,
+.financial-quick-card span,
+.financial-flow-card span {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.financial-decision-card strong,
+.financial-quick-card strong {
+  color: var(--color-heading);
+  font-size: clamp(1.25rem, 2vw, 1.85rem);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.financial-decision-card small,
+.financial-quick-card small,
+.financial-flow-card small {
+  color: var(--color-teal);
+  font-size: 0.74rem;
+  font-weight: 780;
+}
+
+.financial-overview-layout {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(320px, 0.82fr) minmax(420px, 1.18fr);
+}
+
+.financial-overview-layout.secondary {
+  grid-template-columns: minmax(520px, 1.25fr) minmax(340px, 0.75fr);
+}
+
+.financial-panel {
+  display: grid;
+  gap: 13px;
+  padding: 16px;
+}
+
+.financial-panel-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.financial-panel-heading h2 {
+  color: var(--color-heading);
+  font-size: 1.05rem;
+  margin: 3px 0 0;
+}
+
+.financial-panel-heading strong {
+  background: color-mix(in srgb, var(--color-teal) 11%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 26%, var(--color-line));
+  border-radius: 999px;
+  color: var(--color-heading);
+  font-size: 0.82rem;
+  font-weight: 950;
+  padding: 6px 10px;
+  text-align: center;
+}
+
+.financial-action-list {
+  display: grid;
+  gap: 9px;
+}
+
+.financial-action-item {
+  background: color-mix(in srgb, var(--color-section) 68%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-ink);
+  cursor: pointer;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  text-align: left;
+}
+
+.financial-action-item.teal {
+  border-color: color-mix(in srgb, var(--color-teal) 34%, var(--color-line));
+}
+
+.financial-action-item.amber {
+  border-color: color-mix(in srgb, var(--color-amber) 40%, var(--color-line));
+}
+
+.financial-action-item.clay {
+  border-color: color-mix(in srgb, var(--color-clay) 42%, var(--color-line));
+}
+
+.financial-action-item span {
+  color: var(--color-heading);
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.financial-action-item p {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 760;
+  line-height: 1.42;
+  margin: 0;
+}
+
+.financial-action-item strong {
+  color: var(--color-teal-strong);
+  font-size: 0.74rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.financial-flow-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.financial-flow-card {
+  background: color-mix(in srgb, var(--color-section) 62%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  min-height: 116px;
+  padding: 12px;
+}
+
+.financial-flow-card.income {
+  background: color-mix(in srgb, var(--color-teal) 8%, var(--color-section));
+}
+
+.financial-flow-card.cost {
+  background: color-mix(in srgb, var(--color-amber) 8%, var(--color-section));
+}
+
+.financial-flow-card.net {
+  background: color-mix(in srgb, var(--color-cyan) 9%, var(--color-section));
+}
+
+.financial-flow-card strong {
+  color: var(--color-heading);
+  font-size: 1rem;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+
+.financial-month-table {
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.financial-month-row {
+  align-items: center;
+  border-top: 1px solid var(--color-line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 0.55fr repeat(4, minmax(96px, 1fr));
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.financial-month-row:first-child {
+  border-top: 0;
+}
+
+.financial-month-head {
+  background: var(--color-section);
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.financial-month-row strong {
+  color: var(--color-heading);
+  font-size: 0.82rem;
+}
+
+.financial-month-row span {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.financial-month-row.positive span:nth-child(4) {
+  color: var(--color-teal-strong);
+}
+
+.financial-month-row.negative span:nth-child(4) {
+  color: var(--color-clay);
 }
 
 .financial-widget-selector {
@@ -5186,7 +5834,6 @@ select {
 .channels-card,
 .campaigns-card,
 .competitors-card,
-.personnel-card,
 .sales-decision-card {
   grid-column: 1 / -1;
 }
@@ -5203,6 +5850,33 @@ select {
   color: var(--color-heading);
   font-size: 1.02rem;
   margin: 4px 0 0;
+}
+
+.sales-period-toggle {
+  background: color-mix(in srgb, var(--color-section) 66%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.sales-period-toggle button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 900;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.sales-period-toggle button.active {
+  background: color-mix(in srgb, var(--color-cyan) 18%, var(--color-surface));
+  color: var(--color-heading);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-cyan) 38%, var(--color-line));
 }
 
 .sales-form-grid {
@@ -5508,8 +6182,7 @@ select {
   text-transform: uppercase;
 }
 
-.campaign-row,
-.personnel-row {
+.campaign-row {
   background: color-mix(in srgb, var(--color-section) 54%, transparent);
   border: 1px solid var(--color-line);
   border-radius: 8px;
@@ -5520,17 +6193,7 @@ select {
   grid-column: 1 / -1;
 }
 
-.personnel-table .sales-table-row {
-  grid-template-columns: repeat(7, minmax(140px, 1fr));
-  min-width: 1060px;
-}
-
 .campaign-row-layout {
-  grid-template-columns: repeat(5, minmax(150px, 1fr));
-  min-width: 820px;
-}
-
-.personnel-table .personnel-row-layout {
   grid-template-columns: repeat(5, minmax(150px, 1fr));
   min-width: 820px;
 }
@@ -6331,10 +6994,17 @@ select {
   .finance-input-panel,
   .finance-input-panel form,
   .financial-assumption-form,
+  .exchange-rate-grid,
   .financial-input-grid,
+  .financial-loan-currency-section,
   .financial-loan-summary-grid,
   .financial-loan-row,
   .financial-loan-card-metrics,
+  .financial-decision-hero,
+  .financial-decision-metrics,
+  .financial-overview-layout,
+  .financial-flow-grid,
+  .financial-quick-grid,
   .financial-widget-grid,
   .financial-widget-picker,
   .financial-widget-pair,
@@ -6402,6 +7072,7 @@ select {
 
   .financial-header,
   .financial-card-heading,
+  .financial-panel-heading,
   .resource-section-header,
   .scenario-row,
   .simulation-header,
@@ -6416,6 +7087,7 @@ select {
   }
 
   .income-table,
+  .financial-month-table,
   .line-impact-table,
   .compare-table,
   .recent-report-table,
@@ -6424,10 +7096,20 @@ select {
   }
 
   .income-row,
+  .financial-month-row,
   .line-impact-row,
   .compare-table div,
   .recent-report-row {
     min-width: 760px;
+  }
+
+  .financial-hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .financial-horizon-control {
+    width: 100%;
   }
 
   .operation-data-table-card {
@@ -6517,9 +7199,16 @@ select {
   .financial-controls,
   .finance-metric-grid,
   .financial-feasibility-grid,
+  .financial-decision-hero,
+  .financial-decision-metrics,
+  .financial-overview-layout,
+  .financial-flow-grid,
+  .financial-quick-grid,
   .financial-grid,
   .financial-overview-grid,
+  .exchange-rate-grid,
   .financial-input-grid,
+  .financial-loan-currency-section,
   .financial-loan-summary-grid,
   .financial-loan-row,
   .financial-loan-card-metrics,

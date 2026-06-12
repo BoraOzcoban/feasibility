@@ -30,6 +30,49 @@ export const defaultFinancialSettings = {
   workingDaysPerMonth: 22,
 };
 
+export const financialLoanCurrencyOptions = ["TRY", "USD", "EUR"];
+
+function addDateMonths(date, months) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+export function createDemoFinancialLoanRows(referenceDate = new Date()) {
+  const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+
+  return [
+    {
+      amount: 850000,
+      annualInterestRate: 36,
+      currency: "TRY",
+      gracePeriodMonths: 2,
+      id: "demo-working-capital-loan",
+      loanTermMonths: 12,
+      name: "Isletme Sermayesi Kredisi",
+      receivedDate: formatDateInputValue(addDateMonths(monthStart, -2)),
+    },
+    {
+      amount: 45000,
+      annualInterestRate: 9.5,
+      currency: "USD",
+      gracePeriodMonths: 1,
+      id: "demo-usd-equipment-loan",
+      loanTermMonths: 18,
+      name: "USD Ekipman Kredisi",
+      receivedDate: formatDateInputValue(addDateMonths(monthStart, -1)),
+    },
+    {
+      amount: 30000,
+      annualInterestRate: 7.25,
+      currency: "EUR",
+      gracePeriodMonths: 0,
+      id: "demo-eur-short-term-loan",
+      loanTermMonths: 6,
+      name: "EUR Kisa Vadeli Kredi",
+      receivedDate: formatDateInputValue(addDateMonths(monthStart, 1)),
+    },
+  ];
+}
+
 export const requiredFinancialSettingFields = [
   "electricityPricePerKwh",
   "workingDaysPerMonth",
@@ -101,9 +144,38 @@ const financialSettingRules = {
 };
 
 const allowedIncreaseFrequencies = new Set(["monthly", "quarterly", "semiannual", "annual"]);
+const currencyCodePattern = /^[A-Z]{3}$/;
 
 function isBlankFinancialValue(value) {
   return value === null || value === undefined || String(value).trim() === "";
+}
+
+function formatDateInputValue(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function getTodayDateInputValue() {
+  return formatDateInputValue(new Date());
+}
+
+function normalizeLoanCurrency(value) {
+  const currency = String(value || "TRY").trim().toUpperCase();
+  return currencyCodePattern.test(currency) && financialLoanCurrencyOptions.includes(currency) ? currency : "TRY";
+}
+
+function normalizeLoanReceivedDate(value) {
+  if (isBlankFinancialValue(value)) return getTodayDateInputValue();
+
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Loan received date must be a valid date.");
+  }
+
+  return formatDateInputValue(date);
 }
 
 export function normalizeFinancialLoanRows(input = {}) {
@@ -123,8 +195,11 @@ export function normalizeFinancialLoanRows(input = {}) {
   return rows.map((row, index) => {
     const amount = Number(row.amount);
     const annualInterestRate = Number(row.annualInterestRate);
+    const currency = normalizeLoanCurrency(row.currency || input.loanCurrency);
     const gracePeriodMonths = isBlankFinancialValue(row.gracePeriodMonths) ? 0 : Number(row.gracePeriodMonths);
     const loanTermMonths = Number(row.loanTermMonths);
+    const name = String(row.name || `Loan ${index + 1}`).trim() || `Loan ${index + 1}`;
+    const receivedDate = normalizeLoanReceivedDate(row.receivedDate || row.received_date || input.loanReceivedDate);
 
     if (isBlankFinancialValue(row.amount)) {
       throw new Error(`Missing loan amount for loan ${index + 1}`);
@@ -161,9 +236,12 @@ export function normalizeFinancialLoanRows(input = {}) {
     return {
       amount,
       annualInterestRate,
+      currency,
       gracePeriodMonths: Math.round(gracePeriodMonths),
       id: row.id || `loan-${index + 1}`,
       loanTermMonths: Math.round(loanTermMonths),
+      name,
+      receivedDate,
     };
   });
 }
@@ -335,11 +413,31 @@ function mapFinancialSettingsRow(row) {
   };
 }
 
+function mapFinancialLoanRow(row) {
+  return {
+    amount: row.amount,
+    annualInterestRate: row.annual_interest_rate,
+    currency: normalizeLoanCurrency(row.currency),
+    gracePeriodMonths: row.grace_period_months,
+    id: row.id,
+    loanTermMonths: row.loan_term_months,
+    name: row.name,
+    receivedDate: row.received_date,
+  };
+}
+
+function isMissingFinancialLoansTableError(error) {
+  if (!error) return false;
+  const message = String(error.message || "").toLowerCase();
+  return error.code === "42P01" || (message.includes("financial_loans") && message.includes("does not exist"));
+}
+
 export async function loadFinancialModel(supabase, horizon = "6m") {
   let settingsRow = null;
   const [
     { data: settingsData, error: settingsError },
     { data: extraCostRows, error: extraCostsError },
+    { data: loanRows, error: loanRowsError },
   ] = await Promise.all([
     supabase
       .from("financial_model_settings")
@@ -349,18 +447,27 @@ export async function loadFinancialModel(supabase, horizon = "6m") {
       .from("financial_extra_costs")
       .select("id, name, cost_type, amount")
       .order("created_at", { ascending: false }),
+    supabase
+      .from("financial_loans")
+      .select("id, name, amount, currency, annual_interest_rate, grace_period_months, loan_term_months, received_date")
+      .order("received_date", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
 
   if (settingsError) throw settingsError;
   if (extraCostsError) throw extraCostsError;
+  if (loanRowsError && !isMissingFinancialLoansTableError(loanRowsError)) throw loanRowsError;
   settingsRow = settingsData;
+  const mappedSettings = mapFinancialSettingsRow(settingsRow);
+  const mappedLoanRows = loanRowsError ? [] : (loanRows || []).map(mapFinancialLoanRow);
 
   return {
     ...emptyFinancialModel,
     extraCosts: (extraCostRows || []).map(mapFinancialExtraCostRow),
     settings: {
       ...defaultFinancialSettings,
-      ...mapFinancialSettingsRow(settingsRow),
+      ...mappedSettings,
+      loanRows: mappedLoanRows.length ? mappedLoanRows : (mappedSettings.loanRows || []),
     },
     settingsSaved: Boolean(settingsRow),
     horizon,

@@ -47,10 +47,11 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
       if (!machine) return null;
 
       const dailyHours = Math.max(0, toFiniteNumber(row.dailyHours));
+      const machinePrice = Math.max(0, toFiniteNumber(machine.price));
       machineHoursUsed += dailyHours;
       primaryMachineDailyHours = Math.max(primaryMachineDailyHours, dailyHours);
       energyConsumptionKwh += dailyHours * Math.max(0, toFiniteNumber(machine.hourly_energy_consumption_kwh));
-      selectedMachineValue += Math.max(0, toFiniteNumber(machine.price));
+      selectedMachineValue += machinePrice;
 
       return {
         dailyHours,
@@ -58,7 +59,8 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
         hourlyEnergyConsumptionKwh: machine.hourly_energy_consumption_kwh,
         machineId: machine.id,
         name: machine.name,
-        price: machine.price,
+        price: machinePrice,
+        priceCurrency: machine.price_currency || "TRY",
       };
     })
     .filter(Boolean);
@@ -76,7 +78,8 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
       const dailyQuantity = recipeRows.length
         ? producedQuantity * Math.max(0, quantityPerUnit)
         : Math.max(0, toFiniteNumber(row.dailyQuantity));
-      const cost = dailyQuantity * Math.max(0, toFiniteNumber(material.price_per_unit));
+      const pricePerUnit = Math.max(0, toFiniteNumber(material.price_per_unit));
+      const cost = dailyQuantity * pricePerUnit;
       materialCost += cost;
 
       return {
@@ -84,7 +87,8 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
         dailyQuantity,
         materialId: material.id,
         name: material.name,
-        pricePerUnit: material.price_per_unit,
+        priceCurrency: material.price_currency || "TRY",
+        pricePerUnit,
         producedQuantity,
         quantityPerUnit: recipeRows.length ? quantityPerUnit : undefined,
         unit: material.unit,
@@ -102,14 +106,16 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
       const peopleAssigned = Math.max(0, toFiniteNumber(row.peopleAssigned));
       const dailyHours = Math.max(0, toFiniteNumber(row.dailyHours));
       const hoursUsed = peopleAssigned * dailyHours;
-      const cost = hoursUsed * Math.max(0, toFiniteNumber(resource.hourly_cost));
+      const hourlyCost = Math.max(0, toFiniteNumber(resource.hourly_cost));
+      const cost = hoursUsed * hourlyCost;
       workforceCost += cost;
       workforceHoursUsed += hoursUsed;
 
       return {
         cost,
         dailyHours,
-        hourlyCost: resource.hourly_cost,
+        hourlyCost,
+        hourlyCostCurrency: resource.hourly_cost_currency || "TRY",
         hoursUsed,
         peopleAssigned,
         roleName: resource.role_name,
@@ -130,6 +136,7 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
     producedQuantity,
     productName: product.name || plan.result?.productName || plan.input?.productName || "",
     productPrice: toFiniteNumber(product.price, toFiniteNumber(plan.result?.productPrice)),
+    productPriceCurrency: product.price_currency || "TRY",
     productUnit: product.unit || plan.result?.productUnit || "adet",
     selectedMachineValue,
     totalTrackedDailyCost: materialCost + workforceCost,

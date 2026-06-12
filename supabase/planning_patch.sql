@@ -12,6 +12,7 @@ select public.ensure_company_defaults(id) from public.companies;
 create table if not exists public.sales_strategy_settings (
   company_id uuid primary key references public.companies(id) on delete cascade,
   monthly_multipliers jsonb not null default '[1,1,1,1,1,1,1,1,1,1,1,1]'::jsonb,
+  multiplier_period text not null default 'monthly' check (multiplier_period in ('monthly', 'quarterly')),
   updated_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -19,6 +20,7 @@ create table if not exists public.sales_strategy_settings (
 
 alter table public.sales_strategy_settings
   add column if not exists monthly_multipliers jsonb not null default '[1,1,1,1,1,1,1,1,1,1,1,1]'::jsonb,
+  add column if not exists multiplier_period text not null default 'monthly',
   drop column if exists product_name,
   drop column if exists target_segment,
   drop column if exists base_sales_price,
@@ -29,6 +31,13 @@ alter table public.sales_strategy_settings
   drop column if exists market_share,
   drop column if exists reputation_score,
   drop column if exists positioning;
+
+alter table public.sales_strategy_settings
+  drop constraint if exists sales_strategy_settings_multiplier_period_check;
+
+alter table public.sales_strategy_settings
+  add constraint sales_strategy_settings_multiplier_period_check
+  check (multiplier_period in ('monthly', 'quarterly'));
 
 create table if not exists public.sales_channel_types (
   id text primary key,
@@ -315,24 +324,17 @@ alter table public.sales_campaigns
 alter table public.sales_campaigns
   add constraint sales_campaigns_type_id_fkey foreign key (type_id) references public.sales_campaign_types(id);
 
-create table if not exists public.sales_personnel (
-  company_id uuid not null references public.companies(id) on delete cascade,
-  id text not null,
-  name text not null default '',
-  role text not null default '',
-  assigned_channel text not null default '',
-  monthly_target numeric(14, 3) not null default 0,
-  realized_sales_units numeric(14, 3) not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (company_id, id)
-);
+do $$
+begin
+  if to_regclass('public.sales_personnel') is not null then
+    execute 'drop trigger if exists sales_personnel_set_updated_at on public.sales_personnel';
+    execute 'drop policy if exists "sales_personnel_select_company" on public.sales_personnel';
+    execute 'drop policy if exists "sales_personnel_write_company" on public.sales_personnel';
+  end if;
+end;
+$$;
 
-alter table public.sales_personnel
-  add column if not exists realized_sales_units numeric(14, 3) not null default 0,
-  drop column if exists pipeline_value,
-  drop column if exists win_rate,
-  drop column if exists success_score;
+drop table if exists public.sales_personnel;
 
 do $$
 begin
@@ -363,7 +365,6 @@ alter table public.sales_channel_types enable row level security;
 alter table public.sales_campaign_types enable row level security;
 alter table public.sales_channels enable row level security;
 alter table public.sales_campaigns enable row level security;
-alter table public.sales_personnel enable row level security;
 alter table public.simulation_variants enable row level security;
 
 drop policy if exists "sales_strategy_settings_select_company" on public.sales_strategy_settings;
@@ -374,8 +375,6 @@ drop policy if exists "sales_channels_select_company" on public.sales_channels;
 drop policy if exists "sales_channels_write_company" on public.sales_channels;
 drop policy if exists "sales_campaigns_select_company" on public.sales_campaigns;
 drop policy if exists "sales_campaigns_write_company" on public.sales_campaigns;
-drop policy if exists "sales_personnel_select_company" on public.sales_personnel;
-drop policy if exists "sales_personnel_write_company" on public.sales_personnel;
 drop policy if exists "simulation_variants_select_company" on public.simulation_variants;
 drop policy if exists "simulation_variants_write_company" on public.simulation_variants;
 
@@ -476,35 +475,6 @@ with check (
   )
 );
 
-create policy "sales_personnel_select_company"
-on public.sales_personnel
-for select
-using (
-  company_id = public.current_profile_company_id()
-  and (
-    public.has_module_permission('sales-strategy', 'read')
-    or public.has_module_permission('operations', 'read')
-  )
-);
-
-create policy "sales_personnel_write_company"
-on public.sales_personnel
-for all
-using (
-  company_id = public.current_profile_company_id()
-  and (
-    public.has_module_permission('sales-strategy', 'write')
-    or public.has_module_permission('operations', 'write')
-  )
-)
-with check (
-  company_id = public.current_profile_company_id()
-  and (
-    public.has_module_permission('sales-strategy', 'write')
-    or public.has_module_permission('operations', 'write')
-  )
-);
-
 create policy "simulation_variants_select_company"
 on public.simulation_variants
 for select
@@ -567,11 +537,6 @@ create trigger sales_campaigns_set_updated_at
 before update on public.sales_campaigns
 for each row execute function public.set_updated_at();
 
-drop trigger if exists sales_personnel_set_updated_at on public.sales_personnel;
-create trigger sales_personnel_set_updated_at
-before update on public.sales_personnel
-for each row execute function public.set_updated_at();
-
 drop trigger if exists simulation_variants_set_updated_at on public.simulation_variants;
 create trigger simulation_variants_set_updated_at
 before update on public.simulation_variants
@@ -604,20 +569,24 @@ begin
     raise exception 'Sales strategy input is required.';
   end if;
 
-  insert into public.sales_strategy_settings (company_id, monthly_multipliers, updated_by)
+  insert into public.sales_strategy_settings (company_id, monthly_multipliers, multiplier_period, updated_by)
   values (
     v_company_id,
     case
       when jsonb_typeof(p_input->'company'->'monthlyMultipliers') = 'array' then p_input->'company'->'monthlyMultipliers'
       else '[1,1,1,1,1,1,1,1,1,1,1,1]'::jsonb
     end,
+    case
+      when p_input->'company'->>'multiplierPeriod' in ('monthly', 'quarterly') then p_input->'company'->>'multiplierPeriod'
+      else 'monthly'
+    end,
     auth.uid()
   )
   on conflict (company_id) do update set
     monthly_multipliers = excluded.monthly_multipliers,
+    multiplier_period = excluded.multiplier_period,
     updated_by = excluded.updated_by;
 
-  delete from public.sales_personnel where company_id = v_company_id;
   delete from public.sales_campaigns where company_id = v_company_id;
   delete from public.sales_channels where company_id = v_company_id;
 
@@ -695,24 +664,6 @@ begin
       greatest(0, coalesce(nullif(v_entry->>'budget', '')::numeric, 0)),
       greatest(0, coalesce(nullif(v_entry->>'durationDays', '')::numeric, 0)),
       coalesce(v_entry->>'goal', '')
-    );
-  end loop;
-
-  for v_entry in
-    select value
-    from jsonb_array_elements(case when jsonb_typeof(p_input->'personnel') = 'array' then p_input->'personnel' else '[]'::jsonb end)
-  loop
-    insert into public.sales_personnel (
-      company_id, id, name, role, assigned_channel, monthly_target, realized_sales_units
-    )
-    values (
-      v_company_id,
-      coalesce(nullif(v_entry->>'id', ''), gen_random_uuid()::text),
-      coalesce(v_entry->>'name', ''),
-      coalesce(v_entry->>'role', ''),
-      coalesce(v_entry->>'assignedChannel', ''),
-      greatest(0, coalesce(nullif(v_entry->>'monthlyTarget', '')::numeric, 0)),
-      greatest(0, coalesce(nullif(v_entry->>'realizedSalesUnits', '')::numeric, 0))
     );
   end loop;
 
