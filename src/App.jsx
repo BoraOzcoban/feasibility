@@ -3881,36 +3881,44 @@ function App() {
           <button type="submit" disabled={financialLoading}>{copy("Save Assumptions", "Varsayımları Kaydet")}</button>
         </form>
 
-        <form onSubmit={handleSaveFinancialExtraCost}>
-          <label>
-            <span>{copy("Optional expense name", "Opsiyonel gider adı")}</span>
-            <input
-              type="text"
-              value={financialExtraCostForm.name}
-              onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, name: event.target.value }))}
-            />
-          </label>
-          <label>
-            <span>{copy("Type", "Tip")}</span>
-            <select
-              value={financialExtraCostForm.costType}
-              onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, costType: event.target.value }))}
-            >
-              <option value="initial">{copy("Initial", "Başlangıç")}</option>
-              <option value="recurring">{copy("Recurring", "Tekrarlayan")}</option>
-            </select>
-          </label>
-          <label>
-            <span>{copy("Amount", "Tutar")}</span>
-            <input
-              min="0"
-              step="0.01"
-              type="number"
-              value={financialExtraCostForm.amount}
-              onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, amount: event.target.value }))}
-            />
-          </label>
-          <button type="submit" disabled={financialLoading}>{copy("Add Optional Expense", "Opsiyonel Gider Ekle")}</button>
+        <form className="financial-extra-cost-form" onSubmit={handleSaveFinancialExtraCost}>
+          <div className="financial-input-section-heading">
+            <div>
+              <span>{copy("Optional expense", "Opsiyonel gider")}</span>
+              <p>{copy("Add one-off or recurring costs without breaking the main assumption grid.", "Ana varsayım gridini bozmadan tek seferlik veya tekrarlayan gider ekleyin.")}</p>
+            </div>
+          </div>
+          <div className="financial-extra-cost-fields">
+            <label>
+              <span>{copy("Optional expense name", "Opsiyonel gider adı")}</span>
+              <input
+                type="text"
+                value={financialExtraCostForm.name}
+                onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, name: event.target.value }))}
+              />
+            </label>
+            <label>
+              <span>{copy("Type", "Tip")}</span>
+              <select
+                value={financialExtraCostForm.costType}
+                onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, costType: event.target.value }))}
+              >
+                <option value="initial">{copy("Initial", "Başlangıç")}</option>
+                <option value="recurring">{copy("Recurring", "Tekrarlayan")}</option>
+              </select>
+            </label>
+            <label>
+              <span>{copy("Amount", "Tutar")}</span>
+              <input
+                min="0"
+                step="0.01"
+                type="number"
+                value={financialExtraCostForm.amount}
+                onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, amount: event.target.value }))}
+              />
+            </label>
+            <button type="submit" disabled={financialLoading}>{copy("Add Optional Expense", "Opsiyonel Gider Ekle")}</button>
+          </div>
         </form>
       </div>
     );
@@ -4287,26 +4295,73 @@ function App() {
       { amount: summary.netIncome, id: "netIncome", label: copy("Net return", "Net getiri"), source: copy("Calculated", "Hesaplanan"), tone: "net", type: copy("Result", "Sonuç") },
       { amount: summary.totalCashFlow, id: "cashFlow", label: copy("Total cash flow", "Toplam nakit akışı"), source: copy("Calculated", "Hesaplanan"), tone: "cash", type: copy("Result", "Sonuç") },
     ];
+    const overviewFinancialGroups = [
+      {
+        detail: copy("Sales income and non-loan support entering the model.", "Modele giren satış geliri ve kredi dışı destek."),
+        rows: overviewFinancialRows.filter((row) => ["salesRevenue", "investmentGrant"].includes(row.id)),
+        tone: "income",
+        title: copy("Income", "Gelirler"),
+      },
+      {
+        detail: copy("Recurring costs created by operations, sales risk and optional overhead.", "Operations, satış riski ve opsiyonel genel giderlerden gelen tekrarlayan maliyetler."),
+        rows: overviewFinancialRows.filter((row) => ["materialCost", "workforceCost", "electricityCost", "writeOffCost", "recurringExtraCost"].includes(row.id)),
+        tone: "cost",
+        title: copy("Operating Expenses", "Operasyonel Giderler"),
+      },
+      {
+        detail: copy("Initial asset purchases and cash locked into working capital.", "Başlangıç varlık alımları ve işletme sermayesine bağlanan nakit."),
+        rows: overviewFinancialRows.filter((row) => ["machinePurchase", "equipmentPurchase", "extraInitialCost", "workingCapital"].includes(row.id)),
+        tone: "investment",
+        title: copy("Investment & Working Capital", "Yatırım & İşletme Sermayesi"),
+      },
+      {
+        detail: copy("Loans, repayment cash flow and tax obligations.", "Krediler, geri ödeme nakit çıkışı ve vergi yükümlülükleri."),
+        rows: overviewFinancialRows.filter((row) => ["loanAmount", "loanInterest", "loanPaymentTotal", "vatPayable", "incomeTax"].includes(row.id)),
+        tone: "financing",
+        title: copy("Financing & Tax", "Finansman & Vergi"),
+      },
+      {
+        detail: copy("Calculated bottom-line results from the current model.", "Mevcut modelden hesaplanan nihai sonuçlar."),
+        rows: overviewFinancialRows.filter((row) => ["netIncome", "cashFlow"].includes(row.id)),
+        tone: "net",
+        title: copy("Net Result", "Net Sonuç"),
+      },
+    ].map((group) => ({
+      ...group,
+      total: group.rows.reduce((total, row) => total + toFiniteNumber(row.amount), 0),
+    }));
     const renderOverviewFinancialRows = () => (
       <article className="financial-card income-card financial-overview-wide">
         <div className="financial-card-heading">
-          <h2>{copy("Financial Rows", "Finansal Satırlar")}</h2>
-          <span className="financial-row-count">{overviewFinancialRows.length} {copy("rows", "satır")}</span>
-        </div>
-        <div className="income-table overview-income-table">
-          <div className="income-row income-head">
-            <span>{copy("Item", "Kalem")}</span>
-            <span>{copy("Source", "Kaynak")}</span>
-            <span>{copy("Type", "Tip")}</span>
-            <span>{copy("Amount", "Tutar")}</span>
+          <div>
+            <h2>{copy("Financial Statement", "Finansal Tablo")}</h2>
+            <p>{copy("Grouped income, expense, investment, financing and result rows.", "Gelir, gider, yatırım, finansman ve sonuç satırları gruplandı.")}</p>
           </div>
-          {overviewFinancialRows.map((row, index) => (
-            <div className={`income-row ${row.tone || ""}`} key={`${row.id}-${index}`}>
-              <strong>{row.label || getFinancialRowLabel(row)}</strong>
-              <span>{row.source}</span>
-              <span>{row.type}</span>
-              <span>{formatLira(row.amount)}</span>
-            </div>
+          <span className="financial-row-count">{overviewFinancialGroups.length} {copy("groups", "grup")}</span>
+        </div>
+        <div className="financial-statement">
+          {overviewFinancialGroups.map((group) => (
+            <section className={`financial-row-group ${group.tone}`} key={group.title}>
+              <header>
+                <div>
+                  <span>{group.title}</span>
+                  <p>{group.detail}</p>
+                </div>
+                <strong>{formatLira(group.total)}</strong>
+              </header>
+              <div className="financial-row-subgroup">
+                {group.rows.map((row) => (
+                  <div className={`financial-statement-row ${row.tone || ""}`} key={row.id}>
+                    <div>
+                      <strong>{row.label || getFinancialRowLabel(row)}</strong>
+                      <small>{row.source}</small>
+                    </div>
+                    <span>{row.type}</span>
+                    <b>{formatLira(row.amount)}</b>
+                  </div>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       </article>
@@ -4585,6 +4640,32 @@ function App() {
         tone: "clay",
       },
     ].filter(Boolean).slice(0, 5);
+    const overviewFundingReady = financialModel.settingsSaved && (
+      toFiniteNumber(summary.initialCashRequired) <= 0 ||
+      (toFiniteNumber(summary.initialCash) + toFiniteNumber(summary.loanAmount) + toFiniteNumber(summary.investmentGrantAmount)) >= toFiniteNumber(summary.initialCashRequired) ||
+      toFiniteNumber(summary.cashRunwayMonths) >= Math.min(overviewMonthCount, 3)
+    );
+    const overviewReadinessItems = [
+      { done: toFiniteNumber(summary.planCount) > 0, label: copy("Process plan", "Süreç planı"), path: "/operations/data-entry" },
+      { done: overviewHasSalesForecast, label: copy("Sales forecast", "Satış tahmini"), path: "/sales-strategy" },
+      { done: financialModel.settingsSaved, label: copy("Finance inputs", "Finans girdileri"), path: "/financial-modelling/girdiler" },
+      { done: overviewFundingReady, label: copy("Cash plan", "Nakit planı"), path: "/financial-modelling/krediler" },
+    ];
+    const overviewReadinessPercent = Math.round((overviewReadinessItems.filter((item) => item.done).length / overviewReadinessItems.length) * 100);
+    const overviewPlainSummary = overviewIsDecisionReady
+      ? copy(
+          `Monthly net is ${formatLira(overviewMonthlyNet)} with ${formatNumber(summary.cashRunwayMonths)} months runway and ${formatNumber(overviewMarginPercent, 1)}% net margin.`,
+          `Aylık net ${formatLira(overviewMonthlyNet)}, nakit dayanma ${formatNumber(summary.cashRunwayMonths)} ay ve net marj ${formatNumber(overviewMarginPercent, 1)}%.`,
+        )
+      : copy(
+          "Complete the connected inputs first; until then, the financial output should be treated as a draft model.",
+          "Önce bağlı girdileri tamamlayın; o zamana kadar finansal çıktıyı taslak model olarak okuyun.",
+        );
+    const overviewProofPoints = [
+      [copy("Monthly net", "Aylık net"), overviewIsDecisionReady ? formatLira(overviewMonthlyNet) : "-", overviewMonthlyNet >= 0 ? "good" : "risk"],
+      [copy("Runway", "Dayanma"), overviewIsDecisionReady ? `${formatNumber(summary.cashRunwayMonths)} ${copy("mo", "ay")}` : "-", summary.cashRunwayMonths >= overviewCashRunwayLimit ? "good" : "risk"],
+      [copy("Required cash", "Gerekli nakit"), overviewIsDecisionReady ? formatLira(summary.initialCashRequired) : "-", overviewFundingReady ? "good" : "risk"],
+    ];
     const overviewMoneyFlowRows = [
       {
         amount: summary.salesRevenue,
@@ -4721,14 +4802,31 @@ function App() {
 
             {financialStatus && <p className="status-message">{financialStatus}</p>}
 
+            <div className="financial-overview-grid financial-overview-primary">
+              {renderOverviewFinancialRows()}
+              {renderFinancialTrendCard()}
+            </div>
+
             <section className={`financial-decision-hero ${overviewVerdict.tone}`}>
               <div className="financial-decision-copy">
                 <span>{copy("Decision summary", "Karar özeti")}</span>
                 <h2>{overviewVerdict.title}</h2>
                 <p>{overviewVerdict.body}</p>
+                <p className="financial-plain-summary">{overviewPlainSummary}</p>
+                <div className="financial-proof-points" aria-label={copy("Financial proof points", "Finansal kanıt noktaları")}>
+                  {overviewProofPoints.map(([label, value, tone]) => (
+                    <span className={tone} key={label}>
+                      {label}
+                      <strong>{value}</strong>
+                    </span>
+                  ))}
+                </div>
                 <div className="financial-hero-actions">
                   <button type="button" className="primary" onClick={() => goTo(overviewVerdict.path, "login")}>
                     {overviewVerdict.action}
+                  </button>
+                  <button type="button" className="secondary" onClick={() => goTo("/simulation/current-situation", "login")}>
+                    {copy("Stress test", "Stres testi")}
                   </button>
                   <div className="mini-tabs financial-horizon-control">
                     {[
@@ -4751,12 +4849,19 @@ function App() {
                   </div>
                 </div>
               </div>
-              <div className="financial-decision-score">
-                <span>{copy("Model readiness", "Model hazırlığı")}</span>
-                <strong>{overviewIsDecisionReady ? copy("Ready", "Hazır") : copy("Incomplete", "Eksik")}</strong>
-                <small>
-                  {copy("Operations, Sales and Finance data", "Operations, Satış ve Finans verisi")}
-                </small>
+              <div className="financial-decision-score" aria-label={copy("Financial model readiness", "Finansal model hazırlığı")}>
+                <div className="readiness-ring" style={{ "--readiness": `${overviewReadinessPercent}%` }}>
+                  <strong>{overviewReadinessPercent}%</strong>
+                  <span>{copy("Ready", "Hazır")}</span>
+                </div>
+                <div className="financial-readiness-list">
+                  {overviewReadinessItems.map((item) => (
+                    <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
+                      <span>{item.label}</span>
+                      <strong>{item.done ? copy("Done", "Tamam") : copy("Needed", "Gerekli")}</strong>
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -4875,11 +4980,6 @@ function App() {
                   <small>{detail}</small>
                 </article>
               ))}
-            </div>
-
-            <div className="financial-overview-grid">
-              {renderFinancialTrendCard()}
-              {renderOverviewFinancialRows()}
             </div>
 
             {selectedFinancialWidgets.length > 0 && (
@@ -5178,6 +5278,69 @@ function App() {
       [copy("Unit production cost", "Birim üretim maliyeti"), unitProductionCost ? formatLira(unitProductionCost, 2) : "-"],
       [copy("Projection horizon", "Projeksiyon ufku"), `${formatNumber(timeHorizonMonths)} ${copy("months", "ay")}`],
     ];
+    const simulationHasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
+    const simulationSourceReady = Boolean(toFiniteNumber(linkedSummary.planCount) && simulationHasSalesForecast && financialModel.settingsSaved);
+    const positiveOutcomeCount = outcomes.filter((outcome) => outcome.net > 0).length;
+    const simulationConfidencePercent = Math.round((positiveOutcomeCount / outcomes.length) * 100);
+    const simulationReadinessItems = [
+      { done: toFiniteNumber(linkedSummary.planCount) > 0, label: copy("Operations", "Operations"), path: "/operations/data-entry" },
+      { done: simulationHasSalesForecast, label: copy("Sales", "Satış"), path: "/sales-strategy" },
+      { done: financialModel.settingsSaved, label: copy("Finance", "Finans"), path: "/financial-modelling/analiz" },
+      { done: scenarioSalesUnits > 0 && scenarioUnitSalesPrice > 0, label: copy("Variant", "Varyant"), path: variant.path || `/simulation/${variant.id}` },
+    ];
+    const simulationReadinessPercent = Math.round((simulationReadinessItems.filter((item) => item.done).length / simulationReadinessItems.length) * 100);
+    const simulationWorstNet = outcomes[0].net;
+    const simulationDownsideGap = likelyOutcome.net - simulationWorstNet;
+    const simulationUpsideGap = outcomes[3].net - likelyOutcome.net;
+    const simulationRiskTone = !simulationSourceReady
+      ? "amber"
+      : likelyOutcome.net <= 0
+        ? "clay"
+        : simulationWorstNet < 0
+          ? "amber"
+          : "teal";
+    const simulationHeadline = !simulationSourceReady
+      ? copy("Connect the source data before trusting the scenario", "Senaryoya güvenmeden önce kaynak veriyi bağlayın")
+      : simulationRiskTone === "teal"
+        ? copy("The upside holds across the tested range", "Test edilen aralıkta yukarı potansiyel korunuyor")
+        : simulationRiskTone === "amber"
+          ? copy("Profitable base case, visible downside", "Kârlı baz senaryo, görünür aşağı risk")
+          : copy("Scenario needs margin repair", "Senaryonun marj onarımına ihtiyacı var");
+    const simulationBrief = !simulationSourceReady
+      ? copy(
+          "Simulation is most useful after Operations, Sales and Finance data are saved. Missing inputs are marked on the right.",
+          "Simülasyon; Operations, Satış ve Finans verisi kaydedildikten sonra en anlamlı hale gelir. Eksik girdiler sağda işaretli.",
+        )
+      : copy(
+          `Likely net is ${formatLira(likelyOutcome.net)}, worst 5% net is ${formatLira(simulationWorstNet)}, and ${positiveOutcomeCount} of ${outcomes.length} scenario bands stay positive.`,
+          `Olası net ${formatLira(likelyOutcome.net)}, en kötü %5 net ${formatLira(simulationWorstNet)} ve ${outcomes.length} senaryo bandının ${positiveOutcomeCount} tanesi pozitif kalıyor.`,
+        );
+    const simulationSignalRows = [
+      {
+        detail: copy(`${positiveOutcomeCount}/${outcomes.length} positive percentile bands`, `${outcomes.length} bandın ${positiveOutcomeCount} tanesi pozitif`),
+        label: copy("Positive bands", "Pozitif bantlar"),
+        tone: positiveOutcomeCount >= 3 ? "good" : positiveOutcomeCount >= 2 ? "watch" : "risk",
+        value: `${simulationConfidencePercent}%`,
+      },
+      {
+        detail: copy("likely minus worst 5%", "olası eksi en kötü %5"),
+        label: copy("Downside gap", "Aşağı fark"),
+        tone: simulationWorstNet >= 0 ? "good" : "risk",
+        value: formatLira(simulationDownsideGap),
+      },
+      {
+        detail: copy("80th percentile minus likely", "80. persentil eksi olası"),
+        label: copy("Upside room", "Yukarı alan"),
+        tone: "good",
+        value: formatLira(simulationUpsideGap),
+      },
+      {
+        detail: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("without bull/bear tendency", "boğa/ayı eğilimsiz") : copy("with bull/bear tendency", "boğa/ayı eğilimli"),
+        label: copy("Algorithm", "Algoritma"),
+        tone: "neutral",
+        value: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("Neutral", "Nötr") : copy("Tendency", "Eğilimli"),
+      },
+    ];
     return renderDashboardLayout(
       `simulation/${variant.id}`,
         <section className="simulation-workspace monte-carlo-workspace">
@@ -5205,6 +5368,8 @@ function App() {
               <div className={variant.id === item.id ? "simulation-variant-pill active" : "simulation-variant-pill"} key={item.id}>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={variant.id === item.id}
                   onClick={() => goTo(item.path, "login")}
                 >
                   {item.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : item.name || item.label}
@@ -5223,6 +5388,46 @@ function App() {
                   </button>
                 )}
               </div>
+            ))}
+          </div>
+
+          <section className={`simulation-command-hero ${simulationRiskTone}`}>
+            <div className="simulation-command-copy">
+              <span>{copy("Scenario command center", "Senaryo komuta merkezi")}</span>
+              <h2>{simulationHeadline}</h2>
+              <p>{simulationBrief}</p>
+              <div className="simulation-command-actions">
+                <button type="button" className="primary" onClick={() => persistSimulationVariant(variant)} disabled={simulationLoading}>
+                  {simulationLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Variant", "Varyantı Kaydet")}
+                </button>
+                <button type="button" className="secondary" onClick={() => goTo("/financial-modelling/analiz", "login")}>
+                  {copy("Open finance model", "Finans modelini aç")}
+                </button>
+              </div>
+            </div>
+            <div className="simulation-confidence-panel" aria-label={copy("Simulation readiness", "Simülasyon hazırlığı")}>
+              <div className="readiness-ring" style={{ "--readiness": `${simulationReadinessPercent}%` }}>
+                <strong>{simulationReadinessPercent}%</strong>
+                <span>{copy("Ready", "Hazır")}</span>
+              </div>
+              <div className="simulation-source-list">
+                {simulationReadinessItems.map((item) => (
+                  <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.done ? copy("Done", "Tamam") : copy("Needed", "Gerekli")}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <div className="simulation-signal-grid" aria-label={copy("Scenario risk signals", "Senaryo risk sinyalleri")}>
+            {simulationSignalRows.map((signal) => (
+              <article className={`simulation-signal-card ${signal.tone}`} key={signal.label}>
+                <span>{signal.label}</span>
+                <strong>{signal.value}</strong>
+                <small>{signal.detail}</small>
+              </article>
             ))}
           </div>
 
@@ -5438,6 +5643,23 @@ function App() {
       return total + (grossRevenue * Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100);
     }, 0);
     const activeProductCount = new Set(salesStrategy.channels.map((channel) => channel.productId).filter(Boolean)).size;
+    const salesReadinessItems = [
+      { done: operationsWorkspace.products.length > 0, label: copy("Products", "Ürünler"), path: "/operations/products" },
+      { done: salesStrategy.channels.some((channel) => channel.name && channel.productId), label: copy("Channels", "Kanallar"), path: "/sales-strategy" },
+      { done: salesStrategy.channels.some((channel) => toFiniteNumber(channel.monthlySalesUnits) > 0), label: copy("Quantities", "Adetler"), path: "/sales-strategy" },
+      { done: salesStrategy.campaigns.some((campaign) => campaign.name && toFiniteNumber(campaign.budget) > 0), label: copy("Campaigns", "Kampanyalar"), path: "/sales-strategy" },
+    ];
+    const salesReadyCount = salesReadinessItems.filter((item) => item.done).length;
+    const salesReadinessPercent = Math.round((salesReadyCount / Math.max(salesReadinessItems.length, 1)) * 100);
+    const salesMonthLabels = form.language === "tr"
+      ? ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+      : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const salesForecastPreview = Array.from({ length: 12 }, (_, index) => ({
+      label: salesMonthLabels[index],
+      value: getSalesForecastForMonth(salesStrategy, index),
+    }));
+    const maxSalesForecastPreview = Math.max(1, ...salesForecastPreview.map((item) => item.value));
+    const salesStrategyTone = salesReadinessPercent >= 75 ? "teal" : salesReadinessPercent >= 50 ? "amber" : "clay";
     const salesChannelTypeOptions = salesStrategy.channelTypes?.length ? salesStrategy.channelTypes : [
       { averageCommissionPercent: 0, averageCustomerAcquisitionRate: 18, descriptionEn: "Direct sales owned by the company.", descriptionTr: "Şirketin doğrudan yönettiği satış.", id: "direct", nameEn: "Direct sales", nameTr: "Direkt satış" },
       { averageCommissionPercent: 8, averageCustomerAcquisitionRate: 8, descriptionEn: "Digital storefront or online flow.", descriptionTr: "Dijital mağaza veya online akış.", id: "online", nameEn: "Online", nameTr: "Online" },
@@ -5504,6 +5726,36 @@ function App() {
           </div>
 
           {salesStatus && <p className="status-message">{salesStatus}</p>}
+
+          <section className={`sales-command-hero ${salesStrategyTone}`} aria-label={copy("Sales strategy readiness", "Satış stratejisi hazırlığı")}>
+            <div className="sales-command-copy">
+              <span>{copy("Strategy readiness", "Strateji hazırlığı")}</span>
+              <h2>{salesReadinessPercent >= 75 ? copy("Sales plan is model-ready", "Satış planı modele hazır") : copy("Turn channels into a usable forecast", "Kanalları kullanılabilir tahmine çevirin")}</h2>
+              <p>{copy("Connect products, channel quantities, commissions, and campaigns so finance can read a reliable sales signal.", "Finansın güvenilir satış sinyali okuyabilmesi için ürünleri, kanal adetlerini, komisyonları ve kampanyaları bağlayın.")}</p>
+              <div className="sales-readiness-list">
+                {salesReadinessItems.map((item) => (
+                  <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.done ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="sales-forecast-preview">
+              <div className="readiness-ring" style={{ "--readiness": `${salesReadinessPercent}%` }}>
+                <strong>{salesReadinessPercent}%</strong>
+                <span>{copy("ready", "hazır")}</span>
+              </div>
+              <div className="sales-mini-chart" aria-label={copy("12 month sales forecast preview", "12 aylık satış tahmini önizlemesi")}>
+                {salesForecastPreview.map((item) => (
+                  <span style={{ "--bar-height": `${Math.max(6, (item.value / maxSalesForecastPreview) * 100)}%` }} key={item.label}>
+                    <i />
+                    <small>{item.label}</small>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
 
           <div className="sales-stat-grid">
             {[
@@ -5897,7 +6149,13 @@ function App() {
     );
   }
 
-  const references = [];
+  const references = [
+    { name: copy("Production Planning", "Üretim Planlama"), mark: "PP", tone: "teal" },
+    { name: copy("Feasibility Model", "Fizibilite Modeli"), mark: "FM", tone: "cyan" },
+    { name: copy("Cash Scenario", "Nakit Senaryosu"), mark: "CS", tone: "amber" },
+    { name: copy("Sales Route", "Satış Rotası"), mark: "SR", tone: "green" },
+    { name: copy("Risk Review", "Risk Analizi"), mark: "RR", tone: "clay" },
+  ];
 
   const personas = [
     {
@@ -5929,6 +6187,16 @@ function App() {
       difference: labels.exporterDifference,
     },
   ];
+
+  const renderAteraOrbit = (className = "") => (
+    <div className={`who-orbit ${className}`.trim()} aria-hidden="true">
+      <div className="who-core">Atera</div>
+      <span className="who-node node-plan">{copy("Plan", "Planla")}</span>
+      <span className="who-node node-test">{copy("Test", "Dene")}</span>
+      <span className="who-node node-decide">{copy("Decide", "Karar ver")}</span>
+      <span className="who-node node-scale">{copy("Scale", "Büyüt")}</span>
+    </div>
+  );
 
   const dashboardModules = [
     { key: "operations", path: "/operations", label: "Operations" },
@@ -6180,6 +6448,7 @@ function App() {
   ];
   const missingFeasibilityItem = feasibilityChecklist.find((item) => !item.done);
   const feasibilityReadyCount = feasibilityChecklist.filter((item) => item.done).length;
+  const feasibilityReadinessPercent = Math.round((feasibilityReadyCount / Math.max(feasibilityChecklist.length, 1)) * 100);
   const unmetForecastUnits = hasFinancialSourceData
     ? Math.max(0, toFiniteNumber(financialSummary.forecastSalesUnits) - toFiniteNumber(financialSummary.netSoldUnits))
     : 0;
@@ -6217,6 +6486,12 @@ function App() {
               path: "/financial-modelling/analiz",
               tone: "clay",
             };
+  const dashboardQuickActions = [
+    { label: copy("Product setup", "Ürün kurulumu"), path: "/operations/products", value: operationsWorkspace.products.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli") },
+    { label: copy("Process plan", "Süreç planı"), path: "/operations/data-entry", value: activePlanResults.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli") },
+    { label: copy("Sales forecast", "Satış tahmini"), path: "/sales-strategy", value: hasSalesForecast ? copy("Ready", "Hazır") : copy("Needed", "Gerekli") },
+    { label: copy("Finance model", "Finans modeli"), path: "/financial-modelling/girdiler", value: hasFinancialAssumptions ? copy("Ready", "Hazır") : copy("Needed", "Gerekli") },
+  ];
   const improvementFocus = [
     !operationsWorkspace.products.length && copy("Add the product price and recipe so cost is based on a real item.", "Maliyet gerçek ürüne dayansın diye ürün fiyatını ve reçetesini ekleyin."),
     !activePlanResults.length && copy("Save one daily process plan to calculate capacity, labor, material, and energy.", "Kapasite, işçilik, malzeme ve enerjiyi hesaplamak için bir günlük süreç planı kaydedin."),
@@ -6262,7 +6537,7 @@ function App() {
                 <button
                   type="button"
                   className={activePage === module.key || (module.key === "operations" && activePage.startsWith("operations/")) || (module.key === "product-plus" && activePage.startsWith("product-plus/")) || (module.key === "financial-modelling" && activePage.startsWith("financial-modelling/")) || (module.key === "simulation" && activePage.startsWith("simulation/")) ? "active" : ""}
-                  onClick={() => goTo(module.key === "operations" ? "/operations/data-entry" : module.key === "product-plus" ? "/product-plus/product-tree" : module.key === "financial-modelling" ? "/financial-modelling/girdiler" : module.key === "simulation" ? "/simulation/current-situation" : module.path, "login")}
+                  onClick={() => goTo(module.key === "product-plus" ? "/product-plus/product-tree" : module.key === "financial-modelling" ? "/financial-modelling/girdiler" : module.key === "simulation" ? "/simulation/current-situation" : module.path, "login")}
                 >
                   {module.label}
                 </button>
@@ -6405,12 +6680,20 @@ function App() {
         </header>
 
         <section className="landing-hero">
+          {renderAteraOrbit("hero-orbit")}
           <div className="landing-hero-content">
+            <span className="hero-eyebrow">{copy("Factory feasibility command center", "Fabrika fizibilite karar merkezi")}</span>
             <h1>{labels.heroTitle}</h1>
             <p>{labels.heroCopy}</p>
             <button type="button" className="submit-button landing-login" onClick={() => goTo("/login", "login")}>
               {labels.goToLogin}
             </button>
+            <div className="hero-signal-row" aria-label={copy("Atera product signals", "Atera ürün sinyalleri")}>
+              <span>{copy("Production", "Üretim")}</span>
+              <span>{copy("Sales", "Satış")}</span>
+              <span>{copy("Cash flow", "Nakit akışı")}</span>
+              <span>{copy("Risk", "Risk")}</span>
+            </div>
           </div>
         </section>
 
@@ -6422,13 +6705,20 @@ function App() {
             </div>
             <div className="who-content">
               <p>{labels.whoCopy}</p>
-            </div>
-            <div className="who-orbit" aria-hidden="true">
-              <div className="who-core">Atera</div>
-              <span className="who-node node-plan">{copy("Plan", "Planla")}</span>
-              <span className="who-node node-test">{copy("Test", "Dene")}</span>
-              <span className="who-node node-decide">{copy("Decide", "Karar ver")}</span>
-              <span className="who-node node-scale">{copy("Scale", "Büyüt")}</span>
+              <div className="who-principles" aria-label={copy("Atera principles", "Atera ilkeleri")}>
+                <article>
+                  <strong>{copy("One view", "Tek görünüm")}</strong>
+                  <span>{copy("Production, sales, finance, and risk in the same decision flow.", "Üretim, satış, finans ve risk aynı karar akışında.")}</span>
+                </article>
+                <article>
+                  <strong>{copy("Fast scenarios", "Hızlı senaryo")}</strong>
+                  <span>{copy("Change assumptions before capital gets locked into a plan.", "Sermaye plana kilitlenmeden varsayımları değiştirin.")}</span>
+                </article>
+                <article>
+                  <strong>{copy("Practical clarity", "Pratik netlik")}</strong>
+                  <span>{copy("Built for teams that need useful answers, not heavier software.", "Daha ağır yazılım değil, kullanışlı cevap isteyen ekipler için.")}</span>
+                </article>
+              </div>
             </div>
           </article>
 
@@ -6491,11 +6781,18 @@ function App() {
             </div>
             <div className="contact-content">
               <p>{labels.contactCopy}</p>
-              <address className="contact-details">
-                {labels.contactPhone && <a href={`tel:${labels.contactPhone.replaceAll(" ", "")}`}>{labels.contactPhone}</a>}
-                <a href={`mailto:${labels.contactEmail}`}>{labels.contactEmail}</a>
-                <span>{labels.contactLocation}</span>
-              </address>
+              <div className="contact-card">
+                <div className="contact-card-mark" aria-hidden="true">A</div>
+                <address className="contact-details">
+                  {labels.contactPhone && <a href={`tel:${labels.contactPhone.replaceAll(" ", "")}`}>{labels.contactPhone}</a>}
+                  <a href={`mailto:${labels.contactEmail}`}>{labels.contactEmail}</a>
+                  <span>{labels.contactLocation}</span>
+                </address>
+                <div className="contact-status" aria-hidden="true">
+                  <span />
+                  {copy("Open for onboarding conversations", "Onboarding görüşmeleri için açık")}
+                </div>
+              </div>
             </div>
           </article>
         </section>
@@ -6522,6 +6819,32 @@ function App() {
             </div>
             <button type="button" className="command-run-button" onClick={() => goTo("/simulation/current-situation", "login")}>{copy("Open Simulation", "Simülasyonu Aç")}</button>
           </div>
+
+          <section className={`dashboard-command-hero ${feasibilityVerdict.tone}`} aria-label={copy("Decision command center", "Karar komuta merkezi")}>
+            <div className="dashboard-command-copy">
+              <span>{copy("Decision command center", "Karar komuta merkezi")}</span>
+              <h1>{feasibilityVerdict.label}</h1>
+              <p>{feasibilityVerdict.copy}</p>
+              <div className="dashboard-command-actions">
+                <button type="button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
+                <button type="button" className="secondary" onClick={() => goTo("/reports", "login")}>{copy("Open reports", "Raporları Aç")}</button>
+              </div>
+            </div>
+            <div className="dashboard-readiness-panel">
+              <div className="readiness-ring" style={{ "--readiness": `${feasibilityReadinessPercent}%` }}>
+                <strong>{feasibilityReadinessPercent}%</strong>
+                <span>{copy("ready", "hazır")}</span>
+              </div>
+              <div className="readiness-list">
+                {dashboardQuickActions.map((item) => (
+                  <button type="button" onClick={() => goTo(item.path, "login")} key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
 
           <section className={`feasibility-snapshot ${feasibilityVerdict.tone}`} aria-label={copy("Feasibility snapshot", "Fizibilite özeti")}>
             <article className="command-card feasibility-verdict-card">
@@ -6799,12 +7122,37 @@ function App() {
 
   if (session && (activeModule || isOperationsRoute || isProductPlusRoute || isFinancialRoute || isSimulationRoute)) {
     if (path === "/operations") {
-      goTo("/operations/data-entry", "login");
-      return null;
+      return renderDashboardLayout(
+        "operations",
+          <section className="module-placeholder operations-overview">
+            <div>
+              <span>Operations</span>
+              <h1>{copy("Operations", "Operations")}</h1>
+              <p>{copy("Choose the operational workspace you want to work on: resources, products, machines, process definition, or active processes.", "Çalışmak istediğiniz operasyon alanını seçin: kaynaklar, ürünler, makineler, süreç tanımı veya mevcut süreçler.")}</p>
+            </div>
+            <div className="placeholder-grid">
+              {operationsSubmodules.map((submodule) => (
+                <article key={submodule.key}>
+                  <strong>{submodule.label}</strong>
+                  <p>
+                    {submodule.key === "resources" && copy("Define materials and workforce resources used in production plans.", "Üretim planlarında kullanılan malzeme ve iş gücü kaynaklarını tanımlayın.")}
+                    {submodule.key === "products" && copy("Create products and connect their material recipes.", "Ürünleri oluşturun ve malzeme reçetelerini bağlayın.")}
+                    {submodule.key === "machines-equipment" && copy("Manage machines and equipment before planning capacity.", "Kapasite planlamadan önce makine ve ekipmanları yönetin.")}
+                    {submodule.key === "data-entry" && copy("Build and save daily process plans for feasibility analysis.", "Fizibilite analizi için günlük süreç planları oluşturup kaydedin.")}
+                    {submodule.key === "active-processes" && copy("Review saved process plans and their latest feasibility output.", "Kayıtlı süreç planlarını ve son fizibilite çıktılarını inceleyin.")}
+                  </p>
+                  <button type="button" onClick={() => goTo(submodule.path, "login")}>
+                    {copy("Open", "Aç")}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>,
+      );
     }
 
     if (isOperationsRoute && !activeOperationsSubmodule) {
-      goTo(["/operations/material-definitions", "/operations/human-resources"].includes(path) ? "/operations/resources" : "/operations/data-entry", "login");
+      goTo(["/operations/material-definitions", "/operations/human-resources"].includes(path) ? "/operations/resources" : "/operations", "login");
       return null;
     }
 
@@ -6819,6 +7167,31 @@ function App() {
     }
 
     if (activeOperationsSubmodule?.key === "data-entry") {
+      const processSetupItems = [
+        {
+          isReady: operationsWorkspace.products.length > 0,
+          label: copy("Product", "Ürün"),
+          path: "/operations/products",
+          readyCopy: copy("At least one product is defined.", "En az bir ürün tanımlı."),
+          todoCopy: copy("Create a product before defining a process.", "Süreç tanımlamadan önce ürün oluşturun."),
+        },
+        {
+          isReady: operationsWorkspace.machines.length > 0,
+          label: copy("Machine", "Makine"),
+          path: "/operations/machines-equipment",
+          readyCopy: copy("At least one machine is defined.", "En az bir makine tanımlı."),
+          todoCopy: copy("Add a machine with daily capacity inputs.", "Günlük kapasite girdileriyle bir makine ekleyin."),
+        },
+        {
+          isReady: operationsWorkspace.workforce.length > 0,
+          label: copy("Workforce", "İşgücü"),
+          path: "/operations/resources",
+          readyCopy: copy("At least one workforce role is defined.", "En az bir işgücü rolü tanımlı."),
+          todoCopy: copy("Add a workforce role and hourly cost.", "İşgücü rolü ve saatlik maliyet ekleyin."),
+        },
+      ];
+      const isProcessSetupReady = processSetupItems.every((item) => item.isReady);
+
       return renderDashboardLayout(
         `operations/${activeOperationsSubmodule.key}`,
           <section className="operations-workspace operations-modern">
@@ -6826,12 +7199,30 @@ function App() {
               <div>
                 <span>Operations / {copy("Process Definition", "Süreç Tanımlama")}</span>
                 <h1>{copy("Process Definition", "Süreç Tanımlama")}</h1>
+                <p>{copy("Build a daily process plan only after the required product, machine, and workforce records exist.", "Gerekli ürün, makine ve işgücü kayıtları oluştuktan sonra günlük süreç planını kurun.")}</p>
               </div>
               <div className="operations-actions">
                 <button type="button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
               </div>
             </div>
-            {renderOperationPlanner()}
+            {!isProcessSetupReady ? (
+              <div className="process-setup-grid">
+                {processSetupItems.map((item) => (
+                  <article className={`operation-card process-setup-card ${item.isReady ? "ready" : "todo"}`} key={item.label}>
+                    <div>
+                      <mark>{item.isReady ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</mark>
+                      <h2>{item.label}</h2>
+                      <p>{item.isReady ? item.readyCopy : item.todoCopy}</p>
+                    </div>
+                    <button type="button" onClick={() => goTo(item.path, "login")}>
+                      {item.isReady ? copy("Review", "İncele") : copy("Add", "Ekle")}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              renderOperationPlanner()
+            )}
           </section>,
       );
     }

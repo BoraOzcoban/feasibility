@@ -68,6 +68,15 @@ select {
   font: inherit;
 }
 
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-cyan) 42%, transparent);
+  outline-offset: 3px;
+}
+
 .info-tip {
   display: inline-flex;
   line-height: 1.35;
@@ -315,21 +324,21 @@ select {
 }
 
 .landing-hero {
-  align-items: end;
-  display: flex;
+  align-items: center;
+  display: grid;
+  gap: 38px;
   min-height: calc(100vh - 72px);
   overflow: hidden;
-  padding: 64px 32px;
+  padding: 72px 32px 64px;
   position: relative;
 }
 
 .landing-hero::before {
   animation: hero-image-scale 1400ms cubic-bezier(0.16, 1, 0.3, 1) both;
   background:
-    linear-gradient(90deg, rgba(13, 31, 36, 0.9), rgba(16, 43, 50, 0.26)),
-    url("https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1800&q=80");
-  background-position: center;
-  background-size: cover;
+    radial-gradient(circle at 82% 30%, rgba(102, 193, 212, 0.34), transparent 28rem),
+    radial-gradient(circle at 18% 76%, rgba(66, 179, 157, 0.22), transparent 26rem),
+    linear-gradient(135deg, #071418 0%, var(--color-navy) 43%, #0f5f55 100%);
   content: "";
   inset: 0;
   pointer-events: none;
@@ -339,7 +348,12 @@ select {
 
 .landing-hero::after {
   animation: hero-content-glow 1200ms ease-out 220ms both;
-  background: radial-gradient(circle at 18% 72%, rgba(217, 154, 36, 0.32), transparent 34%);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 28% 72%, rgba(47, 159, 189, 0.24), transparent 28%);
+  background-size: 42px 42px, 42px 42px, auto;
+  mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 84%, transparent 100%);
   content: "";
   inset: 0;
   pointer-events: none;
@@ -352,13 +366,29 @@ select {
   max-width: 760px;
   position: relative;
   transform-origin: left bottom;
-  z-index: 1;
+  z-index: 2;
+}
+
+.hero-eyebrow {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  color: rgba(232, 250, 246, 0.92);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  margin-bottom: 18px;
+  padding: 9px 13px;
+  text-transform: uppercase;
 }
 
 .landing-hero h1 {
-  font-size: clamp(3rem, 8vw, 7rem);
+  font-size: clamp(3.4rem, 8.5vw, 7.8rem);
   line-height: 0.95;
   margin: 0;
+  text-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
 }
 
 .landing-hero p {
@@ -370,18 +400,112 @@ select {
 }
 
 .landing-login {
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-teal-strong));
+  box-shadow: 0 18px 38px rgba(47, 159, 189, 0.22);
+  color: #ffffff;
   min-width: 156px;
+}
+
+.landing-login:hover {
+  background: linear-gradient(135deg, #66c1d4, var(--color-teal));
+  box-shadow: 0 20px 46px rgba(47, 159, 189, 0.3);
+}
+
+.hero-signal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.hero-signal-row span {
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.84rem;
+  font-weight: 850;
+  padding: 9px 12px;
 }
 
 @keyframes hero-image-scale {
   from {
     filter: saturate(0.92);
-    transform: scale(0.9);
+    transform: scale(0.98);
   }
 
   to {
     filter: saturate(1);
     transform: scale(1);
+  }
+}
+
+.hero-orbit.who-orbit {
+  animation: hero-orbit-enter 1000ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+  backdrop-filter: blur(8px) saturate(1.02);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(102, 193, 212, 0.08), transparent 36%),
+    radial-gradient(circle at 74% 24%, rgba(66, 179, 157, 0.06), transparent 32%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012));
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 40px 120px rgba(7, 20, 24, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  grid-column: 1 / -1;
+  margin: 0;
+  max-width: 1500px;
+  min-height: clamp(360px, 42vh, 520px);
+  opacity: 0.96;
+  position: relative;
+  width: min(calc(100vw - 64px), 1500px);
+  z-index: 1;
+}
+
+.hero-orbit.who-orbit::before {
+  box-shadow: 0 0 46px rgba(102, 193, 212, 0.18);
+}
+
+.hero-orbit.who-orbit::after {
+  box-shadow: 0 0 34px rgba(66, 179, 157, 0.18);
+}
+
+.hero-orbit.who-orbit::before,
+.hero-orbit.who-orbit::after {
+  border-color: rgba(225, 250, 246, 0.22);
+}
+
+.hero-orbit .who-core {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(102, 193, 212, 0.28), transparent 34%),
+    rgba(13, 31, 36, 0.92);
+  border-color: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 18px 48px rgba(7, 20, 24, 0.4),
+    0 0 0 12px rgba(102, 193, 212, 0.08);
+  height: 154px;
+  width: 154px;
+}
+
+.hero-orbit .who-node {
+  background:
+    linear-gradient(135deg, rgba(13, 31, 36, 0.88), rgba(15, 95, 85, 0.78));
+  border-color: rgba(102, 193, 212, 0.46);
+  box-shadow:
+    0 16px 36px rgba(7, 20, 24, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #f4f8f5;
+}
+
+@keyframes hero-orbit-enter {
+  from {
+    opacity: 0;
+    transform: translateY(34px) scale(0.92);
+  }
+
+  to {
+    opacity: 0.96;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -427,7 +551,7 @@ select {
   background: var(--color-section);
 }
 
-.landing-section > div,
+.landing-section > div:first-child,
 .landing-section > p,
 .who-content,
 .solutions-content > p,
@@ -465,7 +589,7 @@ select {
 
 #who .who-content > p,
 .contact-content > p {
-  border-left: 4px solid var(--color-amber);
+  border-left: 4px solid var(--color-cyan);
   padding-left: 22px;
 }
 
@@ -474,12 +598,68 @@ select {
   gap: 32px;
 }
 
+#who {
+  background:
+    radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--color-cyan) 12%, transparent), transparent 24rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 86%, transparent), color-mix(in srgb, var(--color-section) 72%, transparent));
+  position: relative;
+}
+
+#who::after {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-line) 56%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--color-line) 56%, transparent) 1px, transparent 1px);
+  background-size: 36px 36px;
+  content: "";
+  inset: 0;
+  mask-image: linear-gradient(90deg, transparent, black 18%, transparent 76%);
+  opacity: 0.22;
+  pointer-events: none;
+  position: absolute;
+}
+
+#who > * {
+  position: relative;
+  z-index: 1;
+}
+
+.who-principles {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.who-principles article {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 82%, transparent), color-mix(in srgb, var(--color-cyan) 9%, var(--color-surface)));
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 18%, var(--color-line));
+  border-radius: 8px;
+  box-shadow: 0 16px 38px rgba(16, 43, 50, 0.08);
+  display: grid;
+  gap: 8px;
+  min-height: 144px;
+  padding: 18px;
+}
+
+.who-principles strong {
+  color: var(--color-heading);
+  font-size: 1.02rem;
+}
+
+.who-principles span {
+  color: var(--color-muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  margin: 0;
+  text-transform: none;
+}
+
 .who-orbit {
   aspect-ratio: 16 / 6;
   backdrop-filter: blur(14px) saturate(1.08);
   background:
-    radial-gradient(circle at center, rgba(24, 117, 101, 0.16), transparent 34%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.42), rgba(249, 250, 246, 0.2));
+    radial-gradient(circle at center, color-mix(in srgb, var(--color-teal) 18%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 64%, transparent), color-mix(in srgb, var(--color-surface-soft) 34%, transparent));
   border: 1px solid rgba(215, 225, 218, 0.66);
   border-radius: 8px;
   box-shadow: 0 24px 70px rgba(16, 43, 50, 0.11);
@@ -604,8 +784,10 @@ select {
 
 #contact {
   background:
-    linear-gradient(90deg, rgba(16, 43, 50, 0.05), rgba(24, 117, 101, 0.04)),
+    radial-gradient(circle at 82% 24%, color-mix(in srgb, var(--color-teal) 18%, transparent), transparent 28rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-navy) 6%, var(--color-page)), color-mix(in srgb, var(--color-cyan) 7%, var(--color-section))),
     var(--color-page);
+  position: relative;
 }
 
 .contact-content {
@@ -621,9 +803,9 @@ select {
   align-self: end;
   display: grid;
   font-style: normal;
-  gap: 8px;
+  gap: 12px;
   justify-self: start;
-  margin-top: 34px;
+  margin: 0;
 }
 
 .contact-details a,
@@ -636,6 +818,62 @@ select {
 
 .contact-details a:hover {
   color: var(--color-teal);
+}
+
+.contact-card {
+  align-items: center;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 86%, transparent), color-mix(in srgb, var(--color-teal) 8%, var(--color-surface)));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 20%, var(--color-line));
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(16, 43, 50, 0.12);
+  display: grid;
+  gap: 20px;
+  grid-template-columns: auto minmax(0, 1fr);
+  overflow: hidden;
+  padding: 24px;
+  position: relative;
+}
+
+.contact-card::after {
+  background: linear-gradient(90deg, var(--color-cyan), var(--color-teal));
+  content: "";
+  height: 3px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.contact-card-mark {
+  align-items: center;
+  background:
+    radial-gradient(circle at 28% 22%, color-mix(in srgb, var(--color-cyan) 32%, transparent), transparent 36%),
+    var(--color-navy);
+  border-radius: 8px;
+  color: #ffffff;
+  display: flex;
+  font-size: 2.2rem;
+  font-weight: 950;
+  height: 92px;
+  justify-content: center;
+  width: 92px;
+}
+
+.contact-status {
+  align-items: center;
+  color: var(--color-muted);
+  display: flex;
+  font-size: 0.88rem;
+  font-weight: 800;
+  gap: 8px;
+  grid-column: 2;
+}
+
+.contact-status span {
+  background: var(--color-teal);
+  border-radius: 999px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-teal) 13%, transparent);
+  height: 8px;
+  width: 8px;
 }
 
 .solutions-section,
@@ -1502,6 +1740,181 @@ select {
   padding: 10px 14px;
 }
 
+.dashboard-command-hero {
+  --hero-tone: var(--color-teal);
+  align-items: stretch;
+  background:
+    radial-gradient(circle at 86% 20%, color-mix(in srgb, var(--hero-tone) 22%, transparent), transparent 24rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-navy) 92%, black), color-mix(in srgb, var(--color-navy-soft) 84%, var(--hero-tone)));
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 28%, rgba(255, 255, 255, 0.14));
+  border-radius: 8px;
+  box-shadow: 0 28px 90px rgba(7, 20, 24, 0.24);
+  color: #ffffff;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+  overflow: hidden;
+  padding: 28px;
+  position: relative;
+}
+
+.dashboard-command-hero::after {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 34px 34px;
+  content: "";
+  inset: 0;
+  opacity: 0.24;
+  pointer-events: none;
+  position: absolute;
+}
+
+.dashboard-command-hero.teal {
+  --hero-tone: var(--color-teal);
+}
+
+.dashboard-command-hero.amber {
+  --hero-tone: var(--color-amber);
+}
+
+.dashboard-command-hero.clay {
+  --hero-tone: var(--color-clay);
+}
+
+.dashboard-command-copy,
+.dashboard-readiness-panel {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-command-copy {
+  align-content: center;
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-command-copy > span,
+.sales-command-copy > span {
+  color: color-mix(in srgb, #ffffff 76%, var(--hero-tone));
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-command-copy h1 {
+  font-size: clamp(2.35rem, 4.8vw, 5.35rem);
+  line-height: 0.94;
+  margin: 0;
+}
+
+.dashboard-command-copy p {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1.02rem;
+  line-height: 1.65;
+  margin: 0;
+  max-width: 760px;
+}
+
+.dashboard-command-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.dashboard-command-actions button,
+.sales-command-hero button {
+  background: color-mix(in srgb, var(--hero-tone) 30%, rgba(255, 255, 255, 0.12));
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 45%, rgba(255, 255, 255, 0.22));
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 950;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.dashboard-command-actions .secondary,
+.sales-command-hero button:not(.done) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dashboard-readiness-panel {
+  align-items: center;
+  backdrop-filter: blur(16px) saturate(1.1);
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 18px;
+}
+
+.readiness-ring {
+  --readiness: 0%;
+  align-items: center;
+  background:
+    radial-gradient(circle at center, var(--color-navy) 0 54%, transparent 55%),
+    conic-gradient(var(--hero-tone) 0 var(--readiness), rgba(255, 255, 255, 0.16) var(--readiness) 100%);
+  border-radius: 999px;
+  color: #ffffff;
+  display: grid;
+  height: 132px;
+  justify-items: center;
+  line-height: 1;
+  place-content: center;
+  width: 132px;
+}
+
+.readiness-ring strong {
+  font-size: 2rem;
+}
+
+.readiness-ring span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.75rem;
+  font-weight: 900;
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+
+.readiness-list,
+.sales-readiness-list {
+  display: grid;
+  gap: 8px;
+}
+
+.readiness-list button,
+.sales-readiness-list button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.readiness-list span,
+.sales-readiness-list span {
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.readiness-list strong,
+.sales-readiness-list strong {
+  color: color-mix(in srgb, #ffffff 74%, var(--hero-tone));
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
 .feasibility-snapshot {
   --verdict-color: var(--color-amber);
   display: grid;
@@ -2268,11 +2681,91 @@ select {
   font-size: 1.05rem;
 }
 
+.placeholder-grid button {
+  align-self: end;
+  background: color-mix(in srgb, var(--color-teal) 14%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 28%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-teal-strong);
+  cursor: pointer;
+  font-weight: 900;
+  justify-self: start;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.placeholder-grid button:hover {
+  background: color-mix(in srgb, var(--color-teal) 22%, var(--color-surface));
+}
+
 .operations-workspace {
   display: grid;
   gap: 14px;
   min-height: 100vh;
   padding: 18px;
+}
+
+.process-setup-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.process-setup-card {
+  align-content: space-between;
+  min-height: 220px;
+}
+
+.process-setup-card div {
+  display: grid;
+  gap: 10px;
+}
+
+.process-setup-card mark {
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 950;
+  justify-self: start;
+  padding: 6px 9px;
+  text-transform: uppercase;
+}
+
+.process-setup-card.ready mark {
+  background: color-mix(in srgb, var(--color-teal) 14%, var(--color-surface));
+  color: var(--color-teal-strong);
+}
+
+.process-setup-card.todo mark {
+  background: color-mix(in srgb, var(--color-clay) 12%, var(--color-surface));
+  color: var(--color-clay);
+}
+
+.process-setup-card h2 {
+  color: var(--color-heading);
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.process-setup-card p {
+  color: var(--color-muted);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.process-setup-card button {
+  background: color-mix(in srgb, var(--color-teal) 14%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 28%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-teal-strong);
+  cursor: pointer;
+  font-weight: 900;
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.process-setup-card button:hover {
+  background: color-mix(in srgb, var(--color-teal) 22%, var(--color-surface));
 }
 
 .operations-header {
@@ -3535,20 +4028,36 @@ select {
 .finance-input-panel {
   align-items: start;
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .finance-input-panel form {
-  align-items: end;
+  align-items: stretch;
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .finance-input-panel .financial-assumption-form {
   align-items: stretch;
   grid-template-columns: minmax(0, 1fr);
+}
+
+.financial-extra-cost-form {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-cyan) 8%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 92%, transparent));
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 22%, var(--color-line));
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  padding: 14px;
+}
+
+.financial-extra-cost-fields {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(150px, 0.55fr) minmax(170px, 0.65fr) auto;
 }
 
 .financial-input-section {
@@ -3661,6 +4170,66 @@ select {
 .financial-loan-form {
   display: grid;
   gap: 14px;
+}
+
+.financial-loan-form button {
+  background: color-mix(in srgb, var(--color-cyan) 14%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 32%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-heading);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 950;
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.financial-loan-form button[type="submit"],
+.financial-loan-actions button[type="submit"] {
+  background: color-mix(in srgb, var(--color-teal) 16%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-teal) 34%, var(--color-line));
+}
+
+.financial-loan-form button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.financial-loan-form label {
+  color: var(--color-muted);
+  display: grid;
+  font-size: 0.74rem;
+  font-weight: 900;
+  gap: 6px;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.financial-loan-form label > span {
+  align-items: center;
+  color: var(--color-muted);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.financial-loan-form label small {
+  color: var(--color-teal);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.financial-loan-form input,
+.financial-loan-form select {
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-ink);
+  font: inherit;
+  min-height: 40px;
+  min-width: 0;
+  padding: 8px 10px;
+  width: 100%;
 }
 
 .financial-loan-hero {
@@ -3803,6 +4372,15 @@ select {
   color: var(--color-heading);
   font-size: 1.2rem;
   margin: 0;
+}
+
+.financial-loan-card-heading .resource-remove-button {
+  background: color-mix(in srgb, var(--color-clay) 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-clay) 30%, var(--color-line));
+  color: var(--color-clay);
+  min-height: 34px;
+  min-width: 34px;
+  padding: 0;
 }
 
 .financial-loan-row {
@@ -4167,6 +4745,21 @@ select {
   grid-template-columns: repeat(2, minmax(360px, 1fr));
 }
 
+.financial-overview-primary {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.financial-overview-primary .income-card {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-teal) 8%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 94%, transparent));
+  border-color: color-mix(in srgb, var(--color-teal) 28%, var(--color-line));
+  box-shadow: 0 18px 54px rgba(7, 20, 24, 0.1);
+}
+
+.financial-overview-primary .financial-card-heading h2 {
+  font-size: clamp(1.2rem, 2vw, 1.65rem);
+}
+
 .financial-overview-wide {
   grid-column: 1 / -1;
 }
@@ -4210,35 +4803,51 @@ select {
 }
 
 .financial-decision-hero {
+  --hero-tone: var(--color-teal);
   align-items: stretch;
-  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
-  border: 1px solid var(--color-line);
+  background:
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--hero-tone) 20%, transparent), transparent 24rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 94%, transparent), color-mix(in srgb, var(--color-section) 72%, var(--color-surface)));
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 24%, var(--color-line));
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.28fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+  overflow: hidden;
   padding: 18px;
+  position: relative;
+}
+
+.financial-decision-hero::after {
+  background:
+    linear-gradient(color-mix(in srgb, var(--hero-tone) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--hero-tone) 7%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  content: "";
+  inset: 0;
+  opacity: 0.42;
+  pointer-events: none;
+  position: absolute;
 }
 
 .financial-decision-hero.teal {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--color-teal) 14%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 92%, transparent));
-  border-color: color-mix(in srgb, var(--color-teal) 34%, var(--color-line));
+  --hero-tone: var(--color-teal);
 }
 
 .financial-decision-hero.amber {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--color-amber) 14%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 92%, transparent));
-  border-color: color-mix(in srgb, var(--color-amber) 36%, var(--color-line));
+  --hero-tone: var(--color-amber);
 }
 
 .financial-decision-hero.clay {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--color-clay) 12%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 92%, transparent));
-  border-color: color-mix(in srgb, var(--color-clay) 40%, var(--color-line));
+  --hero-tone: var(--color-clay);
 }
 
 .financial-decision-copy {
   display: grid;
-  gap: 9px;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .financial-decision-copy span,
@@ -4251,9 +4860,10 @@ select {
 
 .financial-decision-copy h2 {
   color: var(--color-heading);
-  font-size: clamp(1.35rem, 2vw, 2rem);
-  line-height: 1.05;
+  font-size: clamp(1.35rem, 2.4vw, 2.35rem);
+  line-height: 1.02;
   margin: 0;
+  max-width: 850px;
 }
 
 .financial-decision-copy p {
@@ -4262,6 +4872,48 @@ select {
   line-height: 1.45;
   margin: 0;
   max-width: 920px;
+}
+
+.financial-plain-summary {
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 18%, var(--color-line));
+  border-radius: 8px;
+  padding: 11px 12px;
+}
+
+.financial-proof-points {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 780px;
+}
+
+.financial-proof-points span {
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 18%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-muted);
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 950;
+  gap: 6px;
+  padding: 10px;
+  text-transform: uppercase;
+}
+
+.financial-proof-points span.good {
+  border-color: color-mix(in srgb, var(--color-teal) 34%, var(--color-line));
+}
+
+.financial-proof-points span.risk {
+  border-color: color-mix(in srgb, var(--color-clay) 34%, var(--color-line));
+}
+
+.financial-proof-points strong {
+  color: var(--color-heading);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+  text-transform: none;
 }
 
 .financial-hero-actions {
@@ -4273,15 +4925,27 @@ select {
 }
 
 .financial-hero-actions .primary {
-  background: color-mix(in srgb, var(--color-cyan) 14%, var(--color-surface));
-  border: 1px solid color-mix(in srgb, var(--color-cyan) 32%, var(--color-line));
+  background: color-mix(in srgb, var(--hero-tone) 18%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 38%, var(--color-line));
   border-radius: 8px;
   color: var(--color-heading);
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 950;
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+.financial-hero-actions .secondary {
+  background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 24%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-heading);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 950;
+  min-height: 42px;
+  padding: 0 14px;
 }
 
 .financial-horizon-control {
@@ -4290,30 +4954,88 @@ select {
 
 .financial-decision-score {
   align-content: center;
-  background: color-mix(in srgb, var(--color-section) 68%, transparent);
-  border: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-surface) 76%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 20%, var(--color-line));
   border-radius: 8px;
   display: grid;
-  gap: 7px;
+  gap: 16px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
   padding: 16px;
+  position: relative;
+  z-index: 1;
 }
 
-.financial-decision-score span {
+.financial-decision-score > span {
   color: var(--color-muted);
   font-size: 0.74rem;
   font-weight: 950;
   text-transform: uppercase;
 }
 
-.financial-decision-score strong {
+.financial-decision-score > strong {
   color: var(--color-heading);
   font-size: 1.4rem;
   line-height: 1;
 }
 
-.financial-decision-score small {
+.financial-decision-score > small {
   color: var(--color-muted);
   font-weight: 780;
+}
+
+.financial-decision-score .readiness-ring {
+  background:
+    radial-gradient(circle at center, var(--color-surface) 0 54%, transparent 55%),
+    conic-gradient(var(--hero-tone) 0 var(--readiness), color-mix(in srgb, var(--color-line) 70%, transparent) var(--readiness) 100%);
+  color: var(--color-heading);
+  height: 118px;
+  width: 118px;
+}
+
+.financial-decision-score .readiness-ring span {
+  color: var(--color-muted);
+}
+
+.financial-readiness-list {
+  align-content: center;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.financial-readiness-list button {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-section) 56%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-heading);
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.financial-readiness-list button.done {
+  background: color-mix(in srgb, var(--hero-tone) 12%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--hero-tone) 28%, var(--color-line));
+}
+
+.financial-readiness-list span {
+  color: var(--color-heading);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: none;
+}
+
+.financial-readiness-list strong {
+  color: var(--hero-tone);
+  font-size: 0.74rem;
+  font-weight: 950;
+  text-transform: uppercase;
 }
 
 .financial-decision-metrics,
@@ -4696,6 +5418,25 @@ select {
   grid-template-columns: minmax(180px, 1.2fr) minmax(180px, 1fr) minmax(120px, 0.75fr) minmax(120px, 0.7fr);
 }
 
+.financial-overview-primary .overview-income-table .income-row {
+  min-height: 46px;
+  padding: 9px 12px;
+}
+
+.financial-overview-primary .overview-income-table .income-head {
+  background: color-mix(in srgb, var(--color-teal) 10%, var(--color-section));
+}
+
+.financial-overview-primary .overview-income-table .income-row strong {
+  font-size: 0.88rem;
+}
+
+.overview-income-table .income-row span:last-child {
+  color: var(--color-heading);
+  font-weight: 900;
+  text-align: right;
+}
+
 .overview-income-table .income-row.income {
   background: color-mix(in srgb, var(--color-teal) 7%, transparent);
 }
@@ -4725,6 +5466,123 @@ select {
 
 .income-total {
   background: color-mix(in srgb, var(--color-teal) 10%, var(--color-surface));
+}
+
+.financial-statement {
+  display: grid;
+  gap: 12px;
+}
+
+.financial-row-group {
+  --group-tone: var(--color-teal);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--group-tone) 24%, var(--color-line));
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.financial-row-group.income {
+  --group-tone: var(--color-teal);
+}
+
+.financial-row-group.cost {
+  --group-tone: var(--color-clay);
+}
+
+.financial-row-group.investment {
+  --group-tone: var(--color-cyan);
+}
+
+.financial-row-group.financing {
+  --group-tone: var(--color-green);
+}
+
+.financial-row-group.net {
+  --group-tone: var(--color-amber);
+}
+
+.financial-row-group header {
+  align-items: center;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--group-tone) 13%, var(--color-surface)), color-mix(in srgb, var(--color-section) 72%, transparent));
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.financial-row-group header div {
+  display: grid;
+  gap: 4px;
+}
+
+.financial-row-group header span {
+  color: var(--color-heading);
+  font-size: 0.92rem;
+  font-weight: 950;
+}
+
+.financial-row-group header p {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 730;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.financial-row-group header strong {
+  color: var(--color-heading);
+  font-size: clamp(1.05rem, 1.8vw, 1.55rem);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.financial-row-subgroup {
+  display: grid;
+}
+
+.financial-statement-row {
+  align-items: center;
+  border-top: 1px solid color-mix(in srgb, var(--group-tone) 14%, var(--color-line));
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(130px, 0.55fr) minmax(130px, 0.55fr);
+  min-height: 52px;
+  padding: 10px 14px;
+}
+
+.financial-statement-row div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.financial-statement-row strong {
+  color: var(--color-heading);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.financial-statement-row small,
+.financial-statement-row span {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  font-weight: 780;
+}
+
+.financial-statement-row span {
+  background: color-mix(in srgb, var(--group-tone) 9%, var(--color-section));
+  border: 1px solid color-mix(in srgb, var(--group-tone) 18%, var(--color-line));
+  border-radius: 999px;
+  justify-self: start;
+  padding: 5px 9px;
+}
+
+.financial-statement-row b {
+  color: var(--color-heading);
+  font-size: 0.92rem;
+  justify-self: end;
+  text-align: right;
 }
 
 .income-row:first-child {
@@ -5463,6 +6321,207 @@ select {
   background: color-mix(in srgb, var(--color-clay) 12%, transparent);
 }
 
+.simulation-command-hero {
+  --hero-tone: var(--color-teal);
+  align-items: stretch;
+  background:
+    radial-gradient(circle at 88% 22%, color-mix(in srgb, var(--hero-tone) 24%, transparent), transparent 25rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-navy) 92%, black), color-mix(in srgb, var(--color-navy-soft) 84%, var(--hero-tone)));
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 28%, rgba(255, 255, 255, 0.16));
+  border-radius: 8px;
+  box-shadow: 0 28px 90px rgba(7, 20, 24, 0.24);
+  color: #ffffff;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+  overflow: hidden;
+  padding: 26px;
+  position: relative;
+}
+
+.simulation-command-hero::after {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 34px 34px;
+  content: "";
+  inset: 0;
+  opacity: 0.24;
+  pointer-events: none;
+  position: absolute;
+}
+
+.simulation-command-hero.teal {
+  --hero-tone: var(--color-teal);
+}
+
+.simulation-command-hero.amber {
+  --hero-tone: var(--color-amber);
+}
+
+.simulation-command-hero.clay {
+  --hero-tone: var(--color-clay);
+}
+
+.simulation-command-copy,
+.simulation-confidence-panel {
+  position: relative;
+  z-index: 1;
+}
+
+.simulation-command-copy {
+  align-content: center;
+  display: grid;
+  gap: 13px;
+}
+
+.simulation-command-copy > span {
+  color: color-mix(in srgb, #ffffff 76%, var(--hero-tone));
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.simulation-command-copy h2 {
+  color: #ffffff;
+  font-size: clamp(1.9rem, 3.9vw, 4.25rem);
+  line-height: 0.98;
+  margin: 0;
+  max-width: 820px;
+}
+
+.simulation-command-copy p {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1rem;
+  line-height: 1.62;
+  margin: 0;
+  max-width: 760px;
+}
+
+.simulation-command-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.simulation-command-actions button {
+  background: color-mix(in srgb, var(--hero-tone) 30%, rgba(255, 255, 255, 0.12));
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 45%, rgba(255, 255, 255, 0.22));
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 950;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.simulation-command-actions .secondary {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.simulation-command-actions button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.simulation-confidence-panel {
+  align-items: center;
+  backdrop-filter: blur(16px) saturate(1.08);
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 18px;
+}
+
+.simulation-source-list {
+  display: grid;
+  gap: 8px;
+}
+
+.simulation-source-list button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.simulation-source-list button.done {
+  background: color-mix(in srgb, var(--hero-tone) 24%, rgba(255, 255, 255, 0.1));
+  border-color: color-mix(in srgb, var(--hero-tone) 44%, rgba(255, 255, 255, 0.18));
+}
+
+.simulation-source-list span {
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.simulation-source-list strong {
+  color: color-mix(in srgb, #ffffff 74%, var(--hero-tone));
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.simulation-signal-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.simulation-signal-card {
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 7px;
+  min-height: 116px;
+  padding: 16px;
+}
+
+.simulation-signal-card.good {
+  border-color: color-mix(in srgb, var(--color-teal) 34%, var(--color-line));
+}
+
+.simulation-signal-card.watch {
+  border-color: color-mix(in srgb, var(--color-amber) 42%, var(--color-line));
+}
+
+.simulation-signal-card.risk {
+  border-color: color-mix(in srgb, var(--color-clay) 42%, var(--color-line));
+}
+
+.simulation-signal-card span {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.simulation-signal-card strong {
+  color: var(--color-heading);
+  font-size: clamp(1.25rem, 2vw, 1.85rem);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.simulation-signal-card small {
+  color: var(--color-teal);
+  font-weight: 800;
+}
+
 .monte-carlo-summary {
   display: grid;
   gap: 12px;
@@ -5778,6 +6837,133 @@ select {
   font-weight: 900;
   min-height: 36px;
   padding: 0 12px;
+}
+
+.sales-command-hero {
+  --hero-tone: var(--color-teal);
+  align-items: stretch;
+  background:
+    radial-gradient(circle at 88% 28%, color-mix(in srgb, var(--hero-tone) 22%, transparent), transparent 26rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 92%, transparent), color-mix(in srgb, var(--color-section) 70%, var(--color-surface)));
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 26%, var(--color-line));
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.86fr);
+  overflow: hidden;
+  padding: 22px;
+  position: relative;
+}
+
+.sales-command-hero.teal {
+  --hero-tone: var(--color-teal);
+}
+
+.sales-command-hero.amber {
+  --hero-tone: var(--color-amber);
+}
+
+.sales-command-hero.clay {
+  --hero-tone: var(--color-clay);
+}
+
+.sales-command-copy {
+  align-content: center;
+  display: grid;
+  gap: 12px;
+}
+
+.sales-command-copy > span {
+  color: var(--hero-tone);
+}
+
+.sales-command-copy h2 {
+  color: var(--color-heading);
+  font-size: clamp(1.7rem, 3.2vw, 3.2rem);
+  line-height: 1;
+  margin: 0;
+}
+
+.sales-command-copy p {
+  color: var(--color-muted);
+  line-height: 1.65;
+  margin: 0;
+  max-width: 760px;
+}
+
+.sales-readiness-list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 6px;
+}
+
+.sales-readiness-list button {
+  background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  border-color: color-mix(in srgb, var(--hero-tone) 18%, var(--color-line));
+  color: var(--color-heading);
+}
+
+.sales-readiness-list button.done {
+  background: color-mix(in srgb, var(--hero-tone) 12%, var(--color-surface));
+}
+
+.sales-readiness-list strong {
+  color: var(--hero-tone);
+}
+
+.sales-forecast-preview {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 20%, var(--color-line));
+  border-radius: 8px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 16px;
+}
+
+.sales-command-hero .readiness-ring {
+  background:
+    radial-gradient(circle at center, var(--color-surface) 0 54%, transparent 55%),
+    conic-gradient(var(--hero-tone) 0 var(--readiness), color-mix(in srgb, var(--color-line) 72%, transparent) var(--readiness) 100%);
+  color: var(--color-heading);
+}
+
+.sales-command-hero .readiness-ring span {
+  color: var(--color-muted);
+}
+
+.sales-mini-chart {
+  align-items: end;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  min-height: 148px;
+}
+
+.sales-mini-chart span {
+  align-items: center;
+  display: grid;
+  gap: 7px;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+}
+
+.sales-mini-chart i {
+  align-self: end;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--hero-tone) 78%, var(--color-cyan)), var(--hero-tone));
+  border-radius: 999px 999px 4px 4px;
+  display: block;
+  height: var(--bar-height);
+  min-height: 8px;
+  width: 100%;
+}
+
+.sales-mini-chart small {
+  color: var(--color-muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-align: center;
 }
 
 .sales-stat-grid {
@@ -6825,14 +8011,59 @@ select {
   }
 
   .landing-hero {
+    align-items: start;
+    display: grid;
+    gap: 28px;
     min-height: 78vh;
     padding: 48px 18px;
+  }
+
+  .landing-hero-content {
+    max-width: 100%;
+  }
+
+  .hero-orbit.who-orbit {
+    animation: none;
+    aspect-ratio: 1 / 0.86;
+    grid-column: auto;
+    max-width: none;
+    min-height: 0;
+    opacity: 0.96;
+    order: 2;
+    position: relative;
+    right: auto;
+    top: auto;
+    transform: none;
+    width: 100%;
+  }
+
+  .hero-orbit .who-core {
+    height: 82px;
+    width: 82px;
+  }
+
+  .hero-orbit .who-node {
+    min-width: 74px;
+    padding: 9px 10px;
   }
 
   .landing-section {
     grid-template-columns: 1fr;
     min-height: auto;
     padding: 64px 18px;
+  }
+
+  .who-principles {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-card {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .contact-status {
+    grid-column: auto;
   }
 
   .persona-carousel::before,
@@ -6914,6 +8145,10 @@ select {
   }
 
   .command-topbar,
+  .dashboard-command-hero,
+  .dashboard-readiness-panel,
+  .simulation-command-hero,
+  .simulation-confidence-panel,
   .command-hero,
   .feasibility-snapshot,
   .command-stat-grid,
@@ -6925,6 +8160,11 @@ select {
   .finance-kpis,
   .finance-date-controls {
     grid-template-columns: 1fr;
+  }
+
+  .readiness-ring {
+    height: 112px;
+    width: 112px;
   }
 
   .command-topbar {
@@ -6969,6 +8209,10 @@ select {
     padding: 12px;
   }
 
+  .process-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
   .operations-header,
   .operation-card-heading {
     align-items: stretch;
@@ -6984,6 +8228,14 @@ select {
     justify-content: flex-start;
   }
 
+  .sales-command-hero,
+  .sales-forecast-preview,
+  .simulation-command-hero,
+  .simulation-confidence-panel,
+  .sales-readiness-list {
+    grid-template-columns: 1fr;
+  }
+
   .operations-grid,
   .operation-planner,
   .part-status-row,
@@ -6994,6 +8246,8 @@ select {
   .finance-input-panel,
   .finance-input-panel form,
   .financial-assumption-form,
+  .financial-extra-cost-fields,
+  .financial-statement-row,
   .exchange-rate-grid,
   .financial-input-grid,
   .financial-loan-currency-section,
@@ -7001,6 +8255,9 @@ select {
   .financial-loan-row,
   .financial-loan-card-metrics,
   .financial-decision-hero,
+  .financial-decision-score,
+  .financial-proof-points,
+  .financial-readiness-list,
   .financial-decision-metrics,
   .financial-overview-layout,
   .financial-flow-grid,
@@ -7024,6 +8281,8 @@ select {
   .reports-grid,
   .monte-carlo-summary,
   .monte-carlo-grid,
+  .simulation-signal-grid,
+  .simulation-source-list,
   .percentile-grid,
   .sim-income-layout,
   .sales-stat-grid,
@@ -7104,6 +8363,11 @@ select {
   }
 
   .financial-hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .simulation-command-actions {
     align-items: stretch;
     flex-direction: column;
   }
@@ -7197,6 +8461,8 @@ select {
   }
 
   .financial-controls,
+  .financial-extra-cost-fields,
+  .financial-statement-row,
   .finance-metric-grid,
   .financial-feasibility-grid,
   .financial-decision-hero,
@@ -7215,9 +8481,16 @@ select {
   .financial-widget-grid,
   .financial-widget-picker,
   .financial-widget-pair,
+  .financial-decision-score,
+  .financial-proof-points,
+  .financial-readiness-list,
   .scenario-management,
   .simulation-grid,
   .simulation-bottom,
+  .simulation-command-hero,
+  .simulation-confidence-panel,
+  .simulation-signal-grid,
+  .simulation-source-list,
   .reports-controls,
   .report-stat-grid,
   .reports-grid,
