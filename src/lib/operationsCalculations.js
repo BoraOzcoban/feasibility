@@ -3,19 +3,28 @@ export function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function asObjectArray(value) {
+  return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : [];
+}
+
 function getPlanProductId(plan = {}) {
-  return plan.product_id || plan.product?.id || plan.input?.productId || "";
+  const safePlan = plan || {};
+  return safePlan.product_id || safePlan.product?.id || safePlan.input?.productId || "";
 }
 
 function getRowsFromInputOrResult(plan = {}, inputKey, resultKey, mapper) {
-  const inputRows = Array.isArray(plan.input?.[inputKey]) ? plan.input[inputKey] : [];
+  const safePlan = plan || {};
+  const inputRows = asObjectArray(safePlan.input?.[inputKey]);
   if (inputRows.length) return inputRows;
 
-  const resultRows = Array.isArray(plan.result?.[resultKey]) ? plan.result[resultKey] : [];
+  const resultRows = asObjectArray(safePlan.result?.[resultKey]);
   return resultRows.map(mapper);
 }
 
 export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
+  plan = plan || {};
+  workspace = workspace || {};
+
   const products = Array.isArray(workspace.products) ? workspace.products : [];
   const machines = Array.isArray(workspace.machines) ? workspace.machines : [];
   const materials = Array.isArray(workspace.materials) ? workspace.materials : [];
@@ -67,7 +76,7 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
 
   const producedQuantity = (primaryMachineDailyHours * 60) / productCycleTimeMinutes;
   let materialCost = 0;
-  const recipeRows = Array.isArray(product.material_rows) ? product.material_rows : [];
+  const recipeRows = asObjectArray(product.material_rows);
   const materialSummary = (recipeRows.length ? recipeRows : manualMaterialRows)
     .map((row) => {
       const materialId = row.material_id || row.materialId;
@@ -151,10 +160,12 @@ export function getCurrentOperationPlans(workspace = {}) {
     ? workspace.activePlans
     : (workspace.latestPlan ? [workspace.latestPlan] : []);
 
-  return sourcePlans.map((plan) => ({
-    ...plan,
-    result: calculateCurrentPlanResult(plan, workspace),
-  }));
+  return sourcePlans
+    .filter((plan) => plan && typeof plan === "object")
+    .map((plan) => ({
+      ...plan,
+      result: calculateCurrentPlanResult(plan, workspace),
+    }));
 }
 
 export function hasViablePlanResult(result = {}) {

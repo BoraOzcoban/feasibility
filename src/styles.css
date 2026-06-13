@@ -1198,6 +1198,17 @@ textarea:focus-visible {
     flex-basis: 88vw;
     width: 88vw;
   }
+
+  .executive-brief,
+  .dashboard-two-column,
+  .dashboard-two-column.lower {
+    grid-template-columns: 1fr;
+  }
+
+  .executive-metric-grid,
+  .module-rollup-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .auth-shell {
@@ -1892,6 +1903,541 @@ textarea:focus-visible {
   gap: 14px;
   min-height: 100vh;
   padding: 14px;
+}
+
+.feasibility-dashboard {
+  background:
+    radial-gradient(circle at 82% 0%, color-mix(in srgb, var(--color-cyan) 10%, transparent), transparent 26rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-section) 58%, transparent), transparent 34rem);
+  gap: 16px;
+}
+
+.executive-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.executive-brief {
+  --brief-tone: var(--color-teal);
+  background:
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--brief-tone) 28%, transparent), transparent 26rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-navy) 94%, black), color-mix(in srgb, var(--color-navy-soft) 78%, var(--brief-tone)));
+  border: 1px solid color-mix(in srgb, var(--brief-tone) 32%, rgba(255, 255, 255, 0.14));
+  border-radius: 8px;
+  box-shadow: 0 30px 92px rgba(7, 20, 24, 0.24);
+  color: #ffffff;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  overflow: hidden;
+  padding: 30px;
+  position: relative;
+}
+
+.executive-brief::after {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.038) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.038) 1px, transparent 1px);
+  background-size: 36px 36px;
+  content: "";
+  inset: 0;
+  opacity: 0.24;
+  pointer-events: none;
+  position: absolute;
+}
+
+.executive-brief.teal {
+  --brief-tone: var(--color-teal);
+}
+
+.executive-brief.amber {
+  --brief-tone: var(--color-amber);
+}
+
+.executive-brief.clay {
+  --brief-tone: var(--color-clay);
+}
+
+.executive-brief-copy,
+.executive-readiness-card {
+  position: relative;
+  z-index: 1;
+}
+
+.executive-brief-copy {
+  align-content: center;
+  display: grid;
+  gap: 14px;
+}
+
+.executive-brief-copy > span,
+.executive-readiness-card > span,
+.dashboard-section-heading span {
+  color: color-mix(in srgb, #ffffff 72%, var(--brief-tone, var(--color-teal)));
+  font-size: 0.76rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.executive-brief-copy h1 {
+  font-size: clamp(2.35rem, 4.6vw, 5.4rem);
+  line-height: 0.94;
+  margin: 0;
+  max-width: 820px;
+}
+
+.executive-brief-copy p {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1.02rem;
+  line-height: 1.64;
+  margin: 0;
+  max-width: 760px;
+}
+
+.executive-brief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.executive-brief-actions button {
+  background: color-mix(in srgb, var(--brief-tone) 30%, rgba(255, 255, 255, 0.12));
+  border: 1px solid color-mix(in srgb, var(--brief-tone) 48%, rgba(255, 255, 255, 0.22));
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 950;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.executive-brief-actions .secondary {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.executive-readiness-card {
+  align-content: start;
+  backdrop-filter: blur(16px) saturate(1.1);
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.executive-readiness-card > strong {
+  color: #ffffff;
+  font-size: clamp(2.4rem, 4vw, 4.6rem);
+  line-height: 0.95;
+}
+
+.executive-readiness-card p {
+  color: rgba(255, 255, 255, 0.78);
+  margin: 0;
+}
+
+.readiness-progress {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.readiness-progress span {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brief-tone) 74%, white), var(--brief-tone));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.readiness-step-list {
+  display: grid;
+  gap: 8px;
+}
+
+.readiness-step-list button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 42px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.readiness-step-list button.done {
+  background: color-mix(in srgb, var(--brief-tone) 18%, rgba(255, 255, 255, 0.08));
+}
+
+.readiness-step-list i {
+  align-items: center;
+  background: color-mix(in srgb, var(--brief-tone) 34%, rgba(255, 255, 255, 0.12));
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 950;
+  height: 25px;
+  justify-content: center;
+  width: 25px;
+}
+
+.readiness-step-list span {
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.readiness-step-list strong {
+  color: color-mix(in srgb, #ffffff 72%, var(--brief-tone));
+  font-size: 0.72rem;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.dashboard-section-group,
+.dashboard-two-column {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-section-heading {
+  --brief-tone: var(--color-teal);
+  align-items: end;
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-line);
+  border-left: 6px solid var(--color-teal);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.dashboard-section-heading span {
+  color: var(--color-teal-strong);
+}
+
+.dashboard-section-heading h2 {
+  color: var(--color-heading);
+  font-size: clamp(1.25rem, 2.2vw, 2rem);
+  line-height: 1.12;
+  margin: 4px 0 0;
+}
+
+.dashboard-section-heading strong {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.executive-metric-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.executive-metric-card {
+  --metric-tone: var(--color-teal);
+  border-color: color-mix(in srgb, var(--metric-tone) 32%, var(--color-line));
+  border-left: 6px solid var(--metric-tone);
+  display: grid;
+  gap: 8px;
+  min-height: 154px;
+  padding: 18px;
+}
+
+.executive-metric-card.teal,
+.dashboard-risk-row.teal {
+  --metric-tone: var(--color-teal);
+}
+
+.executive-metric-card.amber,
+.dashboard-risk-row.amber {
+  --metric-tone: var(--color-amber);
+}
+
+.executive-metric-card.clay,
+.dashboard-risk-row.clay {
+  --metric-tone: var(--color-clay);
+}
+
+.executive-metric-card span {
+  color: var(--metric-tone);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.executive-metric-card h3 {
+  color: var(--color-muted);
+  font-size: 0.86rem;
+  margin: 0;
+}
+
+.executive-metric-card strong {
+  color: var(--color-heading);
+  font-size: clamp(1.45rem, 2.6vw, 2.45rem);
+  line-height: 1.04;
+  overflow-wrap: anywhere;
+}
+
+.executive-metric-card small {
+  color: var(--color-muted);
+}
+
+.dashboard-two-column {
+  grid-template-columns: minmax(0, 1.04fr) minmax(320px, 0.96fr);
+}
+
+.dashboard-two-column.lower {
+  grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr);
+}
+
+.dashboard-risk-board,
+.dashboard-action-board,
+.dashboard-assumption-board,
+.dashboard-business-case {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.dashboard-risk-list,
+.action-sequence,
+.assumption-list,
+.business-case-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-assumption-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-assumption-controls label {
+  color: var(--color-muted);
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 900;
+  gap: 7px;
+}
+
+.dashboard-assumption-controls label > span {
+  color: var(--color-teal-strong);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-assumption-controls select {
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  color: var(--color-ink);
+  font-weight: 850;
+  min-height: 42px;
+  outline: none;
+  padding: 0 11px;
+  width: 100%;
+}
+
+.dashboard-assumption-controls select:focus {
+  border-color: var(--color-teal);
+  box-shadow: 0 0 0 4px rgba(24, 117, 101, 0.14);
+}
+
+.dashboard-assumption-controls select:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
+.dashboard-risk-row {
+  --metric-tone: var(--color-amber);
+  background: color-mix(in srgb, var(--metric-tone) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--metric-tone) 30%, var(--color-line));
+  border-left: 6px solid var(--metric-tone);
+  border-radius: 8px;
+  color: var(--color-heading);
+  cursor: pointer;
+  display: grid;
+  gap: 5px;
+  padding: 13px 14px;
+  text-align: left;
+}
+
+.dashboard-risk-row > span {
+  color: var(--metric-tone);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-risk-row strong {
+  font-size: 1rem;
+}
+
+.dashboard-risk-row p {
+  color: var(--color-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.dashboard-risk-row b {
+  color: var(--metric-tone);
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+
+.action-sequence article {
+  align-items: start;
+  background: color-mix(in srgb, var(--color-section) 58%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 14px;
+}
+
+.action-sequence span {
+  align-items: center;
+  background: var(--color-navy);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 950;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.action-sequence p {
+  color: var(--color-heading);
+  font-weight: 780;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.module-rollup-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.module-rollup-card {
+  --module-tone: var(--color-teal);
+  background: color-mix(in srgb, var(--module-tone) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--module-tone) 26%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-heading);
+  cursor: pointer;
+  display: grid;
+  gap: 9px;
+  min-height: 178px;
+  padding: 16px;
+  text-align: left;
+}
+
+.module-rollup-card.operations {
+  --module-tone: var(--color-teal);
+}
+
+.module-rollup-card.sales {
+  --module-tone: var(--color-green);
+}
+
+.module-rollup-card.finance {
+  --module-tone: var(--color-cyan);
+}
+
+.module-rollup-card.decision {
+  --module-tone: var(--color-clay);
+}
+
+.module-rollup-card.reports {
+  --module-tone: var(--color-navy-soft);
+}
+
+.module-rollup-card span {
+  color: var(--module-tone);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.module-rollup-card.done span {
+  color: var(--color-teal-strong);
+}
+
+.module-rollup-card strong {
+  font-size: 1.1rem;
+}
+
+.module-rollup-card p {
+  color: var(--color-muted);
+  line-height: 1.46;
+  margin: 0;
+}
+
+.module-rollup-card b {
+  align-self: end;
+  color: var(--module-tone);
+  font-size: 0.8rem;
+}
+
+.assumption-list span,
+.business-case-list span {
+  align-items: center;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-muted);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, max-content);
+  min-height: 42px;
+  padding-top: 10px;
+}
+
+.assumption-list span:first-child,
+.business-case-list span:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.assumption-list strong,
+.business-case-list strong {
+  color: var(--color-heading);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.business-case-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.business-case-list span {
+  background: color-mix(in srgb, var(--color-section) 52%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 12px;
 }
 
 .command-topbar {
@@ -8416,6 +8962,13 @@ textarea:focus-visible {
   }
 
   .command-topbar,
+  .executive-brief,
+  .executive-metric-grid,
+  .dashboard-two-column,
+  .dashboard-two-column.lower,
+  .module-rollup-grid,
+  .dashboard-assumption-controls,
+  .business-case-list,
   .dashboard-command-hero,
   .dashboard-readiness-panel,
   .simulation-command-hero,
@@ -8440,6 +8993,47 @@ textarea:focus-visible {
 
   .command-topbar {
     align-items: stretch;
+  }
+
+  .executive-topbar {
+    position: static;
+  }
+
+  .executive-brief {
+    padding: 22px;
+  }
+
+  .executive-brief-copy h1 {
+    font-size: clamp(2.1rem, 12vw, 3.4rem);
+  }
+
+  .dashboard-section-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .dashboard-section-heading strong {
+    text-align: left;
+  }
+
+  .readiness-step-list button {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .readiness-step-list strong {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .assumption-list span,
+  .business-case-list span {
+    grid-template-columns: 1fr;
+  }
+
+  .assumption-list strong,
+  .business-case-list strong {
+    text-align: left;
   }
 
   .command-hero {
@@ -8833,4 +9427,654 @@ textarea:focus-visible {
 
 .resource-guidance-card {
   align-content: start;
+}
+
+.operations-overview,
+.operations-workspace.operations-modern {
+  background:
+    linear-gradient(color-mix(in srgb, var(--color-cyan) 9%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-cyan) 8%, transparent) 1px, transparent 1px),
+    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--color-teal) 16%, transparent), transparent 28rem),
+    radial-gradient(circle at 86% 4%, color-mix(in srgb, var(--color-cyan) 13%, transparent), transparent 30rem),
+    linear-gradient(180deg, var(--color-page), color-mix(in srgb, var(--color-section) 72%, var(--color-page)));
+  background-size: 34px 34px, 34px 34px, auto, auto, auto;
+  gap: 20px;
+  padding: 24px;
+}
+
+.operations-overview > div:first-child,
+.operations-workspace.operations-modern .operations-header {
+  align-items: end;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(102, 193, 212, 0.26), transparent 28rem),
+    linear-gradient(135deg, #071418 0%, var(--color-navy) 58%, #123d42 100%);
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 22%, var(--color-line));
+  border-radius: 8px;
+  box-shadow: 0 28px 80px rgba(7, 20, 24, 0.18);
+  color: #f8fffd;
+  max-width: none;
+  min-height: 214px;
+  overflow: hidden;
+  padding: 28px;
+  position: relative;
+}
+
+.operations-overview > div:first-child::after,
+.operations-workspace.operations-modern .operations-header::after {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
+  content: "";
+  inset: 0;
+  mask-image: linear-gradient(90deg, transparent 0%, black 18%, black 100%);
+  pointer-events: none;
+  position: absolute;
+}
+
+.operations-overview > div:first-child > *,
+.operations-workspace.operations-modern .operations-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.operations-overview > div:first-child span,
+.operations-workspace.operations-modern .operations-header span {
+  color: color-mix(in srgb, var(--color-cyan) 78%, #ffffff);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+}
+
+.operations-overview > div:first-child h1,
+.operations-workspace.operations-modern .operations-header h1 {
+  color: #ffffff;
+  font-size: clamp(2.45rem, 5.2vw, 5.2rem);
+  line-height: 0.92;
+  max-width: 980px;
+  text-wrap: balance;
+}
+
+.operations-overview > div:first-child p,
+.operations-workspace.operations-modern .operations-header p {
+  color: rgba(244, 255, 252, 0.78);
+  font-size: 1rem;
+  max-width: 780px;
+}
+
+.operations-workspace.operations-modern .operations-actions {
+  align-items: center;
+  align-self: stretch;
+}
+
+.operations-workspace.operations-modern .operations-actions button,
+.operations-workspace.operations-modern .operation-card-heading button,
+.operations-workspace.operations-modern .operation-card-heading select,
+.operations-workspace.operations-modern .resource-section-header button,
+.operations-workspace.operations-modern .resource-remove-button,
+.operations-overview .placeholder-grid button,
+.operations-workspace.operations-modern .process-setup-card button {
+  border-radius: 999px;
+  font-weight: 950;
+  min-height: 40px;
+  padding: 0 15px;
+}
+
+.operations-workspace.operations-modern .operations-actions button {
+  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+  color: #ffffff;
+}
+
+.operations-workspace.operations-modern .operations-actions button:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.18);
+}
+
+.operations-workspace.operations-modern .operations-actions .primary,
+.operations-workspace.operations-modern .planner-save-button,
+.operations-overview .placeholder-grid button {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-cyan) 86%, #ffffff), var(--color-teal-strong));
+  border: 0;
+  box-shadow:
+    0 18px 40px color-mix(in srgb, var(--color-teal) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
+
+.operations-workspace.operations-modern .planner-save-button {
+  min-height: 46px;
+  justify-self: start;
+  padding: 0 18px;
+}
+
+.operations-overview .placeholder-grid {
+  counter-reset: operation-step;
+  gap: 14px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  max-width: none;
+}
+
+.operations-overview .placeholder-grid article {
+  --module-tone: var(--color-teal);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--module-tone) 9%, var(--color-surface)), var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--module-tone) 26%, var(--color-line));
+  box-shadow: 0 18px 44px rgba(7, 21, 32, 0.08);
+  counter-increment: operation-step;
+  min-height: 220px;
+  overflow: hidden;
+  padding: 18px;
+  position: relative;
+}
+
+.operations-overview .placeholder-grid article:nth-child(2) {
+  --module-tone: var(--color-cyan);
+}
+
+.operations-overview .placeholder-grid article:nth-child(3) {
+  --module-tone: var(--color-navy-soft);
+}
+
+.operations-overview .placeholder-grid article:nth-child(4) {
+  --module-tone: var(--color-amber);
+}
+
+.operations-overview .placeholder-grid article:nth-child(5) {
+  --module-tone: var(--color-green);
+}
+
+.operations-overview .placeholder-grid article::before {
+  color: color-mix(in srgb, var(--module-tone) 22%, transparent);
+  content: "0" counter(operation-step);
+  font-size: 4.6rem;
+  font-weight: 950;
+  line-height: 0.8;
+  position: absolute;
+  right: 12px;
+  top: 14px;
+}
+
+.operations-overview .placeholder-grid article::after {
+  background: var(--module-tone);
+  content: "";
+  height: 4px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.operations-overview .placeholder-grid strong {
+  color: var(--color-heading);
+  font-size: 1.08rem;
+  position: relative;
+  z-index: 1;
+}
+
+.operations-overview .placeholder-grid p {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  position: relative;
+  z-index: 1;
+}
+
+.operations-overview .placeholder-grid button {
+  align-self: end;
+  justify-self: start;
+  position: relative;
+  z-index: 1;
+}
+
+.operations-workspace.operations-modern .operation-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 94%, transparent), color-mix(in srgb, var(--color-surface-soft) 92%, transparent));
+  border: 1px solid color-mix(in srgb, var(--color-line) 80%, var(--color-cyan));
+  box-shadow: 0 22px 58px rgba(7, 21, 32, 0.09);
+  gap: 16px;
+  padding: 18px;
+  position: relative;
+}
+
+.operations-workspace.operations-modern .operation-card::before {
+  background: linear-gradient(90deg, var(--color-teal), var(--color-cyan));
+  border-radius: 8px 8px 0 0;
+  content: "";
+  height: 4px;
+  inset: -1px -1px auto;
+  position: absolute;
+}
+
+.operations-workspace.operations-modern .operation-data-table-card::before,
+.operations-workspace.operations-modern .planner-result-card::before {
+  background: linear-gradient(90deg, var(--color-amber), var(--color-cyan));
+}
+
+.operations-workspace.operations-modern .resource-list-card::before,
+.operations-workspace.operations-modern .process-card::before {
+  background: linear-gradient(90deg, var(--color-green), var(--color-teal));
+}
+
+.operations-workspace.operations-modern .resource-guidance-card::before,
+.operations-workspace.operations-modern .process-setup-card.todo::before {
+  background: linear-gradient(90deg, var(--color-clay), var(--color-amber));
+}
+
+.operations-workspace.operations-modern .operation-card-heading {
+  align-items: start;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-line) 82%, transparent);
+  gap: 14px;
+  padding-bottom: 12px;
+}
+
+.operations-workspace.operations-modern .operation-card-heading span,
+.operations-workspace.operations-modern .resource-section-header span {
+  color: var(--color-teal-strong);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+}
+
+.operations-workspace.operations-modern .operation-card h2,
+.operations-workspace.operations-modern .operation-card-heading h2 {
+  color: var(--color-heading);
+  font-size: clamp(1.06rem, 1.8vw, 1.42rem);
+  line-height: 1.15;
+}
+
+.operations-workspace.operations-modern .operation-card-heading mark,
+.operations-workspace.operations-modern .process-setup-card mark,
+.operations-workspace.operations-modern .planner-result-card mark {
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  padding: 7px 10px;
+  text-transform: uppercase;
+}
+
+.operations-workspace.operations-modern .process-setup-grid {
+  gap: 16px;
+}
+
+.operations-workspace.operations-modern .process-setup-card {
+  min-height: 240px;
+  padding: 22px;
+}
+
+.operations-workspace.operations-modern .process-setup-card.ready {
+  border-color: color-mix(in srgb, var(--color-teal) 28%, var(--color-line));
+}
+
+.operations-workspace.operations-modern .process-setup-card.todo {
+  border-color: color-mix(in srgb, var(--color-clay) 30%, var(--color-line));
+}
+
+.operations-workspace.operations-modern .process-setup-card.ready mark {
+  background: color-mix(in srgb, var(--color-teal) 13%, var(--color-surface));
+}
+
+.operations-workspace.operations-modern .process-setup-card.todo mark {
+  background: color-mix(in srgb, var(--color-clay) 12%, var(--color-surface));
+}
+
+.operations-workspace.operations-modern .operation-planner {
+  gap: 20px;
+  grid-template-columns: 1fr;
+}
+
+.operations-workspace.operations-modern .planner-input-card,
+.operations-workspace.operations-modern .planner-result-card {
+  width: 100%;
+}
+
+.operations-workspace.operations-modern .planner-result-card {
+  order: 2;
+}
+
+.operations-workspace.operations-modern .operation-data-grid {
+  gap: 18px;
+  grid-template-columns: minmax(340px, 0.78fr) minmax(0, 1.22fr);
+}
+
+.operations-workspace.operations-modern .operation-data-grid.compact {
+  grid-template-columns: minmax(300px, 0.7fr) minmax(0, 1.3fr);
+}
+
+.operations-workspace.operations-modern .resource-definition-grid {
+  gap: 18px;
+  grid-template-columns: minmax(340px, 0.9fr) minmax(0, 1.1fr);
+}
+
+.operations-workspace.operations-modern .machine-equipment-grid {
+  gap: 22px;
+}
+
+.operations-workspace.operations-modern .planner-fields,
+.operations-workspace.operations-modern .operation-data-fields {
+  gap: 14px;
+}
+
+.operations-workspace.operations-modern .planner-fields label,
+.operations-workspace.operations-modern .operation-data-fields label,
+.operations-workspace.operations-modern .resource-row-grid label {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+}
+
+.operations-workspace.operations-modern .planner-fields label div,
+.operations-workspace.operations-modern .resource-row-grid input,
+.operations-workspace.operations-modern .resource-row-grid select,
+.operations-workspace.operations-modern .operation-data-fields input,
+.operations-workspace.operations-modern .operation-data-fields select,
+.operations-workspace.operations-modern .operation-data-fields textarea {
+  background: color-mix(in srgb, var(--color-surface) 86%, var(--color-section));
+  border: 1px solid color-mix(in srgb, var(--color-line) 72%, var(--color-cyan));
+  border-radius: 8px;
+  min-height: 44px;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.operations-workspace.operations-modern .planner-fields input,
+.operations-workspace.operations-modern .planner-fields select,
+.operations-workspace.operations-modern .operation-data-fields input,
+.operations-workspace.operations-modern .operation-data-fields select,
+.operations-workspace.operations-modern .operation-data-fields textarea,
+.operations-workspace.operations-modern .resource-row-grid input,
+.operations-workspace.operations-modern .resource-row-grid select {
+  font-weight: 850;
+}
+
+.operations-workspace.operations-modern .planner-fields label div:focus-within,
+.operations-workspace.operations-modern .resource-row-grid input:focus,
+.operations-workspace.operations-modern .resource-row-grid select:focus,
+.operations-workspace.operations-modern .operation-data-fields input:focus,
+.operations-workspace.operations-modern .operation-data-fields select:focus,
+.operations-workspace.operations-modern .operation-data-fields textarea:focus {
+  background: var(--color-surface);
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-cyan) 16%, transparent);
+}
+
+.operations-workspace.operations-modern .resource-section {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-cyan) 6%, var(--color-surface)), color-mix(in srgb, var(--color-section) 64%, transparent));
+  border: 1px solid color-mix(in srgb, var(--color-line) 74%, var(--color-cyan));
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.operations-workspace.operations-modern .resource-section-header {
+  align-items: start;
+}
+
+.operations-workspace.operations-modern .resource-section-header p {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  max-width: 640px;
+}
+
+.operations-workspace.operations-modern .resource-section-header button,
+.operations-workspace.operations-modern .operation-card-heading button,
+.operations-workspace.operations-modern .operation-card-heading select {
+  background: color-mix(in srgb, var(--color-cyan) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 30%, var(--color-line));
+  color: var(--color-heading);
+}
+
+.operations-workspace.operations-modern .resource-remove-button {
+  background: color-mix(in srgb, var(--color-clay) 9%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-clay) 26%, var(--color-line));
+  color: var(--color-clay);
+}
+
+.operations-workspace.operations-modern .resource-row-grid {
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-line) 78%, var(--color-cyan));
+  box-shadow: 0 12px 28px rgba(7, 21, 32, 0.05);
+  padding: 12px;
+}
+
+.operations-workspace.operations-modern .resource-row-meta,
+.operations-workspace.operations-modern .planner-summary-grid span,
+.operations-workspace.operations-modern .allocation-grid span,
+.operations-workspace.operations-modern .cost-breakdown span,
+.operations-workspace.operations-modern .process-metrics span,
+.operations-workspace.operations-modern .process-detail-grid span {
+  background: color-mix(in srgb, var(--color-surface) 78%, var(--color-section));
+  border: 1px solid color-mix(in srgb, var(--color-line) 72%, var(--color-teal));
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--metric-tone, var(--color-teal)) 92%, transparent);
+}
+
+.operations-workspace.operations-modern .planner-summary-grid span:nth-child(3n + 1),
+.operations-workspace.operations-modern .process-metrics span:nth-child(3n + 1),
+.operations-workspace.operations-modern .process-summary-card:nth-child(1) {
+  --metric-tone: var(--color-teal);
+}
+
+.operations-workspace.operations-modern .planner-summary-grid span:nth-child(3n + 2),
+.operations-workspace.operations-modern .process-metrics span:nth-child(3n + 2),
+.operations-workspace.operations-modern .process-summary-card:nth-child(2) {
+  --metric-tone: var(--color-cyan);
+}
+
+.operations-workspace.operations-modern .planner-summary-grid span:nth-child(3n),
+.operations-workspace.operations-modern .process-metrics span:nth-child(3n),
+.operations-workspace.operations-modern .process-summary-card:nth-child(3) {
+  --metric-tone: var(--color-amber);
+}
+
+.operations-workspace.operations-modern .planner-summary-grid strong,
+.operations-workspace.operations-modern .allocation-grid strong,
+.operations-workspace.operations-modern .cost-breakdown strong,
+.operations-workspace.operations-modern .process-metrics strong,
+.operations-workspace.operations-modern .process-detail-grid strong {
+  color: var(--color-heading);
+  font-size: 1.02rem;
+}
+
+.operations-workspace.operations-modern .operation-data-table-card {
+  overflow-x: auto;
+}
+
+.operations-workspace.operations-modern .operation-data-table {
+  border: 0;
+  display: grid;
+  gap: 8px;
+  min-width: 720px;
+  overflow: visible;
+}
+
+.operations-workspace.operations-modern .operation-data-row {
+  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-section));
+  border: 1px solid color-mix(in srgb, var(--color-line) 78%, transparent);
+  border-radius: 8px;
+  min-height: 50px;
+  padding: 10px 12px;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.operations-workspace.operations-modern .operation-data-head {
+  background: color-mix(in srgb, var(--color-navy) 92%, black);
+  border-color: color-mix(in srgb, var(--color-cyan) 28%, var(--color-navy));
+  color: #ffffff;
+}
+
+.operations-workspace.operations-modern .operation-data-head span {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+.operations-workspace.operations-modern .operation-data-row:not(.operation-data-head):hover {
+  background: color-mix(in srgb, var(--color-cyan) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-cyan) 38%, var(--color-line));
+  transform: translateY(-1px);
+}
+
+.operations-workspace.operations-modern .operation-data-row:not(.operation-data-head) span:first-child {
+  color: var(--color-heading);
+  font-weight: 950;
+}
+
+.operations-workspace.operations-modern .compact-resource-list span,
+.operations-workspace.operations-modern .selected-resource-results div,
+.operations-workspace.operations-modern .process-detail-grid div {
+  background: color-mix(in srgb, var(--color-surface) 80%, var(--color-section));
+  border: 1px solid color-mix(in srgb, var(--color-line) 78%, var(--color-cyan));
+  border-radius: 8px;
+}
+
+.operations-workspace.operations-modern .compact-resource-list span {
+  min-height: 62px;
+  padding: 12px;
+}
+
+.operations-workspace.operations-modern .process-summary-grid {
+  gap: 14px;
+}
+
+.operations-workspace.operations-modern .process-summary-card {
+  border-color: color-mix(in srgb, var(--metric-tone, var(--color-teal)) 32%, var(--color-line));
+  min-height: 132px;
+}
+
+.operations-workspace.operations-modern .process-summary-card strong {
+  color: var(--color-heading);
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+}
+
+.operations-workspace.operations-modern .process-card {
+  gap: 18px;
+}
+
+.operations-workspace.operations-modern .process-detail-grid {
+  gap: 14px;
+}
+
+.operations-workspace.operations-modern .process-detail-grid div {
+  padding: 12px;
+}
+
+.operations-workspace.operations-modern .planner-empty-state {
+  background: color-mix(in srgb, var(--color-amber) 8%, var(--color-surface));
+  border: 1px dashed color-mix(in srgb, var(--color-amber) 42%, var(--color-line));
+  border-radius: 8px;
+  color: var(--color-muted);
+  line-height: 1.55;
+  padding: 14px;
+}
+
+.operations-workspace.operations-modern .status-message {
+  background: color-mix(in srgb, var(--color-cyan) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 28%, var(--color-line));
+  color: var(--color-heading);
+  margin: 0;
+}
+
+@media (max-width: 620px) {
+  .operations-overview,
+  .operations-workspace.operations-modern {
+    background-size: 28px 28px, 28px 28px, auto, auto, auto;
+    padding: 12px;
+  }
+
+  .operations-overview > div:first-child,
+  .operations-workspace.operations-modern .operations-header {
+    align-items: stretch;
+    flex-direction: column;
+    min-height: auto;
+    padding: 20px;
+  }
+
+  .operations-overview > div:first-child h1,
+  .operations-workspace.operations-modern .operations-header h1 {
+    font-size: clamp(2.05rem, 12vw, 3.35rem);
+  }
+
+  .operations-workspace.operations-modern .operations-actions {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .operations-workspace.operations-modern .operations-actions button,
+  .operations-workspace.operations-modern .planner-save-button,
+  .operations-overview .placeholder-grid button,
+  .operations-workspace.operations-modern .process-setup-card button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .operations-overview .placeholder-grid,
+  .operations-workspace.operations-modern .process-setup-grid,
+  .operations-workspace.operations-modern .operation-planner,
+  .operations-workspace.operations-modern .operation-data-grid,
+  .operations-workspace.operations-modern .operation-data-grid.compact,
+  .operations-workspace.operations-modern .resource-definition-grid,
+  .operations-workspace.operations-modern .operation-data-fields,
+  .operations-workspace.operations-modern .planner-fields,
+  .operations-workspace.operations-modern .resource-row-grid,
+  .operations-workspace.operations-modern .machine-plan-row,
+  .operations-workspace.operations-modern .workforce-plan-row,
+  .operations-workspace.operations-modern .material-plan-row,
+  .operations-workspace.operations-modern .selected-resource-results,
+  .operations-workspace.operations-modern .planner-summary-grid,
+  .operations-workspace.operations-modern .allocation-grid,
+  .operations-workspace.operations-modern .cost-breakdown,
+  .operations-workspace.operations-modern .process-summary-grid,
+  .operations-workspace.operations-modern .process-metrics,
+  .operations-workspace.operations-modern .process-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-overview .placeholder-grid article,
+  .operations-workspace.operations-modern .process-setup-card {
+    min-height: 190px;
+  }
+
+  .operations-workspace.operations-modern .resource-section-header,
+  .operations-workspace.operations-modern .operation-card-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .operations-workspace.operations-modern .operation-data-table {
+    min-width: 680px;
+  }
+}
+
+@media (min-width: 621px) and (max-width: 1120px) {
+  .operations-overview .placeholder-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .operations-workspace.operations-modern .process-setup-grid,
+  .operations-workspace.operations-modern .operation-planner,
+  .operations-workspace.operations-modern .operation-data-grid,
+  .operations-workspace.operations-modern .operation-data-grid.compact,
+  .operations-workspace.operations-modern .resource-definition-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-workspace.operations-modern .planner-fields,
+  .operations-workspace.operations-modern .resource-row-grid,
+  .operations-workspace.operations-modern .selected-resource-results,
+  .operations-workspace.operations-modern .operation-data-fields,
+  .operations-workspace.operations-modern .allocation-grid,
+  .operations-workspace.operations-modern .cost-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1121px) and (max-width: 1380px) {
+  .operations-overview .placeholder-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }

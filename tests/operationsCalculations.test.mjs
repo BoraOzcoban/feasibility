@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateCurrentPlanResult, hasViablePlanResult } from "../src/lib/operationsCalculations.js";
+import { calculateCurrentPlanResult, getCurrentOperationPlans, hasViablePlanResult } from "../src/lib/operationsCalculations.js";
 
 const workspace = {
   machines: [
@@ -58,4 +58,41 @@ test("does not treat zero-output plans as viable", () => {
 
   assert.equal(result.producedQuantity, 0);
   assert.equal(hasViablePlanResult(result), false);
+});
+
+test("ignores malformed active plan rows", () => {
+  const plans = getCurrentOperationPlans({
+    ...workspace,
+    activePlans: [
+      null,
+      {
+        input: {
+          machineRows: [{ dailyHours: 8, machineId: "machine-1" }],
+          productId: "product-1",
+        },
+        product_id: "product-1",
+      },
+    ],
+  });
+
+  assert.equal(plans.length, 1);
+  assert.equal(plans[0].result.producedQuantity, 240);
+});
+
+test("ignores malformed nested plan rows", () => {
+  const result = calculateCurrentPlanResult({
+    input: {
+      machineRows: [null, "bad", { dailyHours: 8, machineId: "machine-1" }],
+      productId: "product-1",
+      workforceRows: [undefined, { dailyHours: 8, peopleAssigned: 1, workforceId: "workforce-1" }],
+    },
+    product_id: "product-1",
+    result: {
+      materialRows: [null],
+    },
+  }, workspace);
+
+  assert.equal(result.producedQuantity, 240);
+  assert.equal(result.machineRows.length, 1);
+  assert.equal(result.workforceRows.length, 1);
 });
