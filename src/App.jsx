@@ -1140,8 +1140,8 @@ const text = {
     contact: "Contact",
     heroTitle: "Atera",
     heroCopy: "Check whether a new factory plan can produce, sell, and pay back before you commit capital.",
-    goToLogin: "Go to log in",
-    whoCopy: "Plan. Test. Decide. Scale. Atera brings production, sales, finance, and operations into one practical hub so a factory leader can see capacity, cost, cash, and delivery risk before making the next commitment.",
+    goToLogin: "Use Atera",
+    whoCopy: "Atera is the operating layer for teams that need to see the factory before the factory spends money. Capacity, margin, cash, timing, and risk move in one live decision model, so every scenario shows what it costs, what it breaks, and what it makes possible.",
     solutionsCopy: "Define the product, resources, production plan, sales channels, financial assumptions, and scenarios in one flow. The goal is simple: see if the operation is feasible and what to improve first.",
     farmerPersona: "Planning team",
     factoryOwnerPersona: "Production lead",
@@ -1160,7 +1160,6 @@ const text = {
     exporterBenefit: "Benefit: Reduce surprises between sales, production, and delivery.",
     exporterDifference: "Atera's difference: Friendly planning tools for real-world tradeoffs.",
     referencesCopy: "Reference stories and customer examples will live here as the product grows.",
-    contactCopy: "You can reach us for access, onboarding, and project questions.",
     contactPhone: "",
     contactEmail: "hello@atera.app",
     contactLocation: "Istanbul, Turkiye",
@@ -1234,8 +1233,8 @@ const text = {
     contact: "İletişim",
     heroTitle: "Atera",
     heroCopy: "Yeni bir fabrika planının üretip satıp yatırımını geri ödeyip ödeyemeyeceğini sermaye bağlamadan önce kontrol edin.",
-    goToLogin: "Girişe git",
-    whoCopy: "Planla. Dene. Karar ver. Büyüt. Atera; üretim, satış, finans ve operasyonu tek pratik alanda toplar. Böylece fabrika yöneticisi kapasiteyi, maliyeti, nakdi ve termin riskini bir sonraki karardan önce görebilir.",
+    goToLogin: "Atera'yı kullan",
+    whoCopy: "Atera, fabrika daha para harcamadan fabrikanın kendisini görmenizi sağlayan operasyon katmanıdır. Kapasite, marj, nakit, termin ve risk tek canlı karar modelinde akar; her senaryo neye mal olur, nereyi zorlar ve neyi mümkün kılar netleşir.",
     solutionsCopy: "Ürünü, kaynakları, üretim planını, satış kanallarını, finansal varsayımları ve senaryoları tek akışta tanımlayın. Amaç basit: operasyon fizibl mi ve önce ne iyileştirilmeli?",
     farmerPersona: "Planlama ekibi",
     factoryOwnerPersona: "Üretim sorumlusu",
@@ -1254,7 +1253,6 @@ const text = {
     exporterBenefit: "Fayda: Satış, üretim ve teslimat arasındaki sürprizleri azaltmak.",
     exporterDifference: "Atera'nın farkı: Gerçek hayattaki trade-off'lar için samimi planlama araçları.",
     referencesCopy: "Ürün büyüdükçe referans hikayeleri ve müşteri örnekleri burada yer alacak.",
-    contactCopy: "Erişim, onboarding ve proje soruları için bize ulaşabilirsiniz.",
     contactPhone: "",
     contactEmail: "hello@atera.app",
     contactLocation: "Istanbul, Turkiye",
@@ -1490,6 +1488,12 @@ function App() {
   }, [session]);
 
   useEffect(() => {
+    if (session && path === "/login" && mode !== "reset") {
+      goTo("/dashboard", "login");
+    }
+  }, [session, path, mode]);
+
+  useEffect(() => {
     if (!session || !supabase) {
       setOperationsWorkspace({
         activePlans: [],
@@ -1580,6 +1584,10 @@ function App() {
     setPath(pathname);
     setMode(nextMode);
     setStatus("");
+  }
+
+  function handleUseAtera() {
+    goTo(session ? "/dashboard" : "/login", "login");
   }
 
   function updateField(field, value) {
@@ -6199,11 +6207,11 @@ function App() {
   );
 
   const dashboardModules = [
-    { key: "operations", path: "/operations", label: "Operations" },
-    { key: "sales-strategy", path: "/sales-strategy", label: copy("Sales Strategy", "Satış Stratejisi") },
-    { key: "financial-modelling", path: "/financial-modelling", label: copy("Financial Modelling", "Finansal Modelleme") },
-    { key: "simulation", path: "/simulation", label: copy("Simulation", "Simülasyon") },
-    { key: "reports", path: "/reports", label: copy("Reports", "Raporlar") },
+    { key: "operations", path: "/operations", label: "Operations", category: copy("Production", "Üretim"), tone: "operations" },
+    { key: "sales-strategy", path: "/sales-strategy", label: copy("Sales Strategy", "Satış Stratejisi"), category: copy("Market", "Pazar"), tone: "sales" },
+    { key: "financial-modelling", path: "/financial-modelling", label: copy("Financial Modelling", "Finansal Modelleme"), category: copy("Finance", "Finans"), tone: "finance" },
+    { key: "simulation", path: "/simulation", label: copy("Simulation", "Simülasyon"), category: copy("Decision", "Karar"), tone: "decision" },
+    { key: "reports", path: "/reports", label: copy("Reports", "Raporlar"), category: copy("Output", "Çıktı"), tone: "reports" },
   ];
   const operationsSubmodules = [
     { key: "resources", path: "/operations/resources", label: copy("Resources", "Kaynak") },
@@ -6268,10 +6276,10 @@ function App() {
   const monthlyCost = financialMonthCount ? toFiniteNumber(financialSummary.totalCost) / financialMonthCount : 0;
   const monthlyNet = financialMonthCount ? toFiniteNumber(financialSummary.netIncome) / financialMonthCount : 0;
   const dashboardStats = [
-    { label: copy("Daily Production", "Günlük Üretim"), value: activePlanResults.length ? `${formatNumber(totalDailyProduction, 2)} ${latestPlanResult?.productUnit || operationsWorkspace.product?.unit || copy("units", "adet")}` : noDataValue, delta: copy("Supabase", "Supabase"), detail: copy("active process result", "aktif süreç sonucu") },
-    { label: copy("Active Plans", "Aktif Plan"), value: formatNumber(operationsWorkspace.activePlans.length), delta: copy("Supabase", "Supabase"), detail: copy("saved process plans", "kayıtlı süreç planları") },
-    { label: copy("Monthly Revenue", "Aylık Ciro"), value: moneyOrMissing(monthlyRevenue), delta: copy("calculated", "hesaplandı"), detail: copy("from channel sales plan", "kanal satış planından") },
-    { label: copy("Cash Runway", "Nakit Dayanma"), value: hasFinancialSourceData ? `${formatNumber(financialSummary.cashRunwayMonths)} ${copy("mo", "ay")}` : noDataValue, delta: copy("calculated", "hesaplandı"), detail: copy("from current cash", "mevcut nakitten") },
+    { category: copy("Production", "Üretim"), label: copy("Daily Production", "Günlük Üretim"), value: activePlanResults.length ? `${formatNumber(totalDailyProduction, 2)} ${latestPlanResult?.productUnit || operationsWorkspace.product?.unit || copy("units", "adet")}` : noDataValue, delta: copy("Supabase", "Supabase"), detail: copy("active process result", "aktif süreç sonucu"), tone: "operations" },
+    { category: copy("Production", "Üretim"), label: copy("Active Plans", "Aktif Plan"), value: formatNumber(operationsWorkspace.activePlans.length), delta: copy("Supabase", "Supabase"), detail: copy("saved process plans", "kayıtlı süreç planları"), tone: "operations" },
+    { category: copy("Finance", "Finans"), label: copy("Monthly Revenue", "Aylık Ciro"), value: moneyOrMissing(monthlyRevenue), delta: copy("calculated", "hesaplandı"), detail: copy("from channel sales plan", "kanal satış planından"), tone: "finance" },
+    { category: copy("Finance", "Finans"), label: copy("Cash Runway", "Nakit Dayanma"), value: hasFinancialSourceData ? `${formatNumber(financialSummary.cashRunwayMonths)} ${copy("mo", "ay")}` : noDataValue, delta: copy("calculated", "hesaplandı"), detail: copy("from current cash", "mevcut nakitten"), tone: "finance" },
   ];
   const factoryLines = operationsWorkspace.machines.slice(0, 5).map((machine, index) => ({
     name: machine.name,
@@ -6536,10 +6544,11 @@ function App() {
               <React.Fragment key={module.key}>
                 <button
                   type="button"
-                  className={activePage === module.key || (module.key === "operations" && activePage.startsWith("operations/")) || (module.key === "product-plus" && activePage.startsWith("product-plus/")) || (module.key === "financial-modelling" && activePage.startsWith("financial-modelling/")) || (module.key === "simulation" && activePage.startsWith("simulation/")) ? "active" : ""}
+                  className={`dashboard-nav-item ${module.tone} ${activePage === module.key || (module.key === "operations" && activePage.startsWith("operations/")) || (module.key === "product-plus" && activePage.startsWith("product-plus/")) || (module.key === "financial-modelling" && activePage.startsWith("financial-modelling/")) || (module.key === "simulation" && activePage.startsWith("simulation/")) ? "active" : ""}`}
                   onClick={() => goTo(module.key === "product-plus" ? "/product-plus/product-tree" : module.key === "financial-modelling" ? "/financial-modelling/girdiler" : module.key === "simulation" ? "/simulation/current-situation" : module.path, "login")}
                 >
-                  {module.label}
+                  <span className="dashboard-nav-category">{module.category}</span>
+                  <strong>{module.label}</strong>
                 </button>
                 {module.key === "operations" && (activePage === "operations" || activePage.startsWith("operations/")) && (
                   <div className="dashboard-subnav" aria-label="Operations submodules">
@@ -6682,42 +6691,34 @@ function App() {
         <section className="landing-hero">
           {renderAteraOrbit("hero-orbit")}
           <div className="landing-hero-content">
-            <span className="hero-eyebrow">{copy("Factory feasibility command center", "Fabrika fizibilite karar merkezi")}</span>
-            <h1>{labels.heroTitle}</h1>
-            <p>{labels.heroCopy}</p>
-            <button type="button" className="submit-button landing-login" onClick={() => goTo("/login", "login")}>
+            <button type="button" className="submit-button landing-login" onClick={handleUseAtera}>
               {labels.goToLogin}
             </button>
-            <div className="hero-signal-row" aria-label={copy("Atera product signals", "Atera ürün sinyalleri")}>
-              <span>{copy("Production", "Üretim")}</span>
-              <span>{copy("Sales", "Satış")}</span>
-              <span>{copy("Cash flow", "Nakit akışı")}</span>
-              <span>{copy("Risk", "Risk")}</span>
-            </div>
           </div>
         </section>
 
         <section className="landing-sections" aria-label="Atera information">
           <article id="who" className="landing-section">
-            <div>
+            <div className="section-kicker">
               <span>{labels.who}</span>
               <h2>{labels.who}</h2>
             </div>
             <div className="who-content">
-              <p>{labels.whoCopy}</p>
-              <div className="who-principles" aria-label={copy("Atera principles", "Atera ilkeleri")}>
-                <article>
-                  <strong>{copy("One view", "Tek görünüm")}</strong>
-                  <span>{copy("Production, sales, finance, and risk in the same decision flow.", "Üretim, satış, finans ve risk aynı karar akışında.")}</span>
-                </article>
-                <article>
-                  <strong>{copy("Fast scenarios", "Hızlı senaryo")}</strong>
-                  <span>{copy("Change assumptions before capital gets locked into a plan.", "Sermaye plana kilitlenmeden varsayımları değiştirin.")}</span>
-                </article>
-                <article>
-                  <strong>{copy("Practical clarity", "Pratik netlik")}</strong>
-                  <span>{copy("Built for teams that need useful answers, not heavier software.", "Daha ağır yazılım değil, kullanışlı cevap isteyen ekipler için.")}</span>
-                </article>
+              <div className="who-copy-block">
+                <p>{labels.whoCopy}</p>
+                <div className="who-signal-grid" aria-label={copy("Atera decision signals", "Atera karar sinyalleri")}>
+                  <span>{copy("Capacity pressure", "Kapasite baskısı")}</span>
+                  <span>{copy("Cash exposure", "Nakit riski")}</span>
+                  <span>{copy("Margin impact", "Marj etkisi")}</span>
+                  <span>{copy("Delivery confidence", "Termin güveni")}</span>
+                </div>
+              </div>
+              <div className="who-visual-panel">
+                {renderAteraOrbit("who-section-orbit")}
+                <div className="who-panel-caption">
+                  <strong>{copy("Scenario command layer", "Senaryo komuta katmanı")}</strong>
+                  <span>{copy("From assumption to decision without spreadsheet fog.", "Varsayımdan karara Excel sisine girmeden.")}</span>
+                </div>
               </div>
             </div>
           </article>
@@ -6780,7 +6781,6 @@ function App() {
               <h2>{labels.contact}</h2>
             </div>
             <div className="contact-content">
-              <p>{labels.contactCopy}</p>
               <div className="contact-card">
                 <div className="contact-card-mark" aria-hidden="true">A</div>
                 <address className="contact-details">
@@ -6895,19 +6895,25 @@ function App() {
             </article>
           </section>
 
+          <div className="dashboard-section-label operations">
+            <span>{copy("Production and finance signals", "Üretim ve finans sinyalleri")}</span>
+            <strong>{copy("Daily status cards", "Günlük durum kartları")}</strong>
+          </div>
           <div className="command-stat-grid">
             {dashboardStats.map((stat, index) => (
-              <article className={`command-card stat-card stat-card-${index + 1}`} key={stat.label}>
+              <article className={`command-card stat-card ${stat.tone} stat-card-${index + 1}`} key={stat.label}>
+                <span className="stat-category">{stat.category}</span>
                 <span>{stat.label}</span>
                 <strong>{stat.value}</strong>
                 <small>{stat.delta} {stat.detail}</small>
-                <svg viewBox="0 0 120 42" aria-hidden="true">
-                  <path d="M4 34 L22 26 L36 30 L52 18 L70 22 L88 10 L116 6" />
-                </svg>
               </article>
             ))}
           </div>
 
+          <div className="dashboard-section-label operations">
+            <span>{copy("Operations", "Operasyon")}</span>
+            <strong>{copy("Factory and resource view", "Fabrika ve kaynak görünümü")}</strong>
+          </div>
           <div className="command-main-grid">
             <article className="command-card factory-map-card">
               <div className="card-heading">
@@ -6935,54 +6941,62 @@ function App() {
               </div>
             </article>
 
-            <article className="command-card finance-card">
-              <div className="card-heading">
-                <div>
-                  <span>{copy("Financial Impact Panel", "Finansal Etki Paneli")}</span>
-                  <h2>{financeWindowLabel} {copy("impact", "etkisi")}</h2>
+            <div className="finance-column">
+              <div className="dashboard-section-label finance inline-label">
+                <span>{copy("Finance", "Finans")}</span>
+                <strong>{copy("Cash and revenue view", "Nakit ve ciro görünümü")}</strong>
+              </div>
+              <article className="command-card finance-card">
+                <div className="card-heading">
+                  <div>
+                    <span>{copy("Financial Impact Panel", "Finansal Etki Paneli")}</span>
+                    <h2>{financeWindowLabel} {copy("impact", "etkisi")}</h2>
+                  </div>
+                  <div className="finance-date-controls" aria-label={copy("Financial impact date range", "Finansal etki tarih aralığı")}>
+                    <select value={financeWindow} onChange={(event) => setFinanceWindow(event.target.value)}>
+                      <option value="today">{copy("Today", "Bugün")}</option>
+                      <option value="tomorrow">{copy("Tomorrow", "Yarın")}</option>
+                      <option value="week">{copy("This week", "Bu hafta")}</option>
+                      <option value="month">{copy("This month", "Bu ay")}</option>
+                      <option value="custom">{copy("Custom range", "Özel aralık")}</option>
+                    </select>
+                    <input
+                      aria-label={copy("Start date", "Başlangıç tarihi")}
+                      type="date"
+                      value={financeDateRange.start}
+                      onChange={(event) => updateFinanceDateRange("start", event.target.value)}
+                    />
+                    <input
+                      aria-label={copy("End date", "Bitiş tarihi")}
+                      type="date"
+                      value={financeDateRange.end}
+                      onChange={(event) => updateFinanceDateRange("end", event.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="finance-date-controls" aria-label={copy("Financial impact date range", "Finansal etki tarih aralığı")}>
-                  <select value={financeWindow} onChange={(event) => setFinanceWindow(event.target.value)}>
-                    <option value="today">{copy("Today", "Bugün")}</option>
-                    <option value="tomorrow">{copy("Tomorrow", "Yarın")}</option>
-                    <option value="week">{copy("This week", "Bu hafta")}</option>
-                    <option value="month">{copy("This month", "Bu ay")}</option>
-                    <option value="custom">{copy("Custom range", "Özel aralık")}</option>
-                  </select>
-                  <input
-                    aria-label={copy("Start date", "Başlangıç tarihi")}
-                    type="date"
-                    value={financeDateRange.start}
-                    onChange={(event) => updateFinanceDateRange("start", event.target.value)}
-                  />
-                  <input
-                    aria-label={copy("End date", "Bitiş tarihi")}
-                    type="date"
-                    value={financeDateRange.end}
-                    onChange={(event) => updateFinanceDateRange("end", event.target.value)}
-                  />
+                <div className="finance-kpis">
+                  {dashboardFinanceKpis.map(([label, value]) => (
+                    <span key={label}>{label} <strong>{value}</strong></span>
+                  ))}
                 </div>
-              </div>
-              <div className="finance-kpis">
-                {dashboardFinanceKpis.map(([label, value]) => (
-                  <span key={label}>{label} <strong>{value}</strong></span>
-                ))}
-              </div>
-              <div className="finance-chart" aria-hidden="true">
-                <svg viewBox="0 0 520 250">
-                  <path className="chart-grid" d="M30 40 H500 M30 92 H500 M30 144 H500 M30 196 H500" />
-                  <path className="chart-line" d={projectedFinancialModel.trendChart?.salesPath || ""} />
-                  <path className="chart-dash" d={projectedFinancialModel.trendChart?.netPath || ""} />
-                </svg>
-              </div>
-              <div className="risk-list">
-                {dashboardFinancialRisks.map(([label, value]) => (
-                  <span key={label}>{label} <strong>{value}</strong></span>
-                ))}
-              </div>
-            </article>
+                <div className="finance-plain-summary" aria-label={copy("Financial summary", "Finans özeti")}>
+                  <span>{copy("Monthly cost", "Aylık maliyet")} <strong>{moneyOrMissing(monthlyCost)}</strong></span>
+                  <span>{copy("Monthly net", "Aylık net")} <strong>{moneyOrMissing(monthlyNet)}</strong></span>
+                  <span>{copy("Runway", "Dayanma")} <strong>{hasFinancialSourceData ? `${formatNumber(financialSummary.cashRunwayMonths)} ${copy("mo", "ay")}` : noDataValue}</strong></span>
+                </div>
+                <div className="risk-list">
+                  {dashboardFinancialRisks.map(([label, value]) => (
+                    <span key={label}>{label} <strong>{value}</strong></span>
+                  ))}
+                </div>
+              </article>
+            </div>
           </div>
 
+          <div className="dashboard-section-label decision">
+            <span>{copy("Decision", "Karar")}</span>
+            <strong>{copy("Recommended next moves", "Önerilen sonraki adımlar")}</strong>
+          </div>
           <section className="insight-strip" aria-label={copy("Decision insights", "Karar içgörüleri")}>
             <div className="card-heading">
               <div>
