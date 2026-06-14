@@ -12483,3 +12483,436 @@ textarea:focus-visible {
   border-color: rgba(8, 9, 16, 0.08);
   border-left-color: rgba(37, 184, 255, 0.92);
 }
+
+/* Module grouping and hierarchy layer. */
+.dashboard-shell {
+  --group-tone: var(--app-violet);
+  --group-surface: rgba(255, 255, 255, 0.075);
+  --group-line: rgba(255, 255, 255, 0.14);
+}
+
+.dashboard-shell .command-dashboard {
+  --module-accent: var(--app-violet);
+}
+
+.dashboard-shell .operations-workspace,
+.dashboard-shell .operations-overview {
+  --module-accent: var(--app-blue);
+}
+
+.dashboard-shell .financial-workspace {
+  --module-accent: var(--app-violet);
+}
+
+.dashboard-shell .simulation-workspace {
+  --module-accent: var(--app-blue);
+}
+
+.dashboard-shell .sales-workspace {
+  --module-accent: #81c95a;
+}
+
+.dashboard-shell .reports-workspace {
+  --module-accent: var(--app-coral);
+}
+
+.dashboard-shell .authorization-page {
+  --module-accent: var(--app-pink);
+}
+
+.dashboard-shell :is(
+  .dashboard-section-group,
+  .dashboard-two-column,
+  .module-rollup-grid,
+  .operations-grid,
+  .operation-planner,
+  .operation-data-grid,
+  .resource-definition-grid,
+  .process-setup-grid,
+  .process-list,
+  .finance-input-panel,
+  .financial-assumption-form,
+  .financial-grid,
+  .financial-overview-grid,
+  .financial-overview-layout,
+  .financial-decision-metrics,
+  .financial-quick-grid,
+  .financial-widget-grid,
+  .finance-metric-grid,
+  .financial-feasibility-grid,
+  .financial-loan-form,
+  .financial-loan-summary-grid,
+  .financial-loan-currency-section,
+  .financial-loan-list,
+  .simulation-variant-strip,
+  .scenario-management,
+  .simulation-signal-grid,
+  .simulation-grid,
+  .monte-carlo-summary,
+  .monte-carlo-grid,
+  .simulation-bottom,
+  .sales-stat-grid,
+  .sales-grid,
+  .sales-channel-grid,
+  .competitor-grid,
+  .sales-table,
+  .reports-controls,
+  .report-stat-grid,
+  .reports-grid,
+  .reports-side,
+  .authorization-grid
+) {
+  --group-tone: var(--module-accent, var(--app-violet));
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--group-tone) 14%, transparent), transparent 18rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.035));
+  border: 1px solid var(--group-line);
+  border-left: 5px solid color-mix(in srgb, var(--group-tone) 76%, #ffffff);
+  border-radius: 8px;
+  box-shadow:
+    0 18px 58px rgba(0, 0, 0, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  gap: 16px;
+  min-width: 0;
+  padding: 16px;
+  position: relative;
+}
+
+.dashboard-shell :is(
+  .dashboard-section-group,
+  .dashboard-two-column,
+  .module-rollup-grid,
+  .operations-grid,
+  .operation-planner,
+  .operation-data-grid,
+  .resource-definition-grid,
+  .process-setup-grid,
+  .process-list,
+  .finance-input-panel,
+  .financial-assumption-form,
+  .financial-grid,
+  .financial-overview-grid,
+  .financial-overview-layout,
+  .financial-decision-metrics,
+  .financial-quick-grid,
+  .financial-widget-grid,
+  .finance-metric-grid,
+  .financial-feasibility-grid,
+  .financial-loan-form,
+  .financial-loan-summary-grid,
+  .financial-loan-currency-section,
+  .financial-loan-list,
+  .scenario-management,
+  .simulation-signal-grid,
+  .simulation-grid,
+  .monte-carlo-summary,
+  .monte-carlo-grid,
+  .simulation-bottom,
+  .sales-stat-grid,
+  .sales-grid,
+  .sales-channel-grid,
+  .competitor-grid,
+  .sales-table,
+  .reports-controls,
+  .report-stat-grid,
+  .reports-grid,
+  .reports-side,
+  .authorization-grid
+)::before {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--group-tone) 86%, #ffffff), transparent 70%);
+  border-radius: 999px;
+  content: "";
+  height: 3px;
+  left: 16px;
+  opacity: 0.8;
+  position: absolute;
+  right: 38%;
+  top: 0;
+}
+
+.dashboard-shell :is(
+  .dashboard-section-group,
+  .finance-metric-grid,
+  .financial-decision-metrics,
+  .financial-quick-grid,
+  .monte-carlo-summary,
+  .sales-stat-grid,
+  .report-stat-grid
+) {
+  --group-tone: var(--app-violet);
+}
+
+.dashboard-shell :is(
+  .dashboard-two-column,
+  .operations-grid,
+  .operation-planner,
+  .operation-data-grid,
+  .resource-definition-grid,
+  .process-setup-grid,
+  .finance-input-panel,
+  .financial-assumption-form,
+  .financial-grid,
+  .simulation-grid,
+  .monte-carlo-grid,
+  .sales-grid,
+  .reports-grid,
+  .authorization-grid
+) {
+  --group-tone: var(--app-blue);
+}
+
+.dashboard-shell :is(
+  .module-rollup-grid,
+  .financial-overview-grid,
+  .financial-overview-layout,
+  .financial-feasibility-grid,
+  .simulation-signal-grid,
+  .simulation-bottom,
+  .sales-channel-grid,
+  .competitor-grid,
+  .reports-side
+) {
+  --group-tone: #81c95a;
+}
+
+.dashboard-shell :is(
+  .financial-widget-grid,
+  .financial-loan-form,
+  .financial-loan-summary-grid,
+  .financial-loan-currency-section,
+  .financial-loan-list,
+  .scenario-management,
+  .simulation-variant-strip,
+  .sales-table,
+  .reports-controls
+) {
+  --group-tone: var(--app-coral);
+}
+
+.dashboard-shell .process-list,
+.dashboard-shell .financial-overview-layout.secondary,
+.dashboard-shell .financial-input-section.optional,
+.dashboard-shell .reports-grid .reports-side {
+  --group-tone: var(--app-pink);
+}
+
+.dashboard-shell :is(
+  .financial-input-section,
+  .financial-extra-cost-form,
+  .financial-loan-calendar-section,
+  .resource-section,
+  .parameter-group,
+  .advanced-channel-panel
+) {
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--module-accent, var(--app-violet)) 10%, transparent), transparent 12rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(250, 248, 255, 0.9));
+  border-color: color-mix(in srgb, var(--module-accent, var(--app-violet)) 18%, rgba(8, 9, 16, 0.08));
+  border-left: 4px solid color-mix(in srgb, var(--module-accent, var(--app-violet)) 72%, #ffffff);
+  box-shadow:
+    0 12px 32px rgba(8, 9, 16, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.dashboard-shell :is(
+  .dashboard-section-group,
+  .dashboard-two-column,
+  .module-rollup-grid,
+  .operations-grid,
+  .operation-planner,
+  .operation-data-grid,
+  .resource-definition-grid,
+  .process-setup-grid,
+  .process-list,
+  .finance-input-panel,
+  .financial-assumption-form,
+  .financial-grid,
+  .financial-overview-grid,
+  .financial-overview-layout,
+  .financial-decision-metrics,
+  .financial-quick-grid,
+  .financial-widget-grid,
+  .finance-metric-grid,
+  .financial-feasibility-grid,
+  .financial-loan-form,
+  .financial-loan-summary-grid,
+  .financial-loan-currency-section,
+  .financial-loan-list,
+  .scenario-management,
+  .simulation-signal-grid,
+  .simulation-grid,
+  .monte-carlo-summary,
+  .monte-carlo-grid,
+  .simulation-bottom,
+  .sales-stat-grid,
+  .sales-grid,
+  .sales-channel-grid,
+  .competitor-grid,
+  .sales-table,
+  .reports-controls,
+  .report-stat-grid,
+  .reports-grid,
+  .reports-side,
+  .authorization-grid
+) > :is(
+  [class$="-card"],
+  [class*="-card "],
+  [class$="-panel"],
+  [class*="-panel "],
+  [class$="-board"],
+  [class*="-board "],
+  .financial-input-section,
+  .financial-extra-cost-form,
+  .financial-loan-calendar-section
+) {
+  box-shadow:
+    0 12px 34px rgba(8, 9, 16, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.dashboard-shell :is(
+  .financial-card-heading,
+  .financial-panel-heading,
+  .financial-input-section-heading,
+  .financial-loan-card-heading,
+  .operation-card-heading,
+  .resource-section-header,
+  .simulation-card-heading,
+  .sales-card-heading,
+  .reports-card-heading,
+  .card-heading
+) {
+  border-bottom: 1px solid color-mix(in srgb, var(--module-accent, var(--app-violet)) 16%, rgba(8, 9, 16, 0.08));
+  padding-bottom: 12px;
+}
+
+.dashboard-shell :is(
+  .financial-card-heading,
+  .financial-panel-heading,
+  .financial-input-section-heading,
+  .financial-loan-card-heading,
+  .operation-card-heading,
+  .resource-section-header,
+  .simulation-card-heading,
+  .sales-card-heading,
+  .reports-card-heading,
+  .card-heading
+) :is(span, h2, h3) {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell :is(
+  .operations-tabs,
+  .financial-tabs,
+  .simulation-tabs,
+  .simulation-variant-strip,
+  .reports-tabs,
+  .authorization-tabs
+) {
+  margin-bottom: 4px;
+}
+
+.dashboard-shell :is(
+  .financial-workspace,
+  .operations-workspace,
+  .simulation-workspace,
+  .sales-workspace,
+  .reports-workspace,
+  .authorization-page,
+  .command-dashboard
+) {
+  gap: 18px;
+}
+
+@media (max-width: 760px) {
+  .dashboard-shell :is(
+    .dashboard-section-group,
+    .dashboard-two-column,
+    .module-rollup-grid,
+    .operations-grid,
+    .operation-planner,
+    .operation-data-grid,
+    .resource-definition-grid,
+    .process-setup-grid,
+    .process-list,
+    .finance-input-panel,
+    .financial-assumption-form,
+    .financial-grid,
+    .financial-overview-grid,
+    .financial-overview-layout,
+    .financial-decision-metrics,
+    .financial-quick-grid,
+    .financial-widget-grid,
+    .finance-metric-grid,
+    .financial-feasibility-grid,
+    .financial-loan-form,
+    .financial-loan-summary-grid,
+    .financial-loan-currency-section,
+    .financial-loan-list,
+    .scenario-management,
+    .simulation-signal-grid,
+    .simulation-grid,
+    .monte-carlo-summary,
+    .monte-carlo-grid,
+    .simulation-bottom,
+    .sales-stat-grid,
+    .sales-grid,
+    .sales-channel-grid,
+    .competitor-grid,
+    .sales-table,
+    .reports-controls,
+    .report-stat-grid,
+    .reports-grid,
+    .reports-side,
+    .authorization-grid
+  ) {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .dashboard-shell :is(
+    .dashboard-section-group,
+    .dashboard-two-column,
+    .module-rollup-grid,
+    .operations-grid,
+    .operation-planner,
+    .operation-data-grid,
+    .resource-definition-grid,
+    .process-setup-grid,
+    .process-list,
+    .finance-input-panel,
+    .financial-assumption-form,
+    .financial-grid,
+    .financial-overview-grid,
+    .financial-overview-layout,
+    .financial-decision-metrics,
+    .financial-quick-grid,
+    .financial-widget-grid,
+    .finance-metric-grid,
+    .financial-feasibility-grid,
+    .financial-loan-form,
+    .financial-loan-summary-grid,
+    .financial-loan-currency-section,
+    .financial-loan-list,
+    .scenario-management,
+    .simulation-signal-grid,
+    .simulation-grid,
+    .monte-carlo-summary,
+    .monte-carlo-grid,
+    .simulation-bottom,
+    .sales-stat-grid,
+    .sales-grid,
+    .sales-channel-grid,
+    .competitor-grid,
+    .sales-table,
+    .reports-controls,
+    .report-stat-grid,
+    .reports-grid,
+    .reports-side,
+    .authorization-grid
+  )::before {
+    left: 12px;
+    right: 48%;
+  }
+}
