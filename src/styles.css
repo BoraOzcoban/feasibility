@@ -10979,3 +10979,1507 @@ textarea:focus-visible {
     width: 86vw;
   }
 }
+
+/* Product app refresh inspired by HubX's modular product surfaces. */
+.auth-shell,
+.dashboard-shell {
+  --app-bg: #050509;
+  --app-bg-soft: #0e0d16;
+  --app-ink: #080910;
+  --app-muted: #696574;
+  --app-pink: #ff5a8a;
+  --app-violet: #a34cff;
+  --app-violet-strong: #7c35ff;
+  --app-blue: #25b8ff;
+  --app-lime: #b9ff66;
+  --app-coral: #ff7a5c;
+  --color-ink: #17121f;
+  --color-heading: #080910;
+  --color-muted: #696574;
+  --color-page: #050509;
+  --color-section: #11111b;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f7f4ff;
+  --color-line: rgba(8, 9, 16, 0.09);
+  --color-navy: #050509;
+  --color-navy-soft: #171020;
+  --color-teal: #a34cff;
+  --color-teal-strong: #7c35ff;
+  --color-cyan: #25b8ff;
+  --color-amber: #ffb84d;
+  --color-amber-soft: #fff3d4;
+  --color-clay: #ff5a8a;
+  --color-green: #81c95a;
+  --shadow-soft: 0 22px 70px rgba(8, 9, 16, 0.12);
+  --shadow-strong: 0 34px 110px rgba(0, 0, 0, 0.34);
+}
+
+.auth-shell {
+  background:
+    radial-gradient(circle at 78% 16%, rgba(255, 90, 138, 0.34), transparent 24rem),
+    radial-gradient(circle at 18% 82%, rgba(37, 184, 255, 0.18), transparent 24rem),
+    radial-gradient(circle at 50% 45%, rgba(163, 76, 255, 0.18), transparent 28rem),
+    linear-gradient(135deg, #050509 0%, #0b0b14 48%, #17101f 100%);
+  overflow: hidden;
+  position: relative;
+}
+
+.auth-shell::before,
+.dashboard-shell::before {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  content: "";
+  inset: 0;
+  opacity: 0.42;
+  pointer-events: none;
+  position: fixed;
+}
+
+.auth-panel {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 34px 110px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  position: relative;
+  z-index: 1;
+}
+
+:root[data-theme="dark"] .auth-panel {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.auth-shell .brand-mark strong,
+.auth-shell .mode-tabs button.active,
+.auth-shell .signed-in p {
+  color: var(--app-ink);
+}
+
+.auth-shell .brand-mark span,
+.auth-shell .auth-form label {
+  color: var(--app-muted);
+}
+
+.auth-shell .mode-tabs,
+.auth-shell .file-button {
+  background: rgba(8, 9, 16, 0.06);
+}
+
+.auth-shell .mode-tabs button.active {
+  box-shadow: 0 14px 34px rgba(8, 9, 16, 0.1);
+}
+
+.auth-shell .submit-button,
+.auth-shell .signed-in button,
+.dashboard-shell .submit-button,
+.dashboard-shell .signed-in button {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.38), transparent 34%),
+    linear-gradient(135deg, var(--app-pink), var(--app-violet) 58%, #11111a);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 18px 46px rgba(163, 76, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+}
+
+.auth-shell .submit-button:hover,
+.auth-shell .signed-in button:hover,
+.dashboard-shell .submit-button:hover,
+.dashboard-shell .signed-in button:hover {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.44), transparent 34%),
+    linear-gradient(135deg, #ff6f9c, #b765ff 58%, #171725);
+  box-shadow:
+    0 24px 64px rgba(163, 76, 255, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
+.auth-shell input:not([type="checkbox"]):not([type="radio"]),
+.auth-shell select,
+.dashboard-shell input:not([type="checkbox"]):not([type="radio"]),
+.dashboard-shell select,
+.dashboard-shell textarea {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(8, 9, 16, 0.1);
+  color: var(--app-ink);
+}
+
+.auth-shell input:not([type="checkbox"]):not([type="radio"]):focus,
+.auth-shell select:focus,
+.dashboard-shell input:not([type="checkbox"]):not([type="radio"]):focus,
+.dashboard-shell select:focus,
+.dashboard-shell textarea:focus {
+  border-color: var(--app-violet);
+  box-shadow: 0 0 0 4px rgba(163, 76, 255, 0.16);
+}
+
+.dashboard-shell {
+  background:
+    radial-gradient(circle at 82% 10%, rgba(255, 90, 138, 0.28), transparent 26rem),
+    radial-gradient(circle at 18% 8%, rgba(37, 184, 255, 0.2), transparent 24rem),
+    radial-gradient(circle at 50% 46%, rgba(163, 76, 255, 0.16), transparent 34rem),
+    linear-gradient(135deg, #050509 0%, #0a0a13 52%, #17101f 100%);
+  color: var(--color-ink);
+  isolation: isolate;
+  position: relative;
+}
+
+.dashboard-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-sidebar {
+  background: rgba(5, 5, 9, 0.78);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 22px 0 70px rgba(0, 0, 0, 0.22);
+  min-height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+:root[data-theme="dark"] .dashboard-sidebar {
+  background: rgba(5, 5, 9, 0.78);
+}
+
+.dashboard-shell .landing-brand.dashboard-brand {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.dashboard-shell .landing-brand.dashboard-brand strong {
+  color: #ffffff;
+}
+
+.dashboard-controls,
+.sync-status-card,
+.customer-logo-mark,
+.atera-logo-mark {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.13);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.dashboard-controls .language-picker span,
+.dashboard-controls .language-picker select,
+.dashboard-controls .theme-toggle,
+.sync-status-card strong,
+.customer-logo-mark span,
+.atera-logo-mark span {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.sync-status-card small,
+.dashboard-logout,
+.dashboard-subnav-label {
+  color: rgba(255, 218, 229, 0.92);
+}
+
+.dashboard-nav button {
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.dashboard-nav button:hover,
+.dashboard-nav button.active,
+.dashboard-subnav button.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.dashboard-nav-item::before {
+  background: linear-gradient(180deg, var(--app-pink), var(--app-violet), var(--app-blue));
+}
+
+.dashboard-nav-category {
+  color: rgba(255, 184, 205, 0.9);
+  letter-spacing: 0;
+}
+
+.dashboard-subnav {
+  border-left-color: rgba(255, 255, 255, 0.14);
+}
+
+.dashboard-subnav button {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.dashboard-content {
+  background: transparent;
+}
+
+.command-dashboard,
+.financial-workspace,
+.simulation-workspace,
+.sales-workspace,
+.reports-workspace,
+.authorization-page,
+.operations-workspace,
+.operations-overview {
+  background:
+    radial-gradient(circle at 86% 0%, rgba(255, 90, 138, 0.18), transparent 24rem),
+    radial-gradient(circle at 12% 8%, rgba(37, 184, 255, 0.14), transparent 25rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 36rem);
+  min-height: 100vh;
+}
+
+.dashboard-shell :is([class$="-card"], [class*="-card "], [class$="-panel"], [class*="-panel "], [class$="-board"], [class*="-board "], .detail-heading, .dashboard-section-heading) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(250, 248, 255, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  border-radius: 8px;
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.dashboard-shell :is([class$="-card"], [class*="-card "], [class$="-panel"], [class*="-panel "], [class$="-board"], [class*="-board "])::before {
+  border-radius: 8px 8px 0 0;
+}
+
+.dashboard-shell :is(h1, h2, h3, strong) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell :is(p, small, label) {
+  color: var(--app-muted);
+}
+
+.dashboard-panel {
+  background:
+    radial-gradient(circle at 84% 10%, rgba(255, 90, 138, 0.18), transparent 18rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(250, 248, 255, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  border-radius: 8px;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.18);
+  margin: 32px;
+}
+
+.dashboard-panel span,
+.dashboard-section-heading span,
+.card-heading span,
+.command-card > span,
+.operation-card-heading span,
+.financial-panel-heading span,
+.financial-decision-copy span,
+.simulation-card-heading span,
+.simulation-command-copy > span,
+.sales-card-heading span,
+.sales-command-copy > span,
+.reports-header span,
+.authorization-heading span {
+  color: var(--app-violet);
+  letter-spacing: 0;
+}
+
+.executive-brief,
+.dashboard-command-hero,
+.command-hero,
+.financial-decision-hero,
+.financial-loan-hero,
+.simulation-command-hero,
+.sales-command-hero,
+.operations-overview > div:first-child,
+.operations-workspace.operations-modern .operations-header,
+.financial-header,
+.simulation-header,
+.sales-header,
+.reports-header,
+.authorization-heading {
+  background:
+    radial-gradient(circle at 86% 14%, rgba(255, 90, 138, 0.32), transparent 23rem),
+    radial-gradient(circle at 16% 88%, rgba(37, 184, 255, 0.18), transparent 21rem),
+    linear-gradient(135deg, #050509 0%, #0b0b14 54%, #17101f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  box-shadow: 0 30px 92px rgba(0, 0, 0, 0.28);
+  color: #ffffff;
+  overflow: hidden;
+  position: relative;
+}
+
+.financial-header,
+.simulation-header,
+.sales-header,
+.reports-header,
+.authorization-heading {
+  padding: 28px;
+}
+
+.executive-brief::after,
+.dashboard-command-hero::after,
+.financial-decision-hero::after,
+.simulation-command-hero::after,
+.operations-overview > div:first-child::after,
+.operations-workspace.operations-modern .operations-header::after,
+.financial-header::after,
+.simulation-header::after,
+.sales-header::after,
+.reports-header::after,
+.authorization-heading::after {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 38px 38px;
+  content: "";
+  inset: 0;
+  opacity: 0.42;
+  pointer-events: none;
+  position: absolute;
+}
+
+.financial-header > *,
+.simulation-header > *,
+.sales-header > *,
+.reports-header > *,
+.authorization-heading > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-shell :is(.executive-brief, .dashboard-command-hero, .command-hero, .financial-decision-hero, .financial-loan-hero, .simulation-command-hero, .sales-command-hero, .operations-header, .financial-header, .simulation-header, .sales-header, .reports-header, .authorization-heading) :is(h1, h2, h3, strong) {
+  color: #ffffff;
+}
+
+.dashboard-shell :is(.executive-brief, .dashboard-command-hero, .command-hero, .financial-decision-hero, .financial-loan-hero, .simulation-command-hero, .sales-command-hero, .operations-header, .financial-header, .simulation-header, .sales-header, .reports-header, .authorization-heading) :is(p, small) {
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.dashboard-command-copy > span,
+.executive-brief-copy > span,
+.financial-decision-copy span,
+.simulation-command-copy > span,
+.sales-command-copy > span,
+.operations-overview > div:first-child span,
+.operations-workspace.operations-modern .operations-header span,
+.financial-header span,
+.simulation-header span,
+.sales-header span,
+.reports-header span,
+.authorization-heading span {
+  color: rgba(255, 218, 229, 0.92);
+}
+
+.dashboard-readiness-panel,
+.executive-readiness-card,
+.financial-decision-score,
+.simulation-confidence-panel,
+.sales-forecast-preview,
+.sales-command-hero .readiness-ring {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+
+.readiness-ring,
+.sales-command-hero .readiness-ring,
+.financial-decision-score .readiness-ring {
+  background:
+    radial-gradient(circle at center, #090912 0 54%, transparent 55%),
+    conic-gradient(var(--app-violet) 0 var(--readiness), rgba(255, 255, 255, 0.16) var(--readiness) 100%);
+}
+
+.readiness-progress span,
+.sales-mini-chart i,
+.sales-score-bar i,
+.financial-bar-row i {
+  background: linear-gradient(90deg, var(--app-pink), var(--app-violet), var(--app-blue));
+}
+
+.dashboard-shell :is(.operations-tabs, .financial-tabs, .simulation-tabs, .reports-tabs, .authorization-tabs, .sales-period-toggle, .mode-tabs) {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-shell :is(.operations-tabs, .financial-tabs, .simulation-tabs, .reports-tabs, .authorization-tabs, .sales-period-toggle, .mode-tabs) button {
+  border-radius: 7px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.dashboard-shell :is(.operations-tabs, .financial-tabs, .simulation-tabs, .reports-tabs, .authorization-tabs, .sales-period-toggle, .mode-tabs) button.active {
+  background: #ffffff;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.16);
+  color: var(--app-ink);
+}
+
+.dashboard-shell .primary,
+.dashboard-shell .planner-save-button,
+.dashboard-shell .command-run-button,
+.dashboard-shell .card-heading button {
+  border-radius: 999px;
+}
+
+.dashboard-shell :is(.primary, .planner-save-button, .command-run-button),
+.dashboard-shell .operations-actions .primary,
+.dashboard-shell .financial-header .primary,
+.dashboard-shell .simulation-header-actions .primary,
+.dashboard-shell .sales-header-actions .primary,
+.dashboard-shell .reports-controls .primary {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.34), transparent 34%),
+    linear-gradient(135deg, var(--app-pink), var(--app-violet) 58%, #171725);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 18px 44px rgba(163, 76, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
+.dashboard-shell button:not(.link-button):hover {
+  transform: translateY(-1px);
+}
+
+.dashboard-shell :is(.executive-metric-card, .finance-metric-card, .financial-feasibility-card, .financial-decision-card, .financial-quick-card, .financial-flow-card, .simulation-signal-card, .sales-stat-card, .sales-signal-grid span, .module-rollup-card, .process-summary-card, .financial-widget-card) {
+  border-color: rgba(163, 76, 255, 0.22);
+}
+
+.dashboard-shell :is(.executive-metric-card, .finance-metric-card, .financial-feasibility-card, .financial-decision-card, .financial-quick-card, .financial-flow-card, .simulation-signal-card, .sales-stat-card, .module-rollup-card, .process-summary-card)::after {
+  background: linear-gradient(90deg, var(--app-pink), var(--app-violet), var(--app-blue));
+}
+
+.operation-data-row,
+.financial-month-row,
+.financial-statement-row,
+.income-row,
+.compare-table div,
+.recent-report-row,
+.permissions-row,
+.users-row,
+.sales-table-row {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(8, 9, 16, 0.08);
+}
+
+.operation-data-head,
+.financial-month-head,
+.income-head,
+.compare-table div:first-child,
+.recent-report-row:first-child,
+.permissions-row-head,
+.users-row-head,
+.sales-table-head {
+  background: linear-gradient(135deg, #11111a, #050509);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.operation-data-head span,
+.financial-month-head span,
+.income-head span,
+.permissions-row-head span,
+.users-row-head span,
+.sales-table-head span {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.status-message {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(163, 76, 255, 0.22);
+  color: var(--app-ink);
+}
+
+.info-tip button {
+  background: rgba(163, 76, 255, 0.12);
+  border-color: rgba(163, 76, 255, 0.24);
+  color: var(--app-violet);
+}
+
+.dashboard-shell .link-button {
+  color: rgba(255, 218, 229, 0.92);
+}
+
+.dashboard-sidebar :is(strong, small),
+.dashboard-sidebar .dashboard-nav-item strong,
+.dashboard-sidebar .dashboard-nav button.active strong,
+.dashboard-sidebar .dashboard-nav button:hover strong {
+  color: #ffffff;
+}
+
+.dashboard-sidebar .dashboard-nav button:not(.active):not(:hover) strong {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.dashboard-sidebar .dashboard-nav-category,
+.dashboard-sidebar .dashboard-subnav-label,
+.dashboard-sidebar .sync-status-card small {
+  color: rgba(255, 218, 229, 0.9);
+}
+
+.dashboard-sidebar .sync-status-card {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* App contrast and card-shape fixes. */
+.dashboard-shell .executive-brief .executive-readiness-card,
+.dashboard-shell .dashboard-command-hero .dashboard-readiness-panel,
+.dashboard-shell .simulation-command-hero .simulation-confidence-panel,
+.dashboard-shell .sales-command-hero .sales-readiness-list,
+.dashboard-shell .financial-decision-hero .financial-decision-score {
+  background:
+    linear-gradient(135deg, rgba(5, 5, 9, 0.72), rgba(23, 16, 31, 0.64));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.dashboard-shell .executive-brief .executive-readiness-card :is(span, strong, p, small),
+.dashboard-shell .dashboard-command-hero .dashboard-readiness-panel :is(span, strong, p, small),
+.dashboard-shell .simulation-command-hero .simulation-confidence-panel :is(span, strong, p, small),
+.dashboard-shell .sales-command-hero .sales-readiness-list :is(span, strong, p, small),
+.dashboard-shell .financial-decision-hero .financial-decision-score :is(span, strong, p, small) {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.dashboard-shell .executive-brief .executive-readiness-card > strong,
+.dashboard-shell .dashboard-command-hero .readiness-ring strong,
+.dashboard-shell .simulation-command-hero .readiness-ring strong,
+.dashboard-shell .sales-command-hero .readiness-ring strong,
+.dashboard-shell .financial-decision-hero .readiness-ring strong {
+  color: #ffffff;
+}
+
+.dashboard-shell .executive-brief .executive-readiness-card > span,
+.dashboard-shell .readiness-step-list strong,
+.dashboard-shell .readiness-list strong,
+.dashboard-shell .simulation-source-list strong,
+.dashboard-shell .sales-readiness-list strong,
+.dashboard-shell .financial-readiness-list strong {
+  color: rgba(255, 218, 229, 0.92);
+}
+
+.dashboard-shell .readiness-step-list button,
+.dashboard-shell .readiness-list button,
+.dashboard-shell .simulation-source-list button,
+.dashboard-shell .sales-readiness-list button,
+.dashboard-shell .financial-readiness-list button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: #ffffff;
+  min-width: 0;
+}
+
+.dashboard-shell .readiness-step-list button.done,
+.dashboard-shell .readiness-list button.done,
+.dashboard-shell .simulation-source-list button.done,
+.dashboard-shell .sales-readiness-list button.done,
+.dashboard-shell .financial-readiness-list button.done {
+  background: rgba(163, 76, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.dashboard-shell .dashboard-risk-row,
+.dashboard-shell .module-rollup-card,
+.dashboard-shell .action-sequence article,
+.dashboard-shell .assumption-list span,
+.dashboard-shell .business-case-list span {
+  background: #ffffff;
+  border-color: rgba(8, 9, 16, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 14px 42px rgba(8, 9, 16, 0.08);
+  color: var(--app-ink);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dashboard-shell .dashboard-risk-row,
+.dashboard-shell .module-rollup-card {
+  text-align: left;
+}
+
+.dashboard-shell .dashboard-risk-row {
+  border-left: 5px solid var(--metric-tone);
+}
+
+.dashboard-shell .module-rollup-card {
+  border-left: 5px solid var(--module-tone);
+  min-height: 178px;
+}
+
+.dashboard-shell .action-sequence article {
+  align-items: start;
+}
+
+.dashboard-shell .action-sequence span {
+  background: linear-gradient(135deg, var(--app-pink), var(--app-violet));
+  color: #ffffff;
+  flex: 0 0 auto;
+}
+
+.dashboard-shell .dashboard-risk-row :is(strong, p, b, span),
+.dashboard-shell .module-rollup-card :is(strong, p, b, span),
+.dashboard-shell .action-sequence article :is(strong, p, b, span),
+.dashboard-shell .assumption-list span,
+.dashboard-shell .assumption-list span *,
+.dashboard-shell .business-case-list span,
+.dashboard-shell .business-case-list span * {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell .dashboard-risk-row strong,
+.dashboard-shell .module-rollup-card strong,
+.dashboard-shell .action-sequence p,
+.dashboard-shell .assumption-list strong,
+.dashboard-shell .business-case-list strong {
+  color: var(--app-ink);
+}
+
+.dashboard-shell .dashboard-risk-row p,
+.dashboard-shell .module-rollup-card p,
+.dashboard-shell .assumption-list span,
+.dashboard-shell .business-case-list span {
+  color: #5f596b;
+}
+
+.dashboard-shell .dashboard-risk-row > span,
+.dashboard-shell .dashboard-risk-row b,
+.dashboard-shell .module-rollup-card span,
+.dashboard-shell .module-rollup-card b {
+  color: var(--metric-tone, var(--module-tone, var(--app-violet)));
+}
+
+.dashboard-shell .module-rollup-card.operations {
+  --module-tone: var(--app-violet);
+}
+
+.dashboard-shell .module-rollup-card.sales {
+  --module-tone: #6bbf59;
+}
+
+.dashboard-shell .module-rollup-card.finance {
+  --module-tone: var(--app-blue);
+}
+
+.dashboard-shell .module-rollup-card.decision {
+  --module-tone: var(--app-pink);
+}
+
+.dashboard-shell .module-rollup-card.reports {
+  --module-tone: var(--app-coral);
+}
+
+.dashboard-shell .dashboard-assumption-controls label,
+.dashboard-shell .dashboard-assumption-controls label > span {
+  color: #5f596b;
+}
+
+.dashboard-shell .dashboard-assumption-controls select {
+  background: #ffffff;
+  color: var(--app-ink);
+}
+
+.dashboard-shell :is(.dashboard-risk-board, .dashboard-action-board, .dashboard-assumption-board, .dashboard-business-case) :is(h2, strong) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell :is(.dashboard-risk-board, .dashboard-action-board, .dashboard-assumption-board, .dashboard-business-case) :is(p, small) {
+  color: #5f596b;
+}
+
+.dashboard-shell :is(.command-card, .finance-card, .financial-card, .operation-card, .simulation-card, .sales-card, .reports-card, .authorization-card) :is(p, small, label) {
+  color: #5f596b;
+}
+
+.dashboard-shell :is(.command-card, .finance-card, .financial-card, .operation-card, .simulation-card, .sales-card, .reports-card, .authorization-card) :is(h2, h3, strong) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell :is(.operation-data-row, .financial-month-row, .financial-statement-row, .income-row, .compare-table div, .recent-report-row, .permissions-row, .users-row, .sales-table-row):not(.operation-data-head):not(.financial-month-head):not(.income-head):not(.permissions-row-head):not(.users-row-head):not(.sales-table-head) :is(span, strong, small, b) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell :is(.operation-data-row, .financial-month-row, .financial-statement-row, .income-row, .recent-report-row, .permissions-row, .users-row, .sales-table-row):not(.operation-data-head):not(.financial-month-head):not(.income-head):not(.permissions-row-head):not(.users-row-head):not(.sales-table-head) small {
+  color: #5f596b;
+}
+
+.dashboard-shell :is(.operation-data-head, .financial-month-head, .income-head, .permissions-row-head, .users-row-head, .sales-table-head) :is(span, strong, small, b) {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+/* Consistent readable mini tiles across Dashboard, Finance, Sales, Simulation, and Reports. */
+.dashboard-shell :is(
+  .assumption-list span,
+  .business-case-list span,
+  .financial-plain-summary,
+  .financial-proof-points span,
+  .financial-feasibility-card,
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-widget-metric,
+  .financial-widget-picker button,
+  .financial-action-item,
+  .exchange-rate-card,
+  .financial-loan-summary-card,
+  .financial-loan-currency-card,
+  .financial-loan-card-metrics span,
+  .impact-summary span,
+  .flow-impact-item,
+  .simulation-signal-card,
+  .monte-carlo-stat,
+  .percentile-outcome,
+  .used-parameter-list span,
+  .scenario-choice,
+  .sales-score-row,
+  .sales-channel-capacity,
+  .sales-type-info,
+  .sales-signal-grid span,
+  .report-stat-card,
+  .report-category-list span,
+  .schedule-row,
+  .quick-report-grid button,
+  .reports-filter-summary,
+  .planner-summary-grid span,
+  .allocation-grid span,
+  .cost-breakdown span,
+  .process-metrics span,
+  .process-detail-grid div,
+  .compact-resource-list span,
+  .selected-resource-results div,
+  .process-summary-card,
+  .resource-row-meta,
+  .financial-row-group header,
+  .financial-row-subgroup
+) {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(163, 76, 255, 0.12), transparent 9rem),
+    linear-gradient(135deg, #ffffff 0%, #fbf8ff 100%);
+  border: 1px solid rgba(163, 76, 255, 0.16);
+  border-left: 5px solid rgba(163, 76, 255, 0.82);
+  border-radius: 8px;
+  box-shadow:
+    0 16px 46px rgba(8, 9, 16, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  color: #5f596b;
+  min-width: 0;
+  overflow: hidden;
+  padding: 15px 16px;
+}
+
+.dashboard-shell :is(.assumption-list span, .business-case-list span) {
+  align-items: start;
+  gap: 8px;
+  min-height: 68px;
+}
+
+.dashboard-shell .business-case-list span {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dashboard-shell .assumption-list strong,
+.dashboard-shell .business-case-list strong {
+  font-size: 1.05rem;
+  line-height: 1.18;
+  text-align: left;
+}
+
+.dashboard-shell :is(
+  .assumption-list span,
+  .business-case-list span,
+  .financial-plain-summary,
+  .financial-proof-points span,
+  .financial-feasibility-card,
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-widget-metric,
+  .financial-widget-picker button,
+  .financial-action-item,
+  .exchange-rate-card,
+  .financial-loan-summary-card,
+  .financial-loan-currency-card,
+  .financial-loan-card-metrics span,
+  .impact-summary span,
+  .flow-impact-item,
+  .simulation-signal-card,
+  .monte-carlo-stat,
+  .percentile-outcome,
+  .used-parameter-list span,
+  .scenario-choice,
+  .sales-score-row,
+  .sales-channel-capacity,
+  .sales-type-info,
+  .sales-signal-grid span,
+  .report-stat-card,
+  .report-category-list span,
+  .schedule-row,
+  .quick-report-grid button
+  ,
+  .planner-summary-grid span,
+  .allocation-grid span,
+  .cost-breakdown span,
+  .process-metrics span,
+  .process-detail-grid div,
+  .compact-resource-list span,
+  .selected-resource-results div,
+  .process-summary-card,
+  .resource-row-meta,
+  .financial-row-group header,
+  .financial-row-subgroup
+) :is(strong, h3, b) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell :is(
+  .financial-proof-points span,
+  .financial-feasibility-card,
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-widget-metric,
+  .financial-widget-picker button,
+  .financial-action-item,
+  .exchange-rate-card,
+  .financial-loan-summary-card,
+  .financial-loan-currency-card,
+  .financial-loan-card-metrics span,
+  .impact-summary span,
+  .flow-impact-item,
+  .simulation-signal-card,
+  .monte-carlo-stat,
+  .percentile-outcome,
+  .used-parameter-list span,
+  .scenario-choice,
+  .sales-score-row,
+  .sales-channel-capacity,
+  .sales-type-info,
+  .sales-signal-grid span,
+  .report-stat-card,
+  .report-category-list span,
+  .schedule-row,
+  .quick-report-grid button
+  ,
+  .planner-summary-grid span,
+  .allocation-grid span,
+  .cost-breakdown span,
+  .process-metrics span,
+  .process-detail-grid div,
+  .compact-resource-list span,
+  .selected-resource-results div,
+  .process-summary-card,
+  .resource-row-meta,
+  .financial-row-group header,
+  .financial-row-subgroup
+) :is(span, small, p, em, label) {
+  color: #5f596b;
+}
+
+.dashboard-shell :is(
+  .financial-proof-points span,
+  .financial-feasibility-card,
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-widget-metric,
+  .financial-widget-picker button,
+  .impact-summary span,
+  .flow-impact-item,
+  .simulation-signal-card,
+  .monte-carlo-stat,
+  .percentile-outcome,
+  .used-parameter-list span,
+  .sales-score-row,
+  .sales-channel-capacity,
+  .sales-type-info,
+  .sales-signal-grid span,
+  .report-stat-card,
+  .report-category-list span,
+  .schedule-row
+  ,
+  .planner-summary-grid span,
+  .allocation-grid span,
+  .cost-breakdown span,
+  .process-metrics span,
+  .compact-resource-list span,
+  .selected-resource-results div,
+  .process-summary-card,
+  .resource-row-meta,
+  .financial-row-group header,
+  .financial-row-subgroup
+) > span:first-child {
+  color: var(--app-violet);
+}
+
+.dashboard-shell :is(
+  .financial-feasibility-card,
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-widget-metric,
+  .impact-summary span,
+  .flow-impact-item,
+  .simulation-signal-card,
+  .monte-carlo-stat,
+  .percentile-outcome,
+  .sales-score-row,
+  .sales-signal-grid span,
+  .report-stat-card
+  ,
+  .process-summary-card,
+  .planner-summary-grid span,
+  .allocation-grid span,
+  .cost-breakdown span,
+  .process-metrics span,
+  .process-detail-grid div
+) {
+  gap: 8px;
+}
+
+.dashboard-shell :is(.financial-flow-card, .flow-impact-item, .sales-signal-grid span, .report-stat-card) {
+  min-height: 118px;
+}
+
+.dashboard-shell :is(.sales-channel-capacity, .sales-type-info) {
+  border-left-color: rgba(37, 184, 255, 0.82);
+}
+
+.dashboard-shell :is(.financial-action-item, .financial-flow-card.cost, .simulation-signal-card.watch, .percentile-outcome.bad) {
+  border-left-color: rgba(255, 184, 77, 0.9);
+}
+
+.dashboard-shell :is(.financial-decision-card.risk, .flow-impact-item.risk, .simulation-signal-card.risk, .percentile-outcome.danger, .sales-score-row.risk) {
+  border-left-color: rgba(255, 90, 138, 0.9);
+}
+
+.dashboard-shell :is(.financial-decision-card.good, .simulation-signal-card.good, .percentile-outcome.good, .financial-flow-card.income) {
+  border-left-color: rgba(129, 201, 90, 0.9);
+}
+
+.dashboard-shell .financial-plain-summary {
+  line-height: 1.55;
+}
+
+.dashboard-shell .sales-command-hero .sales-forecast-preview {
+  background:
+    linear-gradient(135deg, rgba(5, 5, 9, 0.74), rgba(23, 16, 31, 0.64));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.dashboard-shell .sales-command-hero .sales-forecast-preview :is(strong, span, small) {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.dashboard-shell .sales-command-hero .sales-forecast-preview .readiness-ring strong {
+  color: #ffffff;
+}
+
+.dashboard-shell .sales-command-hero .sales-readiness-list {
+  padding: 12px;
+}
+
+.dashboard-shell .sales-mini-chart small {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.dashboard-shell :is(.line-impact-row, .sim-financial-table div, .sim-income-table div, .compare-table div):not(:first-child) {
+  background: #ffffff;
+  border-color: rgba(8, 9, 16, 0.08);
+  color: var(--app-ink);
+}
+
+.dashboard-shell :is(.line-impact-row, .sim-financial-table div, .sim-income-table div, .compare-table div):not(:first-child) :is(span, strong, small, em, b) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell :is(.line-impact-head, .compare-table div:first-child) {
+  background: linear-gradient(135deg, #11111a, #050509);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-shell :is(.line-impact-head, .compare-table div:first-child) :is(span, strong, small, b) {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.authorization-card,
+.authorization-locked {
+  min-width: 0;
+}
+
+@media (max-width: 620px) {
+  .dashboard-sidebar {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    border-right: 0;
+    min-height: auto;
+    position: static;
+  }
+
+  .dashboard-panel {
+    margin: 12px;
+  }
+}
+
+/* Financial modelling contrast hardening. */
+.dashboard-shell .financial-workspace {
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-card,
+  .financial-panel,
+  .finance-metric-card,
+  .financial-input-section,
+  .financial-extra-cost-form,
+  .financial-loan-card,
+  .financial-loan-section,
+  .financial-loan-calendar-section,
+  .loan-empty-state,
+  .income-table,
+  .financial-month-table,
+  .financial-statement,
+  .financial-row-group,
+  .cost-list span,
+  .scenario-row,
+  .financial-bar-row,
+  .financial-widget-empty,
+  .mini-tabs,
+  .trend-chart,
+  .cash-chart
+) {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(251, 248, 255, 0.93));
+  border-color: rgba(163, 76, 255, 0.16);
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-card,
+  .financial-panel,
+  .finance-metric-card,
+  .financial-input-section,
+  .financial-extra-cost-form,
+  .financial-loan-card,
+  .financial-row-group,
+  .cost-list span,
+  .scenario-row,
+  .financial-bar-row
+) {
+  box-shadow:
+    0 18px 54px rgba(8, 9, 16, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-card,
+  .financial-panel,
+  .finance-metric-card,
+  .financial-input-section,
+  .financial-extra-cost-form,
+  .financial-loan-card,
+  .financial-row-group
+) :is(h1, h2, h3, strong, b) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-card,
+  .financial-panel,
+  .finance-metric-card,
+  .financial-input-section,
+  .financial-extra-cost-form,
+  .financial-loan-card,
+  .financial-row-group
+) :is(p, small, label, span) {
+  color: #5f596b;
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-card-heading span,
+  .financial-panel-heading span,
+  .financial-input-section-heading span,
+  .financial-loan-card-heading span,
+  .financial-controls label > span,
+  .financial-loan-form label > span,
+  .finance-metric-card span,
+  .financial-row-group header span,
+  .financial-bar-row span,
+  .scenario-row span,
+  .cost-list span,
+  .exchange-rate-card span,
+  .financial-loan-summary-card span,
+  .financial-loan-currency-card span,
+  .financial-widget-picker span,
+  .financial-widget-metric span
+) {
+  color: var(--app-violet);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-controls label,
+  .financial-loan-form label,
+  .required-financial-field small,
+  .optional-financial-field small
+) {
+  color: #5f596b;
+}
+
+.dashboard-shell .financial-workspace :is(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea
+) {
+  background: #ffffff;
+  border: 1px solid rgba(8, 9, 16, 0.12);
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace :is(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea
+)::placeholder {
+  color: #8d8798;
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-header,
+  .financial-decision-hero,
+  .financial-loan-hero
+) {
+  background:
+    radial-gradient(circle at 86% 14%, rgba(255, 90, 138, 0.32), transparent 23rem),
+    radial-gradient(circle at 16% 88%, rgba(37, 184, 255, 0.18), transparent 21rem),
+    linear-gradient(135deg, #050509 0%, #0b0b14 54%, #17101f 100%);
+  border-color: rgba(255, 255, 255, 0.13);
+  color: #ffffff;
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-header,
+  .financial-decision-hero,
+  .financial-loan-hero
+) :is(h1, h2, h3, strong) {
+  color: #ffffff;
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-header,
+  .financial-decision-hero,
+  .financial-loan-hero
+) :is(p, small) {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-header span,
+  .financial-decision-copy span,
+  .financial-loan-hero span
+) {
+  color: rgba(255, 218, 229, 0.92);
+}
+
+.dashboard-shell .financial-workspace .financial-decision-score,
+.dashboard-shell .financial-workspace .financial-readiness-list button,
+.dashboard-shell .financial-workspace .financial-proof-points span,
+.dashboard-shell .financial-workspace .financial-plain-summary {
+  background:
+    linear-gradient(135deg, rgba(5, 5, 9, 0.74), rgba(23, 16, 31, 0.64));
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-decision-score,
+  .financial-readiness-list button,
+  .financial-proof-points span,
+  .financial-plain-summary
+) :is(strong, span, small, p) {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.dashboard-shell .financial-workspace .financial-decision-score .readiness-ring strong {
+  color: #ffffff;
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-feasibility-card,
+  .financial-widget-metric,
+  .financial-widget-picker button,
+  .financial-action-item,
+  .exchange-rate-card,
+  .financial-loan-summary-card,
+  .financial-loan-currency-card,
+  .financial-loan-card-metrics span
+) {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(163, 76, 255, 0.12), transparent 9rem),
+    linear-gradient(135deg, #ffffff 0%, #fbf8ff 100%);
+  border: 1px solid rgba(163, 76, 255, 0.16);
+  border-left: 5px solid rgba(163, 76, 255, 0.82);
+  box-shadow:
+    0 16px 46px rgba(8, 9, 16, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  color: #5f596b;
+  padding: 15px 16px;
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-feasibility-card,
+  .financial-widget-metric,
+  .financial-widget-picker button,
+  .financial-action-item,
+  .exchange-rate-card,
+  .financial-loan-summary-card,
+  .financial-loan-currency-card,
+  .financial-loan-card-metrics span
+) :is(strong, h3, b) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-feasibility-card,
+  .financial-widget-metric,
+  .financial-widget-picker button,
+  .financial-action-item,
+  .exchange-rate-card,
+  .financial-loan-summary-card,
+  .financial-loan-currency-card,
+  .financial-loan-card-metrics span
+) :is(span, small, p) {
+  color: #5f596b;
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-feasibility-card,
+  .financial-widget-metric,
+  .financial-widget-picker button,
+  .exchange-rate-card,
+  .financial-loan-summary-card,
+  .financial-loan-currency-card,
+  .financial-loan-card-metrics span
+) > span:first-child {
+  color: var(--app-violet);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-action-item.amber,
+  .financial-flow-card.cost
+) {
+  border-left-color: rgba(255, 184, 77, 0.92);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-action-item.clay,
+  .financial-decision-card.risk
+) {
+  border-left-color: rgba(255, 90, 138, 0.92);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .financial-action-item.teal,
+  .financial-decision-card.good,
+  .financial-flow-card.income
+) {
+  border-left-color: rgba(129, 201, 90, 0.92);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .income-row,
+  .financial-month-row,
+  .financial-statement-row,
+  .loan-calendar-cell,
+  .loan-calendar-payment-cell,
+  .loan-calendar-loan,
+  .loan-calendar-total,
+  .loan-calendar-total-label,
+  .loan-calendar-month,
+  .loan-calendar-corner
+) {
+  background: #ffffff;
+  border-color: rgba(8, 9, 16, 0.08);
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .income-row,
+  .financial-month-row,
+  .financial-statement-row,
+  .loan-calendar-cell
+) :is(strong, b, span, small) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace :is(
+  .income-row,
+  .financial-month-row,
+  .financial-statement-row,
+  .loan-calendar-cell
+) small {
+  color: #5f596b;
+}
+
+.dashboard-shell .financial-workspace :is(
+  .income-head,
+  .financial-month-head
+) {
+  background: linear-gradient(135deg, #11111a, #050509);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-shell .financial-workspace :is(.income-head, .financial-month-head) :is(span, strong, small) {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.dashboard-shell .financial-workspace .financial-row-group header {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(163, 76, 255, 0.12), transparent 9rem),
+    linear-gradient(135deg, #ffffff 0%, #fbf8ff 100%);
+  border-left: 5px solid var(--group-tone);
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace .financial-row-group header :is(span, strong) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace .financial-row-group header p {
+  color: #5f596b;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-row span {
+  background: rgba(163, 76, 255, 0.1);
+  border-color: rgba(163, 76, 255, 0.16);
+  color: var(--app-violet);
+}
+
+.dashboard-shell .financial-workspace :is(.scenario-row, .cost-list span, .financial-bar-row) :is(strong, b) {
+  color: var(--app-ink);
+}
+
+.dashboard-shell .financial-workspace :is(.scenario-row, .cost-list span, .financial-bar-row) :is(span, small, p) {
+  color: #5f596b;
+}
+
+.dashboard-shell .financial-workspace :is(.chart-legend span, .axis-label) {
+  color: #5f596b;
+  fill: #5f596b;
+}
+
+.dashboard-shell .financial-workspace :is(.chart-tick) {
+  fill: #6d6577;
+}
+
+.dashboard-shell .financial-workspace .chart-grid {
+  stroke: rgba(8, 9, 16, 0.12);
+}
+
+.dashboard-shell .financial-workspace .chart-axis {
+  stroke: rgba(8, 9, 16, 0.34);
+}
+
+.dashboard-shell .financial-workspace .widget-remove-button,
+.dashboard-shell .financial-workspace .financial-card-heading button,
+.dashboard-shell .financial-workspace .financial-controls button,
+.dashboard-shell .financial-workspace .scenario-row button,
+.dashboard-shell .financial-workspace .financial-loan-form button {
+  background: rgba(163, 76, 255, 0.1);
+  border: 1px solid rgba(163, 76, 255, 0.2);
+  color: var(--app-violet);
+}
+
+.dashboard-shell .financial-workspace .financial-card-heading button.primary,
+.dashboard-shell .financial-workspace .financial-header .primary {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.34), transparent 34%),
+    linear-gradient(135deg, var(--app-pink), var(--app-violet) 58%, #171725);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.dashboard-shell .financial-workspace .loan-calendar-payment {
+  align-content: center;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(163, 76, 255, 0.1), transparent 6rem),
+    linear-gradient(135deg, #ffffff 0%, #fbf8ff 100%);
+  border: 1px solid rgba(8, 9, 16, 0.08);
+  border-left: 5px solid rgba(163, 76, 255, 0.82);
+  border-radius: 8px;
+  box-shadow:
+    0 12px 28px rgba(8, 9, 16, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  gap: 5px;
+  min-height: 58px;
+  padding: 11px 12px;
+}
+
+.dashboard-shell .financial-workspace .loan-calendar-payment strong {
+  color: var(--app-ink);
+  font-size: 0.86rem;
+  letter-spacing: 0;
+  line-height: 1.12;
+}
+
+.dashboard-shell .financial-workspace .loan-calendar-payment span {
+  color: #5f596b;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.dashboard-shell .financial-workspace .loan-calendar-payment.tone-yellow {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 184, 77, 0.16), transparent 6rem),
+    linear-gradient(135deg, #ffffff 0%, #fffaf0 100%);
+  border-color: rgba(8, 9, 16, 0.08);
+  border-left-color: rgba(255, 184, 77, 0.92);
+}
+
+.dashboard-shell .financial-workspace .loan-calendar-payment.tone-red,
+.dashboard-shell .financial-workspace .loan-calendar-payment.tone-clay {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 90, 138, 0.14), transparent 6rem),
+    linear-gradient(135deg, #ffffff 0%, #fff7f9 100%);
+  border-color: rgba(8, 9, 16, 0.08);
+  border-left-color: rgba(255, 90, 138, 0.92);
+}
+
+.dashboard-shell .financial-workspace .loan-calendar-payment.tone-teal,
+.dashboard-shell .financial-workspace .loan-calendar-payment.tone-green {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(129, 201, 90, 0.16), transparent 6rem),
+    linear-gradient(135deg, #ffffff 0%, #f7fff4 100%);
+  border-color: rgba(8, 9, 16, 0.08);
+  border-left-color: rgba(129, 201, 90, 0.92);
+}
+
+.dashboard-shell .financial-workspace .loan-calendar-payment.tone-blue {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(37, 184, 255, 0.16), transparent 6rem),
+    linear-gradient(135deg, #ffffff 0%, #f4fbff 100%);
+  border-color: rgba(8, 9, 16, 0.08);
+  border-left-color: rgba(37, 184, 255, 0.92);
+}
