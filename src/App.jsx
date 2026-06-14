@@ -1145,10 +1145,10 @@ const text = {
     references: "Our references",
     contact: "Contact",
     heroTitle: "Atera",
-    heroCopy: "Check whether a new factory plan can produce, sell, and pay back before you commit capital.",
+    heroCopy: "Turn production, cash, capacity, and sales assumptions into one living feasibility model before you commit capital.",
     goToLogin: "Use Atera",
     whoCopy: "Atera is the operating layer for teams that need to see the factory before the factory spends money. Capacity, margin, cash, timing, and risk move in one live decision model, so every scenario shows what it costs, what it breaks, and what it makes possible.",
-    solutionsCopy: "Define the product, resources, production plan, sales channels, financial assumptions, and scenarios in one flow. The goal is simple: see if the operation is feasible and what to improve first.",
+    solutionsCopy: "Define the product, resources, production plan, sales channels, financial assumptions, and scenarios in one flow. Plan, test, decide, and scale with the same operating truth.",
     farmerPersona: "Planning team",
     factoryOwnerPersona: "Production lead",
     entrepreneurPersona: "Finance team",
@@ -1165,7 +1165,7 @@ const text = {
     exporterNeed: "Need: Check price, currency, stock, and shipment promises before quoting.",
     exporterBenefit: "Benefit: Reduce surprises between sales, production, and delivery.",
     exporterDifference: "Atera's difference: Friendly planning tools for real-world tradeoffs.",
-    referencesCopy: "Reference stories and customer examples will live here as the product grows.",
+    referencesCopy: "Reference stories and customer examples will live here as the product grows. For now, the system map shows the decision areas Atera brings into the same loop.",
     contactPhone: "",
     contactEmail: "hello@atera.app",
     contactLocation: "Istanbul, Turkiye",
@@ -1238,10 +1238,10 @@ const text = {
     references: "Referanslarımız",
     contact: "İletişim",
     heroTitle: "Atera",
-    heroCopy: "Yeni bir fabrika planının üretip satıp yatırımını geri ödeyip ödeyemeyeceğini sermaye bağlamadan önce kontrol edin.",
+    heroCopy: "Üretim, nakit, kapasite ve satış varsayımlarını sermaye bağlamadan önce tek canlı fizibilite modeline çevirin.",
     goToLogin: "Atera'yı kullan",
     whoCopy: "Atera, fabrika daha para harcamadan fabrikanın kendisini görmenizi sağlayan operasyon katmanıdır. Kapasite, marj, nakit, termin ve risk tek canlı karar modelinde akar; her senaryo neye mal olur, nereyi zorlar ve neyi mümkün kılar netleşir.",
-    solutionsCopy: "Ürünü, kaynakları, üretim planını, satış kanallarını, finansal varsayımları ve senaryoları tek akışta tanımlayın. Amaç basit: operasyon fizibl mi ve önce ne iyileştirilmeli?",
+    solutionsCopy: "Ürünü, kaynakları, üretim planını, satış kanallarını, finansal varsayımları ve senaryoları tek akışta tanımlayın. Aynı operasyon gerçeğiyle planlayın, deneyin, karar verin ve büyütün.",
     farmerPersona: "Planlama ekibi",
     factoryOwnerPersona: "Üretim sorumlusu",
     entrepreneurPersona: "Finans ekibi",
@@ -1258,7 +1258,7 @@ const text = {
     exporterNeed: "İhtiyaç: Teklif vermeden önce fiyat, kur, stok ve sevkiyat sözünü kontrol etmek.",
     exporterBenefit: "Fayda: Satış, üretim ve teslimat arasındaki sürprizleri azaltmak.",
     exporterDifference: "Atera'nın farkı: Gerçek hayattaki trade-off'lar için samimi planlama araçları.",
-    referencesCopy: "Ürün büyüdükçe referans hikayeleri ve müşteri örnekleri burada yer alacak.",
+    referencesCopy: "Ürün büyüdükçe referans hikayeleri ve müşteri örnekleri burada yer alacak. Şimdilik bu akış, Atera'nın aynı döngüye aldığı karar alanlarını gösterir.",
     contactPhone: "",
     contactEmail: "hello@atera.app",
     contactLocation: "Istanbul, Turkiye",
@@ -6954,11 +6954,42 @@ function App() {
         </header>
 
         <section className="landing-hero">
-          {renderAteraOrbit("hero-orbit")}
           <div className="landing-hero-content">
-            <button type="button" className="submit-button landing-login" onClick={handleUseAtera}>
-              {labels.goToLogin}
-            </button>
+            <span className="hero-eyebrow">{copy("The operating layer behind feasible factories", "Fizibl fabrikaların arkasındaki operasyon katmanı")}</span>
+            <h1>{labels.heroTitle}</h1>
+            <p>{labels.heroCopy}</p>
+            <div className="hero-actions">
+              <button type="button" className="submit-button landing-login" onClick={handleUseAtera}>
+                {labels.goToLogin}
+              </button>
+              <a className="hero-secondary-link" href="#solutions">
+                {copy("Discover the model", "Modeli keşfet")}
+              </a>
+            </div>
+            <div className="hero-proof-strip" aria-label={copy("Atera model signals", "Atera model sinyalleri")}>
+              <span>{copy("Capacity", "Kapasite")}</span>
+              <span>{copy("Cash", "Nakit")}</span>
+              <span>{copy("Margin", "Marj")}</span>
+              <span>{copy("Delivery", "Termin")}</span>
+            </div>
+          </div>
+          <div className="landing-hero-stage" aria-hidden="true">
+            {renderAteraOrbit("hero-orbit")}
+            <div className="hero-product-card hero-product-card-main">
+              <span>{copy("Decision engine", "Karar motoru")}</span>
+              <strong>{copy("Feasibility live", "Fizibilite canlı")}</strong>
+              <div className="hero-card-bars">
+                <i />
+                <i />
+                <i />
+              </div>
+            </div>
+            <div className="hero-product-card hero-product-card-side">
+              <span>{copy("Scenario delta", "Senaryo farkı")}</span>
+              <strong>+18%</strong>
+            </div>
+            <div className="hero-app-chip chip-finance">FM</div>
+            <div className="hero-app-chip chip-ops">OP</div>
           </div>
         </section>
 
@@ -6989,12 +7020,17 @@ function App() {
           </article>
 
           <article id="solutions" className="landing-section solutions-section">
-            <div>
-              <span>{labels.solutions}</span>
+            <div className="section-kicker">
               <h2>{labels.solutions}</h2>
+              <p>{copy("Plan. Model. Decide. Scale.", "Planla. Modelle. Karar ver. Büyüt.")}</p>
             </div>
             <div className="solutions-content">
               <p>{labels.solutionsCopy}</p>
+              <div className="solution-signal-row" aria-label={copy("Atera solution modules", "Atera çözüm modülleri")}>
+                <span>{copy("Operational planning", "Operasyon planlama")}</span>
+                <span>{copy("Financial feasibility", "Finansal fizibilite")}</span>
+                <span>{copy("Sales simulation", "Satış simülasyonu")}</span>
+              </div>
               <div className="persona-carousel" aria-label="Solution personas">
                 <div className="persona-track">
                   {[...personas, ...personas].map((persona, index) => (
@@ -7014,12 +7050,11 @@ function App() {
           </article>
 
           <article id="references" className="landing-section references-section">
-            <div>
-              <span>{labels.references}</span>
+            <div className="section-kicker">
               <h2>{labels.references}</h2>
+              <p>{copy("One loop for the decisions that usually live apart.", "Genelde ayrı yaşayan kararlar için tek döngü.")}</p>
             </div>
             <div className="references-content">
-              <p>{labels.referencesCopy}</p>
               <div className="reference-carousel" aria-label="Reference company logos">
                 <div className="reference-track">
                   {references.length ? (
