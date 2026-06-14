@@ -371,6 +371,13 @@ function formatCycleTime(minutes, preferredUnit, maximumFractionDigits = 2) {
   return `${formatNumber(cycleTimeValue, maximumFractionDigits)} ${getCycleTimeUnitLabel(cycleTimeUnit)}`;
 }
 
+function formatMinutesDuration(minutes) {
+  const safeMinutes = Math.max(0, toFiniteNumber(minutes));
+  if (safeMinutes >= 1440) return `${formatNumber(safeMinutes / 1440, 2)} ${document.documentElement.lang === "tr" ? "gün" : "days"}`;
+  if (safeMinutes >= 60) return `${formatNumber(safeMinutes / 60, 2)} ${document.documentElement.lang === "tr" ? "saat" : "hours"}`;
+  return `${formatNumber(safeMinutes, 2)} ${document.documentElement.lang === "tr" ? "dk" : "min"}`;
+}
+
 function getProjectionMonthCount(horizon) {
   if (horizon === "5y") return 60;
   if (horizon === "1y") return 12;
@@ -2005,11 +2012,47 @@ function App() {
     setOperationPlan((current) => ({ ...current, [field]: value }));
   }
 
+  function getOperationMachineDefaults(machineId, sourceMachines = operationsWorkspace.machines) {
+    const machine = sourceMachines.find((item) => item.id === machineId);
+
+    return {
+      capacity: Math.max(1, toFiniteNumber(machine?.concurrent_capacity, 1)),
+      dailyHours: Math.max(0, toFiniteNumber(machine?.availability_hours, 8)),
+      failureProbabilityPercent: Math.max(0, toFiniteNumber(machine?.failure_probability_percent, 0)),
+      speedMultiplier: Math.max(0.0001, toFiniteNumber(machine?.speed_multiplier, 1)),
+    };
+  }
+
+  function buildDefaultOperationRow(index = 0, machine, product, sourceMachines = operationsWorkspace.machines) {
+    const selectedMachine = machine || sourceMachines[index] || sourceMachines[0];
+    const machineDefaults = getOperationMachineDefaults(selectedMachine?.id, sourceMachines);
+
+    return {
+      ...emptyPlanRows.operation,
+      ...machineDefaults,
+      machineId: selectedMachine?.id || "",
+      operationName: `${copy("Operation", "Operasyon")} ${index + 1}`,
+      processTimeMinutes: Math.max(0.0001, toFiniteNumber(product?.cycle_time_minutes, 1)),
+    };
+  }
+
+  function buildDefaultOperationRows(product, machines = operationsWorkspace.machines) {
+    return machines.slice(0, Math.min(2, Math.max(1, machines.length))).map((machine, index) => (
+      buildDefaultOperationRow(index, machine, product, machines)
+    ));
+  }
+
   function updateOperationPlanRow(collection, index, field, value) {
     setOperationPlan((current) => ({
       ...current,
       [collection]: (current[collection] || []).map((row, rowIndex) => (
-        rowIndex === index ? { ...row, [field]: value } : row
+        rowIndex === index
+          ? {
+              ...row,
+              ...(collection === "operationRows" && field === "machineId" ? getOperationMachineDefaults(value) : {}),
+              [field]: value,
+            }
+          : row
       )),
     }));
   }
@@ -2091,6 +2134,7 @@ function App() {
       if (workspace.latestPlan) {
         const savedMachineRows = asObjectArray(workspace.latestPlan.input?.machineRows);
         const savedMaterialRows = asObjectArray(workspace.latestPlan.input?.materialRows);
+        const savedOperationRows = asObjectArray(workspace.latestPlan.input?.operationRows);
         const savedWorkforceRows = asObjectArray(workspace.latestPlan.input?.workforceRows);
         const hasSimplePlanResult = currentLatestPlan?.result?.energyConsumptionKwh !== undefined;
 
@@ -2116,6 +2160,13 @@ function App() {
               })),
           productId: workspace.latestPlan.input?.productId || workspace.product?.id || "",
           productName: workspace.latestPlan.input?.productName || workspace.product?.name || "",
+          operationRows: savedOperationRows.length
+            ? savedOperationRows.map((row, index) => ({
+                ...emptyPlanRows.operation,
+                ...row,
+                operationName: row.operationName || row.name || `${copy("Operation", "Operasyon")} ${index + 1}`,
+              }))
+            : buildDefaultOperationRows(workspace.product, workspace.machines),
           workforceRows: savedWorkforceRows.length
             ? savedWorkforceRows
             : (workspace.workforce[0]
@@ -2137,6 +2188,7 @@ function App() {
             : [],
           productId: workspace.product.id,
           productName: workspace.product.name || "",
+          operationRows: buildDefaultOperationRows(workspace.product, workspace.machines),
           workforceRows: workspace.workforce[0]
             ? [{ ...emptyPlanRows.workforce, workforceId: workspace.workforce[0].id }]
             : [],
@@ -2161,8 +2213,14 @@ function App() {
 
     const selectedProduct = operationsWorkspace.products.find((product) => product.id === operationPlan.productId);
     const machineRows = asObjectArray(operationPlan.machineRows);
+    const operationRows = asObjectArray(operationPlan.operationRows);
     const productRecipeRows = asObjectArray(selectedProduct?.material_rows);
     const hasPositiveMachineHours = machineRows.some((row) => row.machineId && toFiniteNumber(row.dailyHours) > 0);
+    const hasSchedulableOperationRows = operationRows.some((row) => (
+      row.machineId &&
+      toFiniteNumber(row.processTimeMinutes) > 0 &&
+      toFiniteNumber(row.capacity, 1) > 0
+    ));
 
     if (!selectedProduct) {
       setOperationsStatus(copy("Select a saved product with a recipe before calculating feasibility.", "Fizibilite hesaplamadan önce reçetesi olan kayıtlı bir ürün seçin."));
@@ -2174,8 +2232,13 @@ function App() {
       return;
     }
 
-    if (!hasPositiveMachineHours) {
-      setOperationsStatus(copy("Add at least one machine with daily hours greater than zero.", "Günlük saati sıfırdan büyük en az bir makine ekleyin."));
+    if (!hasPositiveMachineHours && !hasSchedulableOperationRows) {
+      setOperationsStatus(copy("Add at least one machine with daily hours, or define an operation step with a machine and process time.", "Günlük saati olan en az bir makine ekleyin ya da makine ve işlem süresi olan bir operasyon adımı tanımlayın."));
+      return;
+    }
+
+    if (hasSchedulableOperationRows && toFiniteNumber(operationPlan.targetQuantity) <= 0) {
+      setOperationsStatus(copy("Enter a production quantity greater than zero for the operation flow.", "Operasyon akışı için sıfırdan büyük üretim miktarı girin."));
       return;
     }
 
@@ -2851,20 +2914,43 @@ function App() {
     const latestProcess = asObjectArray(operationsWorkspace.activePlans)[0] || operationsWorkspace.latestPlan;
     const latestProcessName = latestProcess?.plan_name || latestProcess?.input?.planName || result?.planName || "";
     const machineRows = asObjectArray(operationPlan.machineRows);
+    const operationRows = asObjectArray(operationPlan.operationRows);
     const workforceRows = asObjectArray(operationPlan.workforceRows);
     const selectedProduct = operationsWorkspace.products.find((product) => product.id === operationPlan.productId);
     const selectedProductMaterials = asObjectArray(selectedProduct?.material_rows);
     const resultMachineRows = asObjectArray(result?.machineRows);
+    const resultOperationRows = asObjectArray(result?.operationRows);
+    const resultBufferRows = asObjectArray(result?.bufferRows);
     const resultWorkforceRows = asObjectArray(result?.workforceRows);
     const resultMaterialRows = asObjectArray(result?.materialRows);
+    const flowStrategyLabels = {
+      batch: copy("Batch", "Toplu"),
+      flow: copy("Flow / Pull", "Akış / Pull"),
+      parallel: copy("Parallel simulation", "Paralel simülasyon"),
+    };
     const defaultMachineRow = {
       ...emptyPlanRows.machine,
       machineId: operationsWorkspace.machines[0]?.id || "",
     };
+    const defaultOperationRow = buildDefaultOperationRow(operationRows.length, operationsWorkspace.machines[operationRows.length] || operationsWorkspace.machines[0], selectedProduct);
     const defaultWorkforceRow = {
       ...emptyPlanRows.workforce,
       workforceId: operationsWorkspace.workforce[0]?.id || "",
     };
+    const infoLabel = (label, info) => (
+      <span className="label-with-info">
+        {label}
+        <InfoTip label={`${label} ${copy("info", "bilgi")}`} text={info} />
+      </span>
+    );
+    const resultMetric = (label, value, info) => (
+      <article className="result-metric-card">
+        <div className="result-metric-label">
+          {info ? infoLabel(label, info) : label}
+        </div>
+        <strong>{value}</strong>
+      </article>
+    );
 
     return (
       <section className="operation-planner" aria-label={copy("Resource planning calculator", "Kaynak planlama hesaplayıcı")}>
@@ -2872,13 +2958,14 @@ function App() {
           <div className="operation-card-heading">
             <div>
               <span>{copy("Process Definition", "Süreç Tanımlama")}</span>
-              <h2>{copy("Simple daily production cost", "Basit günlük üretim maliyeti")}</h2>
+              <h2>{copy("Batch / flow operation model", "Batch / akış operasyon modeli")}</h2>
             </div>
             <button
               type="button"
               onClick={() => setOperationPlan({
                 ...emptyOperationPlan,
                 machineRows: defaultMachineRow.machineId ? [defaultMachineRow] : [],
+                operationRows: buildDefaultOperationRows(operationsWorkspace.product, operationsWorkspace.machines),
                 productId: operationsWorkspace.product?.id || "",
                 productName: operationsWorkspace.product?.name || "",
                 workforceRows: defaultWorkforceRow.workforceId ? [defaultWorkforceRow] : [],
@@ -2889,7 +2976,10 @@ function App() {
           </div>
           <div className="planner-fields">
             <label>
-              <span>{copy("Plan name", "Plan adı")}</span>
+              {infoLabel(
+                copy("Plan name", "Plan adı"),
+                copy("Use a clear name for this saved scenario, such as Flow 5-pack or Full batch plan. It helps compare alternatives later.", "Bu kayıtlı senaryoya Akış 5'li ya da Tam batch planı gibi anlaşılır bir ad verin. Sonradan alternatifleri karşılaştırmayı kolaylaştırır."),
+              )}
               <div>
                 <input
                   type="text"
@@ -2899,7 +2989,10 @@ function App() {
               </div>
             </label>
             <label>
-              <span>{copy("Product", "Ürün")}</span>
+              {infoLabel(
+                copy("Product", "Ürün"),
+                copy("The selected product brings its recipe, unit, price, and base cycle time into the calculation. Material cost is derived from this recipe.", "Seçili ürün reçetesini, birimini, fiyatını ve temel çevrim süresini hesaba taşır. Malzeme maliyeti bu reçeteden türetilir."),
+              )}
               <div>
                 <select
                   value={operationPlan.productId || ""}
@@ -2907,6 +3000,9 @@ function App() {
                     const product = operationsWorkspace.products.find((item) => item.id === event.target.value);
                     setOperationPlan((current) => ({
                       ...current,
+                      operationRows: asObjectArray(current.operationRows).length
+                        ? current.operationRows
+                        : buildDefaultOperationRows(product, operationsWorkspace.machines),
                       productId: product?.id || "",
                       productName: product?.name || "",
                     }));
@@ -2920,12 +3016,280 @@ function App() {
                 <small>{selectedProduct ? `${formatOperationMoney(selectedProduct.price, selectedProduct.price_currency, exchangeRates, 2)} / ${selectedProduct.unit || copy("pcs", "adet")}` : copy("Select a record from the Products screen", "Ürünler ekranından kayıt seçin")}</small>
               </div>
             </label>
+            <label>
+              {infoLabel(
+                copy("Production quantity", "Üretilecek adet"),
+                copy("Total demand for this run. In the fruit puree example this is 1000 units, and the scheduler tries to push exactly this quantity through all operations.", "Bu çalışma için toplam talep. Meyve püresi örneğinde bu 1000 adettir ve planlayıcı bu miktarı tüm operasyonlardan geçirmeye çalışır."),
+              )}
+              <div>
+                <input
+                  min="0"
+                  step="1"
+                  type="number"
+                  value={operationPlan.targetQuantity ?? ""}
+                  onChange={(event) => updateOperationPlan("targetQuantity", event.target.value)}
+                />
+                <small>{selectedProduct?.unit || copy("units", "adet")}</small>
+              </div>
+            </label>
+            <label>
+              {infoLabel(
+                copy("Flow strategy", "Akış stratejisi"),
+                copy("Batch waits until all units finish the first operation. Flow sends smaller groups forward as soon as they are ready. Parallel simulation uses the minimum transfer size for the most granular event flow.", "Batch modelinde ilk operasyonun tüm ürünleri bitirmesi beklenir. Flow modelinde küçük gruplar hazır oldukça sonraki operasyona geçer. Paralel simülasyon en küçük transfer miktarıyla en ayrıntılı event akışını kurar."),
+              )}
+              <div>
+                <select value={operationPlan.flowStrategy || "flow"} onChange={(event) => updateOperationPlan("flowStrategy", event.target.value)}>
+                  <option value="flow">{flowStrategyLabels.flow}</option>
+                  <option value="batch">{flowStrategyLabels.batch}</option>
+                  <option value="parallel">{flowStrategyLabels.parallel}</option>
+                </select>
+              </div>
+            </label>
+            <label>
+              {infoLabel(
+                copy("Batch size", "Batch boyutu"),
+                copy("How many units move together between operations in Flow mode. Smaller batches usually reduce waiting and WIP, but may increase handling complexity.", "Flow modunda operasyonlar arasında birlikte hareket eden ürün adedi. Küçük batch genelde beklemeyi ve WIP'i azaltır, ama taşıma/elleçleme karmaşıklığını artırabilir."),
+              )}
+              <div>
+                <input
+                  min="1"
+                  step="1"
+                  type="number"
+                  value={operationPlan.batchSize ?? ""}
+                  onChange={(event) => updateOperationPlan("batchSize", event.target.value)}
+                />
+              </div>
+            </label>
+            <label>
+              {infoLabel(
+                copy("Minimum transfer", "Minimum transfer"),
+                copy("The smallest acceptable quantity that can be transferred to the next operation. If this is 5, packaging cannot start with only 1 pureed unit.", "Sonraki operasyona aktarılabilecek kabul edilen en küçük miktar. Bu değer 5 ise paketleme yalnızca 1 pürelenmiş ürünle başlayamaz."),
+              )}
+              <div>
+                <input
+                  min="1"
+                  step="1"
+                  type="number"
+                  value={operationPlan.minimumTransferQuantity ?? ""}
+                  onChange={(event) => updateOperationPlan("minimumTransferQuantity", event.target.value)}
+                />
+              </div>
+            </label>
+            <label>
+              {infoLabel(
+                copy("Max buffer", "Maks buffer"),
+                copy("Buffer is the temporary stock between two operations. Use 0 for unlimited buffer; otherwise the result flags if WIP exceeds this limit.", "Buffer iki operasyon arasındaki geçici yarı mamul stoğudur. 0 sınırsız buffer demektir; değer girerseniz WIP bu sınırı aşınca sonuçta işaretlenir."),
+              )}
+              <div>
+                <input
+                  min="0"
+                  step="1"
+                  type="number"
+                  value={operationPlan.bufferMaxQuantity ?? ""}
+                  onChange={(event) => updateOperationPlan("bufferMaxQuantity", event.target.value)}
+                />
+                <small>{copy("0 = unlimited", "0 = sınırsız")}</small>
+              </div>
+            </label>
           </div>
 
           <div className="resource-section">
             <div className="resource-section-header">
               <div>
-                <span>{copy("Machine selection", "Makine seçimi")}</span>
+                <span className="label-with-info">
+                  {copy("Operation flow", "Operasyon akışı")}
+                  <InfoTip
+                    label={copy("Operation flow info", "Operasyon akışı bilgisi")}
+                    text={copy(
+                      "This is the precedence chain. Operation 2 can only start for a batch after Operation 1 finishes that same batch, so packaging cannot run before pureeing creates output.",
+                      "Bu öncelik zinciridir. Operasyon 2 ancak Operasyon 1 aynı batch'i bitirdikten sonra başlayabilir; yani paketleme, püreleme çıktı üretmeden çalışamaz.",
+                    )}
+                  />
+                </span>
+                <p>{copy("Define the ordered precedence chain: each batch can enter the next operation only after the previous operation finishes.", "Sıralı öncelik zincirini tanımlayın: her batch bir sonraki operasyona ancak önceki operasyon tamamlanınca geçer.")}</p>
+              </div>
+              <button type="button" onClick={() => addOperationPlanRow("operationRows", defaultOperationRow)}>
+                {copy("Add Operation", "Operasyon Ekle")}
+              </button>
+            </div>
+            <div className="resource-row-list">
+              {operationRows.length ? operationRows.map((row, index) => {
+                const selectedMachine = operationsWorkspace.machines.find((machine) => machine.id === row.machineId);
+
+                return (
+                  <div className="resource-row-grid operation-plan-row" key={`operation-${index}`}>
+                    <label>
+                      {infoLabel(
+                        copy("Operation", "Operasyon"),
+                        copy("A named production step such as Pureeing, Filling, Packaging, or Quality Check. Rows run in the order shown.", "Püreleme, Dolum, Paketleme veya Kalite Kontrol gibi adlandırılmış üretim adımıdır. Satırlar ekrandaki sırayla çalışır."),
+                      )}
+                      <input
+                        type="text"
+                        value={row.operationName || ""}
+                        onChange={(event) => updateOperationPlanRow("operationRows", index, "operationName", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      {infoLabel(
+                        copy("Machine", "Makine"),
+                        copy("The resource that performs this operation. Its energy, purchase value, capacity defaults, speed, and availability come from the machine record unless overridden here.", "Bu operasyonu yapan kaynaktır. Enerji, yatırım değeri, kapasite varsayılanı, hız ve çalışma süresi makine kaydından gelir; burada override edilebilir."),
+                      )}
+                      <select value={row.machineId || ""} onChange={(event) => updateOperationPlanRow("operationRows", index, "machineId", event.target.value)}>
+                        <option value="">{copy("Select machine", "Makine seç")}</option>
+                        {operationsWorkspace.machines.map((machine) => (
+                          <option value={machine.id} key={machine.id}>{machine.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      {infoLabel(
+                        copy("Min / unit", "Dk / birim"),
+                        copy("Processing time for one product unit in this operation. Example: if pureeing takes 2 minutes per unit, enter 2.", "Bu operasyonda bir ürün birimini işleme süresidir. Örnek: püreleme ürün başına 2 dakika sürüyorsa 2 girin."),
+                      )}
+                      <input
+                        min="0.0001"
+                        step="0.01"
+                        type="number"
+                        value={row.processTimeMinutes ?? ""}
+                        onChange={(event) => updateOperationPlanRow("operationRows", index, "processTimeMinutes", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      {infoLabel(
+                        copy("Capacity", "Kapasite"),
+                        copy("How many units can be processed at the same time in this operation. Capacity 5 means one processing cycle can handle 5 units together.", "Bu operasyonda aynı anda kaç ürün işlenebildiğidir. Kapasite 5 ise tek işlem çevrimi 5 ürünü birlikte işleyebilir."),
+                      )}
+                      <input
+                        min="1"
+                        step="1"
+                        type="number"
+                        value={row.capacity ?? ""}
+                        onChange={(event) => updateOperationPlanRow("operationRows", index, "capacity", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      {infoLabel(
+                        copy("Setup min", "Setup dk"),
+                        copy("One-time preparation time before the first batch of this operation, such as cleaning, tooling, heating, calibration, or line changeover.", "Bu operasyonun ilk batch'i başlamadan önceki tek seferlik hazırlık süresidir; temizlik, kalıp bağlama, ısıtma, kalibrasyon veya hat değişimi gibi."),
+                      )}
+                      <input
+                        min="0"
+                        step="0.1"
+                        type="number"
+                        value={row.setupMinutes ?? ""}
+                        onChange={(event) => updateOperationPlanRow("operationRows", index, "setupMinutes", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      {infoLabel(
+                        copy("Speed", "Hız"),
+                        copy("Speed multiplier applied to processing time. 1.00 is normal; 1.25 means 25% faster; 0.80 means slower than standard.", "İşlem süresine uygulanan hız çarpanıdır. 1.00 normal; 1.25 yüzde 25 daha hızlı; 0.80 standarttan yavaş anlamına gelir."),
+                      )}
+                      <input
+                        min="0.0001"
+                        step="0.01"
+                        type="number"
+                        value={row.speedMultiplier ?? ""}
+                        onChange={(event) => updateOperationPlanRow("operationRows", index, "speedMultiplier", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      {infoLabel(
+                        copy("Availability", "Çalışma süresi"),
+                        copy("Available machine time for this operation in the planning window. If total production time exceeds available time, delay cost can be triggered.", "Planlama penceresinde bu operasyon için kullanılabilir makine süresidir. Toplam üretim süresi bu süreyi aşarsa gecikme maliyeti tetiklenebilir."),
+                      )}
+                      <input
+                        min="0"
+                        step="0.25"
+                        type="number"
+                        value={row.dailyHours ?? ""}
+                        onChange={(event) => updateOperationPlanRow("operationRows", index, "dailyHours", event.target.value)}
+                      />
+                    </label>
+                    <div className="resource-row-meta">
+                      <strong>{selectedMachine ? `${formatNumber(selectedMachine.hourly_energy_consumption_kwh, 2)} ${copy("kWh/hour", "kWh/saat")}` : "-"}</strong>
+                      <small>{selectedMachine ? `${copy("Machine default", "Makine varsayılanı")} ${formatNumber(selectedMachine.concurrent_capacity || row.capacity || 1)}x` : copy("No record selected", "Kayıt seçilmedi")}</small>
+                    </div>
+                    <button type="button" className="resource-remove-button" onClick={() => removeOperationPlanRow("operationRows", index)}>
+                      {copy("Delete", "Sil")}
+                    </button>
+                  </div>
+                );
+              }) : (
+                <p className="planner-empty-state">{copy("Add operation steps such as Pureeing then Packaging to activate batch/flow simulation.", "Batch/akış simülasyonunu açmak için Püreleme sonra Paketleme gibi operasyon adımları ekleyin.")}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="resource-section">
+            <div className="resource-section-header">
+              <div>
+                <span className="label-with-info">
+                  {copy("Optimization costs", "Optimizasyon maliyetleri")}
+                  <InfoTip
+                    label={copy("Optimization costs info", "Optimizasyon maliyetleri bilgisi")}
+                    text={copy(
+                      "These weights turn scheduling tradeoffs into money. The optimizer compares batch sizes by total time plus waiting, inventory, delay, and idle-capacity penalties.",
+                      "Bu ağırlıklar planlama takaslarını paraya çevirir. Optimizasyon batch boyutlarını toplam süre + bekleme, stok, gecikme ve boş kapasite cezalarına göre karşılaştırır.",
+                    )}
+                  />
+                </span>
+                <p>{copy("Optional cost weights let the batch optimizer balance time, queue waiting, inventory in buffer, idle capacity, and delay.", "Opsiyonel maliyet ağırlıkları batch optimizasyonunun süre, bekleme, buffer stoku, boş kapasite ve gecikmeyi dengelemesini sağlar.")}</p>
+              </div>
+            </div>
+            <div className="planner-fields compact-planner-fields">
+              <label>
+                {infoLabel(
+                  copy("Waiting cost / hour", "Bekleme maliyeti / saat"),
+                  copy("Penalty for time batches spend queued before a downstream operation can start. Use it when waiting creates labor, freshness, or service-level cost.", "Batch'lerin sonraki operasyon başlamadan kuyrukta beklediği süreye verilen cezadır. Bekleme işçilik, tazelik veya servis seviyesi maliyeti yaratıyorsa kullanın."),
+                )}
+                <div>
+                  <input min="0" step="0.01" type="number" value={operationPlan.waitingCostPerHour ?? ""} onChange={(event) => updateOperationPlan("waitingCostPerHour", event.target.value)} />
+                </div>
+              </label>
+              <label>
+                {infoLabel(
+                  copy("Inventory cost / unit-hour", "Stok maliyeti / birim-saat"),
+                  copy("Penalty for WIP sitting in the buffer. Higher values push the optimizer toward smaller transfer batches and lower intermediate stock.", "Buffer'da bekleyen WIP için cezadır. Yüksek değerler optimizasyonu daha küçük transfer batch'lerine ve daha düşük ara stoğa iter."),
+                )}
+                <div>
+                  <input min="0" step="0.01" type="number" value={operationPlan.inventoryCostPerUnitHour ?? ""} onChange={(event) => updateOperationPlan("inventoryCostPerUnitHour", event.target.value)} />
+                </div>
+              </label>
+              <label>
+                {infoLabel(
+                  copy("Delay cost / hour", "Gecikme maliyeti / saat"),
+                  copy("Penalty when calculated production time exceeds available machine time. It represents overtime, missed delivery, freshness loss, or customer penalty.", "Hesaplanan üretim süresi kullanılabilir makine süresini aşarsa oluşan cezadır. Fazla mesai, teslimat gecikmesi, tazelik kaybı veya müşteri cezasını temsil eder."),
+                )}
+                <div>
+                  <input min="0" step="0.01" type="number" value={operationPlan.delayCostPerHour ?? ""} onChange={(event) => updateOperationPlan("delayCostPerHour", event.target.value)} />
+                </div>
+              </label>
+              <label>
+                {infoLabel(
+                  copy("Capacity loss / hour", "Kapasite kaybı / saat"),
+                  copy("Penalty for idle machine capacity while the line waits on another operation. It helps expose bottleneck-driven capacity loss.", "Hat başka bir operasyonu beklerken boş kalan makine kapasitesi için cezadır. Darboğaz kaynaklı kapasite kaybını görünür yapar."),
+                )}
+                <div>
+                  <input min="0" step="0.01" type="number" value={operationPlan.capacityLossCostPerHour ?? ""} onChange={(event) => updateOperationPlan("capacityLossCostPerHour", event.target.value)} />
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div className="resource-section">
+            <div className="resource-section-header">
+              <div>
+                <span className="label-with-info">
+                  {copy("Machine selection", "Makine seçimi")}
+                  <InfoTip
+                    label={copy("Machine selection info", "Makine seçimi bilgisi")}
+                    text={copy(
+                      "This legacy resource section is still used for existing cost and finance flows. When operation steps are defined, machine usage is calculated from the operation schedule.",
+                      "Bu eski kaynak bölümü mevcut maliyet ve finans akışlarında hâlâ kullanılır. Operasyon adımları tanımlıysa makine kullanımı operasyon takviminden hesaplanır.",
+                    )}
+                  />
+                </span>
                 <p>{copy("Enter which machine will be used and how many hours per day it will run for the product.", "Ürünü üretirken hangi makinenin günde kaç saat kullanılacağını girin.")}</p>
               </div>
               <button type="button" onClick={() => addOperationPlanRow("machineRows", defaultMachineRow)}>
@@ -2939,7 +3303,10 @@ function App() {
                 return (
                   <div className="resource-row-grid machine-plan-row" key={`machine-${index}`}>
                     <label>
-                      <span>{copy("Machine", "Makine")}</span>
+                      {infoLabel(
+                        copy("Machine", "Makine"),
+                        copy("Select a machine record so energy consumption and machine investment value can roll into the process result.", "Enerji tüketimi ve makine yatırım değeri süreç sonucuna işlenebilsin diye makine kaydı seçin."),
+                      )}
                       <select value={row.machineId || ""} onChange={(event) => updateOperationPlanRow("machineRows", index, "machineId", event.target.value)}>
                         <option value="">{copy("Select machine", "Makine seç")}</option>
                         {operationsWorkspace.machines.map((machine) => (
@@ -2950,7 +3317,10 @@ function App() {
                       </select>
                     </label>
                     <label>
-                      <span>{copy("Daily hours", "Günlük saat")}</span>
+                      {infoLabel(
+                        copy("Daily hours", "Günlük saat"),
+                        copy("Manual machine hours for legacy/simple plans. In operation-flow plans, calculated busy hours from the schedule replace this for utilization and energy.", "Eski/basit planlar için manuel makine saatidir. Operasyon akışı planlarında kullanım ve enerji için bunun yerine takvimden hesaplanan çalışma saati kullanılır."),
+                      )}
                       <input
                         min="0"
                         step="0.25"
@@ -2977,7 +3347,16 @@ function App() {
           <div className="resource-section">
             <div className="resource-section-header">
               <div>
-                <span>{copy("Workforce selection", "İşgücü seçimi")}</span>
+                <span className="label-with-info">
+                  {copy("Workforce selection", "İşgücü seçimi")}
+                  <InfoTip
+                    label={copy("Workforce selection info", "İşgücü seçimi bilgisi")}
+                    text={copy(
+                      "Labor cost remains separate from the machine schedule: assigned people x daily hours x hourly cost. This lets human resource cost stay integrated with flow plans.",
+                      "İşgücü maliyeti makine takviminden ayrı hesaplanır: atanan kişi x günlük saat x saatlik maliyet. Böylece insan kaynağı maliyeti flow planlarıyla entegre kalır.",
+                    )}
+                  />
+                </span>
                 <p>{copy("Enter how many people from each role will work and for how many hours per day.", "Hangi rolden kaç kişinin günde kaç saat çalışacağını girin.")}</p>
               </div>
               <button type="button" onClick={() => addOperationPlanRow("workforceRows", defaultWorkforceRow)}>
@@ -2991,7 +3370,10 @@ function App() {
                 return (
                   <div className="resource-row-grid workforce-plan-row" key={`workforce-${index}`}>
                     <label>
-                      <span>{copy("Role", "Rol")}</span>
+                      {infoLabel(
+                        copy("Role", "Rol"),
+                        copy("Workforce role used in this plan, such as operator, packer, technician, or quality controller.", "Bu planda kullanılan işgücü rolüdür; operatör, paketleme personeli, teknisyen veya kalite kontrolcü gibi."),
+                      )}
                       <select value={row.workforceId || ""} onChange={(event) => updateOperationPlanRow("workforceRows", index, "workforceId", event.target.value)}>
                         <option value="">{copy("Select role", "Rol seç")}</option>
                         {operationsWorkspace.workforce.map((workforce) => (
@@ -3002,7 +3384,10 @@ function App() {
                       </select>
                     </label>
                     <label>
-                      <span>{copy("People", "Kişi")}</span>
+                      {infoLabel(
+                        copy("People", "Kişi"),
+                        copy("Number of people assigned from this role. Cost scales directly with this count.", "Bu rolden atanan kişi sayısıdır. Maliyet bu sayıyla doğrudan ölçeklenir."),
+                      )}
                       <input
                         min="0"
                         step="1"
@@ -3012,7 +3397,10 @@ function App() {
                       />
                     </label>
                     <label>
-                      <span>{copy("Daily hours", "Günlük saat")}</span>
+                      {infoLabel(
+                        copy("Daily hours", "Günlük saat"),
+                        copy("Daily working hours for this role in the plan. Labor cost is people x hours x hourly cost.", "Bu rolün plandaki günlük çalışma saatidir. İşgücü maliyeti kişi x saat x saatlik maliyet olarak hesaplanır."),
+                      )}
                       <input
                         min="0"
                         step="0.25"
@@ -3039,7 +3427,16 @@ function App() {
           <div className="resource-section">
             <div className="resource-section-header">
               <div>
-                <span>{copy("Product materials", "Ürün malzemeleri")}</span>
+                <span className="label-with-info">
+                  {copy("Product materials", "Ürün malzemeleri")}
+                  <InfoTip
+                    label={copy("Product materials info", "Ürün malzemeleri bilgisi")}
+                    text={copy(
+                      "Materials are not manually scheduled. The system multiplies produced quantity by the product recipe to calculate required material quantity and cost.",
+                      "Malzemeler manuel takvimlenmez. Sistem üretilen adedi ürün reçetesiyle çarparak gerekli malzeme miktarını ve maliyeti hesaplar.",
+                    )}
+                  />
+                </span>
                 <p>{copy("Material quantities are calculated automatically from the selected product recipe and produced quantity.", "Malzeme miktarları seçilen ürün reçetesinden ve hesaplanan üretim adedinden otomatik hesaplanır.")}</p>
               </div>
             </div>
@@ -3071,7 +3468,7 @@ function App() {
           <div className="operation-card-heading">
             <div>
               <span>{latestProcessName || copy("Waiting for backend result", "Backend sonucu bekleniyor")}</span>
-              <h2>{copy("Daily cost summary", "Günlük maliyet özeti")}</h2>
+              <h2>{copy("Flow and cost summary", "Akış ve maliyet özeti")}</h2>
             </div>
             <mark className={result ? "ok" : "bad"}>
               {result ? `${formatNumber(result.energyConsumptionKwh, 2)} kWh` : copy("No calculation", "Hesap yok")}
@@ -3084,29 +3481,118 @@ function App() {
           ) : (
             <>
               <div className="planner-summary-grid">
-                <span>{copy("Product", "Ürün")} <strong>{result.productName || "-"}</strong></span>
-                <span>{copy("Unit Price", "Birim Fiyat")} <strong>{formatOperationMoney(result.productPrice, result.productPriceCurrency, exchangeRates, 2)} / {result.productUnit || copy("pcs", "adet")}</strong></span>
-                <span>{copy("Quantity to Produce", "Üretilecek Miktar")} <strong>{formatNumber(result.producedQuantity, 2)} {result.productUnit || copy("pcs", "adet")}</strong></span>
-                <span>{copy("Cycle Time", "Çevrim Süresi")} <strong>{formatCycleTime(result.cycleTimeMinutes, selectedProduct?.cycle_time_unit || "minute")}</strong></span>
-                <span>{copy("Electricity Consumption", "Elektrik Tüketimi")} <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
-                <span>{copy("Material Cost", "Malzeme Maliyeti")} <strong>{formatLira(result.materialCost)}</strong></span>
-                <span>{copy("Workforce Cost", "İşgücü Maliyeti")} <strong>{formatLira(result.workforceCost)}</strong></span>
+                {resultMetric(copy("Product", "Ürün"), result.productName || "-")}
+                {resultMetric(copy("Unit Price", "Birim Fiyat"), `${formatOperationMoney(result.productPrice, result.productPriceCurrency, exchangeRates, 2)} / ${result.productUnit || copy("pcs", "adet")}`)}
+                {resultMetric(copy("Quantity to Produce", "Üretilecek Miktar"), `${formatNumber(result.producedQuantity, 2)} ${result.productUnit || copy("pcs", "adet")}`)}
+                {resultMetric(
+                    copy("Production Time", "Toplam üretim süresi"),
+                    result.totalProductionTimeMinutes ? formatMinutesDuration(result.totalProductionTimeMinutes) : "-",
+                    copy("The simulated time from the first operation start until the last batch finishes the final operation.", "İlk operasyonun başlamasından son batch'in son operasyonu bitirmesine kadar simüle edilen süredir."),
+                  )}
+                {resultMetric(
+                    copy("Transfer Batch", "Transfer batch"),
+                    result.transferBatchSize ? formatNumber(result.transferBatchSize, 2) : "-",
+                    copy("The actual group size sent between operations. In Batch mode it becomes the full quantity; in Flow mode it follows batch size; in Parallel mode it follows minimum transfer.", "Operasyonlar arasında aktarılan gerçek grup boyutudur. Batch modunda tüm miktar; Flow modunda batch boyutu; Parallel modunda minimum transfer kullanılır."),
+                  )}
+                {resultMetric(
+                    copy("Strategy", "Strateji"),
+                    flowStrategyLabels[result.flowStrategy] || result.flowStrategy || "-",
+                    copy("The selected production logic used by the scheduler: full batch, flow/pull batches, or minimum-transfer event simulation.", "Planlayıcının kullandığı üretim mantığıdır: tam batch, flow/pull batch'leri veya minimum transferli event simülasyonu."),
+                  )}
+                {resultMetric(copy("Cycle Time", "Çevrim Süresi"), formatCycleTime(result.cycleTimeMinutes, selectedProduct?.cycle_time_unit || "minute"))}
+                {resultMetric(
+                    copy("Effective Cycle", "Efektif çevrim"),
+                    result.effectiveCycleTimeMinutes ? formatMinutesDuration(result.effectiveCycleTimeMinutes) : "-",
+                    copy("Average elapsed production time per finished unit after flow, waiting, setup, and bottlenecks are included.", "Akış, bekleme, setup ve darboğazlar dahil edildikten sonra biten ürün başına ortalama geçen üretim süresidir."),
+                  )}
+                {resultMetric(
+                    copy("Bottleneck", "Darboğaz"),
+                    result.bottleneck?.operationName || "-",
+                    copy("The operation with the highest total busy time. It limits the line and is usually the first place to improve capacity.", "Toplam meşgul süresi en yüksek operasyondur. Hattı sınırlar ve kapasite iyileştirmesinde genellikle ilk bakılacak yerdir."),
+                  )}
+                {resultMetric(
+                    copy("Max WIP", "Maks WIP"),
+                    formatNumber(result.maxWipQuantity, 2),
+                    copy("Maximum work-in-progress quantity waiting in buffers between operations. High WIP means intermediate stock is accumulating.", "Operasyonlar arasındaki buffer'larda bekleyen maksimum yarı mamul miktarıdır. Yüksek WIP ara stok biriktiğini gösterir."),
+                  )}
+                {resultMetric(
+                    copy("Best batch size", "En iyi batch"),
+                    result.optimization?.recommendedBatchSize ? formatNumber(result.optimization.recommendedBatchSize, 2) : "-",
+                    copy("Recommended transfer batch size from the optimizer, based on total time plus waiting, inventory, delay, and capacity-loss costs.", "Toplam süre, bekleme, stok, gecikme ve kapasite kaybı maliyetlerine göre optimizasyonun önerdiği transfer batch boyutudur."),
+                  )}
+                {resultMetric(copy("Electricity Consumption", "Elektrik Tüketimi"), `${formatNumber(result.energyConsumptionKwh, 2)} kWh`)}
+                {resultMetric(copy("Material Cost", "Malzeme Maliyeti"), formatLira(result.materialCost))}
+                {resultMetric(copy("Workforce Cost", "İşgücü Maliyeti"), formatLira(result.workforceCost))}
               </div>
               <div className="allocation-grid">
-                <span>{copy("Machine Hours", "Makine Saati")} <strong>{formatNumber(result.machineHoursUsed, 1)} {copy("hours", "saat")}</strong></span>
-                <span>{copy("Workforce Hours", "İşgücü Saati")} <strong>{formatNumber(result.workforceHoursUsed, 1)} {copy("hours", "saat")}</strong></span>
-                <span>{copy("Selected Machine Value", "Seçili Makine Değeri")} <strong>{formatLira(result.selectedMachineValue)}</strong></span>
+                {resultMetric(copy("Machine Hours", "Makine Saati"), `${formatNumber(result.machineHoursUsed, 1)} ${copy("hours", "saat")}`)}
+                {resultMetric(copy("Workforce Hours", "İşgücü Saati"), `${formatNumber(result.workforceHoursUsed, 1)} ${copy("hours", "saat")}`)}
+                {resultMetric(copy("Selected Machine Value", "Seçili Makine Değeri"), formatLira(result.selectedMachineValue))}
+                {resultMetric(
+                    copy("Idle Time", "Boşta süre"),
+                    `${formatNumber(result.totalIdleTimeHours, 2)} ${copy("hours", "saat")}`,
+                    copy("Machine time that remains unused while the simulated line is constrained by another operation or demand timing.", "Simüle edilen hat başka bir operasyon veya talep zamanlaması tarafından sınırlandığında kullanılmadan kalan makine süresidir."),
+                  )}
+                {resultMetric(
+                    copy("Waiting Cost", "Bekleme maliyeti"),
+                    formatLira(result.waitingCost),
+                    copy("Cost generated by queue waiting before downstream operations. It equals waiting hours multiplied by your waiting cost input.", "Sonraki operasyonlardan önce kuyrukta bekleme nedeniyle oluşan maliyettir. Bekleme saatleri ile girdiğiniz bekleme maliyetinin çarpımıdır."),
+                  )}
+                {resultMetric(
+                    copy("Inventory Cost", "Stok maliyeti"),
+                    formatLira(result.inventoryCost),
+                    copy("Cost generated by WIP held in buffers. It uses unit-hours, so both quantity and time in buffer matter.", "Buffer'da tutulan WIP nedeniyle oluşan maliyettir. Birim-saat mantığıyla çalışır; yani hem miktar hem de buffer'da kalma süresi önemlidir."),
+                  )}
               </div>
               <div className="cost-breakdown">
-                <span>{copy("Tracked Daily Cost", "Takip Edilen Günlük Maliyet")} <strong>{formatLira(result.totalTrackedDailyCost)}</strong></span>
-                <span>{copy("Saved Product", "Kayıtlı Ürün")} <strong>{result.productName || "-"}</strong></span>
+                {resultMetric(copy("Tracked Daily Cost", "Takip Edilen Günlük Maliyet"), formatLira(result.totalTrackedDailyCost))}
+                {resultMetric(copy("Saved Product", "Kayıtlı Ürün"), result.productName || "-")}
+                {resultMetric(
+                    copy("Delay / Capacity Loss", "Gecikme / kapasite kaybı"),
+                    formatLira(toFiniteNumber(result.delayCost) + toFiniteNumber(result.capacityLossCost)),
+                    copy("Combined penalty for exceeding available production time and leaving machine capacity idle because of line imbalance.", "Kullanılabilir üretim süresini aşma ve hat dengesizliği yüzünden makine kapasitesinin boş kalması için birleşik cezadır."),
+                  )}
               </div>
               <div className="selected-resource-results">
                 <div>
-                  <h3>{copy("Machine breakdown", "Makine kırılımı")}</h3>
+                  <h3 className="label-with-info">
+                    {copy("Operation schedule", "Operasyon takvimi")}
+                    <InfoTip
+                      label={copy("Operation schedule info", "Operasyon takvimi bilgisi")}
+                      text={copy("Shows each operation's selected machine and total busy time after batch flow and precedence rules are simulated.", "Batch akışı ve öncelik kuralları simüle edildikten sonra her operasyonun seçili makinesini ve toplam meşgul süresini gösterir.")}
+                    />
+                  </h3>
+                  {(resultOperationRows.length ? resultOperationRows : [{ operationId: "empty", operationName: "-", machineName: "-" }]).map((row, index) => (
+                    <span key={row.operationId || `operation-result-${index}`}>
+                      {row.operationName} <strong>{row.machineName || "-"} / {formatMinutesDuration(row.busyMinutes || 0)}</strong>
+                    </span>
+                  ))}
+                </div>
+                <div>
+                  <h3 className="label-with-info">
+                    {copy("Buffers", "Buffer")}
+                    <InfoTip
+                      label={copy("Buffer result info", "Buffer sonucu bilgisi")}
+                      text={copy("Shows temporary stock between two operations. Max WIP is the highest amount waiting there at any point in the simulated timeline.", "İki operasyon arasındaki geçici stoğu gösterir. Maks WIP, simüle edilen zaman çizelgesinde o ara noktada bekleyen en yüksek miktardır.")}
+                    />
+                  </h3>
+                  {(resultBufferRows.length ? resultBufferRows : [{ fromOperationName: "-", toOperationName: "-", maxWip: 0 }]).map((row, index) => (
+                    <span key={`${row.fromOperationName}-${row.toOperationName}-${index}`}>
+                      {row.fromOperationName} -&gt; {row.toOperationName} <strong>{formatNumber(row.maxWip, 2)} WIP</strong>
+                    </span>
+                  ))}
+                </div>
+                <div>
+                  <h3 className="label-with-info">
+                    {copy("Machine breakdown", "Makine kırılımı")}
+                    <InfoTip
+                      label={copy("Machine breakdown info", "Makine kırılımı bilgisi")}
+                      text={copy("Shows calculated energy and utilization for machines used by the schedule. Utilization is busy time divided by available/simulated time.", "Takvimde kullanılan makinelerin hesaplanan enerji ve kullanım oranını gösterir. Kullanım oranı meşgul sürenin kullanılabilir/simüle edilen süreye bölünmesidir.")}
+                    />
+                  </h3>
                   {resultMachineRows.map((row, index) => (
                     <span key={row.machineId || `machine-result-${index}`}>
-                      {row.name} <strong>{formatNumber(row.energyConsumptionKwh, 2)} kWh</strong>
+                      {row.name} <strong>{formatNumber(row.energyConsumptionKwh, 2)} kWh{Number.isFinite(Number(row.utilizationPercent)) ? ` / ${formatNumber(row.utilizationPercent, 1)}%` : ""}</strong>
                     </span>
                   ))}
                 </div>
@@ -3559,6 +4045,11 @@ function App() {
 
   function renderActiveProcessesPage() {
     const activePlans = getCurrentOperationPlans(operationsWorkspaceForFinance);
+    const processStrategyLabels = {
+      batch: copy("Batch", "Batch"),
+      flow: copy("Flow / Pull", "Akış / Pull"),
+      parallel: copy("Parallel simulation", "Paralel simülasyon"),
+    };
 
     return renderDashboardLayout(
       `operations/${activeOperationsSubmodule.key}`,
@@ -3597,6 +4088,8 @@ function App() {
               const productUnit = result.productUnit || plan.product?.unit || copy("pcs", "adet");
               const machineRows = Array.isArray(result.machineRows) ? result.machineRows : [];
               const materialRows = Array.isArray(result.materialRows) ? result.materialRows : [];
+              const operationRows = Array.isArray(result.operationRows) ? result.operationRows : [];
+              const bufferRows = Array.isArray(result.bufferRows) ? result.bufferRows : [];
 
               return (
                 <article className="operation-card process-card" key={plan.id}>
@@ -3612,6 +4105,11 @@ function App() {
                     <span>{copy("Product", "Ürün")} <strong>{productName}</strong></span>
                     <span>{copy("Quantity to Produce", "Üretilecek Miktar")} <strong>{formatNumber(result.producedQuantity, 2)} {productUnit}</strong></span>
                     <span>{copy("Cycle", "Çevrim")} <strong>{formatCycleTime(result.cycleTimeMinutes, plan.product?.cycle_time_unit || "minute")}</strong></span>
+                    <span>{copy("Production Time", "Toplam süre")} <strong>{result.totalProductionTimeMinutes ? formatMinutesDuration(result.totalProductionTimeMinutes) : "-"}</strong></span>
+                    <span>{copy("Strategy", "Strateji")} <strong>{processStrategyLabels[result.flowStrategy] || result.flowStrategy || "-"}</strong></span>
+                    <span>{copy("Batch / Transfer", "Batch / Transfer")} <strong>{result.transferBatchSize ? formatNumber(result.transferBatchSize, 2) : "-"}</strong></span>
+                    <span>{copy("Max WIP", "Maks WIP")} <strong>{formatNumber(result.maxWipQuantity, 2)}</strong></span>
+                    <span>{copy("Bottleneck", "Darboğaz")} <strong>{result.bottleneck?.operationName || "-"}</strong></span>
                     <span>{copy("Main Machine Hours", "Ana Makine Saati")} <strong>{formatNumber(result.primaryMachineDailyHours, 2)} {copy("hours", "saat")}</strong></span>
                     <span>{copy("Energy", "Enerji")} <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
                     <span>{copy("Cost", "Maliyet")} <strong>{formatLira(result.totalTrackedDailyCost)}</strong></span>
@@ -3619,10 +4117,26 @@ function App() {
 
                   <div className="process-detail-grid">
                     <div>
+                      <h3>{copy("Operations", "Operasyonlar")}</h3>
+                      {(operationRows.length ? operationRows : [{ operationId: "empty", operationName: "-", machineName: "-", busyMinutes: 0 }]).map((row, index) => (
+                        <span key={row.operationId || `operation-${index}`}>
+                          {row.operationName} <strong>{row.machineName || "-"} / {formatMinutesDuration(row.busyMinutes || 0)}</strong>
+                        </span>
+                      ))}
+                    </div>
+                    <div>
+                      <h3>{copy("Buffers", "Buffer")}</h3>
+                      {(bufferRows.length ? bufferRows : [{ fromOperationName: "-", toOperationName: "-", maxWip: 0 }]).map((row, index) => (
+                        <span key={`${row.fromOperationName}-${row.toOperationName}-${index}`}>
+                          {row.fromOperationName} -&gt; {row.toOperationName} <strong>{formatNumber(row.maxWip, 2)} WIP</strong>
+                        </span>
+                      ))}
+                    </div>
+                    <div>
                       <h3>{copy("Machines", "Makineler")}</h3>
                       {(machineRows.length ? machineRows : [{ machineId: "empty", name: "-", dailyHours: 0 }]).map((row) => (
                         <span key={row.machineId}>
-                          {row.name} <strong>{formatNumber(row.dailyHours, 2)} {copy("hours", "saat")}</strong>
+                          {row.name} <strong>{formatNumber(row.dailyHours, 2)} {copy("hours", "saat")}{Number.isFinite(Number(row.utilizationPercent)) ? ` / ${formatNumber(row.utilizationPercent, 1)}%` : ""}</strong>
                         </span>
                       ))}
                     </div>
@@ -6130,6 +6644,10 @@ function App() {
       { info: copy("Purchase value of the selected machine. If currency is USD/EUR, financial analysis converts it to TRY using the current FX rate.", "Seçili makinenin alım değeri. Para birimi USD/EUR ise finansal analiz güncel kurla TL'ye çevirir."), name: "price", label: copy("Machine price", "Makine fiyatı"), step: "0.01", type: "number" },
       { info: copy("Choose the currency the price is entered in. TRY stays unchanged; USD/EUR are multiplied by their TRY rates in financial outputs.", "Fiyatın girildiği para birimini seçin. TL aynen kalır; USD/EUR finans çıktılarında ilgili TL kuru ile çarpılır."), name: "priceCurrency", label: copy("Currency", "Para birimi"), options: operationCurrencyOptions, type: "select" },
       { name: "hourlyEnergyConsumptionKwh", label: copy("Hourly energy consumption", "Saatlik enerji tüketimi"), step: "0.01", type: "number" },
+      { info: copy("How many product units this machine can process at the same time.", "Makinenin aynı anda kaç ürün işleyebildiği."), name: "concurrentCapacity", label: copy("Concurrent capacity", "Eş zamanlı kapasite"), step: "1", type: "number" },
+      { info: copy("Daily available production time used by the scheduler before delay cost starts.", "Gecikme maliyeti başlamadan önce planlayıcının kullandığı günlük çalışma süresi."), name: "availabilityHours", label: copy("Availability hours", "Çalışma saati"), step: "0.25", type: "number" },
+      { info: copy("Speed multiplier applied to process time. 1 is normal, 1.2 is 20% faster.", "İşlem süresine uygulanan hız çarpanı. 1 normal, 1.2 yüzde 20 daha hızlıdır."), name: "speedMultiplier", label: copy("Speed multiplier", "Hız çarpanı"), step: "0.01", type: "number" },
+      { info: copy("Optional advanced risk input kept on the machine record for future reliability simulations.", "Gelecek güvenilirlik simülasyonları için makine kaydında tutulan opsiyonel risk girdisi."), name: "failureProbabilityPercent", label: copy("Failure probability %", "Arıza ihtimali %"), step: "0.01", type: "number" },
     ];
     const equipmentFields = [
       { name: "name", label: copy("Equipment name", "Ekipman adı") },
@@ -6141,6 +6659,9 @@ function App() {
       { header: copy("Machine", "Makine"), render: (row) => row.name },
       { header: copy("Price", "Fiyat"), render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates) },
       { header: copy("Hourly Energy", "Saatlik Enerji"), render: (row) => `${formatNumber(row.hourly_energy_consumption_kwh, 2)} kWh` },
+      { header: copy("Capacity", "Kapasite"), render: (row) => formatNumber(row.concurrent_capacity || 1) },
+      { header: copy("Availability", "Çalışma"), render: (row) => `${formatNumber(row.availability_hours || 8, 2)} ${copy("hours", "saat")}` },
+      { header: copy("Speed", "Hız"), render: (row) => `${formatNumber(row.speed_multiplier || 1, 2)}x` },
     ];
     const equipmentColumns = [
       { header: copy("Equipment", "Ekipman"), render: (row) => row.name },
@@ -6397,7 +6918,12 @@ function App() {
     [copy("Material / Unit", "Malzeme / Birim"), dashboardSelectedProduct?.material_kg_per_unit ? `${formatNumber(dashboardSelectedProduct.material_kg_per_unit, 2)} kg` : noDataValue],
     [copy("Scrap Rate", "Fire Oranı"), dashboardSelectedProduct?.scrap_rate ? `${formatNumber(dashboardSelectedProduct.scrap_rate, 2)}%` : noDataValue],
   ];
-  const operationFlowSteps = [
+  const operationProcessSteps = (latestPlanResult?.operationRows || []).map((row) => ({
+    id: `operation-${row.operationId || row.operationName}`,
+    name: row.operationName,
+    station: `${row.machineName || copy("Machine", "Makine")} / ${formatMinutesDuration(row.busyMinutes || 0)}`,
+  }));
+  const operationFlowSteps = operationProcessSteps.length ? operationProcessSteps : [
     ...(latestPlanResult?.machineRows || []).map((row) => ({
       id: `machine-${row.machineId}`,
       name: row.name,

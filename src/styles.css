@@ -102,14 +102,16 @@ textarea:focus-visible {
 }
 
 .info-tip .info-tip-panel {
-  background: var(--color-heading);
-  border: 1px solid color-mix(in srgb, var(--color-teal) 34%, var(--color-heading));
+  background: #102033;
+  border: 1px solid rgba(115, 209, 190, 0.36);
   border-radius: 8px;
   box-shadow: var(--shadow-strong);
-  color: var(--color-surface);
+  color: #ffffff !important;
+  display: block;
   font-size: 0.74rem;
   font-weight: 750;
-  left: 50%;
+  left: 0;
+  line-height: 1.45;
   max-width: min(320px, calc(100vw - 42px));
   opacity: 0;
   padding: 9px 10px;
@@ -117,7 +119,7 @@ textarea:focus-visible {
   position: absolute;
   text-transform: none;
   top: calc(100% + 8px);
-  transform: translate(-50%, -4px);
+  transform: translate(0, -4px);
   transition:
     opacity 150ms ease,
     transform 150ms ease;
@@ -128,7 +130,7 @@ textarea:focus-visible {
 .info-tip:hover .info-tip-panel,
 .info-tip:focus-within .info-tip-panel {
   opacity: 1;
-  transform: translate(-50%, 0);
+  transform: translate(0, 0);
 }
 
 .heading-with-info,
@@ -3702,7 +3704,11 @@ textarea:focus-visible {
 .planner-fields {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.compact-planner-fields {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .planner-fields label {
@@ -3813,6 +3819,19 @@ textarea:focus-visible {
   grid-template-columns: minmax(190px, 1.4fr) minmax(110px, 0.65fr) minmax(170px, 1fr) auto;
 }
 
+.operation-plan-row {
+  grid-template-columns:
+    minmax(150px, 1.05fr)
+    minmax(170px, 1.1fr)
+    minmax(86px, 0.55fr)
+    minmax(80px, 0.48fr)
+    minmax(80px, 0.48fr)
+    minmax(76px, 0.45fr)
+    minmax(86px, 0.52fr)
+    minmax(150px, 0.95fr)
+    auto;
+}
+
 .workforce-plan-row {
   grid-template-columns: minmax(170px, 1.4fr) minmax(90px, 0.55fr) minmax(90px, 0.55fr) minmax(170px, 1fr) auto;
 }
@@ -3889,22 +3908,22 @@ textarea:focus-visible {
 }
 
 .planner-summary-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .allocation-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .cost-breakdown {
   border-top: 1px solid var(--color-line);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   padding-top: 12px;
 }
 
-.planner-summary-grid span,
-.allocation-grid span,
-.cost-breakdown span {
+.planner-summary-grid > .result-metric-card,
+.allocation-grid > .result-metric-card,
+.cost-breakdown > .result-metric-card {
   background: color-mix(in srgb, var(--color-section) 58%, transparent);
   border: 1px solid var(--color-line);
   border-radius: 8px;
@@ -3915,9 +3934,29 @@ textarea:focus-visible {
   padding: 10px;
 }
 
-.planner-summary-grid strong,
-.allocation-grid strong,
-.cost-breakdown strong {
+.result-metric-card {
+  min-width: 0;
+  overflow: visible;
+}
+
+.result-metric-label {
+  align-items: center;
+  color: var(--color-muted);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  gap: 7px;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.result-metric-label .label-with-info {
+  min-height: 0;
+}
+
+.planner-summary-grid > .result-metric-card strong,
+.allocation-grid > .result-metric-card strong,
+.cost-breakdown > .result-metric-card strong {
   color: var(--color-heading);
   font-size: 1rem;
 }
@@ -3925,7 +3964,7 @@ textarea:focus-visible {
 .selected-resource-results {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 .selected-resource-results div {
@@ -3942,7 +3981,7 @@ textarea:focus-visible {
   margin: 0;
 }
 
-.selected-resource-results span {
+.selected-resource-results div > span {
   color: var(--color-muted);
   display: flex;
   font-size: 0.74rem;
@@ -4362,33 +4401,33 @@ textarea:focus-visible {
 }
 
 .operations-modern .resource-row-meta,
-.operations-modern .planner-summary-grid span,
-.operations-modern .allocation-grid span,
-.operations-modern .cost-breakdown span,
+.operations-modern .planner-summary-grid > .result-metric-card,
+.operations-modern .allocation-grid > .result-metric-card,
+.operations-modern .cost-breakdown > .result-metric-card,
 .operations-modern .process-metrics span,
 .operations-modern .process-detail-grid span {
   background: color-mix(in srgb, var(--color-surface) 82%, var(--color-section));
   border-color: color-mix(in srgb, var(--color-line) 70%, var(--color-teal));
 }
 
-.operations-modern .planner-summary-grid span:nth-child(3n + 1),
+.operations-modern .planner-summary-grid > .result-metric-card:nth-child(3n + 1),
 .operations-modern .process-metrics span:nth-child(3n + 1) {
   border-left: 4px solid var(--color-teal);
 }
 
-.operations-modern .planner-summary-grid span:nth-child(3n + 2),
+.operations-modern .planner-summary-grid > .result-metric-card:nth-child(3n + 2),
 .operations-modern .process-metrics span:nth-child(3n + 2) {
   border-left: 4px solid var(--color-cyan);
 }
 
-.operations-modern .planner-summary-grid span:nth-child(3n),
+.operations-modern .planner-summary-grid > .result-metric-card:nth-child(3n),
 .operations-modern .process-metrics span:nth-child(3n) {
   border-left: 4px solid var(--color-amber);
 }
 
-.operations-modern .planner-summary-grid strong,
-.operations-modern .allocation-grid strong,
-.operations-modern .cost-breakdown strong,
+.operations-modern .planner-summary-grid > .result-metric-card strong,
+.operations-modern .allocation-grid > .result-metric-card strong,
+.operations-modern .cost-breakdown > .result-metric-card strong,
 .operations-modern .process-metrics strong,
 .operations-modern .process-detail-grid strong {
   font-size: 1.05rem;
@@ -9840,9 +9879,9 @@ textarea:focus-visible {
 }
 
 .operations-workspace.operations-modern .resource-row-meta,
-.operations-workspace.operations-modern .planner-summary-grid span,
-.operations-workspace.operations-modern .allocation-grid span,
-.operations-workspace.operations-modern .cost-breakdown span,
+.operations-workspace.operations-modern .planner-summary-grid > .result-metric-card,
+.operations-workspace.operations-modern .allocation-grid > .result-metric-card,
+.operations-workspace.operations-modern .cost-breakdown > .result-metric-card,
 .operations-workspace.operations-modern .process-metrics span,
 .operations-workspace.operations-modern .process-detail-grid span {
   background: color-mix(in srgb, var(--color-surface) 78%, var(--color-section));
@@ -9850,27 +9889,27 @@ textarea:focus-visible {
   box-shadow: inset 4px 0 0 color-mix(in srgb, var(--metric-tone, var(--color-teal)) 92%, transparent);
 }
 
-.operations-workspace.operations-modern .planner-summary-grid span:nth-child(3n + 1),
+.operations-workspace.operations-modern .planner-summary-grid > .result-metric-card:nth-child(3n + 1),
 .operations-workspace.operations-modern .process-metrics span:nth-child(3n + 1),
 .operations-workspace.operations-modern .process-summary-card:nth-child(1) {
   --metric-tone: var(--color-teal);
 }
 
-.operations-workspace.operations-modern .planner-summary-grid span:nth-child(3n + 2),
+.operations-workspace.operations-modern .planner-summary-grid > .result-metric-card:nth-child(3n + 2),
 .operations-workspace.operations-modern .process-metrics span:nth-child(3n + 2),
 .operations-workspace.operations-modern .process-summary-card:nth-child(2) {
   --metric-tone: var(--color-cyan);
 }
 
-.operations-workspace.operations-modern .planner-summary-grid span:nth-child(3n),
+.operations-workspace.operations-modern .planner-summary-grid > .result-metric-card:nth-child(3n),
 .operations-workspace.operations-modern .process-metrics span:nth-child(3n),
 .operations-workspace.operations-modern .process-summary-card:nth-child(3) {
   --metric-tone: var(--color-amber);
 }
 
-.operations-workspace.operations-modern .planner-summary-grid strong,
-.operations-workspace.operations-modern .allocation-grid strong,
-.operations-workspace.operations-modern .cost-breakdown strong,
+.operations-workspace.operations-modern .planner-summary-grid > .result-metric-card strong,
+.operations-workspace.operations-modern .allocation-grid > .result-metric-card strong,
+.operations-workspace.operations-modern .cost-breakdown > .result-metric-card strong,
 .operations-workspace.operations-modern .process-metrics strong,
 .operations-workspace.operations-modern .process-detail-grid strong {
   color: var(--color-heading);
@@ -10021,6 +10060,7 @@ textarea:focus-visible {
   .operations-workspace.operations-modern .operation-data-fields,
   .operations-workspace.operations-modern .planner-fields,
   .operations-workspace.operations-modern .resource-row-grid,
+  .operations-workspace.operations-modern .operation-plan-row,
   .operations-workspace.operations-modern .machine-plan-row,
   .operations-workspace.operations-modern .workforce-plan-row,
   .operations-workspace.operations-modern .material-plan-row,
@@ -10065,6 +10105,7 @@ textarea:focus-visible {
 
   .operations-workspace.operations-modern .planner-fields,
   .operations-workspace.operations-modern .resource-row-grid,
+  .operations-workspace.operations-modern .operation-plan-row,
   .operations-workspace.operations-modern .selected-resource-results,
   .operations-workspace.operations-modern .operation-data-fields,
   .operations-workspace.operations-modern .allocation-grid,
@@ -11745,9 +11786,9 @@ textarea:focus-visible {
   .schedule-row,
   .quick-report-grid button,
   .reports-filter-summary,
-  .planner-summary-grid span,
-  .allocation-grid span,
-  .cost-breakdown span,
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card,
   .process-metrics span,
   .process-detail-grid div,
   .compact-resource-list span,
@@ -11821,9 +11862,9 @@ textarea:focus-visible {
   .schedule-row,
   .quick-report-grid button
   ,
-  .planner-summary-grid span,
-  .allocation-grid span,
-  .cost-breakdown span,
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card,
   .process-metrics span,
   .process-detail-grid div,
   .compact-resource-list span,
@@ -11865,9 +11906,9 @@ textarea:focus-visible {
   .schedule-row,
   .quick-report-grid button
   ,
-  .planner-summary-grid span,
-  .allocation-grid span,
-  .cost-breakdown span,
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card,
   .process-metrics span,
   .process-detail-grid div,
   .compact-resource-list span,
@@ -11902,9 +11943,9 @@ textarea:focus-visible {
   .report-category-list span,
   .schedule-row
   ,
-  .planner-summary-grid span,
-  .allocation-grid span,
-  .cost-breakdown span,
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card,
   .process-metrics span,
   .compact-resource-list span,
   .selected-resource-results div,
@@ -11932,9 +11973,9 @@ textarea:focus-visible {
   .report-stat-card
   ,
   .process-summary-card,
-  .planner-summary-grid span,
-  .allocation-grid span,
-  .cost-breakdown span,
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card,
   .process-metrics span,
   .process-detail-grid div
 ) {
@@ -12915,4 +12956,309 @@ textarea:focus-visible {
     left: 12px;
     right: 48%;
   }
+}
+
+.operations-workspace.operations-modern .operation-planner {
+  gap: 22px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.operations-workspace.operations-modern .planner-input-card,
+.operations-workspace.operations-modern .planner-result-card,
+.operations-workspace.operations-modern .process-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 252, 252, 0.96));
+  border-color: color-mix(in srgb, var(--color-cyan) 28%, var(--color-line));
+  box-shadow:
+    0 22px 60px rgba(7, 21, 32, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  overflow: visible;
+}
+
+.operations-workspace.operations-modern .planner-input-card::before {
+  background: linear-gradient(90deg, var(--color-teal), var(--color-cyan), var(--color-amber));
+}
+
+.operations-workspace.operations-modern .planner-result-card::before {
+  background: linear-gradient(90deg, var(--color-amber), var(--color-cyan), var(--color-teal));
+}
+
+.operations-workspace.operations-modern .operation-card-heading {
+  align-items: center;
+}
+
+.operations-workspace.operations-modern .operation-card-heading h2 {
+  max-width: 760px;
+}
+
+.operations-workspace.operations-modern .planner-fields {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.operations-workspace.operations-modern .planner-fields label > .label-with-info,
+.operations-workspace.operations-modern .resource-row-grid label > .label-with-info {
+  color: var(--color-heading);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  min-height: 0;
+  text-transform: none;
+}
+
+.operations-workspace.operations-modern .resource-section {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  overflow: visible;
+}
+
+.operations-workspace.operations-modern .resource-row-grid {
+  overflow: visible;
+}
+
+.operations-workspace.operations-modern .planner-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+}
+
+.operations-workspace.operations-modern .allocation-grid,
+.operations-workspace.operations-modern .cost-breakdown {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.operations-workspace.operations-modern .planner-summary-grid > .result-metric-card,
+.operations-workspace.operations-modern .allocation-grid > .result-metric-card,
+.operations-workspace.operations-modern .cost-breakdown > .result-metric-card {
+  align-content: space-between;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 250, 250, 0.96));
+  border-color: color-mix(in srgb, var(--metric-tone, var(--color-teal)) 30%, var(--color-line));
+  border-width: 1px;
+  box-shadow:
+    inset 4px 0 0 color-mix(in srgb, var(--metric-tone, var(--color-teal)) 90%, transparent),
+    0 14px 34px rgba(7, 21, 32, 0.06);
+  gap: 14px;
+  min-height: 104px;
+  overflow: visible;
+  padding: 14px 16px;
+}
+
+.operations-workspace.operations-modern .allocation-grid > .result-metric-card,
+.operations-workspace.operations-modern .cost-breakdown > .result-metric-card {
+  min-height: 92px;
+}
+
+.operations-workspace.operations-modern .result-metric-label,
+.operations-workspace.operations-modern .result-metric-label .label-with-info {
+  color: #5f6676 !important;
+  font-size: 0.77rem !important;
+  font-weight: 950;
+  letter-spacing: 0.01em;
+}
+
+.operations-workspace.operations-modern .planner-summary-grid > .result-metric-card strong,
+.operations-workspace.operations-modern .allocation-grid > .result-metric-card strong,
+.operations-workspace.operations-modern .cost-breakdown > .result-metric-card strong {
+  color: var(--color-heading);
+  font-size: clamp(1.06rem, 1.25vw, 1.34rem);
+  line-height: 1.12;
+}
+
+.operations-workspace.operations-modern .selected-resource-results div {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 251, 251, 0.94));
+  box-shadow: 0 12px 30px rgba(7, 21, 32, 0.05);
+  overflow: visible;
+}
+
+.operations-workspace.operations-modern .selected-resource-results div > span {
+  align-items: start;
+  border-top: 1px solid color-mix(in srgb, var(--color-line) 76%, transparent);
+  padding-top: 8px;
+}
+
+.operations-workspace.operations-modern .process-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.operations-workspace.operations-modern .process-summary-card {
+  align-content: space-between;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 251, 251, 0.94));
+  box-shadow:
+    inset 4px 0 0 color-mix(in srgb, var(--metric-tone, var(--color-teal)) 90%, transparent),
+    0 18px 42px rgba(7, 21, 32, 0.08);
+  border-width: 1px;
+  min-height: 124px;
+}
+
+.operations-workspace.operations-modern .process-summary-card span {
+  color: #4c5968;
+}
+
+.operations-workspace.operations-modern .process-summary-card strong {
+  color: #101827;
+}
+
+.operations-workspace.operations-modern .process-list {
+  gap: 18px;
+}
+
+.operations-workspace.operations-modern .process-card {
+  padding: 20px;
+}
+
+.operations-workspace.operations-modern .process-card .operation-card-heading {
+  align-items: start;
+}
+
+.operations-workspace.operations-modern .process-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+}
+
+.operations-workspace.operations-modern .process-metrics span {
+  align-content: space-between;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 251, 0.96));
+  border-color: color-mix(in srgb, var(--metric-tone, var(--color-teal)) 30%, var(--color-line));
+  border-width: 1px;
+  box-shadow:
+    inset 4px 0 0 color-mix(in srgb, var(--metric-tone, var(--color-teal)) 88%, transparent),
+    0 12px 30px rgba(7, 21, 32, 0.05);
+  color: #4c5968;
+  min-height: 92px;
+  padding: 14px;
+}
+
+.operations-workspace.operations-modern .process-metrics span > strong {
+  color: #101827;
+}
+
+.operations-workspace.operations-modern .process-detail-grid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.operations-workspace.operations-modern .process-detail-grid div {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(247, 251, 251, 0.95));
+  box-shadow: 0 12px 30px rgba(7, 21, 32, 0.05);
+}
+
+.operations-workspace.operations-modern .process-detail-grid h3 {
+  color: var(--color-heading);
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+.operations-workspace.operations-modern .process-detail-grid span {
+  background: color-mix(in srgb, var(--color-section) 72%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-line) 78%, transparent);
+  box-shadow: none;
+  color: #4c5968;
+}
+
+.operations-workspace.operations-modern .process-detail-grid span > strong {
+  color: #101827;
+}
+
+.operations-workspace.operations-modern .process-card .operation-card-heading span {
+  color: #35777a;
+}
+
+.operations-workspace.operations-modern .process-card .operation-card-heading h2 {
+  color: #101827;
+}
+
+.operations-workspace.operations-modern .process-card mark.ok {
+  background: #e7f8f4;
+  color: #0f6f61;
+}
+
+@media (max-width: 760px) {
+  .operations-workspace.operations-modern .planner-input-card,
+  .operations-workspace.operations-modern .planner-result-card,
+  .operations-workspace.operations-modern .process-card {
+    padding: 14px;
+  }
+
+  .operations-workspace.operations-modern .operation-card-heading {
+    align-items: stretch;
+  }
+
+  .operations-workspace.operations-modern .planner-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-workspace.operations-modern .planner-summary-grid,
+  .operations-workspace.operations-modern .allocation-grid,
+  .operations-workspace.operations-modern .cost-breakdown,
+  .operations-workspace.operations-modern .process-metrics,
+  .operations-workspace.operations-modern .process-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-shell .info-tip .info-tip-panel,
+.operations-workspace .info-tip .info-tip-panel,
+.operations-workspace.operations-modern .info-tip .info-tip-panel,
+.info-tip .info-tip-panel {
+  background: #102033 !important;
+  border: 1px solid rgba(115, 209, 190, 0.42) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35) !important;
+  color: #ffffff !important;
+  display: block !important;
+  left: 0 !important;
+  max-width: min(340px, calc(100vw - 56px)) !important;
+  opacity: 0;
+  padding: 10px 12px !important;
+  right: auto !important;
+  text-align: left !important;
+  transform: translate(0, -4px);
+  white-space: normal !important;
+  width: max-content !important;
+  z-index: 4000 !important;
+}
+
+.dashboard-shell .info-tip .info-tip-panel *,
+.operations-workspace .info-tip .info-tip-panel *,
+.operations-workspace.operations-modern .info-tip .info-tip-panel *,
+.info-tip .info-tip-panel * {
+  background: transparent !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.dashboard-shell .info-tip:hover .info-tip-panel,
+.dashboard-shell .info-tip:focus-within .info-tip-panel,
+.operations-workspace .info-tip:hover .info-tip-panel,
+.operations-workspace .info-tip:focus-within .info-tip-panel,
+.operations-workspace.operations-modern .info-tip:hover .info-tip-panel,
+.operations-workspace.operations-modern .info-tip:focus-within .info-tip-panel,
+.info-tip:hover .info-tip-panel,
+.info-tip:focus-within .info-tip-panel {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+.planner-summary-grid .label-with-info,
+.allocation-grid .label-with-info,
+.cost-breakdown .label-with-info,
+.selected-resource-results h3.label-with-info,
+.operations-workspace.operations-modern .planner-summary-grid .label-with-info,
+.operations-workspace.operations-modern .allocation-grid .label-with-info,
+.operations-workspace.operations-modern .cost-breakdown .label-with-info,
+.operations-workspace.operations-modern .selected-resource-results h3.label-with-info {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--color-muted) !important;
+  display: inline-flex !important;
+  font-size: inherit !important;
+  gap: 7px !important;
+  line-height: 1.2 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  width: auto !important;
+}
+
+.selected-resource-results h3.label-with-info,
+.operations-workspace.operations-modern .selected-resource-results h3.label-with-info {
+  color: var(--color-heading) !important;
 }

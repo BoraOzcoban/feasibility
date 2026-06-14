@@ -96,3 +96,35 @@ test("ignores malformed nested plan rows", () => {
   assert.equal(result.machineRows.length, 1);
   assert.equal(result.workforceRows.length, 1);
 });
+
+test("simulates operation precedence with flow batches", () => {
+  const result = calculateCurrentPlanResult({
+    input: {
+      batchSize: 5,
+      flowStrategy: "flow",
+      minimumTransferQuantity: 1,
+      operationRows: [
+        { capacity: 1, dailyHours: 8, machineId: "machine-1", operationName: "Puree", processTimeMinutes: 2, setupMinutes: 0, speedMultiplier: 1 },
+        { capacity: 1, dailyHours: 8, machineId: "machine-2", operationName: "Pack", processTimeMinutes: 1, setupMinutes: 0, speedMultiplier: 1 },
+      ],
+      productId: "product-1",
+      targetQuantity: 10,
+    },
+    product_id: "product-1",
+  }, {
+    ...workspace,
+    machines: [
+      ...workspace.machines,
+      { availability_hours: 8, concurrent_capacity: 1, hourly_energy_consumption_kwh: 1, id: "machine-2", name: "Packer", price: 50000, speed_multiplier: 1 },
+    ],
+  });
+
+  assert.equal(result.producedQuantity, 10);
+  assert.equal(result.transferBatchSize, 5);
+  assert.equal(result.totalProductionTimeMinutes, 25);
+  assert.equal(result.bottleneck.operationName, "Puree");
+  assert.equal(result.maxWipQuantity, 0);
+  assert.equal(result.optimization.recommendedBatchSize, 1);
+  assert.equal(result.materialCost, 450);
+  assert.equal(result.machineRows.length, 2);
+});

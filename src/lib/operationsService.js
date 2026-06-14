@@ -1,9 +1,19 @@
 export const emptyOperationPlan = {
+  batchSize: 5,
+  bufferMaxQuantity: 0,
+  capacityLossCostPerHour: 0,
+  delayCostPerHour: 0,
+  flowStrategy: "flow",
+  inventoryCostPerUnitHour: 0,
   machineRows: [],
   materialRows: [],
+  minimumTransferQuantity: 1,
+  operationRows: [],
   planName: "",
   productId: "",
   productName: "",
+  targetQuantity: 1000,
+  waitingCostPerHour: 0,
   workforceRows: [],
 };
 
@@ -15,6 +25,15 @@ export const emptyPlanRows = {
   material: {
     dailyQuantity: 0,
     materialId: "",
+  },
+  operation: {
+    capacity: 1,
+    dailyHours: 8,
+    machineId: "",
+    operationName: "",
+    processTimeMinutes: 1,
+    setupMinutes: 0,
+    speedMultiplier: 1,
   },
   workforce: {
     dailyHours: 8,
@@ -31,10 +50,14 @@ export const emptyOperationForms = {
     quantity: 1,
   },
   machine: {
+    availabilityHours: 8,
+    concurrentCapacity: 1,
+    failureProbabilityPercent: 0,
     hourlyEnergyConsumptionKwh: 0,
     name: "",
     price: 0,
     priceCurrency: "TRY",
+    speedMultiplier: 1,
   },
   product: {
     cycleTimeUnit: "minute",

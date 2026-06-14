@@ -1,16 +1,47 @@
 alter table public.operation_products
+  add column if not exists price_currency text not null default 'TRY',
   add column if not exists cycle_time_unit text not null default 'minute';
+
+alter table public.operation_machines
+  add column if not exists price_currency text not null default 'TRY',
+  add column if not exists concurrent_capacity numeric(10, 2) not null default 1,
+  add column if not exists availability_hours numeric(10, 2) not null default 8,
+  add column if not exists speed_multiplier numeric(10, 4) not null default 1,
+  add column if not exists failure_probability_percent numeric(5, 2) not null default 0;
+
+alter table public.operation_materials
+  add column if not exists price_currency text not null default 'TRY';
+
+alter table public.operation_workforce_resources
+  add column if not exists hourly_cost_currency text not null default 'TRY';
 
 update public.operation_products
 set cycle_time_unit = 'minute'
 where cycle_time_unit is null
    or cycle_time_unit not in ('minute', 'hour', 'day');
 
+update public.operation_products
+set price_currency = 'TRY'
+where price_currency not in ('TRY', 'USD', 'EUR');
+
+update public.operation_machines
+set price_currency = 'TRY'
+where price_currency not in ('TRY', 'USD', 'EUR');
+
+update public.operation_materials
+set price_currency = 'TRY'
+where price_currency not in ('TRY', 'USD', 'EUR');
+
+update public.operation_workforce_resources
+set hourly_cost_currency = 'TRY'
+where hourly_cost_currency not in ('TRY', 'USD', 'EUR');
+
 create table if not exists public.operation_equipment (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
   name text not null,
   price numeric(14, 2) not null default 0,
+  price_currency text not null default 'TRY' check (price_currency in ('TRY', 'USD', 'EUR')),
   quantity numeric(14, 4) not null default 1,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -19,7 +50,12 @@ create table if not exists public.operation_equipment (
 
 alter table public.operation_equipment
   add column if not exists price numeric(14, 2) not null default 0,
+  add column if not exists price_currency text not null default 'TRY',
   add column if not exists quantity numeric(14, 4) not null default 1;
+
+update public.operation_equipment
+set price_currency = 'TRY'
+where price_currency not in ('TRY', 'USD', 'EUR');
 
 alter table public.operation_equipment enable row level security;
 
@@ -65,17 +101,28 @@ begin
 
   if p_entity = 'machine' then
     insert into public.operation_machines (
-      company_id, name, price, hourly_energy_consumption_kwh
+      company_id, name, price, price_currency, hourly_energy_consumption_kwh,
+      concurrent_capacity, availability_hours, speed_multiplier, failure_probability_percent
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'name'), ''),
       greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
-      greatest(0, coalesce(nullif(p_input->>'hourlyEnergyConsumptionKwh', '')::numeric, 0))
+      case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end,
+      greatest(0, coalesce(nullif(p_input->>'hourlyEnergyConsumptionKwh', '')::numeric, 0)),
+      greatest(1, coalesce(nullif(p_input->>'concurrentCapacity', '')::numeric, 1)),
+      greatest(0, coalesce(nullif(p_input->>'availabilityHours', '')::numeric, 8)),
+      greatest(0.0001, coalesce(nullif(p_input->>'speedMultiplier', '')::numeric, 1)),
+      greatest(0, coalesce(nullif(p_input->>'failureProbabilityPercent', '')::numeric, 0))
     )
     on conflict (company_id, name) do update set
       price = excluded.price,
-      hourly_energy_consumption_kwh = excluded.hourly_energy_consumption_kwh
+      price_currency = excluded.price_currency,
+      hourly_energy_consumption_kwh = excluded.hourly_energy_consumption_kwh,
+      concurrent_capacity = excluded.concurrent_capacity,
+      availability_hours = excluded.availability_hours,
+      speed_multiplier = excluded.speed_multiplier,
+      failure_probability_percent = excluded.failure_probability_percent
     returning id into v_record_id;
 
     select to_jsonb(m.*) into v_row from public.operation_machines m where m.id = v_record_id;
@@ -84,16 +131,18 @@ begin
 
   if p_entity = 'equipment' then
     insert into public.operation_equipment (
-      company_id, name, price, quantity
+      company_id, name, price, price_currency, quantity
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'name'), ''),
       greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+      case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end,
       greatest(0, coalesce(nullif(p_input->>'quantity', '')::numeric, 1))
     )
     on conflict (company_id, name) do update set
       price = excluded.price,
+      price_currency = excluded.price_currency,
       quantity = excluded.quantity
     returning id into v_record_id;
 
@@ -115,6 +164,7 @@ begin
         name = nullif(trim(p_input->>'name'), ''),
         unit = coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
         price = greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+        price_currency = case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end,
         cycle_time_minutes = greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
         cycle_time_unit = case
           when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
@@ -124,7 +174,7 @@ begin
         and company_id = v_company_id;
     else
       insert into public.operation_products (
-        company_id, product_code, name, unit, price, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
+        company_id, product_code, name, unit, price, price_currency, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
       )
       values (
         v_company_id,
@@ -132,6 +182,7 @@ begin
         nullif(trim(p_input->>'name'), ''),
         coalesce(nullif(trim(p_input->>'unit'), ''), 'adet'),
         greatest(0, coalesce(nullif(p_input->>'price', '')::numeric, 0)),
+        case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end,
         greatest(0.0001, coalesce(nullif(p_input->>'cycleTimeMinutes', '')::numeric, 1)),
         case
           when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
@@ -146,6 +197,7 @@ begin
         name = excluded.name,
         unit = excluded.unit,
         price = excluded.price,
+        price_currency = excluded.price_currency,
         cycle_time_minutes = excluded.cycle_time_minutes,
         cycle_time_unit = excluded.cycle_time_unit,
         product_group = excluded.product_group,
@@ -190,17 +242,19 @@ begin
 
   if p_entity = 'material' then
     insert into public.operation_materials (
-      company_id, name, unit, price_per_unit
+      company_id, name, unit, price_per_unit, price_currency
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'name'), ''),
       coalesce(nullif(trim(p_input->>'unit'), ''), 'kg'),
-      greatest(0, coalesce(nullif(p_input->>'pricePerUnit', '')::numeric, 0))
+      greatest(0, coalesce(nullif(p_input->>'pricePerUnit', '')::numeric, 0)),
+      case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end
     )
     on conflict (company_id, name) do update set
       unit = excluded.unit,
-      price_per_unit = excluded.price_per_unit
+      price_per_unit = excluded.price_per_unit,
+      price_currency = excluded.price_currency
     returning id into v_record_id;
 
     select to_jsonb(m.*) into v_row from public.operation_materials m where m.id = v_record_id;
@@ -209,15 +263,17 @@ begin
 
   if p_entity = 'workforce' then
     insert into public.operation_workforce_resources (
-      company_id, role_name, hourly_cost
+      company_id, role_name, hourly_cost, hourly_cost_currency
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'roleName'), ''),
-      greatest(0, coalesce(nullif(p_input->>'hourlyCost', '')::numeric, 0))
+      greatest(0, coalesce(nullif(p_input->>'hourlyCost', '')::numeric, 0)),
+      case when upper(coalesce(nullif(trim(p_input->>'hourlyCostCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'hourlyCostCurrency'), ''), 'TRY')) else 'TRY' end
     )
     on conflict (company_id, role_name) do update set
-      hourly_cost = excluded.hourly_cost
+      hourly_cost = excluded.hourly_cost,
+      hourly_cost_currency = excluded.hourly_cost_currency
     returning id into v_record_id;
 
     select to_jsonb(w.*) into v_row from public.operation_workforce_resources w where w.id = v_record_id;
