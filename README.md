@@ -48,7 +48,7 @@ npm run build
 
 The feasibility flow is intentionally simple:
 
-1. Define materials, workforce, machines/equipment, and products in Operations.
+1. Define materials, workforce, machines/equipment, and products in Operations, including product-level flow defaults such as batch size and minimum transfer quantity.
 2. Save a process plan for a product with a material recipe plus operation steps or nonzero machine hours.
 3. Add product-linked sales channels in Sales Strategy.
 4. Save financial assumptions and optional expenses in Financial Modelling.

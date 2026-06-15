@@ -39,7 +39,7 @@ function getTransferBatchSize(strategy, targetQuantity, batchSize, minimumTransf
 
   const safeMinimumTransferQuantity = Math.max(1, Math.min(safeTargetQuantity, toFiniteNumber(minimumTransferQuantity, 1)));
   if (strategy === "batch") return safeTargetQuantity;
-  if (strategy === "parallel") return safeMinimumTransferQuantity;
+  if (strategy === "parallel") return 1;
 
   return Math.max(
     safeMinimumTransferQuantity,
@@ -115,7 +115,7 @@ function buildBatchCandidates(targetQuantity, minimumTransferQuantity, currentBa
     Math.max(safeMinimumTransferQuantity, Math.round(toFiniteNumber(currentBatchSize, safeMinimumTransferQuantity))),
     safeTargetQuantity,
   ]);
-  const maxCandidateCount = 1000;
+  const maxCandidateCount = 80;
   const rawStep = safeTargetQuantity / safeMinimumTransferQuantity <= maxCandidateCount
     ? safeMinimumTransferQuantity
     : Math.ceil((safeTargetQuantity / maxCandidateCount) / safeMinimumTransferQuantity) * safeMinimumTransferQuantity;
@@ -128,6 +128,106 @@ function buildBatchCandidates(targetQuantity, minimumTransferQuantity, currentBa
   return Array.from(candidates)
     .filter((batch) => batch >= safeMinimumTransferQuantity && batch <= safeTargetQuantity)
     .sort((a, b) => a - b);
+}
+
+function addInterval(intervals, startMinutes, finishMinutes) {
+  if (finishMinutes > startMinutes) intervals.push([startMinutes, finishMinutes]);
+}
+
+function getMergedIntervalMinutes(intervals) {
+  const sortedIntervals = intervals
+    .filter(([startMinutes, finishMinutes]) => finishMinutes > startMinutes)
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+  let totalMinutes = 0;
+  let currentStart = null;
+  let currentFinish = null;
+
+  sortedIntervals.forEach(([startMinutes, finishMinutes]) => {
+    if (currentStart === null) {
+      currentStart = startMinutes;
+      currentFinish = finishMinutes;
+      return;
+    }
+
+    if (startMinutes <= currentFinish) {
+      currentFinish = Math.max(currentFinish, finishMinutes);
+      return;
+    }
+
+    totalMinutes += currentFinish - currentStart;
+    currentStart = startMinutes;
+    currentFinish = finishMinutes;
+  });
+
+  if (currentStart !== null) totalMinutes += currentFinish - currentStart;
+  return totalMinutes;
+}
+
+function ensureMachineSlots(machineState, capacity) {
+  const slotCount = Math.max(1, Math.ceil(toFiniteNumber(capacity, 1)));
+
+  if (machineState.slotAvailableAt.length > slotCount) {
+    const nextAvailableAt = Math.max(0, ...machineState.slotAvailableAt);
+    machineState.slotAvailableAt = Array.from({ length: slotCount }, () => nextAvailableAt);
+  }
+
+  while (machineState.slotAvailableAt.length < slotCount) {
+    machineState.slotAvailableAt.push(Math.max(0, ...machineState.slotAvailableAt));
+  }
+
+  return slotCount;
+}
+
+function scheduleGroupOnMachine(machineState, operation, group, precedenceReadyMinutes, includeSetup) {
+  ensureMachineSlots(machineState, operation.capacity);
+  const unitCount = Math.max(1, Math.ceil(toFiniteNumber(group.quantity, 1)));
+  const unitProcessMinutes = operation.processTimeMinutes / operation.speedMultiplier;
+  const setupMinutes = includeSetup ? operation.setupMinutes : 0;
+  let processingReadyMinutes = precedenceReadyMinutes;
+  let startMinutes = null;
+  let processingStartMinutes = null;
+  let finishMinutes = precedenceReadyMinutes;
+  const groupIntervals = [];
+
+  if (setupMinutes > 0) {
+    const setupStartMinutes = Math.max(precedenceReadyMinutes, ...machineState.slotAvailableAt);
+    const setupFinishMinutes = setupStartMinutes + setupMinutes;
+    machineState.slotAvailableAt = machineState.slotAvailableAt.map((slotTime) => Math.max(slotTime, setupFinishMinutes));
+    addInterval(machineState.intervals, setupStartMinutes, setupFinishMinutes);
+    addInterval(groupIntervals, setupStartMinutes, setupFinishMinutes);
+    startMinutes = setupStartMinutes;
+    processingReadyMinutes = setupFinishMinutes;
+    finishMinutes = setupFinishMinutes;
+  }
+
+  for (let unitIndex = 0; unitIndex < unitCount; unitIndex += 1) {
+    machineState.slotAvailableAt.sort((a, b) => a - b);
+    const usableSlotIndex = 0;
+    const unitStartMinutes = Math.max(machineState.slotAvailableAt[usableSlotIndex], processingReadyMinutes);
+    const unitFinishMinutes = unitStartMinutes + unitProcessMinutes;
+
+    machineState.slotAvailableAt[usableSlotIndex] = unitFinishMinutes;
+    addInterval(machineState.intervals, unitStartMinutes, unitFinishMinutes);
+    addInterval(groupIntervals, unitStartMinutes, unitFinishMinutes);
+    startMinutes = startMinutes === null ? unitStartMinutes : Math.min(startMinutes, unitStartMinutes);
+    processingStartMinutes = processingStartMinutes === null
+      ? unitStartMinutes
+      : Math.min(processingStartMinutes, unitStartMinutes);
+    finishMinutes = Math.max(finishMinutes, unitFinishMinutes);
+  }
+
+  const durationMinutes = Math.max(0, finishMinutes - (startMinutes ?? precedenceReadyMinutes));
+
+  return {
+    durationMinutes,
+    finishMinutes,
+    groupIntervals,
+    processingStartMinutes: processingStartMinutes ?? startMinutes ?? precedenceReadyMinutes,
+    setupMinutes,
+    startMinutes: startMinutes ?? precedenceReadyMinutes,
+    waitMinutes: Math.max(0, (startMinutes ?? precedenceReadyMinutes) - precedenceReadyMinutes),
+  };
 }
 
 function runOperationSchedule(operationRows, options = {}) {
@@ -156,46 +256,49 @@ function runOperationSchedule(operationRows, options = {}) {
       machineName: operation.machineName,
       machinePrice: Math.max(0, toFiniteNumber(operation.machinePrice)),
       priceCurrency: operation.priceCurrency || "TRY",
-      availableAt: 0,
+      intervals: [],
+      slotAvailableAt: [],
     };
     machineState.availabilityHours = Math.max(machineState.availabilityHours, operation.dailyHours);
 
     const currentTimings = [];
     const currentFinishes = [];
-    let operationBusyMinutes = 0;
+    const operationIntervals = [];
     let operationWaitMinutes = 0;
     let firstStartMinutes = null;
     let lastFinishMinutes = 0;
 
     groups.forEach((group, groupIndex) => {
       const precedenceReadyMinutes = operationIndex === 0 ? 0 : previousFinishes[groupIndex] || 0;
-      const startMinutes = Math.max(machineState.availableAt, precedenceReadyMinutes);
-      const setupMinutes = groupIndex === 0 ? operation.setupMinutes : 0;
-      const processMinutes = (Math.ceil(group.quantity / operation.capacity) * operation.processTimeMinutes) / operation.speedMultiplier;
-      const durationMinutes = setupMinutes + processMinutes;
-      const finishMinutes = startMinutes + durationMinutes;
-      const waitMinutes = Math.max(0, startMinutes - precedenceReadyMinutes);
+      const scheduledGroup = scheduleGroupOnMachine(
+        machineState,
+        operation,
+        group,
+        precedenceReadyMinutes,
+        groupIndex === 0,
+      );
 
-      machineState.availableAt = finishMinutes;
-      machineState.busyMinutes += durationMinutes;
-      operationBusyMinutes += durationMinutes;
-      operationWaitMinutes += waitMinutes;
-      totalQueueWaitMinutes += waitMinutes;
-      totalProcessingTimeMinutes += durationMinutes;
-      makespanMinutes = Math.max(makespanMinutes, finishMinutes);
-      firstStartMinutes = firstStartMinutes === null ? startMinutes : Math.min(firstStartMinutes, startMinutes);
-      lastFinishMinutes = Math.max(lastFinishMinutes, finishMinutes);
-      currentFinishes[groupIndex] = finishMinutes;
+      scheduledGroup.groupIntervals.forEach((interval) => operationIntervals.push(interval));
+      operationWaitMinutes += scheduledGroup.waitMinutes;
+      totalQueueWaitMinutes += scheduledGroup.waitMinutes;
+      makespanMinutes = Math.max(makespanMinutes, scheduledGroup.finishMinutes);
+      firstStartMinutes = firstStartMinutes === null
+        ? scheduledGroup.startMinutes
+        : Math.min(firstStartMinutes, scheduledGroup.startMinutes);
+      lastFinishMinutes = Math.max(lastFinishMinutes, scheduledGroup.finishMinutes);
+      currentFinishes[groupIndex] = scheduledGroup.finishMinutes;
 
       const timing = {
         batchIndex: group.index,
-        durationMinutes,
-        finishMinutes,
+        durationMinutes: scheduledGroup.durationMinutes,
+        finishMinutes: scheduledGroup.finishMinutes,
         operationIndex,
         operationName: operation.operationName,
+        processingStartMinutes: scheduledGroup.processingStartMinutes,
         quantity: group.quantity,
-        startMinutes,
-        waitMinutes,
+        setupMinutes: scheduledGroup.setupMinutes,
+        startMinutes: scheduledGroup.startMinutes,
+        waitMinutes: scheduledGroup.waitMinutes,
       };
       currentTimings.push(timing);
 
@@ -205,18 +308,20 @@ function runOperationSchedule(operationRows, options = {}) {
           event: "start",
           operationName: operation.operationName,
           quantity: group.quantity,
-          timeMinutes: startMinutes,
+          timeMinutes: scheduledGroup.startMinutes,
         });
         eventSample.push({
           batchIndex: group.index,
           event: "finish",
           operationName: operation.operationName,
           quantity: group.quantity,
-          timeMinutes: finishMinutes,
+          timeMinutes: scheduledGroup.finishMinutes,
         });
       }
     });
 
+    const operationBusyMinutes = getMergedIntervalMinutes(operationIntervals);
+    totalProcessingTimeMinutes += operationBusyMinutes;
     operationTimings.push(currentTimings);
     previousFinishes = currentFinishes;
     machineStates.set(machineKey, machineState);
@@ -245,8 +350,9 @@ function runOperationSchedule(operationRows, options = {}) {
       const nextTiming = toTimings[index];
       events.push({ delta: timing.quantity, priority: 0, timeMinutes: timing.finishMinutes });
       if (nextTiming) {
-        events.push({ delta: -timing.quantity, priority: 1, timeMinutes: nextTiming.startMinutes });
-        waitingUnitMinutes += timing.quantity * Math.max(0, nextTiming.startMinutes - timing.finishMinutes);
+        const consumeTimeMinutes = nextTiming.processingStartMinutes ?? nextTiming.startMinutes;
+        events.push({ delta: -timing.quantity, priority: 1, timeMinutes: consumeTimeMinutes });
+        waitingUnitMinutes += timing.quantity * Math.max(0, consumeTimeMinutes - timing.finishMinutes);
       }
     });
 
@@ -257,21 +363,13 @@ function runOperationSchedule(operationRows, options = {}) {
     let bufferArea = 0;
     let bufferMaxWip = 0;
 
-    for (let eventIndex = 0; eventIndex < events.length;) {
-      const eventTimeMinutes = events[eventIndex].timeMinutes;
-      let delta = 0;
-
+    events.forEach((event) => {
+      const eventTimeMinutes = event.timeMinutes;
       bufferArea += Math.max(0, eventTimeMinutes - lastTimeMinutes) * level;
-
-      while (eventIndex < events.length && events[eventIndex].timeMinutes === eventTimeMinutes) {
-        delta += events[eventIndex].delta;
-        eventIndex += 1;
-      }
-
-      level = Math.max(0, level + delta);
+      level = Math.max(0, level + event.delta);
       bufferMaxWip = Math.max(bufferMaxWip, level);
       lastTimeMinutes = eventTimeMinutes;
-    }
+    });
 
     totalWipUnitMinutes += bufferArea;
     maxWipQuantity = Math.max(maxWipQuantity, bufferMaxWip);
@@ -297,6 +395,7 @@ function runOperationSchedule(operationRows, options = {}) {
 
   const machineRows = Array.from(machineStates.values()).map((state) => {
     const machine = options.machines.find((item) => item.id === state.machineId) || {};
+    state.busyMinutes = getMergedIntervalMinutes(state.intervals);
     const busyHours = state.busyMinutes / 60;
     const availabilityMinutes = Math.max(makespanMinutes, Math.max(0, toFiniteNumber(state.availabilityHours)) * 60);
     const idleHours = Math.max(0, availabilityMinutes - state.busyMinutes) / 60;
@@ -356,11 +455,27 @@ function runOperationSchedule(operationRows, options = {}) {
   };
 }
 
-function simulateOperationFlow(operationRows, plan, workspace, machineRows, productCycleTimeMinutes) {
-  const flowStrategy = String(getPlanValue(plan, "flowStrategy", "flow") || "flow");
+function normalizeFlowStrategy(value) {
+  return ["batch", "flow", "parallel"].includes(value) ? value : "flow";
+}
+
+function simulateOperationFlow(operationRows, plan, workspace, machineRows, productCycleTimeMinutes, product = {}, options = {}) {
+  const productFlowStrategy = normalizeFlowStrategy(product.default_flow_strategy || product.defaultFlowStrategy);
+  const flowStrategy = normalizeFlowStrategy(String(getPlanValue(plan, "flowStrategy", productFlowStrategy) || productFlowStrategy));
   const targetQuantity = Math.max(0, toFiniteNumber(getPlanValue(plan, "targetQuantity", 0)));
-  const minimumTransferQuantity = Math.max(1, toFiniteNumber(getPlanValue(plan, "minimumTransferQuantity", 1)));
-  const batchSize = Math.max(minimumTransferQuantity, toFiniteNumber(getPlanValue(plan, "batchSize", minimumTransferQuantity)));
+  const productMinimumTransferQuantity = Math.max(1, toFiniteNumber(product.minimum_transfer_quantity ?? product.minimumTransferQuantity, 1));
+  const minimumTransferQuantity = Math.max(
+    1,
+    toFiniteNumber(getPlanValue(plan, "minimumTransferQuantity", productMinimumTransferQuantity), productMinimumTransferQuantity),
+  );
+  const productBatchSize = Math.max(
+    minimumTransferQuantity,
+    toFiniteNumber(product.default_batch_size ?? product.defaultBatchSize, minimumTransferQuantity),
+  );
+  const batchSize = Math.max(
+    minimumTransferQuantity,
+    toFiniteNumber(getPlanValue(plan, "batchSize", productBatchSize), productBatchSize),
+  );
   const normalizedRows = normalizeOperationRows(operationRows, workspace.machines || [], machineRows, productCycleTimeMinutes);
 
   if (!normalizedRows.length || targetQuantity <= 0) return null;
@@ -378,15 +493,19 @@ function simulateOperationFlow(operationRows, plan, workspace, machineRows, prod
     waitingCostPerHour: Math.max(0, toFiniteNumber(getPlanValue(plan, "waitingCostPerHour", 0))),
   };
   const schedule = runOperationSchedule(normalizedRows.map((row) => ({ ...row })), scheduleOptions);
-  const candidates = buildBatchCandidates(targetQuantity, minimumTransferQuantity, batchSize);
-  const optimal = candidates
-    .map((candidateBatchSize) => runOperationSchedule(
-      normalizedRows.map((row) => ({ ...row })),
-      { ...scheduleOptions, batchSize: candidateBatchSize, flowStrategy: "flow" },
-    ))
-    .reduce((best, candidate) => (
-      !best || candidate.objectiveScore < best.objectiveScore ? candidate : best
-    ), null);
+  const shouldOptimize = options.optimize !== false;
+  const candidates = shouldOptimize ? buildBatchCandidates(targetQuantity, minimumTransferQuantity, batchSize) : [];
+  const optimal = shouldOptimize
+    ? candidates
+        .map((candidateBatchSize) => runOperationSchedule(
+          normalizedRows.map((row) => ({ ...row })),
+          { ...scheduleOptions, batchSize: candidateBatchSize, flowStrategy: "flow" },
+        ))
+        .reduce((best, candidate) => (
+          !best || candidate.objectiveScore < best.objectiveScore ? candidate : best
+        ), null)
+    : null;
+  const savedOptimization = plan.result?.optimization || null;
 
   return {
     ...schedule,
@@ -397,16 +516,17 @@ function simulateOperationFlow(operationRows, plan, workspace, machineRows, prod
       ? {
           objectiveScore: optimal.objectiveScore,
           recommendedBatchSize: optimal.transferBatchSize,
+          testedBatchSizes: candidates,
           totalProductionTimeMinutes: optimal.totalProductionTimeMinutes,
           waitingCost: optimal.waitingCost,
           inventoryCost: optimal.inventoryCost,
         }
-      : null,
+      : savedOptimization,
     targetQuantity,
   };
 }
 
-export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
+export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = {}) {
   plan = plan || {};
   workspace = workspace || {};
 
@@ -440,7 +560,7 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
     materialId: row.materialId,
   }));
   const productCycleTimeMinutes = Math.max(0.0001, toFiniteNumber(product.cycle_time_minutes, toFiniteNumber(plan.result?.cycleTimeMinutes, 1)));
-  const flowSimulation = simulateOperationFlow(operationRows, plan, workspace, machineRows, productCycleTimeMinutes);
+  const flowSimulation = simulateOperationFlow(operationRows, plan, workspace, machineRows, productCycleTimeMinutes, product, options);
   let machineHoursUsed = 0;
   let primaryMachineDailyHours = 0;
   let energyConsumptionKwh = 0;
@@ -573,7 +693,7 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}) {
   };
 }
 
-export function getCurrentOperationPlans(workspace = {}) {
+export function getCurrentOperationPlans(workspace = {}, options = {}) {
   const sourcePlans = Array.isArray(workspace.activePlans) && workspace.activePlans.length
     ? workspace.activePlans
     : (workspace.latestPlan ? [workspace.latestPlan] : []);
@@ -582,7 +702,9 @@ export function getCurrentOperationPlans(workspace = {}) {
     .filter((plan) => plan && typeof plan === "object")
     .map((plan) => ({
       ...plan,
-      result: calculateCurrentPlanResult(plan, workspace),
+      result: !options.recalculate && plan.result
+        ? plan.result
+        : calculateCurrentPlanResult(plan, workspace, options),
     }));
 }
 

@@ -62,8 +62,11 @@ export const emptyOperationForms = {
   product: {
     cycleTimeUnit: "minute",
     cycleTimeValue: 1,
+    defaultBatchSize: 5,
+    defaultFlowStrategy: "flow",
     id: "",
     materialRows: [],
+    minimumTransferQuantity: 1,
     name: "",
     price: 0,
     priceCurrency: "TRY",

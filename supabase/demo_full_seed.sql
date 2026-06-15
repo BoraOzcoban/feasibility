@@ -104,14 +104,15 @@ begin
 
     insert into public.operation_products (
       company_id, product_code, name, product_group, revision, status, unit, price,
-      price_currency, cycle_time_minutes, cycle_time_unit, description, quality_grade,
+      price_currency, cycle_time_minutes, cycle_time_unit, default_flow_strategy,
+      default_batch_size, minimum_transfer_quantity, description, quality_grade,
       weight_kg, dimensions, material_name, cycle_time_seconds, labor_minutes_per_unit,
       material_kg_per_unit, scrap_rate
     )
     values (
       v_company.id, 'DEMO-STRAWBERRY-MILK', 'Demo Çilekli Süt 250 ml',
       'Soğuk Zincir İçecek', 'A', 'Aktif', 'adet', 100.00, 'TRY', 2.00,
-      'minute', 'Demo seed ile eklenen tam reçeteli ürün.', 'A+', 0.28,
+      'minute', 'flow', 5, 5, 'Demo seed ile eklenen tam reçeteli ürün.', 'A+', 0.28,
       '55x55x145 mm', 'Süt, çilek püresi, şişe', 120, 0.45, 0.25, 1.8
     )
     on conflict (company_id, product_code) do update set
@@ -124,6 +125,9 @@ begin
       price_currency = excluded.price_currency,
       cycle_time_minutes = excluded.cycle_time_minutes,
       cycle_time_unit = excluded.cycle_time_unit,
+      default_flow_strategy = excluded.default_flow_strategy,
+      default_batch_size = excluded.default_batch_size,
+      minimum_transfer_quantity = excluded.minimum_transfer_quantity,
       description = excluded.description,
       quality_grade = excluded.quality_grade,
       weight_kg = excluded.weight_kg,
@@ -137,14 +141,15 @@ begin
 
     insert into public.operation_products (
       company_id, product_code, name, product_group, revision, status, unit, price,
-      price_currency, cycle_time_minutes, cycle_time_unit, description, quality_grade,
+      price_currency, cycle_time_minutes, cycle_time_unit, default_flow_strategy,
+      default_batch_size, minimum_transfer_quantity, description, quality_grade,
       weight_kg, dimensions, material_name, cycle_time_seconds, labor_minutes_per_unit,
       material_kg_per_unit, scrap_rate
     )
     values (
       v_company.id, 'DEMO-MANGO-PUREE', 'Demo Mango Püresi 500 g',
       'Meyve Püresi', 'B', 'Aktif', 'adet', 145.00, 'TRY', 2.75,
-      'minute', 'İkinci demo ürün; ürün listesi ve satış seçimi dolu görünsün diye eklenir.', 'A', 0.54,
+      'minute', 'flow', 5, 5, 'İkinci demo ürün; ürün listesi ve satış seçimi dolu görünsün diye eklenir.', 'A', 0.54,
       '90x65x165 mm', 'Mango, ambalaj', 165, 0.55, 0.50, 2.2
     )
     on conflict (company_id, product_code) do update set
@@ -154,6 +159,9 @@ begin
       price = excluded.price,
       cycle_time_minutes = excluded.cycle_time_minutes,
       cycle_time_unit = excluded.cycle_time_unit,
+      default_flow_strategy = excluded.default_flow_strategy,
+      default_batch_size = excluded.default_batch_size,
+      minimum_transfer_quantity = excluded.minimum_transfer_quantity,
       description = excluded.description
     returning id into v_secondary_product_id;
 

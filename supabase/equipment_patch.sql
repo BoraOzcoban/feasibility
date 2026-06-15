@@ -1,6 +1,9 @@
 alter table public.operation_products
   add column if not exists price_currency text not null default 'TRY',
-  add column if not exists cycle_time_unit text not null default 'minute';
+  add column if not exists cycle_time_unit text not null default 'minute',
+  add column if not exists default_flow_strategy text not null default 'flow',
+  add column if not exists default_batch_size numeric(14, 4) not null default 1,
+  add column if not exists minimum_transfer_quantity numeric(14, 4) not null default 1;
 
 alter table public.operation_machines
   add column if not exists price_currency text not null default 'TRY',
@@ -23,6 +26,43 @@ where cycle_time_unit is null
 update public.operation_products
 set price_currency = 'TRY'
 where price_currency not in ('TRY', 'USD', 'EUR');
+
+update public.operation_products
+set default_flow_strategy = 'flow'
+where default_flow_strategy is null
+   or default_flow_strategy not in ('batch', 'flow', 'parallel');
+
+update public.operation_products
+set minimum_transfer_quantity = greatest(1, coalesce(minimum_transfer_quantity, 1)),
+    default_batch_size = greatest(greatest(1, coalesce(minimum_transfer_quantity, 1)), coalesce(default_batch_size, 1));
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_schema = 'public'
+      and table_name = 'operation_products'
+      and constraint_name = 'operation_products_default_flow_strategy_check'
+  ) then
+    alter table public.operation_products
+      add constraint operation_products_default_flow_strategy_check
+      check (default_flow_strategy in ('batch', 'flow', 'parallel'));
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_schema = 'public'
+      and table_name = 'operation_products'
+      and constraint_name = 'operation_products_transfer_quantities_check'
+  ) then
+    alter table public.operation_products
+      add constraint operation_products_transfer_quantities_check
+      check (minimum_transfer_quantity >= 1 and default_batch_size >= minimum_transfer_quantity);
+  end if;
+end;
+$$;
 
 update public.operation_machines
 set price_currency = 'TRY'
@@ -169,12 +209,27 @@ begin
         cycle_time_unit = case
           when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
           else 'minute'
-        end
+        end,
+        default_flow_strategy = case
+          when p_input->>'defaultFlowStrategy' in ('batch', 'flow', 'parallel') then p_input->>'defaultFlowStrategy'
+          else default_flow_strategy
+        end,
+        minimum_transfer_quantity = greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, minimum_transfer_quantity, 1)),
+        default_batch_size = greatest(
+          greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, minimum_transfer_quantity, 1)),
+          coalesce(
+            nullif(p_input->>'defaultBatchSize', '')::numeric,
+            default_batch_size,
+            greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, minimum_transfer_quantity, 1))
+          )
+        )
       where id = v_record_id
         and company_id = v_company_id;
     else
       insert into public.operation_products (
-        company_id, product_code, name, unit, price, price_currency, cycle_time_minutes, cycle_time_unit, product_group, revision, status, description
+        company_id, product_code, name, unit, price, price_currency, cycle_time_minutes,
+        cycle_time_unit, default_flow_strategy, default_batch_size, minimum_transfer_quantity,
+        product_group, revision, status, description
       )
       values (
         v_company_id,
@@ -188,6 +243,15 @@ begin
           when p_input->>'cycleTimeUnit' in ('minute', 'hour', 'day') then p_input->>'cycleTimeUnit'
           else 'minute'
         end,
+        case
+          when p_input->>'defaultFlowStrategy' in ('batch', 'flow', 'parallel') then p_input->>'defaultFlowStrategy'
+          else 'flow'
+        end,
+        greatest(
+          greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, 1)),
+          coalesce(nullif(p_input->>'defaultBatchSize', '')::numeric, greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, 1)))
+        ),
+        greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, 1)),
         'Basit Üretim',
         'A',
         'Aktif',
@@ -200,6 +264,9 @@ begin
         price_currency = excluded.price_currency,
         cycle_time_minutes = excluded.cycle_time_minutes,
         cycle_time_unit = excluded.cycle_time_unit,
+        default_flow_strategy = excluded.default_flow_strategy,
+        default_batch_size = excluded.default_batch_size,
+        minimum_transfer_quantity = excluded.minimum_transfer_quantity,
         product_group = excluded.product_group,
         status = excluded.status,
         description = excluded.description

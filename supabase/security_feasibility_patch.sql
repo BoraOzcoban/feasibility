@@ -78,6 +78,48 @@ for each row execute function public.handle_new_user();
 alter table public.operation_resource_plans
   add column if not exists is_active boolean not null default true;
 
+alter table public.operation_products
+  add column if not exists default_flow_strategy text not null default 'flow',
+  add column if not exists default_batch_size numeric(14, 4) not null default 1,
+  add column if not exists minimum_transfer_quantity numeric(14, 4) not null default 1;
+
+update public.operation_products
+set default_flow_strategy = 'flow'
+where default_flow_strategy is null
+   or default_flow_strategy not in ('batch', 'flow', 'parallel');
+
+update public.operation_products
+set minimum_transfer_quantity = greatest(1, coalesce(minimum_transfer_quantity, 1)),
+    default_batch_size = greatest(greatest(1, coalesce(minimum_transfer_quantity, 1)), coalesce(default_batch_size, 1));
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_schema = 'public'
+      and table_name = 'operation_products'
+      and constraint_name = 'operation_products_default_flow_strategy_check'
+  ) then
+    alter table public.operation_products
+      add constraint operation_products_default_flow_strategy_check
+      check (default_flow_strategy in ('batch', 'flow', 'parallel'));
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_schema = 'public'
+      and table_name = 'operation_products'
+      and constraint_name = 'operation_products_transfer_quantities_check'
+  ) then
+    alter table public.operation_products
+      add constraint operation_products_transfer_quantities_check
+      check (minimum_transfer_quantity >= 1 and default_batch_size >= minimum_transfer_quantity);
+  end if;
+end;
+$$;
+
 alter table public.operation_machines
   add column if not exists concurrent_capacity numeric(10, 2) not null default 1,
   add column if not exists availability_hours numeric(10, 2) not null default 8,
@@ -121,12 +163,16 @@ declare
   v_operation_index integer;
   v_group_index integer;
   v_machine_index integer;
+  v_product_id uuid := nullif(p_input->>'productId', '')::uuid;
+  v_product_default_flow_strategy text := 'flow';
+  v_product_default_batch_size numeric := 1;
+  v_product_min_transfer_quantity numeric := 1;
   v_target_quantity numeric := greatest(0, coalesce(nullif(p_input->>'targetQuantity', '')::numeric, 0));
-  v_min_transfer_quantity numeric := greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, 1));
+  v_min_transfer_quantity numeric := 1;
   v_batch_size numeric;
   v_transfer_batch_size numeric;
   v_group_count integer;
-  v_strategy text := case when p_input->>'flowStrategy' in ('batch', 'flow', 'parallel') then p_input->>'flowStrategy' else 'flow' end;
+  v_strategy text := 'flow';
   v_buffer_max_quantity numeric := greatest(0, coalesce(nullif(p_input->>'bufferMaxQuantity', '')::numeric, 0));
   v_waiting_cost_per_hour numeric := greatest(0, coalesce(nullif(p_input->>'waitingCostPerHour', '')::numeric, 0));
   v_inventory_cost_per_unit_hour numeric := greatest(0, coalesce(nullif(p_input->>'inventoryCostPerUnitHour', '')::numeric, 0));
@@ -198,6 +244,30 @@ declare
   v_available_minutes numeric;
   v_idle_hours numeric;
 begin
+  if v_product_id is not null then
+    select
+      coalesce(default_flow_strategy, 'flow'),
+      greatest(1, coalesce(default_batch_size, 1)),
+      greatest(1, coalesce(minimum_transfer_quantity, 1))
+    into
+      v_product_default_flow_strategy,
+      v_product_default_batch_size,
+      v_product_min_transfer_quantity
+    from public.operation_products
+    where id = v_product_id
+      and company_id = p_company_id;
+  end if;
+
+  v_strategy := case
+    when p_input->>'flowStrategy' in ('batch', 'flow', 'parallel') then p_input->>'flowStrategy'
+    when v_product_default_flow_strategy in ('batch', 'flow', 'parallel') then v_product_default_flow_strategy
+    else 'flow'
+  end;
+  v_min_transfer_quantity := greatest(
+    1,
+    coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, v_product_min_transfer_quantity, 1)
+  );
+
   if jsonb_array_length(v_operation_rows) = 0 or v_target_quantity <= 0 then
     return null;
   end if;
@@ -206,10 +276,13 @@ begin
     v_min_transfer_quantity := v_target_quantity;
   end if;
 
-  v_batch_size := greatest(v_min_transfer_quantity, coalesce(nullif(p_input->>'batchSize', '')::numeric, v_min_transfer_quantity));
+  v_batch_size := greatest(
+    v_min_transfer_quantity,
+    coalesce(nullif(p_input->>'batchSize', '')::numeric, v_product_default_batch_size, v_min_transfer_quantity)
+  );
   v_transfer_batch_size := case
     when v_strategy = 'batch' then v_target_quantity
-    when v_strategy = 'parallel' then v_min_transfer_quantity
+    when v_strategy = 'parallel' then 1
     else least(v_target_quantity, v_batch_size)
   end;
   v_group_count := greatest(1, ceil(v_target_quantity / greatest(v_transfer_batch_size, 1))::integer);
@@ -510,6 +583,7 @@ declare
   v_flow_cost numeric := 0;
   v_product_unit text := 'adet';
   v_product_price numeric := 0;
+  v_product_price_currency text := 'TRY';
   v_product_cycle_time_minutes numeric := 1;
   v_product_material_count integer := 0;
   v_primary_machine_daily_hours numeric := 0;
@@ -540,8 +614,8 @@ begin
     raise exception 'Selected product was not found for your company.';
   end if;
 
-  select name, unit, price, cycle_time_minutes
-    into v_product_name, v_product_unit, v_product_price, v_product_cycle_time_minutes
+  select name, unit, price, price_currency, cycle_time_minutes
+    into v_product_name, v_product_unit, v_product_price, v_product_price_currency, v_product_cycle_time_minutes
   from public.operation_products
   where id = v_product_id
     and company_id = v_company_id;
@@ -567,7 +641,8 @@ begin
       'dailyHours', v_daily_hours,
       'hourlyEnergyConsumptionKwh', v_machine.hourly_energy_consumption_kwh,
       'energyConsumptionKwh', v_daily_hours * greatest(v_machine.hourly_energy_consumption_kwh, 0),
-      'price', v_machine.price
+      'price', v_machine.price,
+      'priceCurrency', coalesce(v_machine.price_currency, 'TRY')
     ));
   end loop;
 
@@ -703,6 +778,7 @@ begin
     'productName', v_product_name,
     'productUnit', coalesce(v_product_unit, 'adet'),
     'productPrice', coalesce(v_product_price, 0),
+    'productPriceCurrency', coalesce(v_product_price_currency, 'TRY'),
     'cycleTimeMinutes', v_product_cycle_time_minutes,
     'primaryMachineDailyHours', v_primary_machine_daily_hours,
     'producedQuantity', v_produced_quantity,

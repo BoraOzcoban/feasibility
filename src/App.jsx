@@ -1975,6 +1975,7 @@ function App() {
     }));
     setOperationPlan((plan) => ({
       ...plan,
+      ...getProductFlowDefaults(nextProduct),
       productId: nextProduct?.id || "",
       productName: nextProduct?.name || "",
     }));
@@ -2010,6 +2011,27 @@ function App() {
 
   function updateOperationPlan(field, value) {
     setOperationPlan((current) => ({ ...current, [field]: value }));
+  }
+
+  function normalizeFlowStrategy(value) {
+    return ["batch", "flow", "parallel"].includes(value) ? value : "flow";
+  }
+
+  function getProductFlowDefaults(product) {
+    const minimumTransferQuantity = Math.max(
+      1,
+      toFiniteNumber(product?.minimum_transfer_quantity ?? product?.minimumTransferQuantity, 1),
+    );
+    const defaultBatchSize = Math.max(
+      minimumTransferQuantity,
+      toFiniteNumber(product?.default_batch_size ?? product?.defaultBatchSize, minimumTransferQuantity),
+    );
+
+    return {
+      batchSize: defaultBatchSize,
+      flowStrategy: normalizeFlowStrategy(product?.default_flow_strategy ?? product?.defaultFlowStrategy),
+      minimumTransferQuantity,
+    };
   }
 
   function getOperationMachineDefaults(machineId, sourceMachines = operationsWorkspace.machines) {
@@ -2140,6 +2162,7 @@ function App() {
 
         setOperationPlan({
           ...emptyOperationPlan,
+          ...getProductFlowDefaults(workspace.product),
           ...workspace.latestPlan.input,
           machineRows: savedMachineRows.length
             ? savedMachineRows.map((row) => ({
@@ -2177,6 +2200,7 @@ function App() {
       } else if (workspace.product) {
         setOperationPlan((current) => ({
           ...current,
+          ...getProductFlowDefaults(workspace.product),
           machineRows: workspace.machines[0]
             ? [{ ...emptyPlanRows.machine, machineId: workspace.machines[0].id }]
             : [],
@@ -2909,7 +2933,7 @@ function App() {
 
   function renderOperationPlanner() {
     const result = operationPlanResult
-      ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, operationsWorkspaceForFinance)
+      ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, operationsWorkspaceForFinance, { optimize: false })
       : null;
     const latestProcess = asObjectArray(operationsWorkspace.activePlans)[0] || operationsWorkspace.latestPlan;
     const latestProcessName = latestProcess?.plan_name || latestProcess?.input?.planName || result?.planName || "";
@@ -2917,6 +2941,7 @@ function App() {
     const operationRows = asObjectArray(operationPlan.operationRows);
     const workforceRows = asObjectArray(operationPlan.workforceRows);
     const selectedProduct = operationsWorkspace.products.find((product) => product.id === operationPlan.productId);
+    const selectedProductFlowDefaults = getProductFlowDefaults(selectedProduct);
     const selectedProductMaterials = asObjectArray(selectedProduct?.material_rows);
     const resultMachineRows = asObjectArray(result?.machineRows);
     const resultOperationRows = asObjectArray(result?.operationRows);
@@ -2964,6 +2989,7 @@ function App() {
               type="button"
               onClick={() => setOperationPlan({
                 ...emptyOperationPlan,
+                ...getProductFlowDefaults(operationsWorkspace.product),
                 machineRows: defaultMachineRow.machineId ? [defaultMachineRow] : [],
                 operationRows: buildDefaultOperationRows(operationsWorkspace.product, operationsWorkspace.machines),
                 productId: operationsWorkspace.product?.id || "",
@@ -3000,6 +3026,7 @@ function App() {
                     const product = operationsWorkspace.products.find((item) => item.id === event.target.value);
                     setOperationPlan((current) => ({
                       ...current,
+                      ...getProductFlowDefaults(product),
                       operationRows: asObjectArray(current.operationRows).length
                         ? current.operationRows
                         : buildDefaultOperationRows(product, operationsWorkspace.machines),
@@ -3013,7 +3040,11 @@ function App() {
                     <option value={product.id} key={product.id}>{product.name}</option>
                   ))}
                 </select>
-                <small>{selectedProduct ? `${formatOperationMoney(selectedProduct.price, selectedProduct.price_currency, exchangeRates, 2)} / ${selectedProduct.unit || copy("pcs", "adet")}` : copy("Select a record from the Products screen", "Ürünler ekranından kayıt seçin")}</small>
+                <small>
+                  {selectedProduct
+                    ? `${formatOperationMoney(selectedProduct.price, selectedProduct.price_currency, exchangeRates, 2)} / ${selectedProduct.unit || copy("pcs", "adet")} | ${copy("Product default", "Ürün varsayılanı")}: ${flowStrategyLabels[selectedProductFlowDefaults.flowStrategy]} / ${formatNumber(selectedProductFlowDefaults.batchSize, 0)}`
+                    : copy("Select a record from the Products screen", "Ürünler ekranından kayıt seçin")}
+                </small>
               </div>
             </label>
             <label>
@@ -3552,6 +3583,11 @@ function App() {
                     formatLira(toFiniteNumber(result.delayCost) + toFiniteNumber(result.capacityLossCost)),
                     copy("Combined penalty for exceeding available production time and leaving machine capacity idle because of line imbalance.", "Kullanılabilir üretim süresini aşma ve hat dengesizliği yüzünden makine kapasitesinin boş kalması için birleşik cezadır."),
                   )}
+                {resultMetric(
+                    copy("Objective Score", "Amaç skoru"),
+                    formatNumber(result.objectiveScore, 2),
+                    copy("Optimizer score: total production minutes plus waiting, inventory, delay, and capacity-loss costs. Lower is better.", "Optimizasyon skoru: toplam üretim dakikası ile bekleme, stok, gecikme ve kapasite kaybı maliyetlerinin toplamı. Düşük olması daha iyidir."),
+                  )}
               </div>
               <div className="selected-resource-results">
                 <div>
@@ -3837,6 +3873,11 @@ function App() {
 
   function renderProductDataPage() {
     const productMaterialRows = operationForms.product.materialRows || [];
+    const productFlowStrategyLabels = {
+      batch: copy("Batch", "Toplu"),
+      flow: copy("Flow / Pull", "Akış / Pull"),
+      parallel: copy("Parallel simulation", "Paralel simülasyon"),
+    };
 
     return renderDashboardLayout(
       `operations/${activeOperationsSubmodule.key}`,
@@ -3845,7 +3886,7 @@ function App() {
             <div>
               <span>Operations / {copy("Products", "Ürünler")}</span>
               <h1>{copy("Products", "Ürünler")}</h1>
-              <p>{copy("Keep the product recipe, unit, price, and cycle time used in process definition calculations.", "Süreç tanımlama hesaplamasında kullanılacak ürün reçetesini, birimini, fiyatını ve çevrim süresini tutun.")}</p>
+              <p>{copy("Keep the product recipe, unit, price, cycle time, and default transfer rules used in process definition calculations.", "Süreç tanımlama hesaplamasında kullanılacak ürün reçetesini, birimini, fiyatını, çevrim süresini ve varsayılan transfer kurallarını tutun.")}</p>
             </div>
             <div className="operations-actions">
               <button type="button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
@@ -3934,6 +3975,55 @@ function App() {
                     </select>
                   </div>
                 </label>
+                <label>
+                  <span className="label-with-info">
+                    {copy("Default flow strategy", "Varsayılan akış stratejisi")}
+                    <InfoTip
+                      label={copy("Default flow strategy info", "Varsayılan akış stratejisi bilgisi")}
+                      text={copy("Used as the starting strategy when this product is selected in Process Definition. The plan can still override it.", "Bu ürün Süreç Tanımlama'da seçildiğinde başlangıç stratejisi olarak kullanılır. Plan içinde yine değiştirilebilir.")}
+                    />
+                  </span>
+                  <select
+                    value={operationForms.product.defaultFlowStrategy}
+                    onChange={(event) => updateOperationForm("product", "defaultFlowStrategy", event.target.value)}
+                  >
+                    <option value="flow">{productFlowStrategyLabels.flow}</option>
+                    <option value="batch">{productFlowStrategyLabels.batch}</option>
+                    <option value="parallel">{productFlowStrategyLabels.parallel}</option>
+                  </select>
+                </label>
+                <label>
+                  <span className="label-with-info">
+                    {copy("Default batch size", "Varsayılan batch boyutu")}
+                    <InfoTip
+                      label={copy("Default batch size info", "Varsayılan batch boyutu bilgisi")}
+                      text={copy("The normal transfer lot for this product in Flow mode, such as 5, 10, or 50 units.", "Bu ürün için Flow modundaki normal transfer lotudur; örneğin 5, 10 veya 50 adet.")}
+                    />
+                  </span>
+                  <input
+                    min="1"
+                    step="1"
+                    type="number"
+                    value={operationForms.product.defaultBatchSize}
+                    onChange={(event) => updateOperationForm("product", "defaultBatchSize", event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span className="label-with-info">
+                    {copy("Minimum transfer", "Minimum transfer")}
+                    <InfoTip
+                      label={copy("Minimum transfer info", "Minimum transfer bilgisi")}
+                      text={copy("Smallest accepted quantity that can move to the next operation for this product.", "Bu ürün için sonraki operasyona aktarılabilecek kabul edilen en küçük miktar.")}
+                    />
+                  </span>
+                  <input
+                    min="1"
+                    step="1"
+                    type="number"
+                    value={operationForms.product.minimumTransferQuantity}
+                    onChange={(event) => updateOperationForm("product", "minimumTransferQuantity", event.target.value)}
+                  />
+                </label>
               </div>
 
               <div className="resource-section">
@@ -3995,31 +4085,36 @@ function App() {
                 <span>{operationsWorkspace.products.length} {copy("records", "kayıt")}</span>
               </div>
               <div className="operation-data-table">
-                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: "1.2fr 0.7fr 0.8fr 0.8fr 1.4fr" }}>
+                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: "1.2fr 0.6fr 0.8fr 0.8fr 1fr 1.4fr" }}>
                   <span>{copy("Product", "Ürün")}</span>
                   <span>{copy("Unit", "Birim")}</span>
                   <span>{copy("Price", "Fiyat")}</span>
                   <span>{copy("Cycle", "Çevrim")}</span>
+                  <span>{copy("Flow defaults", "Akış varsayılanı")}</span>
                   <span>{copy("Materials", "Malzemeler")}</span>
                 </div>
                 {(operationsWorkspace.products.length ? operationsWorkspace.products : [{ id: "empty" }]).map((product) => (
                   <button
                     type="button"
                     className="operation-data-row operation-data-button-row"
-                    style={{ gridTemplateColumns: "1.2fr 0.7fr 0.8fr 0.8fr 1.4fr" }}
+                    style={{ gridTemplateColumns: "1.2fr 0.6fr 0.8fr 0.8fr 1fr 1.4fr" }}
                     key={product.id}
                     onClick={() => {
                       if (product.id === "empty") return;
+                      const flowDefaults = getProductFlowDefaults(product);
 
                       setOperationForms((current) => ({
                         ...current,
                         product: {
                           ...getCycleTimeInputFromMinutes(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute"),
+                          defaultBatchSize: flowDefaults.batchSize,
+                          defaultFlowStrategy: flowDefaults.flowStrategy,
                           id: product.id,
                           materialRows: (product.material_rows || []).map((row) => ({
                             materialId: row.material_id,
                             quantityPerUnit: row.quantity_per_unit,
                           })),
+                          minimumTransferQuantity: flowDefaults.minimumTransferQuantity,
                           name: product.name || "",
                           price: product.price || 0,
                           priceCurrency: product.price_currency || "TRY",
@@ -4032,6 +4127,7 @@ function App() {
                     <span>{product.id === "empty" ? "-" : product.unit || "adet"}</span>
                     <span>{product.id === "empty" ? "-" : formatOperationMoney(product.price, product.price_currency, exchangeRates, 2)}</span>
                     <span>{product.id === "empty" ? "-" : formatCycleTime(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute")}</span>
+                    <span>{product.id === "empty" ? "-" : `${productFlowStrategyLabels[getProductFlowDefaults(product).flowStrategy]} / ${formatNumber(getProductFlowDefaults(product).batchSize, 0)} / min ${formatNumber(getProductFlowDefaults(product).minimumTransferQuantity, 0)}`}</span>
                     <span>{product.id === "empty" ? "-" : (product.material_rows || []).map((row) => `${row.material?.name || "-"}: ${formatNumber(row.quantity_per_unit, 4)} ${row.material?.unit || ""}`).join(", ") || "-"}</span>
                   </button>
                 ))}
@@ -6854,7 +6950,7 @@ function App() {
   const activePlanResults = currentOperationPlans.map((plan) => plan.result || {}).filter(hasViablePlanResult);
   const latestPlan = currentOperationPlans[0] || dashboardOperationsWorkspace.latestPlan || null;
   const latestPlanResult = latestPlan?.result || (operationPlanResult
-    ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, dashboardOperationsWorkspace)
+    ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, dashboardOperationsWorkspace, { optimize: false })
     : null);
   const totalDailyProduction = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.producedQuantity), 0);
   const totalDailyTrackedCost = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.totalTrackedDailyCost), 0);
