@@ -13262,3 +13262,1505 @@ textarea:focus-visible {
 .operations-workspace.operations-modern .selected-resource-results h3.label-with-info {
   color: var(--color-heading) !important;
 }
+
+/* Operations experience polish: product-hub energy, production-floor readability. */
+.operations-overview,
+.operations-workspace.operations-modern {
+  --ops-ink: #101827;
+  --ops-muted: #4f5f5b;
+  --ops-soft-muted: #667571;
+  --ops-panel: rgba(255, 255, 255, 0.96);
+  --ops-panel-strong: #ffffff;
+  --ops-panel-tint: #f3faf8;
+  --ops-line: rgba(16, 43, 50, 0.13);
+  --ops-line-strong: rgba(24, 117, 101, 0.28);
+  --ops-teal: #187565;
+  --ops-teal-strong: #0f5f55;
+  --ops-cyan: #2f9fbd;
+  --ops-amber: #d99a24;
+  --ops-navy: #081c21;
+  --ops-radius: 8px;
+  background:
+    linear-gradient(rgba(24, 117, 101, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 159, 189, 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, #f8fbf7 0%, #edf5f2 48%, #f8faf7 100%);
+  background-size: 36px 36px, 36px 36px, auto;
+  color: var(--ops-ink);
+  gap: 22px;
+}
+
+.operations-overview > div:first-child,
+.operations-workspace.operations-modern .operations-header {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(135deg, #061216 0%, #0b2930 48%, #0d4a4a 100%);
+  background-size: 34px 34px, 34px 34px, auto;
+  border: 1px solid rgba(126, 222, 207, 0.26);
+  border-radius: var(--ops-radius);
+  box-shadow:
+    0 28px 82px rgba(6, 18, 22, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  isolation: isolate;
+  min-height: 220px;
+}
+
+.operations-overview > div:first-child::before,
+.operations-workspace.operations-modern .operations-header::before {
+  background:
+    linear-gradient(120deg, transparent 0 42%, rgba(255, 255, 255, 0.18) 48%, transparent 56%),
+    linear-gradient(90deg, rgba(47, 159, 189, 0.18), rgba(217, 154, 36, 0.16));
+  content: "";
+  inset: auto -12% -42% 42%;
+  opacity: 0.78;
+  pointer-events: none;
+  position: absolute;
+  transform: rotate(-10deg);
+  z-index: 0;
+}
+
+.operations-overview > div:first-child::after,
+.operations-workspace.operations-modern .operations-header::after {
+  background: linear-gradient(90deg, var(--ops-cyan), var(--ops-teal), var(--ops-amber));
+  content: "";
+  height: 4px;
+  inset: auto 28px 0;
+  opacity: 0.95;
+  position: absolute;
+  z-index: 1;
+}
+
+.operations-overview > div:first-child > *,
+.operations-workspace.operations-modern .operations-header > * {
+  position: relative;
+  z-index: 2;
+}
+
+.operations-overview > div:first-child span,
+.operations-workspace.operations-modern .operations-header span {
+  color: #a7f0e0;
+  font-size: 0.74rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.operations-overview > div:first-child h1,
+.operations-workspace.operations-modern .operations-header h1 {
+  color: #ffffff;
+  font-size: clamp(2.35rem, 5vw, 4.9rem);
+  letter-spacing: 0;
+  line-height: 0.94;
+  max-width: 980px;
+  text-shadow: 0 16px 44px rgba(0, 0, 0, 0.24);
+}
+
+.operations-overview > div:first-child p,
+.operations-workspace.operations-modern .operations-header p {
+  color: rgba(244, 255, 252, 0.84);
+  font-weight: 720;
+  line-height: 1.6;
+  max-width: 800px;
+}
+
+.operations-workspace.operations-modern .operations-actions {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ops-radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 8px;
+}
+
+.operations-workspace.operations-modern .operations-actions button,
+.operations-workspace.operations-modern .operation-card-heading button,
+.operations-workspace.operations-modern .operation-card-heading select,
+.operations-workspace.operations-modern .resource-section-header button,
+.operations-workspace.operations-modern .resource-remove-button,
+.operations-overview .placeholder-grid button,
+.operations-workspace.operations-modern .process-setup-card button {
+  border-radius: var(--ops-radius);
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.operations-workspace.operations-modern .operations-actions button {
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
+
+.operations-workspace.operations-modern .operations-actions button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(167, 240, 224, 0.52);
+}
+
+.operations-workspace.operations-modern .operations-actions .primary,
+.operations-workspace.operations-modern .planner-save-button,
+.operations-overview .placeholder-grid button {
+  background:
+    linear-gradient(135deg, #22a88e 0%, #2f9fbd 62%, #0f5f55 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 16px 36px rgba(24, 117, 101, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
+.operations-workspace.operations-modern .operation-card,
+.operations-overview .placeholder-grid article {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 250, 248, 0.95));
+  border: 1px solid var(--ops-line);
+  border-radius: var(--ops-radius);
+  box-shadow:
+    0 18px 52px rgba(16, 43, 50, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  color: var(--ops-ink);
+  overflow: hidden;
+}
+
+.operations-workspace.operations-modern .operation-card::before,
+.operations-overview .placeholder-grid article::after {
+  background: linear-gradient(90deg, var(--ops-teal), var(--ops-cyan), var(--ops-amber));
+  height: 4px;
+}
+
+.operations-workspace.operations-modern .operation-card:hover,
+.operations-overview .placeholder-grid article:hover {
+  border-color: var(--ops-line-strong);
+  box-shadow:
+    0 24px 64px rgba(16, 43, 50, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.operations-overview .placeholder-grid {
+  gap: 16px;
+}
+
+.operations-overview .placeholder-grid article {
+  min-height: 230px;
+}
+
+.operations-overview .placeholder-grid article::before {
+  color: rgba(24, 117, 101, 0.14);
+}
+
+.operations-overview .placeholder-grid strong,
+.operations-workspace.operations-modern .operation-card h2,
+.operations-workspace.operations-modern .operation-card-heading h2,
+.operations-workspace.operations-modern .process-card .operation-card-heading h2,
+.operations-workspace.operations-modern .process-detail-grid h3 {
+  color: var(--ops-ink);
+}
+
+.operations-overview .placeholder-grid p,
+.operations-workspace.operations-modern .operation-card :is(p, small, label),
+.operations-workspace.operations-modern .resource-section-header p,
+.operations-workspace.operations-modern .process-summary-card span,
+.operations-workspace.operations-modern .process-metrics span,
+.operations-workspace.operations-modern .process-detail-grid span {
+  color: var(--ops-muted);
+}
+
+.operations-workspace.operations-modern .operation-card-heading {
+  border-bottom: 1px solid rgba(16, 43, 50, 0.1);
+  gap: 14px;
+}
+
+.operations-workspace.operations-modern .operation-card-heading span,
+.operations-workspace.operations-modern .resource-section-header span,
+.operations-workspace.operations-modern .process-card .operation-card-heading span {
+  color: var(--ops-teal-strong);
+  font-weight: 950;
+}
+
+.operations-workspace.operations-modern .operation-card-heading button,
+.operations-workspace.operations-modern .operation-card-heading select,
+.operations-workspace.operations-modern .resource-section-header button {
+  background: #eef9f6;
+  border: 1px solid rgba(24, 117, 101, 0.2);
+  color: var(--ops-ink);
+}
+
+.operations-workspace.operations-modern .resource-remove-button {
+  background: #fff0e9;
+  border: 1px solid rgba(157, 91, 63, 0.26);
+  color: #87472f;
+}
+
+.operations-workspace.operations-modern .planner-fields label div,
+.operations-workspace.operations-modern .resource-row-grid input,
+.operations-workspace.operations-modern .resource-row-grid select,
+.operations-workspace.operations-modern .operation-data-fields input,
+.operations-workspace.operations-modern .operation-data-fields select,
+.operations-workspace.operations-modern .operation-data-fields textarea {
+  background: #ffffff;
+  border: 1px solid rgba(16, 43, 50, 0.16);
+  color: var(--ops-ink);
+}
+
+.operations-workspace.operations-modern .planner-fields input,
+.operations-workspace.operations-modern .planner-fields select,
+.operations-workspace.operations-modern .operation-data-fields input,
+.operations-workspace.operations-modern .operation-data-fields select,
+.operations-workspace.operations-modern .operation-data-fields textarea,
+.operations-workspace.operations-modern .resource-row-grid input,
+.operations-workspace.operations-modern .resource-row-grid select {
+  color: var(--ops-ink);
+  font-weight: 850;
+}
+
+.operations-workspace.operations-modern .planner-fields label div:focus-within,
+.operations-workspace.operations-modern .resource-row-grid input:focus,
+.operations-workspace.operations-modern .resource-row-grid select:focus,
+.operations-workspace.operations-modern .operation-data-fields input:focus,
+.operations-workspace.operations-modern .operation-data-fields select:focus,
+.operations-workspace.operations-modern .operation-data-fields textarea:focus {
+  border-color: var(--ops-cyan);
+  box-shadow: 0 0 0 4px rgba(47, 159, 189, 0.16);
+}
+
+.operations-workspace.operations-modern .resource-section,
+.operations-workspace.operations-modern .resource-row-grid,
+.operations-workspace.operations-modern .compact-resource-list span,
+.operations-workspace.operations-modern .selected-resource-results div,
+.operations-workspace.operations-modern .process-detail-grid div {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(242, 249, 247, 0.94));
+  border: 1px solid rgba(16, 43, 50, 0.12);
+  border-radius: var(--ops-radius);
+}
+
+.operations-workspace.operations-modern .resource-row-meta,
+.operations-workspace.operations-modern .planner-summary-grid > .result-metric-card,
+.operations-workspace.operations-modern .allocation-grid > .result-metric-card,
+.operations-workspace.operations-modern .cost-breakdown > .result-metric-card,
+.operations-workspace.operations-modern .process-metrics span,
+.operations-workspace.operations-modern .process-detail-grid span,
+.operations-workspace.operations-modern .process-summary-card {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4faf8 100%);
+  border: 1px solid color-mix(in srgb, var(--metric-tone, var(--ops-teal)) 24%, rgba(16, 43, 50, 0.12));
+  border-left: 5px solid color-mix(in srgb, var(--metric-tone, var(--ops-teal)) 88%, transparent);
+  border-radius: var(--ops-radius);
+  box-shadow: 0 14px 38px rgba(16, 43, 50, 0.07);
+}
+
+.operations-workspace.operations-modern .result-metric-label,
+.operations-workspace.operations-modern .result-metric-label .label-with-info,
+.operations-workspace.operations-modern .planner-summary-grid .label-with-info,
+.operations-workspace.operations-modern .allocation-grid .label-with-info,
+.operations-workspace.operations-modern .cost-breakdown .label-with-info {
+  color: var(--ops-muted) !important;
+}
+
+.operations-workspace.operations-modern .planner-summary-grid > .result-metric-card strong,
+.operations-workspace.operations-modern .allocation-grid > .result-metric-card strong,
+.operations-workspace.operations-modern .cost-breakdown > .result-metric-card strong,
+.operations-workspace.operations-modern .process-summary-card strong,
+.operations-workspace.operations-modern .process-metrics span > strong,
+.operations-workspace.operations-modern .process-detail-grid span > strong,
+.operations-workspace.operations-modern .resource-row-meta strong,
+.operations-workspace.operations-modern .compact-resource-list strong {
+  color: var(--ops-ink);
+}
+
+.operations-workspace.operations-modern .planner-result-card,
+.operations-workspace.operations-modern .process-card,
+.operations-workspace.operations-modern .planner-input-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(242, 249, 247, 0.97));
+  border-color: rgba(24, 117, 101, 0.22);
+}
+
+.operations-workspace.operations-modern .operation-data-table-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(246, 250, 248, 0.97));
+}
+
+.operations-workspace.operations-modern .operation-data-table {
+  gap: 9px;
+}
+
+.operations-workspace.operations-modern .operation-data-row {
+  background: #ffffff;
+  border: 1px solid rgba(16, 43, 50, 0.1);
+  border-radius: var(--ops-radius);
+  box-shadow: 0 8px 24px rgba(16, 43, 50, 0.04);
+  color: var(--ops-ink);
+}
+
+.operations-workspace.operations-modern .operation-data-row:not(.operation-data-head):nth-child(2n + 1) {
+  background: #f6fbf9;
+}
+
+.operations-workspace.operations-modern .operation-data-head {
+  background: linear-gradient(135deg, #071418 0%, #102b32 100%);
+  border-color: rgba(126, 222, 207, 0.22);
+  box-shadow: 0 14px 34px rgba(7, 20, 24, 0.18);
+}
+
+.operations-workspace.operations-modern .operation-data-head span {
+  color: rgba(255, 255, 255, 0.84);
+  font-weight: 950;
+}
+
+.operations-workspace.operations-modern .operation-data-row:not(.operation-data-head) :is(span, strong, small, b) {
+  color: var(--ops-ink);
+}
+
+.operations-workspace.operations-modern .operation-data-row:not(.operation-data-head) small {
+  color: var(--ops-soft-muted);
+}
+
+.operations-workspace.operations-modern .operation-data-row:not(.operation-data-head):hover {
+  background: #eaf8f4;
+  border-color: rgba(24, 117, 101, 0.32);
+  transform: translateY(-1px);
+}
+
+.operations-workspace.operations-modern .process-setup-card.ready {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #edf9f5 100%);
+  border-color: rgba(24, 117, 101, 0.26);
+}
+
+.operations-workspace.operations-modern .process-setup-card.todo {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fff8ea 100%);
+  border-color: rgba(217, 154, 36, 0.32);
+}
+
+.operations-workspace.operations-modern .process-setup-card mark,
+.operations-workspace.operations-modern .operation-card-heading mark,
+.operations-workspace.operations-modern .planner-result-card mark {
+  border-radius: 999px;
+}
+
+.operations-workspace.operations-modern .process-setup-card.ready mark,
+.operations-workspace.operations-modern .process-card mark.ok {
+  background: #dff7f1;
+  color: #0c655a;
+}
+
+.operations-workspace.operations-modern .process-setup-card.todo mark {
+  background: #fff0c9;
+  color: #7a5200;
+}
+
+.operations-workspace.operations-modern .planner-empty-state,
+.operations-workspace.operations-modern .status-message {
+  background: #fffaf0;
+  border: 1px solid rgba(217, 154, 36, 0.34);
+  border-radius: var(--ops-radius);
+  color: #624515;
+}
+
+@media (max-width: 620px) {
+  .operations-overview,
+  .operations-workspace.operations-modern {
+    background-size: 28px 28px, 28px 28px, auto;
+  }
+
+  .operations-workspace.operations-modern .operations-actions {
+    padding: 6px;
+  }
+
+  .operations-overview > div:first-child::after,
+  .operations-workspace.operations-modern .operations-header::after {
+    inset-inline: 20px;
+  }
+}
+
+:root[data-theme="dark"] .operations-overview,
+:root[data-theme="dark"] .operations-workspace.operations-modern {
+  --ops-ink: #f4fbf8;
+  --ops-muted: #b9c9c4;
+  --ops-soft-muted: #9db2ac;
+  --ops-panel: rgba(16, 43, 50, 0.96);
+  --ops-panel-strong: #102b32;
+  --ops-panel-tint: #12343a;
+  --ops-line: rgba(167, 240, 224, 0.17);
+  --ops-line-strong: rgba(126, 222, 207, 0.34);
+  background:
+    linear-gradient(rgba(126, 222, 207, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(102, 193, 212, 0.05) 1px, transparent 1px),
+    linear-gradient(180deg, #08171b 0%, #102b32 52%, #0b1f24 100%);
+  background-size: 36px 36px, 36px 36px, auto;
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-card,
+:root[data-theme="dark"] .operations-overview .placeholder-grid article,
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-result-card,
+:root[data-theme="dark"] .operations-workspace.operations-modern .process-card,
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-table-card {
+  background:
+    linear-gradient(180deg, rgba(19, 52, 58, 0.98), rgba(13, 35, 40, 0.96));
+  border-color: var(--ops-line);
+  box-shadow:
+    0 22px 58px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .resource-section,
+:root[data-theme="dark"] .operations-workspace.operations-modern .resource-row-grid,
+:root[data-theme="dark"] .operations-workspace.operations-modern .compact-resource-list span,
+:root[data-theme="dark"] .operations-workspace.operations-modern .selected-resource-results div,
+:root[data-theme="dark"] .operations-workspace.operations-modern .process-detail-grid div,
+:root[data-theme="dark"] .operations-workspace.operations-modern .resource-row-meta,
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-summary-grid > .result-metric-card,
+:root[data-theme="dark"] .operations-workspace.operations-modern .allocation-grid > .result-metric-card,
+:root[data-theme="dark"] .operations-workspace.operations-modern .cost-breakdown > .result-metric-card,
+:root[data-theme="dark"] .operations-workspace.operations-modern .process-metrics span,
+:root[data-theme="dark"] .operations-workspace.operations-modern .process-detail-grid span,
+:root[data-theme="dark"] .operations-workspace.operations-modern .process-summary-card {
+  background:
+    linear-gradient(180deg, rgba(23, 59, 65, 0.98), rgba(14, 40, 45, 0.97));
+  border-color: var(--ops-line);
+  color: var(--ops-muted);
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-row {
+  background: rgba(18, 45, 51, 0.98);
+  border-color: rgba(167, 240, 224, 0.13);
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-row:not(.operation-data-head):nth-child(2n + 1) {
+  background: rgba(23, 59, 65, 0.96);
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-row:not(.operation-data-head):hover {
+  background: rgba(24, 117, 101, 0.24);
+  border-color: rgba(126, 222, 207, 0.34);
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-fields label div,
+:root[data-theme="dark"] .operations-workspace.operations-modern .resource-row-grid input,
+:root[data-theme="dark"] .operations-workspace.operations-modern .resource-row-grid select,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-fields input,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-fields select,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-fields textarea {
+  background: #0d2328;
+  border-color: rgba(167, 240, 224, 0.18);
+  color: #f4fbf8;
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-card-heading button,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-card-heading select,
+:root[data-theme="dark"] .operations-workspace.operations-modern .resource-section-header button {
+  background: rgba(126, 222, 207, 0.12);
+  border-color: rgba(126, 222, 207, 0.24);
+  color: #f4fbf8;
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .resource-remove-button {
+  background: rgba(196, 124, 94, 0.15);
+  border-color: rgba(196, 124, 94, 0.34);
+  color: #ffb79b;
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-empty-state,
+:root[data-theme="dark"] .operations-workspace.operations-modern .status-message {
+  background: rgba(217, 154, 36, 0.14);
+  border-color: rgba(217, 154, 36, 0.32);
+  color: #ffe2a8;
+}
+
+/* Operations table and planner control readability pass. */
+.operations-workspace.operations-modern .operation-data-table-card {
+  overflow: hidden;
+}
+
+.operations-workspace.operations-modern .operation-data-table-card .operation-data-table {
+  background: transparent;
+  border: 0;
+  gap: 10px;
+  overflow: visible;
+}
+
+.operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head) {
+  align-items: center;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f5fbf8 100%);
+  border: 1px solid rgba(16, 43, 50, 0.12);
+  border-left: 5px solid rgba(24, 117, 101, 0.78);
+  border-radius: var(--ops-radius);
+  box-shadow:
+    0 14px 34px rgba(16, 43, 50, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  color: var(--ops-muted);
+  min-height: 64px;
+  padding: 12px 14px;
+}
+
+.operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head):nth-child(3n + 1) {
+  border-left-color: rgba(47, 159, 189, 0.82);
+}
+
+.operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head):nth-child(3n) {
+  border-left-color: rgba(217, 154, 36, 0.88);
+}
+
+.operations-workspace.operations-modern .operation-data-table-card .operation-data-button-row {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head) :is(span, strong, b) {
+  color: #17221f;
+  font-weight: 820;
+}
+
+.operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head) span {
+  color: #3f514c;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head) span:first-child {
+  color: #0d1f24;
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head):hover {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #eaf8f4 100%);
+  border-color: rgba(24, 117, 101, 0.34);
+  box-shadow:
+    0 18px 42px rgba(16, 43, 50, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateY(-1px);
+}
+
+.operations-workspace.operations-modern .planner-input-card .resource-row-grid {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 249, 247, 0.96));
+  border: 1px solid rgba(24, 117, 101, 0.16);
+  border-radius: var(--ops-radius);
+  box-shadow: 0 14px 34px rgba(16, 43, 50, 0.07);
+  gap: 10px;
+}
+
+.operations-workspace.operations-modern .planner-input-card .resource-row-grid label {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f6fbf9 100%);
+  border: 1px solid rgba(16, 43, 50, 0.11);
+  border-left: 5px solid rgba(47, 159, 189, 0.76);
+  border-radius: var(--ops-radius);
+  color: #4f5f5b;
+  min-width: 0;
+  padding: 10px 11px;
+  text-transform: none;
+}
+
+.operations-workspace.operations-modern .planner-input-card .operation-plan-row label:nth-of-type(3n + 1),
+.operations-workspace.operations-modern .planner-input-card .machine-plan-row label:nth-of-type(3n + 1),
+.operations-workspace.operations-modern .planner-input-card .workforce-plan-row label:nth-of-type(3n + 1) {
+  border-left-color: rgba(24, 117, 101, 0.8);
+}
+
+.operations-workspace.operations-modern .planner-input-card .operation-plan-row label:nth-of-type(3n),
+.operations-workspace.operations-modern .planner-input-card .machine-plan-row label:nth-of-type(3n),
+.operations-workspace.operations-modern .planner-input-card .workforce-plan-row label:nth-of-type(3n) {
+  border-left-color: rgba(217, 154, 36, 0.86);
+}
+
+.operations-workspace.operations-modern .planner-input-card .resource-row-grid label > .label-with-info,
+.operations-workspace.operations-modern .planner-input-card .resource-row-grid label > span {
+  color: #50615c !important;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.01em;
+}
+
+.operations-workspace.operations-modern .planner-input-card .resource-row-grid input,
+.operations-workspace.operations-modern .planner-input-card .resource-row-grid select {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: #0d1f24;
+  min-height: 28px;
+  padding: 0;
+}
+
+.operations-workspace.operations-modern .planner-input-card .resource-row-grid input:focus,
+.operations-workspace.operations-modern .planner-input-card .resource-row-grid select:focus {
+  box-shadow: 0 2px 0 rgba(47, 159, 189, 0.72);
+  outline: 0;
+}
+
+.operations-workspace.operations-modern .planner-input-card .resource-row-meta {
+  align-content: center;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f5fbf8 100%);
+  min-height: 62px;
+  padding: 10px 12px;
+}
+
+.operations-workspace.operations-modern .planner-input-card .resource-section-header button {
+  background:
+    linear-gradient(135deg, #0f5f55 0%, #187565 58%, #2f9fbd 100%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow:
+    0 14px 30px rgba(24, 117, 101, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
+
+.operations-workspace.operations-modern .planner-input-card .operation-card-heading button {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4faf8 100%);
+  border: 1px solid rgba(47, 159, 189, 0.28);
+  border-left: 5px solid rgba(47, 159, 189, 0.86);
+  box-shadow: 0 12px 28px rgba(16, 43, 50, 0.08);
+  color: #0d1f24;
+}
+
+.operations-workspace.operations-modern .planner-input-card .resource-remove-button {
+  align-self: stretch;
+  background:
+    linear-gradient(180deg, #fff9f6 0%, #ffece4 100%);
+  border: 1px solid rgba(157, 91, 63, 0.26);
+  border-left: 5px solid rgba(157, 91, 63, 0.72);
+  box-shadow: 0 10px 24px rgba(157, 91, 63, 0.1);
+  color: #7b3d28;
+  min-height: 62px;
+}
+
+.operations-workspace.operations-modern .planner-input-card .resource-remove-button:hover {
+  background:
+    linear-gradient(180deg, #fff4ee 0%, #ffe2d6 100%);
+  border-color: rgba(157, 91, 63, 0.38);
+}
+
+@media (max-width: 760px) {
+  .operations-workspace.operations-modern .operation-data-table-card .operation-data-table {
+    min-width: 680px;
+  }
+
+  .operations-workspace.operations-modern .planner-input-card .resource-remove-button {
+    min-height: 46px;
+  }
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head),
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card .resource-row-grid label,
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card .resource-row-meta,
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card .operation-card-heading button {
+  background:
+    linear-gradient(180deg, rgba(244, 251, 248, 0.98), rgba(229, 242, 238, 0.96));
+  border-color: rgba(167, 240, 224, 0.2);
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head) :is(span, strong, small, b),
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card .resource-row-grid label > .label-with-info,
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card .resource-row-grid label > span,
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card .resource-row-grid input,
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card .resource-row-grid select,
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card .resource-row-meta :is(strong, small),
+:root[data-theme="dark"] .operations-workspace.operations-modern .planner-input-card .operation-card-heading button {
+  color: #10231f !important;
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-data-table-card .operation-data-row:not(.operation-data-head):hover {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #e5f6f1 100%);
+}
+
+/* Process Definition command console. */
+.operations-workspace.operations-modern .operation-planner {
+  align-items: start;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1.38fr) minmax(360px, 0.82fr);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(238, 247, 244, 0.98));
+  border: 1px solid rgba(16, 43, 50, 0.14);
+  box-shadow:
+    0 24px 70px rgba(16, 43, 50, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  counter-reset: planner-section;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .operation-card-heading {
+  align-items: center;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(135deg, #071418 0%, #102b32 58%, #12504c 100%);
+  background-size: 30px 30px, 30px 30px, auto;
+  border: 0;
+  border-bottom: 1px solid rgba(126, 222, 207, 0.24);
+  color: #ffffff;
+  gap: 16px;
+  padding: 20px;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .operation-card-heading span {
+  color: #a7f0e0;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .operation-card-heading h2 {
+  color: #ffffff;
+  font-size: clamp(1.22rem, 1.9vw, 1.72rem);
+  letter-spacing: 0;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .operation-card-heading button {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  box-shadow: none;
+  color: #ffffff;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .operation-card-heading button::before {
+  background: rgba(167, 240, 224, 0.18);
+  border: 1px solid rgba(167, 240, 224, 0.28);
+  border-radius: 7px;
+  color: #a7f0e0;
+  content: "AUTO";
+  font-size: 0.64rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 6px 7px;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .operation-card-heading button:hover {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.12));
+  border-color: rgba(167, 240, 224, 0.48);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f5fbf8 100%);
+  border-bottom: 1px solid rgba(16, 43, 50, 0.1);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  padding: 16px;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields > label,
+.operations-workspace.operations-modern .operation-planner .resource-section .planner-fields > label {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4faf8 100%);
+  border: 1px solid rgba(16, 43, 50, 0.11);
+  border-left: 5px solid rgba(24, 117, 101, 0.82);
+  border-radius: 8px;
+  box-shadow:
+    0 12px 30px rgba(16, 43, 50, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  color: #4f5f5b;
+  display: grid;
+  gap: 8px;
+  min-height: 88px;
+  min-width: 0;
+  padding: 12px;
+  text-transform: none;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields > label:nth-child(3n + 2),
+.operations-workspace.operations-modern .operation-planner .resource-section .planner-fields > label:nth-child(3n + 2) {
+  border-left-color: rgba(47, 159, 189, 0.86);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields > label:nth-child(3n),
+.operations-workspace.operations-modern .operation-planner .resource-section .planner-fields > label:nth-child(3n) {
+  border-left-color: rgba(217, 154, 36, 0.9);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields > label > .label-with-info,
+.operations-workspace.operations-modern .operation-planner .resource-section .planner-fields > label > .label-with-info {
+  color: #50615c !important;
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields > label > div,
+.operations-workspace.operations-modern .operation-planner .resource-section .planner-fields > label > div {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 0;
+  padding: 0;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-fields input,
+.operations-workspace.operations-modern .operation-planner .planner-fields select {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: #0d1f24;
+  font-size: 0.98rem;
+  font-weight: 950;
+  min-height: 30px;
+  padding: 0;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-fields small {
+  color: #657671;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-fields label:focus-within {
+  border-color: rgba(47, 159, 189, 0.42);
+  box-shadow:
+    0 16px 36px rgba(47, 159, 189, 0.12),
+    inset 0 0 0 1px rgba(47, 159, 189, 0.16);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section {
+  background: #ffffff;
+  border: 1px solid rgba(16, 43, 50, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(16, 43, 50, 0.08);
+  counter-increment: planner-section;
+  margin: 16px;
+  overflow: hidden;
+  padding: 0;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-section-header {
+  align-items: center;
+  background:
+    linear-gradient(180deg, #f8fcfa 0%, #eef8f4 100%);
+  border-bottom: 1px solid rgba(16, 43, 50, 0.1);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 16px;
+  position: relative;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-section-header > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-left: 52px;
+  position: relative;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-section-header > div::before {
+  align-items: center;
+  background:
+    linear-gradient(135deg, #102b32 0%, #187565 100%);
+  border-radius: 8px;
+  box-shadow: 0 12px 26px rgba(24, 117, 101, 0.18);
+  color: #ffffff;
+  content: counter(planner-section, decimal-leading-zero);
+  display: inline-flex;
+  font-size: 0.84rem;
+  font-weight: 950;
+  height: 38px;
+  justify-content: center;
+  left: 0;
+  position: absolute;
+  top: 1px;
+  width: 38px;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-section-header span {
+  color: #0f5f55;
+  font-size: 0.76rem;
+  font-weight: 950;
+  letter-spacing: 0.03em;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-section-header p {
+  color: #52635d;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  max-width: 780px;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-section-header button {
+  align-items: center;
+  background:
+    linear-gradient(135deg, #102b32 0%, #187565 58%, #2f9fbd 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  box-shadow:
+    0 16px 34px rgba(24, 117, 101, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-section-header button::before {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 7px;
+  content: "+";
+  display: inline-flex;
+  font-size: 1rem;
+  font-weight: 950;
+  height: 24px;
+  justify-content: center;
+  line-height: 1;
+  width: 24px;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-section-header button:hover {
+  background:
+    linear-gradient(135deg, #0d242a 0%, #0f6f61 58%, #238ca6 100%);
+  transform: translateY(-1px);
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-row-list {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-row-grid {
+  align-items: stretch;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f5fbf8 100%);
+  border: 1px solid rgba(16, 43, 50, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(16, 43, 50, 0.06);
+  padding: 10px;
+}
+
+.operations-workspace.operations-modern .operation-planner .operation-plan-row {
+  grid-template-columns:
+    minmax(170px, 1.18fr)
+    minmax(170px, 1.12fr)
+    repeat(5, minmax(88px, 0.58fr))
+    minmax(150px, 0.9fr)
+    minmax(72px, auto);
+}
+
+.operations-workspace.operations-modern .operation-planner .machine-plan-row {
+  grid-template-columns: minmax(190px, 1.35fr) minmax(110px, 0.65fr) minmax(170px, 1fr) minmax(72px, auto);
+}
+
+.operations-workspace.operations-modern .operation-planner .workforce-plan-row {
+  grid-template-columns: minmax(170px, 1.25fr) minmax(90px, 0.55fr) minmax(90px, 0.55fr) minmax(170px, 1fr) minmax(72px, auto);
+}
+
+.operations-workspace.operations-modern .operation-planner .material-plan-row {
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card .resource-row-grid label {
+  align-content: start;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f7fbfa 100%);
+  border: 1px solid rgba(16, 43, 50, 0.1);
+  border-left: 4px solid rgba(47, 159, 189, 0.72);
+  border-radius: 8px;
+  box-shadow: none;
+  min-height: 68px;
+  padding: 10px;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card .resource-row-grid input,
+.operations-workspace.operations-modern .operation-planner .planner-input-card .resource-row-grid select {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: #0d1f24;
+  font-size: 0.9rem;
+  min-height: 30px;
+  padding: 0;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-row-meta {
+  align-content: center;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f2faf7 100%);
+  border: 1px solid rgba(16, 43, 50, 0.1);
+  border-left: 4px solid rgba(24, 117, 101, 0.72);
+  border-radius: 8px;
+  box-shadow: none;
+  color: #52635d;
+  display: grid;
+  gap: 5px;
+  min-height: 68px;
+  padding: 10px;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-row-meta strong {
+  color: #0d1f24;
+  font-size: 0.92rem;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-row-meta small {
+  color: #657671;
+  font-weight: 780;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-remove-button {
+  align-self: center;
+  background:
+    linear-gradient(180deg, #fff9f6 0%, #ffece4 100%);
+  border: 1px solid rgba(157, 91, 63, 0.24);
+  border-radius: 8px;
+  box-shadow: none;
+  color: #783a25;
+  min-height: 42px;
+  min-width: 64px;
+  padding: 0 12px;
+}
+
+.operations-workspace.operations-modern .operation-planner .resource-remove-button:hover {
+  background:
+    linear-gradient(180deg, #fff3ed 0%, #ffded0 100%);
+  border-color: rgba(157, 91, 63, 0.36);
+  transform: translateY(-1px);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-save-button {
+  align-items: center;
+  background:
+    linear-gradient(135deg, #071418 0%, #0f5f55 55%, #2f9fbd 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  box-shadow:
+    0 18px 42px rgba(16, 43, 50, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.94rem;
+  justify-content: center;
+  margin: 4px 16px 16px;
+  min-height: 52px;
+  width: calc(100% - 32px);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-save-button:hover {
+  transform: translateY(-1px);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #eef8f4 100%);
+  border: 1px solid rgba(16, 43, 50, 0.14);
+  box-shadow:
+    0 24px 70px rgba(16, 43, 50, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 16px;
+  position: sticky;
+  top: 16px;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card > .operation-card-heading {
+  align-items: start;
+  background:
+    linear-gradient(135deg, #071418 0%, #102b32 100%);
+  border: 1px solid rgba(126, 222, 207, 0.22);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card > .operation-card-heading span {
+  color: #a7f0e0;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card > .operation-card-heading h2 {
+  color: #ffffff;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card mark {
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card mark.ok {
+  background: #dff7f1;
+  color: #0c655a;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card mark.bad {
+  background: #fff0e9;
+  color: #87472f;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-summary-grid,
+.operations-workspace.operations-modern .operation-planner .allocation-grid,
+.operations-workspace.operations-modern .operation-planner .cost-breakdown {
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-summary-grid > .result-metric-card,
+.operations-workspace.operations-modern .operation-planner .allocation-grid > .result-metric-card,
+.operations-workspace.operations-modern .operation-planner .cost-breakdown > .result-metric-card {
+  min-height: 92px;
+  padding: 12px;
+}
+
+.operations-workspace.operations-modern .operation-planner .selected-resource-results {
+  grid-template-columns: 1fr;
+}
+
+.operations-workspace.operations-modern .process-setup-grid {
+  align-items: stretch;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.operations-workspace.operations-modern .process-setup-card {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4faf8 100%);
+  border: 1px solid rgba(16, 43, 50, 0.12);
+  box-shadow: 0 22px 58px rgba(16, 43, 50, 0.1);
+  overflow: hidden;
+}
+
+.operations-workspace.operations-modern .process-setup-card button {
+  background:
+    linear-gradient(135deg, #102b32 0%, #187565 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  box-shadow: 0 14px 30px rgba(24, 117, 101, 0.18);
+  color: #ffffff;
+}
+
+@media (max-width: 1280px) {
+  .operations-workspace.operations-modern .operation-planner {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-workspace.operations-modern .operation-planner .planner-result-card {
+    max-height: none;
+    position: static;
+  }
+}
+
+@media (max-width: 1040px) {
+  .operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .operations-workspace.operations-modern .operation-planner .operation-plan-row,
+  .operations-workspace.operations-modern .operation-planner .machine-plan-row,
+  .operations-workspace.operations-modern .operation-planner .workforce-plan-row,
+  .operations-workspace.operations-modern .operation-planner .material-plan-row,
+  .operations-workspace.operations-modern .process-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-workspace.operations-modern .operation-planner .resource-remove-button {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .operations-workspace.operations-modern .operation-planner .planner-input-card > .operation-card-heading,
+  .operations-workspace.operations-modern .operation-planner .resource-section-header {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section {
+    margin: 12px;
+  }
+
+  .operations-workspace.operations-modern .operation-planner .resource-section-header > div {
+    padding-left: 0;
+    padding-top: 48px;
+  }
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .planner-input-card,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .planner-result-card {
+  background:
+    linear-gradient(180deg, rgba(244, 251, 248, 0.98), rgba(229, 242, 238, 0.96));
+  border-color: rgba(167, 240, 224, 0.22);
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .resource-row-grid,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields > label,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .resource-section .planner-fields > label,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .planner-input-card .resource-row-grid label,
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .resource-row-meta {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f3faf8 100%);
+  border-color: rgba(16, 43, 50, 0.12);
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner :is(
+  .planner-fields input,
+  .planner-fields select,
+  .planner-fields small,
+  .resource-row-grid input,
+  .resource-row-grid select,
+  .resource-row-meta strong,
+  .resource-row-meta small,
+  .planner-input-card > .planner-fields > label > .label-with-info,
+  .resource-section .planner-fields > label > .label-with-info
+) {
+  color: #0d1f24 !important;
+}
+
+/* Process flow overflow and demo-flow contrast fixes. */
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .operation-card-heading {
+  order: 0;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-fields {
+  order: 1;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(4) {
+  order: 2;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(5) {
+  order: 3;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(6) {
+  order: 4;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(7) {
+  order: 5;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(3) {
+  order: 6;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .planner-save-button {
+  order: 7;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .status-message {
+  order: 8;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(4) .resource-section-header > div::before {
+  content: "01";
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(5) .resource-section-header > div::before {
+  content: "02";
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(6) .resource-section-header > div::before {
+  content: "03";
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(7) .resource-section-header > div::before {
+  content: "04";
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(3) .resource-section-header > div::before {
+  content: "05";
+}
+
+.operations-workspace.operations-modern .operation-planner .operation-plan-row {
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  overflow: visible;
+}
+
+.operations-workspace.operations-modern .operation-planner .operation-plan-row .resource-row-meta {
+  min-width: 0;
+}
+
+.operations-workspace.operations-modern .operation-planner .operation-plan-row .resource-remove-button {
+  min-width: 0;
+  width: 100%;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-input-card > .resource-section:nth-of-type(3) .resource-row-list {
+  overflow: visible;
+}
+
+.operations-workspace .operation-flow {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(135deg, #071418 0%, #102b32 58%, #0f4b48 100%);
+  background-size: 34px 34px, 34px 34px, auto;
+  border: 1px solid rgba(167, 240, 224, 0.22);
+  border-radius: 8px;
+  box-shadow: 0 26px 70px rgba(7, 20, 24, 0.28);
+  color: #ffffff;
+  grid-column: 1 / -1;
+  order: 99;
+  overflow: hidden;
+}
+
+.operations-workspace .operation-flow .operation-card-heading {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.operations-workspace .operation-flow .operation-card-heading h2 {
+  color: #d8e4e1;
+}
+
+.operations-workspace .operation-flow .operation-card-heading button {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #ffffff;
+}
+
+.operations-workspace .operation-flow .flow-steps {
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+  min-width: 0;
+}
+
+.operations-workspace .operation-flow .flow-step {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.operations-workspace .operation-flow .flow-step span {
+  background: rgba(167, 240, 224, 0.16);
+  border: 1px solid rgba(167, 240, 224, 0.28);
+  color: #d8e4e1;
+}
+
+.operations-workspace .operation-flow .flow-step strong {
+  color: #ffffff;
+}
+
+.operations-workspace .operation-flow .flow-step small {
+  color: #ffffff;
+}
+
+/* Put the process demo/result flow at the bottom and fix dark-panel contrast. */
+.operations-workspace.operations-modern .operation-planner {
+  grid-template-columns: 1fr;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(135deg, #071418 0%, #102b32 56%, #0f4b48 100%);
+  background-size: 34px 34px, 34px 34px, auto;
+  border: 1px solid rgba(167, 240, 224, 0.24);
+  box-shadow: 0 28px 80px rgba(7, 20, 24, 0.28);
+  color: #ffffff;
+  max-height: none;
+  order: 99;
+  overflow: visible;
+  position: static;
+  top: auto;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card::before {
+  background: linear-gradient(90deg, #2f9fbd, #187565, #d99a24);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card > .operation-card-heading {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card > .operation-card-heading span,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .result-metric-label,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .result-metric-label .label-with-info,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .selected-resource-results h3,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .selected-resource-results h3.label-with-info {
+  color: #d8e4e1 !important;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card :is(h2, strong),
+.operations-workspace.operations-modern .operation-planner .planner-result-card > .operation-card-heading h2 {
+  color: #ffffff !important;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card .planner-empty-state {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card .planner-summary-grid > .result-metric-card,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .allocation-grid > .result-metric-card,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .cost-breakdown > .result-metric-card,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .selected-resource-results div {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-left: 5px solid rgba(167, 240, 224, 0.72);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card .allocation-grid > .result-metric-card,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .selected-resource-results div:nth-child(2n) {
+  border-left-color: rgba(47, 159, 189, 0.78);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card .cost-breakdown > .result-metric-card,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .selected-resource-results div:nth-child(3n) {
+  border-left-color: rgba(217, 154, 36, 0.82);
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card .planner-summary-grid > .result-metric-card strong,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .allocation-grid > .result-metric-card strong,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .cost-breakdown > .result-metric-card strong,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .selected-resource-results div > span,
+.operations-workspace.operations-modern .operation-planner .planner-result-card .selected-resource-results div > span strong {
+  color: #ffffff !important;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card .selected-resource-results div > span {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  line-height: 1.45;
+  padding: 10px;
+}
+
+.operations-workspace.operations-modern .operation-planner .planner-result-card .selected-resource-results {
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+:root[data-theme="dark"] .operations-workspace.operations-modern .operation-planner .planner-result-card {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(135deg, #071418 0%, #102b32 56%, #0f4b48 100%);
+  border-color: rgba(167, 240, 224, 0.24);
+}
