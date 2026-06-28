@@ -1202,9 +1202,18 @@ textarea:focus-visible {
   }
 
   .executive-brief,
+  .dashboard-assumption-strip,
   .dashboard-two-column,
   .dashboard-two-column.lower {
     grid-template-columns: 1fr;
+  }
+
+  .assumption-strip-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-assumption-strip-controls {
+    grid-template-columns: minmax(190px, 1fr) minmax(150px, 0.72fr);
   }
 
   .executive-metric-grid,
@@ -1920,6 +1929,171 @@ textarea:focus-visible {
   z-index: 5;
 }
 
+.dashboard-assumption-strip {
+  --brief-tone: var(--color-teal);
+  align-items: stretch;
+  background:
+    radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--brief-tone) 18%, transparent), transparent 22rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-navy) 88%, black), color-mix(in srgb, var(--color-navy-soft) 62%, var(--brief-tone)));
+  border: 1px solid color-mix(in srgb, var(--brief-tone) 28%, rgba(255, 255, 255, 0.14));
+  border-radius: 8px;
+  box-shadow: 0 18px 56px rgba(7, 20, 24, 0.16);
+  color: #ffffff;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(220px, 0.62fr) minmax(340px, 0.86fr) minmax(420px, 1.5fr);
+  overflow: hidden;
+  padding: 18px;
+  position: relative;
+}
+
+.dashboard-assumption-strip::after {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+  content: "";
+  inset: 0;
+  opacity: 0.2;
+  pointer-events: none;
+  position: absolute;
+}
+
+.dashboard-assumption-strip.teal {
+  --brief-tone: var(--color-teal);
+}
+
+.dashboard-assumption-strip.amber {
+  --brief-tone: var(--color-amber);
+}
+
+.dashboard-assumption-strip.clay {
+  --brief-tone: var(--color-clay);
+}
+
+.dashboard-assumption-strip-heading,
+.dashboard-assumption-strip-controls,
+.assumption-strip-list {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-assumption-strip-heading {
+  align-content: center;
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-assumption-strip-heading span,
+.dashboard-assumption-strip-controls label > span {
+  color: color-mix(in srgb, #ffffff 72%, var(--brief-tone));
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-assumption-strip-heading h2 {
+  color: #ffffff;
+  font-size: clamp(1.05rem, 1.6vw, 1.45rem);
+  line-height: 1.08;
+  margin: 0;
+}
+
+.dashboard-assumption-strip-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(190px, 1fr) minmax(150px, 0.72fr);
+}
+
+.dashboard-assumption-strip-controls label {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.075));
+  border: 1px solid color-mix(in srgb, var(--brief-tone) 24%, rgba(255, 255, 255, 0.16));
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 14px 34px rgba(0, 0, 0, 0.1);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.dashboard-assumption-strip-controls select {
+  appearance: none;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 255, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  color: var(--color-ink);
+  font-size: 0.84rem;
+  font-weight: 850;
+  min-height: 38px;
+  outline: none;
+  overflow: hidden;
+  padding: 0 36px 0 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.assumption-control {
+  position: relative;
+}
+
+.assumption-control::after {
+  border: solid var(--color-ink);
+  border-width: 0 2px 2px 0;
+  content: "";
+  height: 7px;
+  pointer-events: none;
+  position: absolute;
+  right: 22px;
+  top: 35px;
+  transform: rotate(45deg);
+  width: 7px;
+}
+
+.dashboard-assumption-strip-controls select:focus {
+  border-color: color-mix(in srgb, var(--brief-tone) 72%, #ffffff);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brief-tone) 24%, transparent);
+}
+
+.dashboard-assumption-strip-controls select:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.dashboard-assumption-strip-controls option {
+  background: #ffffff;
+  color: var(--color-ink);
+}
+
+.assumption-strip-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.assumption-strip-list span {
+  align-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.68);
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 11px;
+}
+
+.assumption-strip-list strong {
+  color: #ffffff;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
 .executive-brief {
   --brief-tone: var(--color-teal);
   background:
@@ -2204,6 +2378,10 @@ textarea:focus-visible {
 
 .dashboard-two-column.lower {
   grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr);
+}
+
+.dashboard-financial-detail {
+  display: grid;
 }
 
 .dashboard-risk-board,
@@ -11000,6 +11178,20 @@ textarea:focus-visible {
 }
 
 @media (max-width: 620px) {
+  .dashboard-assumption-strip {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .dashboard-assumption-strip-controls,
+  .assumption-strip-list {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-assumption-strip-heading h2 {
+    font-size: 1.05rem;
+  }
+
   .landing-header {
     gap: 12px;
     grid-template-columns: 1fr;
@@ -11746,6 +11938,30 @@ textarea:focus-visible {
   color: var(--app-ink);
   min-width: 0;
   overflow: hidden;
+}
+
+.dashboard-shell .assumption-strip-list span {
+  overflow: hidden;
+}
+
+.dashboard-shell .assumption-strip-list :is(span, strong),
+.dashboard-shell .dashboard-assumption-strip-heading :is(span, h2),
+.dashboard-shell .dashboard-assumption-strip-controls label,
+.dashboard-shell .dashboard-assumption-strip-controls label > span {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell .dashboard-assumption-strip-heading h2,
+.dashboard-shell .assumption-strip-list strong {
+  color: #ffffff;
+}
+
+.dashboard-shell .assumption-strip-list span {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.dashboard-shell .dashboard-assumption-strip-controls select {
+  color: var(--app-ink);
 }
 
 .dashboard-shell .dashboard-risk-row,
@@ -14872,4 +15088,581 @@ textarea:focus-visible {
     linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
     linear-gradient(135deg, #071418 0%, #102b32 56%, #0f4b48 100%);
   border-color: rgba(167, 240, 224, 0.24);
+}
+
+/* Spacious workspace refresh: carry the landing page's airiness into the product app. */
+.dashboard-shell {
+  --workspace-page-pad: clamp(22px, 3vw, 44px);
+  --workspace-section-gap: clamp(22px, 2.4vw, 34px);
+  --workspace-card-gap: clamp(16px, 1.6vw, 22px);
+  --workspace-card-pad: clamp(18px, 1.8vw, 26px);
+  --workspace-hero-pad: clamp(26px, 3.6vw, 46px);
+  --workspace-line: rgba(8, 9, 16, 0.1);
+  --workspace-soft-line: rgba(255, 255, 255, 0.54);
+  --workspace-shadow: 0 24px 76px rgba(0, 0, 0, 0.14);
+}
+
+.dashboard-content {
+  scroll-padding: var(--workspace-page-pad);
+}
+
+.dashboard-shell :is(
+  .command-dashboard,
+  .financial-workspace,
+  .simulation-workspace,
+  .sales-workspace,
+  .reports-workspace,
+  .authorization-page,
+  .operations-workspace,
+  .operations-overview,
+  .module-placeholder
+) {
+  align-content: start;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.042) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.014) 38rem, transparent);
+  background-size: 44px 44px, 44px 44px, auto;
+  gap: var(--workspace-section-gap);
+  padding: var(--workspace-page-pad);
+}
+
+.dashboard-shell :is(
+  .dashboard-section-group,
+  .dashboard-two-column,
+  .module-rollup-grid,
+  .operations-grid,
+  .operation-planner,
+  .operation-data-grid,
+  .resource-definition-grid,
+  .process-setup-grid,
+  .process-list,
+  .finance-input-panel,
+  .financial-assumption-form,
+  .financial-grid,
+  .financial-overview-grid,
+  .financial-overview-layout,
+  .financial-decision-metrics,
+  .financial-quick-grid,
+  .financial-widget-grid,
+  .finance-metric-grid,
+  .financial-feasibility-grid,
+  .financial-loan-form,
+  .financial-loan-summary-grid,
+  .financial-loan-currency-section,
+  .financial-loan-list,
+  .scenario-management,
+  .simulation-signal-grid,
+  .simulation-grid,
+  .monte-carlo-summary,
+  .monte-carlo-grid,
+  .simulation-bottom,
+  .sales-stat-grid,
+  .sales-grid,
+  .sales-channel-grid,
+  .competitor-grid,
+  .sales-table,
+  .reports-controls,
+  .report-stat-grid,
+  .reports-grid,
+  .reports-side,
+  .authorization-grid
+) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  gap: var(--workspace-section-gap);
+  padding: 0;
+}
+
+.dashboard-shell :is(
+  .dashboard-section-group,
+  .dashboard-two-column,
+  .module-rollup-grid,
+  .operations-grid,
+  .operation-planner,
+  .operation-data-grid,
+  .resource-definition-grid,
+  .process-setup-grid,
+  .process-list,
+  .finance-input-panel,
+  .financial-assumption-form,
+  .financial-grid,
+  .financial-overview-grid,
+  .financial-overview-layout,
+  .financial-decision-metrics,
+  .financial-quick-grid,
+  .financial-widget-grid,
+  .finance-metric-grid,
+  .financial-feasibility-grid,
+  .financial-loan-form,
+  .financial-loan-summary-grid,
+  .financial-loan-currency-section,
+  .financial-loan-list,
+  .scenario-management,
+  .simulation-signal-grid,
+  .simulation-grid,
+  .monte-carlo-summary,
+  .monte-carlo-grid,
+  .simulation-bottom,
+  .sales-stat-grid,
+  .sales-grid,
+  .sales-channel-grid,
+  .competitor-grid,
+  .sales-table,
+  .reports-controls,
+  .report-stat-grid,
+  .reports-grid,
+  .reports-side,
+  .authorization-grid
+)::before {
+  display: none;
+}
+
+.dashboard-shell :is(
+  .executive-brief,
+  .dashboard-assumption-strip,
+  .dashboard-command-hero,
+  .command-hero,
+  .financial-decision-hero,
+  .financial-loan-hero,
+  .simulation-command-hero,
+  .sales-command-hero,
+  .operations-overview > div:first-child,
+  .operations-workspace.operations-modern .operations-header,
+  .financial-header,
+  .simulation-header,
+  .sales-header,
+  .reports-header,
+  .authorization-heading
+) {
+  border-radius: 8px;
+  gap: clamp(22px, 2.2vw, 34px);
+  min-height: 220px;
+  padding: var(--workspace-hero-pad);
+}
+
+.dashboard-shell :is(
+  .financial-header,
+  .simulation-header,
+  .sales-header,
+  .reports-header,
+  .authorization-heading,
+  .operations-workspace.operations-modern .operations-header
+) {
+  align-items: center;
+}
+
+.dashboard-shell :is(
+  .executive-brief,
+  .dashboard-command-hero,
+  .financial-decision-hero,
+  .simulation-command-hero,
+  .sales-command-hero
+) :is(p, small),
+.dashboard-shell :is(
+  .financial-header,
+  .simulation-header,
+  .sales-header,
+  .reports-header,
+  .authorization-heading,
+  .operations-workspace.operations-modern .operations-header
+) p {
+  line-height: 1.72;
+  max-width: 880px;
+}
+
+.dashboard-shell :is(
+  .command-card,
+  .financial-card,
+  .financial-panel,
+  .operation-card,
+  .simulation-card,
+  .sales-card,
+  .reports-card,
+  .authorization-card,
+  .financial-input-section,
+  .financial-extra-cost-form,
+  .financial-loan-card,
+  .scenario-choice,
+  .sales-edit-card,
+  .competitor-card,
+  .process-setup-card,
+  .placeholder-grid article,
+  .detail-heading,
+  .dashboard-section-heading
+) {
+  border-color: var(--workspace-soft-line);
+  box-shadow:
+    var(--workspace-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  gap: var(--workspace-card-gap);
+  padding: var(--workspace-card-pad);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.dashboard-shell :is(
+  .command-card,
+  .financial-card,
+  .financial-panel,
+  .operation-card,
+  .simulation-card,
+  .sales-card,
+  .reports-card,
+  .authorization-card,
+  .financial-input-section,
+  .financial-extra-cost-form,
+  .financial-loan-card,
+  .scenario-choice,
+  .sales-edit-card,
+  .competitor-card,
+  .process-setup-card,
+  .placeholder-grid article
+):hover {
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 30px 88px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.dashboard-shell :is(
+  .executive-metric-card,
+  .finance-metric-card,
+  .financial-feasibility-card,
+  .financial-decision-card,
+  .financial-quick-card,
+  .financial-flow-card,
+  .financial-widget-metric,
+  .financial-widget-picker button,
+  .financial-proof-points span,
+  .exchange-rate-card,
+  .financial-loan-summary-card,
+  .financial-loan-currency-card,
+  .financial-loan-card-metrics span,
+  .simulation-signal-card,
+  .monte-carlo-stat,
+  .percentile-outcome,
+  .impact-summary span,
+  .flow-impact-item,
+  .sales-stat-card,
+  .sales-score-row,
+  .sales-channel-capacity,
+  .sales-type-info,
+  .sales-signal-grid span,
+  .report-stat-card,
+  .quick-report-grid button,
+  .module-rollup-card,
+  .process-summary-card,
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card,
+  .process-metrics span,
+  .process-detail-grid div,
+  .compact-resource-list span,
+  .selected-resource-results div
+) {
+  border-radius: 8px;
+  gap: 10px;
+  min-width: 0;
+  padding: clamp(14px, 1.25vw, 18px);
+}
+
+.dashboard-shell :is(
+  .financial-card-heading,
+  .financial-panel-heading,
+  .financial-input-section-heading,
+  .financial-loan-card-heading,
+  .operation-card-heading,
+  .resource-section-header,
+  .simulation-card-heading,
+  .sales-card-heading,
+  .reports-card-heading,
+  .card-heading
+) {
+  gap: 16px;
+  padding-bottom: 16px;
+}
+
+.dashboard-shell :is(
+  .financial-card-heading,
+  .financial-panel-heading,
+  .financial-input-section-heading,
+  .financial-loan-card-heading,
+  .operation-card-heading,
+  .resource-section-header,
+  .simulation-card-heading,
+  .sales-card-heading,
+  .reports-card-heading,
+  .card-heading
+) h2 {
+  line-height: 1.18;
+}
+
+.dashboard-shell :is(
+  .planner-fields,
+  .operation-data-fields,
+  .financial-input-grid,
+  .financial-controls,
+  .financial-extra-cost-fields,
+  .financial-loan-row,
+  .reports-controls,
+  .sales-form-grid,
+  .sales-forecast-grid,
+  .advanced-channel-grid,
+  .user-definition-fields
+) {
+  gap: 14px;
+}
+
+.dashboard-shell :is(
+  .planner-fields label,
+  .operation-data-fields label,
+  .financial-controls label,
+  .financial-loan-form label,
+  .reports-controls label,
+  .sales-form-grid label,
+  .sales-forecast-grid label,
+  .sales-edit-card label,
+  .sales-table label,
+  .role-form label,
+  .user-definition-form label
+) {
+  gap: 8px;
+  line-height: 1.32;
+}
+
+.dashboard-shell :is(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea
+) {
+  min-height: 44px;
+}
+
+.dashboard-shell textarea {
+  line-height: 1.5;
+  min-height: 94px;
+}
+
+.dashboard-shell :is(
+  .operations-tabs,
+  .financial-tabs,
+  .simulation-tabs,
+  .simulation-variant-strip,
+  .reports-tabs,
+  .authorization-tabs,
+  .sales-period-toggle,
+  .mini-tabs
+) {
+  gap: 6px;
+  padding: 6px;
+}
+
+.dashboard-shell :is(
+  .operations-tabs,
+  .financial-tabs,
+  .simulation-tabs,
+  .simulation-variant-strip,
+  .reports-tabs,
+  .authorization-tabs,
+  .sales-period-toggle,
+  .mini-tabs
+) button {
+  min-height: 38px;
+  padding-inline: 14px;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.dashboard-shell :is(
+  .command-run-button,
+  .card-heading button,
+  .operations-actions button,
+  .operation-card-heading button,
+  .resource-section-header button,
+  .financial-header .primary,
+  .financial-controls button,
+  .financial-card-heading button,
+  .financial-loan-form button,
+  .simulation-header-actions button,
+  .simulation-card button,
+  .sales-header-actions button,
+  .sales-card-heading button,
+  .reports-controls button,
+  .reports-card-heading button,
+  .authorization-tabs button,
+  .process-setup-card button
+) {
+  min-height: 40px;
+  padding-inline: 15px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.dashboard-shell :is(
+  .operation-data-table,
+  .income-table,
+  .financial-statement,
+  .financial-month-table,
+  .line-impact-table,
+  .sim-financial-table,
+  .compare-table,
+  .recent-report-table,
+  .permissions-table,
+  .users-table
+) {
+  border-color: rgba(8, 9, 16, 0.08);
+  border-radius: 8px;
+}
+
+.dashboard-shell :is(
+  .operation-data-row,
+  .income-row,
+  .financial-statement-row,
+  .financial-month-row,
+  .line-impact-row,
+  .sim-financial-table div,
+  .compare-table div,
+  .recent-report-row,
+  .permissions-row,
+  .users-row
+) {
+  min-height: 52px;
+  padding: 11px 14px;
+}
+
+.dashboard-shell :is(
+  .operation-data-row:not(.operation-data-head),
+  .income-row:not(.income-head),
+  .financial-month-row:not(.financial-month-head),
+  .recent-report-row:not(.report-head),
+  .permissions-row:not(.permissions-row-head),
+  .users-row:not(.users-row-head)
+) {
+  line-height: 1.45;
+}
+
+.dashboard-shell :is(
+  .financial-action-list,
+  .financial-flow-grid,
+  .financial-widget-picker,
+  .financial-widget-grid,
+  .financial-loan-list,
+  .financial-bar-list,
+  .scenario-list,
+  .simulation-main,
+  .simulation-side,
+  .used-parameter-list,
+  .sales-score-list,
+  .sales-channel-grid,
+  .competitor-grid,
+  .sales-table,
+  .report-category-list,
+  .schedule-card,
+  .resource-row-list,
+  .compact-resource-list,
+  .selected-resource-results,
+  .business-case-list,
+  .dashboard-risk-list,
+  .action-sequence,
+  .readiness-step-list
+) {
+  gap: 12px;
+}
+
+.dashboard-shell :is(
+  .financial-decision-card,
+  .financial-quick-card,
+  .simulation-signal-card,
+  .sales-stat-card,
+  .report-stat-card,
+  .module-rollup-card,
+  .executive-metric-card
+) {
+  align-content: space-between;
+  min-height: 132px;
+}
+
+.dashboard-shell :is(p, small, label, span) {
+  text-wrap: pretty;
+}
+
+.dashboard-shell :is(h1, h2, h3, strong, b, p, small, label, span) {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1280px) {
+  .dashboard-shell :is(
+    .financial-workspace,
+    .simulation-workspace,
+    .sales-workspace,
+    .reports-workspace,
+    .authorization-page,
+    .operations-workspace,
+    .operations-overview,
+    .command-dashboard
+  ) {
+    padding-inline: clamp(34px, 4vw, 58px);
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-shell {
+    --workspace-page-pad: 14px;
+    --workspace-section-gap: 16px;
+    --workspace-card-gap: 13px;
+    --workspace-card-pad: 16px;
+    --workspace-hero-pad: 20px;
+  }
+
+  .dashboard-shell :is(
+    .executive-brief,
+    .dashboard-assumption-strip,
+    .dashboard-command-hero,
+    .command-hero,
+    .financial-decision-hero,
+    .financial-loan-hero,
+    .simulation-command-hero,
+    .sales-command-hero,
+    .operations-overview > div:first-child,
+    .operations-workspace.operations-modern .operations-header,
+    .financial-header,
+    .simulation-header,
+    .sales-header,
+    .reports-header,
+    .authorization-heading
+  ) {
+    min-height: auto;
+  }
+
+  .dashboard-shell :is(
+    .command-card,
+    .financial-card,
+    .financial-panel,
+    .operation-card,
+    .simulation-card,
+    .sales-card,
+    .reports-card,
+    .authorization-card,
+    .financial-input-section,
+    .financial-extra-cost-form,
+    .financial-loan-card,
+    .scenario-choice,
+    .sales-edit-card,
+    .competitor-card,
+    .process-setup-card,
+    .placeholder-grid article,
+    .detail-heading,
+    .dashboard-section-heading
+  ) {
+    padding: var(--workspace-card-pad);
+  }
 }

@@ -7937,6 +7937,45 @@ function App() {
             <button type="button" className="command-run-button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
           </div>
 
+          <section className={`dashboard-assumption-strip ${feasibilityVerdict.tone}`} aria-label={copy("Assumption snapshot", "Varsayım özeti")}>
+            <div className="dashboard-assumption-strip-heading">
+              <span>{copy("Assumption snapshot", "Varsayım özeti")}</span>
+              <h2>{copy("What this dashboard is based on", "Bu dashboard neye dayanıyor")}</h2>
+            </div>
+            <div className="dashboard-assumption-strip-controls">
+              <label className="assumption-control product-control">
+                <span>{copy("Product", "Ürün")}</span>
+                <select
+                  value={dashboardSelectedProductId}
+                  onChange={(event) => handleDashboardProductChange(event.target.value)}
+                  disabled={!operationsWorkspace.products.length}
+                >
+                  {!operationsWorkspace.products.length && (
+                    <option value="">{copy("No products yet", "Henüz ürün yok")}</option>
+                  )}
+                  {operationsWorkspace.products.map((product) => (
+                    <option value={product.id} key={product.id}>
+                      {product.name || product.product_code || copy("Unnamed product", "İsimsiz ürün")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="assumption-control horizon-control">
+                <span>{copy("Projection horizon", "Projeksiyon ufku")}</span>
+                <select value={financialHorizon} onChange={(event) => loadFinancialData(event.target.value)}>
+                  {financialHorizonOptions.map(([value, label]) => (
+                    <option value={value} key={value}>{label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="assumption-strip-list">
+              {dashboardAssumptionRows.map(([label, value]) => (
+                <span key={label}>{label}<strong>{value}</strong></span>
+              ))}
+            </div>
+          </section>
+
           <section className={`executive-brief ${feasibilityVerdict.tone}`} aria-label={copy("Feasibility executive brief", "Fizibilite yönetici özeti")}>
             <div className="executive-brief-copy">
               <span>{copy("Feasibility executive brief", "Fizibilite yönetici özeti")}</span>
@@ -8054,48 +8093,7 @@ function App() {
             </div>
           </section>
 
-          <section className="dashboard-two-column lower" aria-label={copy("Assumptions and financial detail", "Varsayımlar ve finans detayı")}>
-            <article className="command-card dashboard-assumption-board">
-              <div className="card-heading">
-                <div>
-                  <span>{copy("Assumption snapshot", "Varsayım özeti")}</span>
-                  <h2>{copy("What this dashboard is based on", "Bu dashboard neye dayanıyor")}</h2>
-                </div>
-              </div>
-              <div className="dashboard-assumption-controls">
-                <label>
-                  <span>{copy("Product", "Ürün")}</span>
-                  <select
-                    value={dashboardSelectedProductId}
-                    onChange={(event) => handleDashboardProductChange(event.target.value)}
-                    disabled={!operationsWorkspace.products.length}
-                  >
-                    {!operationsWorkspace.products.length && (
-                      <option value="">{copy("No products yet", "Henüz ürün yok")}</option>
-                    )}
-                    {operationsWorkspace.products.map((product) => (
-                      <option value={product.id} key={product.id}>
-                        {product.name || product.product_code || copy("Unnamed product", "İsimsiz ürün")}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>{copy("Projection horizon", "Projeksiyon ufku")}</span>
-                  <select value={financialHorizon} onChange={(event) => loadFinancialData(event.target.value)}>
-                    {financialHorizonOptions.map(([value, label]) => (
-                      <option value={value} key={value}>{label}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="assumption-list">
-                {dashboardAssumptionRows.map(([label, value]) => (
-                  <span key={label}>{label}<strong>{value}</strong></span>
-                ))}
-              </div>
-            </article>
-
+          <section className="dashboard-financial-detail" aria-label={copy("Financial detail", "Finans detayı")}>
             <article className="command-card dashboard-business-case">
               <div className="card-heading">
                 <div>
