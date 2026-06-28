@@ -6436,19 +6436,42 @@ textarea:focus-visible {
 }
 
 .trend-chart {
-  background: color-mix(in srgb, var(--color-section) 56%, transparent);
-  border: 1px solid var(--color-line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 96%, transparent), color-mix(in srgb, var(--color-section) 74%, transparent));
+  border: 1px solid color-mix(in srgb, var(--color-teal) 16%, var(--color-line));
   border-radius: 8px;
-  min-height: 260px;
-  padding: 10px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 58%, transparent), 0 18px 44px rgba(8, 12, 18, 0.1);
+  min-height: 278px;
+  padding: 12px;
+  overflow: visible;
   width: 100%;
+}
+
+.chart-panel {
+  fill: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  stroke: color-mix(in srgb, var(--color-teal) 12%, var(--color-line));
+  stroke-width: 1;
+}
+
+.trend-area {
+  pointer-events: none;
+  stroke: none;
+}
+
+.trend-area.sales {
+  fill: url("#incomeTrendSurface");
+}
+
+.trend-area.costs {
+  fill: url("#expenseTrendSurface");
 }
 
 .trend-line {
   fill: none;
+  filter: drop-shadow(0 9px 10px rgba(8, 12, 18, 0.14));
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 4;
+  stroke-width: 4.8;
 }
 
 .trend-line.sales {
@@ -6475,21 +6498,107 @@ textarea:focus-visible {
 }
 
 .chart-axis {
-  stroke: var(--color-muted);
-  stroke-width: 1.4;
+  stroke: color-mix(in srgb, var(--color-muted) 58%, transparent);
+  stroke-linecap: round;
+  stroke-width: 1.6;
 }
 
 .axis-label {
-  fill: var(--color-heading);
+  fill: color-mix(in srgb, var(--color-heading) 88%, var(--color-muted));
   font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0;
 }
 
+.chart-axis-title {
+  fill: var(--color-teal-strong);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
 .chart-tick {
   fill: var(--color-muted);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 800;
+}
+
+.chart-tick-y {
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-x-guide {
+  stroke: color-mix(in srgb, var(--color-muted) 14%, transparent);
+  stroke-dasharray: 3 8;
+  stroke-linecap: round;
+  stroke-width: 1;
+}
+
+.chart-badge-rail {
+  stroke: color-mix(in srgb, var(--color-muted) 18%, transparent);
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  stroke-width: 1;
+}
+
+.chart-badge-connector {
+  fill: none;
+  opacity: 0.74;
+  stroke-dasharray: 3 5;
+  stroke-linecap: round;
+  stroke-width: 1.4;
+}
+
+.chart-badge-connector.sales {
+  stroke: color-mix(in srgb, var(--color-cyan) 72%, transparent);
+}
+
+.chart-badge-connector.costs {
+  stroke: color-mix(in srgb, var(--color-amber) 76%, transparent);
+}
+
+.trend-point {
+  fill: var(--color-surface);
+  stroke-width: 2.8;
+}
+
+.trend-point.sales {
+  stroke: var(--color-cyan);
+}
+
+.trend-point.costs {
+  stroke: var(--color-amber);
+}
+
+.chart-value-badge rect {
+  filter: drop-shadow(0 10px 13px rgba(8, 12, 18, 0.18));
+  stroke-width: 1;
+}
+
+.chart-value-badge text {
+  fill: var(--color-heading);
+  font-variant-numeric: tabular-nums;
+  font-weight: 950;
+}
+
+.chart-value-badge-label {
+  fill: var(--color-muted);
+  font-size: 0.52rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.chart-value-badge-amount {
+  font-size: 0.7rem;
+}
+
+.chart-value-badge.sales rect {
+  fill: color-mix(in srgb, var(--color-cyan) 20%, var(--color-surface));
+  stroke: color-mix(in srgb, var(--color-cyan) 58%, var(--color-line));
+}
+
+.chart-value-badge.costs rect {
+  fill: color-mix(in srgb, var(--color-amber) 22%, var(--color-surface));
+  stroke: color-mix(in srgb, var(--color-amber) 58%, var(--color-line));
 }
 
 .chart-tick-end {

@@ -40,3 +40,44 @@ test("normalizes unsupported loan currencies to TRY", () => {
 
   assert.equal(settings.loanRows[0].currency, "TRY");
 });
+
+test("normalizes the startup feasibility financial assumptions", () => {
+  const settings = normalizeFinancialModelSettings({
+    ...defaultFinancialSettings,
+    assetValueIncreaseAnnualPercent: 20,
+    cogsInflationAnnualPercent: 35,
+    electricityPricePerKwh: 4.75,
+    expenseVatRate: 20,
+    incomeTaxRate: 25,
+    increaseFrequency: "quarterly",
+    initialCash: 2500000,
+    initialCapacityUnits: 12000,
+    investmentGrantAmount: 500000,
+    loanRows: [
+      { amount: 1500000, annualInterestRate: 38, currency: "TRY", gracePeriodMonths: 3, loanTermMonths: 36, name: "Startup 36 Ay İşletme ve Kapasite Kredisi", receivedDate: "2026-06-28" },
+    ],
+    monthlyCurrencyIncreasePercent: 1.5,
+    monthlyEnergyPriceIncreasePercent: 2,
+    monthlyInflationPercent: 2.5,
+    monthlyWageIncreasePercent: 2,
+    opexInflationAnnualPercent: 30,
+    priceIncreaseAnnualPercent: 30,
+    rawMaterialBufferMonths: 1,
+    rawMaterialStockDays: 15,
+    receivablesCollectionDays: 35,
+    rentBufferMonths: 1,
+    salaryBufferMonths: 1,
+    salesVatRate: 10,
+    supplierPaymentDays: 45,
+    taxPaymentDelayMonths: 3,
+    workingDaysPerMonth: 22,
+  });
+
+  assert.equal(settings.loanAmount, 1500000);
+  assert.equal(settings.annualInterestRate, 38);
+  assert.equal(settings.loanTermMonths, 36);
+  assert.equal(settings.increaseFrequency, "quarterly");
+  assert.equal(settings.salesVatRate, 10);
+  assert.equal(settings.expenseVatRate, 20);
+  assert.equal(settings.vatRate, 10);
+});

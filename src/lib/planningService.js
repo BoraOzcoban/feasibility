@@ -179,6 +179,7 @@ export async function loadSalesStrategy(supabase) {
       trafficScore: normalizeOptionalNumber(row.traffic_score),
       type: row.type || null,
       typeId: row.type_id || row.type?.id || "",
+      unitSalesPrice: normalizeOptionalNumber(row.unit_sales_price),
     })),
   };
 }

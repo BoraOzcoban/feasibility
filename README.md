@@ -21,11 +21,12 @@ Fill `.env` with the values from your new Supabase project:
 1. Create a new Supabase project.
 2. Open `SQL Editor`.
 3. Run `supabase/schema.sql`.
-4. In `Authentication > URL Configuration`, set the site URL to your local Vite URL. This app usually runs at `http://127.0.0.1:5173` or `http://127.0.0.1:5174`.
-5. Add these to the redirect URLs:
+4. Optional: run `supabase/startup_feasibility_seed.sql` to load the functional cold-chain beverage startup test scenario.
+5. In `Authentication > URL Configuration`, set the site URL to your local Vite URL. This app usually runs at `http://127.0.0.1:5173` or `http://127.0.0.1:5174`.
+6. Add these to the redirect URLs:
    - `http://127.0.0.1:5173/login`
    - `http://127.0.0.1:5174/login`
-6. Confirm the storage bucket named `profile-pictures` exists and is private. The SQL file creates it and applies owner-only policies.
+7. Confirm the storage bucket named `profile-pictures` exists and is private. The SQL file creates it and applies owner-only policies.
 
 Passwords are not stored in `public.profiles`. Supabase Auth stores password hashes securely in its own auth schema.
 

@@ -123,6 +123,7 @@ create table if not exists public.sales_channels (
   growth_months_19_24_percent numeric(8, 4) not null default 0,
   growth_years_3_5_percent numeric(8, 4) not null default 0,
   collection_days numeric(8, 2) not null default 30,
+  unit_sales_price numeric(14, 4),
   customer_acquisition_cost numeric(14, 2) not null default 0,
   commission_percent numeric(8, 4) not null default 0,
   basket_size numeric(12, 4),
@@ -153,6 +154,7 @@ alter table public.sales_channels
   add column if not exists growth_months_19_24_percent numeric(8, 4) not null default 0,
   add column if not exists growth_years_3_5_percent numeric(8, 4) not null default 0,
   add column if not exists collection_days numeric(8, 2) not null default 30,
+  add column if not exists unit_sales_price numeric(14, 4),
   add column if not exists customer_acquisition_cost numeric(14, 2) not null default 0,
   add column if not exists commission_percent numeric(8, 4) not null default 0,
   add column if not exists basket_size numeric(12, 4),
@@ -609,7 +611,7 @@ begin
     insert into public.sales_channels (
       company_id, id, name, type_id, product_id, start_month, monthly_sales_units,
       growth_months_1_6_percent, growth_months_7_18_percent, growth_months_19_24_percent,
-      growth_years_3_5_percent, collection_days, customer_acquisition_cost, commission_percent,
+      growth_years_3_5_percent, collection_days, unit_sales_price, customer_acquisition_cost, commission_percent,
       basket_size, conversion_rate_percent, traffic_score, repeat_rate_percent, churn_rate_percent,
       discount_rate_percent, return_rate_percent, capacity_limit, launch_fee, moq_monthly,
       failure_probability_percent, ramp_up_months, seasonality_curve
@@ -627,6 +629,7 @@ begin
       greatest(0, coalesce(nullif(v_entry->>'growthMonths19To24Percent', '')::numeric, 0)),
       greatest(0, coalesce(nullif(v_entry->>'growthYears3To5Percent', '')::numeric, 0)),
       greatest(0, coalesce(nullif(v_entry->>'collectionDays', '')::numeric, 30)),
+      nullif(v_entry->>'unitSalesPrice', '')::numeric,
       greatest(0, coalesce(nullif(v_entry->>'customerAcquisitionCost', '')::numeric, 0)),
       greatest(0, coalesce(nullif(v_entry->>'commissionPercent', '')::numeric, 0)),
       nullif(v_entry->>'basketSize', '')::numeric,

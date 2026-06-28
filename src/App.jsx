@@ -429,6 +429,123 @@ function formatMonthLabel(date) {
   return new Intl.DateTimeFormat(locale, { month: "short", year: "numeric" }).format(date);
 }
 
+function formatTrendAxisAmount(value) {
+  const safeValue = toFiniteNumber(value);
+  const absoluteValue = Math.abs(safeValue);
+  const sign = safeValue < 0 ? "-" : "";
+  const isTurkish = document.documentElement.lang === "tr";
+
+  if (absoluteValue >= 1_000_000_000) return `${sign}${formatNumber(absoluteValue / 1_000_000_000, 1)} ${isTurkish ? "Mr" : "B"}`;
+  if (absoluteValue >= 1_000_000) return `${sign}${formatNumber(absoluteValue / 1_000_000, 1)} Mn`;
+  if (absoluteValue >= 1_000) return `${sign}${formatNumber(absoluteValue / 1_000, 1)} ${isTurkish ? "Bin" : "K"}`;
+
+  return `${sign}${formatNumber(absoluteValue)}`;
+}
+
+function getFinancialTrendRowDate(row, index) {
+  const parsedPeriodDate = parseDateInput(row?.period);
+  if (parsedPeriodDate) return parsedPeriodDate;
+
+  const periodNumber = Math.max(1, Math.round(toFiniteNumber(row?.period, index + 1)));
+  return addMonths(getMonthStart(new Date()), periodNumber - 1);
+}
+
+function buildIncomeExpenseTrendChart(rows = []) {
+  const plot = {
+    bottom: 210,
+    left: 82,
+    right: 438,
+    top: 38,
+  };
+  const sanitizedRows = rows.map((row, index) => ({
+    cost: Math.max(0, toFiniteNumber(row.totalCost)),
+    date: getFinancialTrendRowDate(row, index),
+    revenue: Math.max(0, toFiniteNumber(row.salesRevenue)),
+  }));
+  const maxValue = Math.max(
+    1,
+    ...sanitizedRows.flatMap((row) => [row.revenue, row.cost]),
+  );
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+    const y = plot.bottom - (ratio * (plot.bottom - plot.top));
+
+    return {
+      label: formatTrendAxisAmount(maxValue * ratio),
+      value: maxValue * ratio,
+      y,
+    };
+  });
+  const getX = (index) => (
+    sanitizedRows.length <= 1
+      ? plot.left
+      : plot.left + (index * ((plot.right - plot.left) / (sanitizedRows.length - 1)))
+  );
+  const getY = (value) => plot.bottom - ((Math.max(0, value) / maxValue) * (plot.bottom - plot.top));
+  const getPoints = (field) => sanitizedRows.map((row, index) => ({
+    value: row[field],
+    x: getX(index),
+    y: getY(row[field]),
+  }));
+  const buildPath = (points) => {
+    if (!points.length) return "";
+    if (points.length === 1) return `M${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+
+    return points.reduce((path, point, index) => {
+      if (index === 0) return `M${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+
+      const previous = points[index - 1];
+      const beforePrevious = points[index - 2] || previous;
+      const next = points[index + 1] || point;
+      const controlOneX = previous.x + ((point.x - beforePrevious.x) / 6);
+      const controlTwoX = point.x - ((next.x - previous.x) / 6);
+
+      return `${path} C${controlOneX.toFixed(2)} ${previous.y.toFixed(2)}, ${controlTwoX.toFixed(2)} ${point.y.toFixed(2)}, ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+    }, "");
+  };
+  const revenuePoints = getPoints("revenue");
+  const costPoints = getPoints("cost");
+  const revenuePath = buildPath(revenuePoints);
+  const costPath = buildPath(costPoints);
+  const buildAreaPath = (path, points) => {
+    if (!path || !points.length) return "";
+
+    const firstPoint = points[0];
+    const lastPoint = points[points.length - 1];
+    return `${path} L${lastPoint.x.toFixed(2)} ${plot.bottom} L${firstPoint.x.toFixed(2)} ${plot.bottom} Z`;
+  };
+  const xTickIndexes = [];
+
+  if (sanitizedRows.length) {
+    const maxTicks = Math.min(6, sanitizedRows.length);
+    const step = maxTicks <= 1 ? 1 : Math.max(1, Math.ceil((sanitizedRows.length - 1) / (maxTicks - 1)));
+
+    for (let index = 0; index < sanitizedRows.length; index += step) {
+      xTickIndexes.push(index);
+    }
+
+    if (xTickIndexes[xTickIndexes.length - 1] !== sanitizedRows.length - 1) {
+      xTickIndexes.push(sanitizedRows.length - 1);
+    }
+  }
+
+  return {
+    axisPath: `M${plot.left} ${plot.top} V${plot.bottom} H${plot.right}`,
+    costAreaPath: buildAreaPath(costPath, costPoints),
+    costPath,
+    costPoints,
+    gridPath: yTicks.map((tick) => `M${plot.left} ${tick.y.toFixed(2)} H${plot.right}`).join(" "),
+    plot,
+    revenueAreaPath: buildAreaPath(revenuePath, revenuePoints),
+    revenuePath,
+    revenuePoints,
+    xTicks: xTickIndexes.map((index) => ({
+      label: formatMonthLabel(sanitizedRows[index].date),
+      x: getX(index),
+    })),
+    yTicks,
+  };
+}
+
 function getMonthlyLoanPayment(amount, annualInterestRate, termMonths) {
   const principal = Math.max(0, toFiniteNumber(amount));
   const term = Math.max(1, Math.round(toFiniteNumber(termMonths, 1)));
@@ -720,7 +837,8 @@ function calculateChannelMonth(monthIndex, salesStrategy, operationsWorkspace = 
     const availableUnits = productId ? Math.max(0, productionByProduct.get(productId) || 0) : 0;
     const channelUnits = Math.min(desiredUnits, availableUnits);
     const product = productMap.get(productId) || channel.product || {};
-    const price = Math.max(0, toFiniteNumber(product.price)) * priceIncreaseMultiplier;
+    const channelUnitPrice = getOptionalPositiveNumber(channel.unitSalesPrice);
+    const price = Math.max(0, channelUnitPrice ?? toFiniteNumber(product.price)) * priceIncreaseMultiplier;
     const commissionRate = Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100;
     const discountRate = Math.max(0, toFiniteNumber(channel.discountRatePercent)) / 100;
     const returnRate = Math.max(0, toFiniteNumber(channel.returnRatePercent)) / 100;
@@ -1743,6 +1861,7 @@ function App() {
         startMonth: 1,
         trafficScore: "",
         typeId: salesStrategy.channelTypes?.[0]?.id || "direct",
+        unitSalesPrice: "",
       },
     };
 
@@ -4262,7 +4381,7 @@ function App() {
   function renderFinancialModellingPage() {
     const model = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, financialHorizon);
     const summary = model.summary || emptyFinancialModel.summary;
-    const chart = model.trendChart || emptyFinancialModel.trendChart;
+    const incomeExpenseTrendChart = buildIncomeExpenseTrendChart(model.trendRows || []);
     const currentFinancialPage = activeFinancialSubmodule || financialSubmodules[0];
     const investmentTotal = (summary.machinePurchaseCost || 0) + (summary.equipmentPurchaseCost || 0) + (summary.extraInitialCost || 0) + (summary.workingCapitalRequirement || 0);
     const returnOnInvestment = investmentTotal ? `${formatNumber(((summary.netIncome || 0) / investmentTotal) * 100, 1)}%` : "-";
@@ -4286,6 +4405,107 @@ function App() {
       writeOffCost: copy("Spoilage, returns and expired write-off", "Bozulma, iade ve SKT fireleri"),
     };
     const getFinancialRowLabel = (row) => financialRowLabels[row.id] || row.label;
+    const renderIncomeExpenseTrendSvg = (ariaLabel) => {
+      const revenuePoints = incomeExpenseTrendChart.revenuePoints || [];
+      const costPoints = incomeExpenseTrendChart.costPoints || [];
+      const latestRevenuePoint = revenuePoints[revenuePoints.length - 1];
+      const latestCostPoint = costPoints[costPoints.length - 1];
+      const badgeHeight = 34;
+      const badgeMinGap = 8;
+      const badgeTop = 36;
+      const badgeBottom = 200;
+      const badgeX = 454;
+      const clampBadgeY = (value) => Math.min(badgeBottom, Math.max(badgeTop, value));
+      let revenueBadgeY = latestRevenuePoint ? clampBadgeY(latestRevenuePoint.y - (badgeHeight / 2)) : 0;
+      let costBadgeY = latestCostPoint ? clampBadgeY(latestCostPoint.y - (badgeHeight / 2)) : 0;
+
+      if (latestRevenuePoint && latestCostPoint && Math.abs(revenueBadgeY - costBadgeY) < badgeHeight + badgeMinGap) {
+        const midpoint = clampBadgeY(((revenueBadgeY + costBadgeY) / 2) - (badgeHeight / 2));
+        const revenueIsAbove = latestRevenuePoint.y <= latestCostPoint.y;
+
+        revenueBadgeY = revenueIsAbove ? midpoint : midpoint + badgeHeight + badgeMinGap;
+        costBadgeY = revenueIsAbove ? midpoint + badgeHeight + badgeMinGap : midpoint;
+
+        const lowestBadgeY = Math.max(revenueBadgeY, costBadgeY);
+        const highestBadgeY = Math.min(revenueBadgeY, costBadgeY);
+
+        if (lowestBadgeY > badgeBottom) {
+          const overflow = lowestBadgeY - badgeBottom;
+          revenueBadgeY -= overflow;
+          costBadgeY -= overflow;
+        }
+
+        if (highestBadgeY < badgeTop) {
+          const underflow = badgeTop - highestBadgeY;
+          revenueBadgeY += underflow;
+          costBadgeY += underflow;
+        }
+      }
+
+      return (
+        <svg className="trend-chart finance-model-chart" viewBox="0 0 560 280" role="img" aria-label={ariaLabel}>
+          <defs>
+            <linearGradient id="incomeTrendSurface" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-cyan)" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="var(--color-cyan)" stopOpacity="0.02" />
+            </linearGradient>
+            <linearGradient id="expenseTrendSurface" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-amber)" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="var(--color-amber)" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          <rect className="chart-panel" x="50" y="20" width="490" height="224" rx="8" />
+          <text className="axis-label axis-label-y chart-axis-title" x={incomeExpenseTrendChart.plot.left} y="18">{copy("Amount (TRY)", "Tutar (TRY)")}</text>
+          <text className="axis-label axis-label-x" x="260" y="266">{copy("Date", "Tarih")}</text>
+          <path className="chart-grid" d={incomeExpenseTrendChart.gridPath} />
+          {incomeExpenseTrendChart.xTicks.map((tick) => (
+            <line className="chart-x-guide" x1={tick.x} x2={tick.x} y1={incomeExpenseTrendChart.plot.top} y2={incomeExpenseTrendChart.plot.bottom} key={`guide-${tick.x}`} />
+          ))}
+          <path className="chart-axis" d={incomeExpenseTrendChart.axisPath} />
+          {incomeExpenseTrendChart.yTicks.map((tick) => (
+            <text className="chart-tick chart-tick-y" x={incomeExpenseTrendChart.plot.left - 8} y={tick.y + 4} textAnchor="end" key={tick.value}>
+              {tick.label}
+            </text>
+          ))}
+          {incomeExpenseTrendChart.xTicks.map((tick) => (
+            <text className="chart-tick chart-tick-x" x={tick.x} y="235" textAnchor="middle" key={`${tick.x}-${tick.label}`}>
+              {tick.label}
+            </text>
+          ))}
+          {incomeExpenseTrendChart.revenueAreaPath && <path className="trend-area sales" d={incomeExpenseTrendChart.revenueAreaPath} />}
+          {incomeExpenseTrendChart.costAreaPath && <path className="trend-area costs" d={incomeExpenseTrendChart.costAreaPath} />}
+          <line className="chart-badge-rail" x1="448" x2="448" y1="34" y2="218" />
+          {incomeExpenseTrendChart.revenuePath && <path className="trend-line sales" d={incomeExpenseTrendChart.revenuePath} />}
+          {incomeExpenseTrendChart.costPath && <path className="trend-line costs" d={incomeExpenseTrendChart.costPath} />}
+          {revenuePoints.map((point, index) => (
+            <circle className="trend-point sales" cx={point.x} cy={point.y} r={index === revenuePoints.length - 1 ? 4.8 : 3.2} key={`sales-${index}`} />
+          ))}
+          {costPoints.map((point, index) => (
+            <circle className="trend-point costs" cx={point.x} cy={point.y} r={index === costPoints.length - 1 ? 4.8 : 3.2} key={`cost-${index}`} />
+          ))}
+          {latestRevenuePoint && (
+            <>
+              <path className="chart-badge-connector sales" d={`M${latestRevenuePoint.x + 7} ${latestRevenuePoint.y} C${latestRevenuePoint.x + 28} ${latestRevenuePoint.y}, ${badgeX - 18} ${revenueBadgeY + 17}, ${badgeX} ${revenueBadgeY + 17}`} />
+              <g className="chart-value-badge sales" transform={`translate(${badgeX} ${revenueBadgeY})`}>
+                <rect width="86" height={badgeHeight} rx="8" />
+                <text className="chart-value-badge-label" x="12" y="13">{copy("Income", "Gelir")}</text>
+                <text className="chart-value-badge-amount" x="12" y="27">{formatTrendAxisAmount(latestRevenuePoint.value)}</text>
+              </g>
+            </>
+          )}
+          {latestCostPoint && (
+            <>
+              <path className="chart-badge-connector costs" d={`M${latestCostPoint.x + 7} ${latestCostPoint.y} C${latestCostPoint.x + 28} ${latestCostPoint.y}, ${badgeX - 18} ${costBadgeY + 17}, ${badgeX} ${costBadgeY + 17}`} />
+              <g className="chart-value-badge costs" transform={`translate(${badgeX} ${costBadgeY})`}>
+                <rect width="86" height={badgeHeight} rx="8" />
+                <text className="chart-value-badge-label" x="12" y="13">{copy("Expense", "Gider")}</text>
+                <text className="chart-value-badge-amount" x="12" y="27">{formatTrendAxisAmount(latestCostPoint.value)}</text>
+              </g>
+            </>
+          )}
+        </svg>
+      );
+    };
     const financialPageMeta = {
       inputs: {
         description: copy("Enter financial assumptions and extra costs used by the feasibility model.", "Fizibilite modelinde kullanılacak finansal varsayımları ve ek giderleri girin."),
@@ -4907,7 +5127,7 @@ function App() {
     const renderFinancialTrendCard = () => (
       <article className="financial-card financial-overview-wide">
         <div className="financial-card-heading">
-          <h2>{copy("Income, Expense and Net Projection", "Gelir, Gider ve Net Projeksiyonu")}</h2>
+          <h2>{copy("Income and Expense Projection", "Gelir ve Gider Projeksiyonu")}</h2>
           <div className="mini-tabs">
             {[
               ["6m", copy("6 Months", "6 Ay")],
@@ -4931,21 +5151,8 @@ function App() {
         <div className="chart-legend" aria-label={copy("Chart color legend", "Grafik renk açıklaması")}>
           <span className="legend-sales">{copy("Income", "Gelir")}</span>
           <span className="legend-costs">{copy("Expense", "Gider")}</span>
-          <span className="legend-net">{copy("Net", "Net")}</span>
         </div>
-        <svg className="trend-chart finance-model-chart" viewBox="0 0 560 280" role="img" aria-label={copy("Income, expense, and net projection chart", "Gelir, gider ve net projeksiyon grafiği")}>
-          <text className="axis-label axis-label-y" x="-162" y="18" transform="rotate(-90)">{copy("Amount (TRY)", "Tutar (TRY)")}</text>
-          <text className="axis-label axis-label-x" x="272" y="262">{copy("Projection period", "Projeksiyon dönemi")}</text>
-          <path className="chart-grid" d="M30 40 H500 M30 82.5 H500 M30 125 H500 M30 167.5 H500 M30 210 H500" />
-          <path className="chart-axis" d="M30 30 V210 H500" />
-          <text className="chart-tick" x="30" y="214">0</text>
-          <text className="chart-tick" x="24" y="44">{copy("High", "Yüksek")}</text>
-          <text className="chart-tick" x="30" y="232">{copy("Start", "Başlangıç")}</text>
-          <text className="chart-tick chart-tick-end" x="500" y="232">{copy("End", "Bitiş")}</text>
-          {chart.salesPath && <path className="trend-line sales" d={chart.salesPath} />}
-          {chart.costPath && <path className="trend-line costs" d={chart.costPath} />}
-          {chart.netPath && <path className="trend-line net" d={chart.netPath} />}
-        </svg>
+        {renderIncomeExpenseTrendSvg(copy("Income and expense projection chart", "Gelir ve gider projeksiyon grafiği"))}
       </article>
     );
     const overviewFinancialRows = [
@@ -5761,21 +5968,8 @@ function App() {
             <div className="chart-legend" aria-label={copy("Chart color legend", "Grafik renk açıklaması")}>
               <span className="legend-sales">{copy("Sales revenue", "Satış kazançları")}</span>
               <span className="legend-costs">{copy("Expenses", "Giderler")}</span>
-              <span className="legend-net">{copy("Net income", "Net kazanç")}</span>
             </div>
-              <svg className="trend-chart finance-model-chart" viewBox="0 0 560 280" role="img" aria-label={copy("Sales revenue, expenses, and net income projection chart", "Satış kazançları, giderler ve net kazanç projeksiyon grafiği")}>
-                <text className="axis-label axis-label-y" x="-162" y="18" transform="rotate(-90)">{copy("Amount (TRY)", "Tutar (TRY)")}</text>
-                <text className="axis-label axis-label-x" x="272" y="262">{copy("Projection period", "Projeksiyon dönemi")}</text>
-                <path className="chart-grid" d="M30 40 H500 M30 82.5 H500 M30 125 H500 M30 167.5 H500 M30 210 H500" />
-                <path className="chart-axis" d="M30 30 V210 H500" />
-                <text className="chart-tick" x="30" y="214">0</text>
-                <text className="chart-tick" x="24" y="44">{copy("High", "Yüksek")}</text>
-                <text className="chart-tick" x="30" y="232">{copy("Start", "Başlangıç")}</text>
-                <text className="chart-tick chart-tick-end" x="500" y="232">{copy("End", "Bitiş")}</text>
-                {chart.salesPath && <path className="trend-line sales" d={chart.salesPath} />}
-                {chart.costPath && <path className="trend-line costs" d={chart.costPath} />}
-                {chart.netPath && <path className="trend-line net" d={chart.netPath} />}
-              </svg>
+            {renderIncomeExpenseTrendSvg(copy("Sales revenue and expenses projection chart", "Satış kazançları ve giderler projeksiyon grafiği"))}
             </article>
 
             <article className="financial-card cost-card">
@@ -6311,7 +6505,7 @@ function App() {
     const totalReadyUnits = operationsWorkspace.products.reduce((total, product) => total + Math.max(0, getProductAvailability(product.id).remaining), 0);
     const totalMonthlyCommission = salesStrategy.channels.reduce((total, channel) => {
       const product = productMap.get(channel.productId) || channel.product || {};
-      const productPriceTry = convertMoneyToTry(product.price, product.price_currency, exchangeRates);
+      const productPriceTry = getOptionalPositiveNumber(channel.unitSalesPrice) ?? convertMoneyToTry(product.price, product.price_currency, exchangeRates);
       const grossRevenue = Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) * Math.max(0, productPriceTry);
       return total + (grossRevenue * Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100);
     }, 0);
@@ -6365,6 +6559,7 @@ function App() {
       { field: "basketSize", label: copy("Basket Size", "Sepet Büyüklüğü"), min: 0, step: "0.01" },
       { field: "conversionRatePercent", label: copy("Conversion Rate (%)", "Dönüşüm Oranı (%)"), min: 0, step: "0.001" },
       { field: "trafficScore", info: copy("A simple demand strength multiplier. 1 keeps demand unchanged, 1.2 lifts it by 20%, 0.8 lowers it by 20%.", "Basit talep gücü çarpanı. 1 talebi değiştirmez, 1,2 %20 artırır, 0,8 %20 düşürür."), label: copy("Traffic Score", "Trafik Skoru"), min: 0, step: "0.01" },
+      { field: "unitSalesPrice", info: copy("Optional channel-specific TRY price. If empty, finance uses the selected product price.", "Opsiyonel kanala özel TL satış fiyatı. Boş bırakılırsa finans seçili ürün fiyatını kullanır."), label: copy("Channel Unit Price (TRY)", "Kanal Birim Fiyatı (TL)"), min: 0, step: "0.01" },
       { field: "repeatRatePercent", label: copy("Repeat Rate (%)", "Tekrar Oranı (%)"), min: 0, step: "0.001" },
       { field: "churnRatePercent", label: copy("Churn Rate (%)", "Kayıp Oranı (%)"), min: 0, step: "0.001" },
       { field: "discountRatePercent", label: copy("Discount Rate (%)", "İndirim Oranı (%)"), min: 0, step: "0.01" },
