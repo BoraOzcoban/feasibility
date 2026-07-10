@@ -15666,3 +15666,1990 @@ textarea:focus-visible {
     padding: var(--workspace-card-pad);
   }
 }
+
+/* Landing-inspired refinements for the dashboard overview header and assumption controls. */
+.feasibility-dashboard .executive-topbar {
+  backdrop-filter: blur(20px) saturate(1.18);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 90, 138, 0.24), transparent 18rem),
+    radial-gradient(circle at 86% 36%, rgba(37, 184, 255, 0.16), transparent 20rem),
+    linear-gradient(135deg, rgba(5, 5, 9, 0.9), rgba(17, 17, 26, 0.84));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 24px 76px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  grid-template-columns: minmax(0, 1.25fr) auto minmax(140px, 0.45fr) auto;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.feasibility-dashboard .executive-topbar::before {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.052) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.046) 1px, transparent 1px);
+  background-size: 34px 34px;
+  content: "";
+  inset: 0;
+  opacity: 0.34;
+  pointer-events: none;
+  position: absolute;
+}
+
+.feasibility-dashboard .executive-topbar > * {
+  position: relative;
+  z-index: 1;
+}
+
+.feasibility-dashboard .command-context,
+.feasibility-dashboard .command-user {
+  background: rgba(255, 255, 255, 0.075);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.feasibility-dashboard .command-context strong,
+.feasibility-dashboard .command-user span,
+.feasibility-dashboard .command-live strong {
+  color: #ffffff;
+}
+
+.feasibility-dashboard .command-context span,
+.feasibility-dashboard .command-user small {
+  color: rgba(255, 255, 255, 0.68);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feasibility-dashboard .command-live {
+  background:
+    linear-gradient(135deg, rgba(185, 255, 102, 0.16), rgba(37, 184, 255, 0.09));
+  border-color: rgba(185, 255, 102, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.feasibility-dashboard .command-live .live-dot {
+  background: var(--app-lime);
+  box-shadow: 0 0 0 5px rgba(185, 255, 102, 0.14);
+}
+
+.feasibility-dashboard .command-run-button {
+  align-self: stretch;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.36), transparent 34%),
+    linear-gradient(135deg, var(--app-pink), var(--app-violet) 58%, #11111a);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 18px 46px rgba(163, 76, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  min-height: 44px;
+  padding-inline: 18px;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip {
+  backdrop-filter: blur(18px) saturate(1.14);
+  background:
+    radial-gradient(circle at 82% 2%, rgba(255, 90, 138, 0.28), transparent 23rem),
+    radial-gradient(circle at 14% 86%, rgba(37, 184, 255, 0.16), transparent 24rem),
+    linear-gradient(135deg, rgba(5, 5, 9, 0.94), rgba(17, 16, 28, 0.86));
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 28px 88px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  gap: 16px;
+  grid-template-columns: minmax(180px, 0.38fr) minmax(0, 1fr);
+  padding: 18px;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip::after {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.052) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.046) 1px, transparent 1px);
+  background-size: 34px 34px;
+  opacity: 0.34;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-heading {
+  min-width: 0;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-heading span,
+.feasibility-dashboard .dashboard-assumption-strip-controls label > span {
+  color: rgba(255, 218, 229, 0.92);
+  font-size: 0.64rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-heading h2 {
+  font-size: clamp(1.18rem, 1.7vw, 1.72rem);
+  line-height: 1.05;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls {
+  align-items: stretch;
+  gap: 8px;
+  grid-template-columns: 1fr;
+  min-width: 0;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls label {
+  background:
+    radial-gradient(circle at 14% 0%, rgba(255, 90, 138, 0.22), transparent 55%),
+    radial-gradient(circle at 86% 14%, rgba(37, 184, 255, 0.14), transparent 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.045));
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 10px;
+  position: relative;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls label::before {
+  background: linear-gradient(90deg, var(--app-pink), var(--app-violet), var(--app-blue));
+  content: "";
+  height: 2px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls label > span,
+.feasibility-dashboard .dashboard-assumption-strip-controls select {
+  position: relative;
+  z-index: 1;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls select {
+  background:
+    linear-gradient(135deg, rgba(5, 5, 9, 0.62), rgba(17, 17, 26, 0.48));
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 12px 30px rgba(0, 0, 0, 0.14);
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 750;
+  line-height: 1.2;
+  min-height: 38px;
+  padding: 0 34px 0 10px;
+  text-overflow: ellipsis;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls select:hover {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.07));
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow:
+    0 0 0 4px rgba(255, 90, 138, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 16px 38px rgba(0, 0, 0, 0.18);
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls select:focus {
+  border-color: rgba(255, 90, 138, 0.76);
+  box-shadow:
+    0 0 0 4px rgba(255, 90, 138, 0.16),
+    0 16px 38px rgba(0, 0, 0, 0.18);
+}
+
+.feasibility-dashboard .assumption-control::after {
+  border-color: rgba(255, 255, 255, 0.86);
+  bottom: 19px;
+  right: 20px;
+  top: auto;
+}
+
+.feasibility-dashboard .assumption-strip-list {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls option {
+  font-size: 0.72rem;
+}
+
+.feasibility-dashboard .assumption-strip-list span {
+  background: rgba(255, 255, 255, 0.075);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+@media (max-width: 1180px) {
+  .feasibility-dashboard .executive-topbar,
+  .feasibility-dashboard .dashboard-assumption-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .feasibility-dashboard .command-live,
+  .feasibility-dashboard .command-run-button {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .feasibility-dashboard .command-live,
+  .feasibility-dashboard .command-run-button {
+    justify-self: stretch;
+  }
+
+  .feasibility-dashboard .command-live {
+    white-space: normal;
+  }
+
+  .feasibility-dashboard .dashboard-assumption-strip-controls,
+  .feasibility-dashboard .assumption-strip-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Fixed, user-toggleable dashboard menu. */
+.dashboard-shell {
+  --dashboard-sidebar-width: 250px;
+  --dashboard-sidebar-closed-width: 76px;
+  grid-template-columns: var(--dashboard-sidebar-width) minmax(0, 1fr);
+  transition: grid-template-columns 180ms ease;
+}
+
+.dashboard-shell.sidebar-collapsed {
+  grid-template-columns: var(--dashboard-sidebar-closed-width) minmax(0, 1fr);
+}
+
+.dashboard-sidebar {
+  align-content: stretch;
+  box-sizing: border-box;
+  gap: 14px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100svh;
+  left: 0;
+  max-height: 100svh;
+  overflow: hidden;
+  padding: 16px;
+  position: fixed;
+  top: 0;
+  width: var(--dashboard-sidebar-width);
+  z-index: 20;
+}
+
+.sidebar-collapsed .dashboard-sidebar {
+  padding: 14px 10px;
+  width: var(--dashboard-sidebar-closed-width);
+}
+
+.dashboard-content {
+  grid-column: 2;
+}
+
+.dashboard-sidebar-top {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+  width: 100%;
+}
+
+.dashboard-sidebar-toggle {
+  align-items: center;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 34px;
+  font-size: 0.94rem;
+  font-weight: 950;
+  height: 34px;
+  justify-content: center;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+  width: 34px;
+}
+
+.dashboard-sidebar-toggle:hover {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.24), transparent 34%),
+    linear-gradient(135deg, rgba(255, 90, 138, 0.24), rgba(37, 184, 255, 0.13));
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.dashboard-brand-block {
+  min-width: 0;
+}
+
+.dashboard-brand-block .dashboard-controls {
+  margin-top: 2px;
+}
+
+.dashboard-nav {
+  align-content: start;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dashboard-nav button {
+  min-width: 0;
+}
+
+.sidebar-footer {
+  margin-top: 0;
+  min-width: 0;
+}
+
+.sidebar-collapsed .dashboard-brand {
+  justify-content: center;
+  padding: 6px;
+  width: 42px;
+}
+
+.sidebar-collapsed .dashboard-brand strong,
+.sidebar-collapsed .dashboard-controls,
+.sidebar-collapsed .dashboard-nav,
+.sidebar-collapsed .sidebar-footer {
+  display: none;
+}
+
+.sidebar-collapsed .dashboard-sidebar-top {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.sidebar-collapsed .dashboard-sidebar-toggle {
+  transform: none;
+}
+
+@media (max-width: 980px) {
+  .dashboard-shell,
+  .dashboard-shell.sidebar-collapsed {
+    min-width: 0;
+  }
+
+  .dashboard-sidebar {
+    border-bottom: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
+    min-height: 100svh;
+  }
+}
+
+/* Operations resource entry pages: tall vertical forms with scrollable database records. */
+.operations-workspace.operations-modern .operations-record-pair,
+.operations-workspace.operations-modern .resource-definition-grid {
+  align-items: stretch;
+}
+
+.operations-workspace.operations-modern .operations-record-pair {
+  grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
+}
+
+.operations-workspace.operations-modern .operations-record-form-card,
+.operations-workspace.operations-modern .operations-record-list-card {
+  box-sizing: border-box;
+  display: grid;
+  height: min(680px, max(560px, calc(100svh - 220px)));
+  min-height: 560px;
+  overflow: hidden;
+}
+
+.operations-workspace.operations-modern .operations-record-form-card {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.operations-workspace.operations-modern .operations-record-form-card .operation-data-fields {
+  align-content: start;
+  grid-template-columns: 1fr;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.operations-workspace.operations-modern .operations-record-form-card .operation-data-fields label {
+  gap: 5px;
+}
+
+.operations-workspace.operations-modern .operations-record-form-card .operation-data-fields input,
+.operations-workspace.operations-modern .operations-record-form-card .operation-data-fields select,
+.operations-workspace.operations-modern .operations-record-form-card .operation-data-fields textarea {
+  min-height: 38px;
+}
+
+.operations-workspace.operations-modern .operations-record-list-card {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.operations-workspace.operations-modern .operations-record-list-card .operation-data-table,
+.operations-workspace.operations-modern .operations-record-list-card .compact-resource-list {
+  min-height: 0;
+  overflow: auto;
+}
+
+.operations-workspace.operations-modern .operations-record-list-card .operation-data-table {
+  border-color: rgba(255, 255, 255, 0.12);
+  min-width: 0;
+}
+
+.operations-workspace.operations-modern .operations-record-list-card .operation-data-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.operations-workspace.operations-modern .compact-resource-record {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid rgba(8, 9, 16, 0.1);
+  border-left: 5px solid var(--app-violet);
+  border-radius: 8px;
+  box-shadow: 0 14px 42px rgba(8, 9, 16, 0.08);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 62px;
+  padding: 10px;
+}
+
+.operations-workspace.operations-modern .compact-resource-record:nth-child(2n) {
+  border-left-color: var(--app-blue);
+}
+
+.operations-workspace.operations-modern .compact-resource-record > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.operations-workspace.operations-modern .compact-resource-record strong {
+  color: var(--app-ink);
+}
+
+.operations-workspace.operations-modern .compact-resource-record small {
+  color: #5f596b;
+  line-height: 1.35;
+}
+
+.operations-workspace.operations-modern .record-copy-button,
+.operations-workspace.operations-modern .compact-resource-record button {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.34), transparent 34%),
+    linear-gradient(135deg, var(--app-pink), var(--app-violet) 58%, #171725);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  box-shadow:
+    0 12px 30px rgba(163, 76, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 900;
+  min-height: 32px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.operations-workspace.operations-modern .record-copy-button:hover,
+.operations-workspace.operations-modern .compact-resource-record button:hover {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 980px) {
+  .operations-workspace.operations-modern .operations-record-pair,
+  .operations-workspace.operations-modern .resource-definition-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-workspace.operations-modern .operations-record-form-card,
+  .operations-workspace.operations-modern .operations-record-list-card {
+    height: auto;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .operations-workspace.operations-modern .operations-record-list-card .operation-data-table,
+  .operations-workspace.operations-modern .operations-record-list-card .compact-resource-list {
+    max-height: 420px;
+  }
+}
+
+/* Mevcut Surecler-inspired visual pass for the editable Operations pages. */
+.operations-entry-page,
+.operations-process-page {
+  --entry-ink: #101827;
+  --entry-muted: #4c5968;
+  --entry-soft: #f4faf8;
+  --entry-line: rgba(16, 43, 50, 0.13);
+  --entry-line-strong: rgba(24, 117, 101, 0.28);
+  --entry-teal: #187565;
+  --entry-cyan: #2f9fbd;
+  --entry-amber: #d99a24;
+}
+
+.operations-entry-page .operations-record-form-card,
+.operations-entry-page .operations-record-list-card,
+.operations-products-page .operations-product-form-card,
+.operations-products-page .operations-product-list-card,
+.operations-process-page .planner-input-card,
+.operations-process-page .planner-result-card,
+.operations-process-page .process-setup-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(242, 249, 247, 0.96)) !important;
+  border: 1px solid var(--entry-line-strong) !important;
+  border-radius: 8px;
+  box-shadow:
+    0 22px 58px rgba(7, 21, 32, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  color: var(--entry-ink);
+  overflow: hidden;
+  position: relative;
+}
+
+.operations-entry-page .operations-record-form-card::after,
+.operations-entry-page .operations-record-list-card::after,
+.operations-products-page .operations-product-form-card::after,
+.operations-products-page .operations-product-list-card::after,
+.operations-process-page .planner-input-card::after,
+.operations-process-page .planner-result-card::after,
+.operations-process-page .process-setup-card::after {
+  background: linear-gradient(90deg, var(--entry-teal), var(--entry-cyan), var(--entry-amber));
+  content: "";
+  height: 4px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.operations-entry-page .operation-card-heading,
+.operations-products-page .operation-card-heading,
+.operations-process-page .operation-card-heading,
+.operations-process-page .resource-section-header {
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(16, 43, 50, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.operations-entry-page .operation-card-heading h2,
+.operations-products-page .operation-card-heading h2,
+.operations-process-page .operation-card-heading h2,
+.operations-process-page .resource-section-header h2 {
+  color: var(--entry-ink) !important;
+}
+
+.operations-entry-page .operation-card-heading span,
+.operations-entry-page .operation-data-fields label,
+.operations-entry-page .label-with-info,
+.operations-products-page .operation-data-fields label,
+.operations-products-page .resource-row-grid label,
+.operations-products-page .label-with-info,
+.operations-process-page .operation-card-heading span,
+.operations-process-page .resource-section-header span,
+.operations-process-page .planner-fields label,
+.operations-process-page .resource-row-grid label,
+.operations-process-page .label-with-info {
+  color: var(--entry-muted) !important;
+  letter-spacing: 0;
+}
+
+.operations-entry-page .operation-card-heading span,
+.operations-products-page .operation-card-heading span,
+.operations-process-page .operation-card-heading span,
+.operations-process-page .resource-section-header span {
+  color: var(--entry-teal) !important;
+  font-weight: 950;
+}
+
+.operations-entry-page .operation-data-fields,
+.operations-products-page .operation-data-fields,
+.operations-process-page .planner-fields {
+  gap: 12px;
+}
+
+.operations-entry-page .operation-data-fields input,
+.operations-entry-page .operation-data-fields select,
+.operations-entry-page .operation-data-fields textarea,
+.operations-products-page .operation-data-fields input,
+.operations-products-page .operation-data-fields select,
+.operations-products-page .operation-data-fields textarea,
+.operations-products-page .resource-row-grid input,
+.operations-products-page .resource-row-grid select,
+.operations-process-page .planner-fields input,
+.operations-process-page .planner-fields select,
+.operations-process-page .resource-row-grid input,
+.operations-process-page .resource-row-grid select {
+  background: #ffffff !important;
+  border: 1px solid color-mix(in srgb, var(--entry-line) 72%, var(--entry-cyan)) !important;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  color: var(--entry-ink) !important;
+  font-weight: 850;
+  min-height: 42px;
+}
+
+.operations-process-page .planner-fields label > div {
+  background: #ffffff !important;
+  border: 1px solid color-mix(in srgb, var(--entry-line) 72%, var(--entry-cyan)) !important;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.operations-entry-page .operation-data-fields input:focus,
+.operations-entry-page .operation-data-fields select:focus,
+.operations-entry-page .operation-data-fields textarea:focus,
+.operations-products-page .operation-data-fields input:focus,
+.operations-products-page .operation-data-fields select:focus,
+.operations-products-page .operation-data-fields textarea:focus,
+.operations-products-page .resource-row-grid input:focus,
+.operations-products-page .resource-row-grid select:focus,
+.operations-process-page .planner-fields label:focus-within,
+.operations-process-page .resource-row-grid input:focus,
+.operations-process-page .resource-row-grid select:focus {
+  border-color: var(--entry-cyan) !important;
+  box-shadow: 0 0 0 4px rgba(47, 159, 189, 0.16) !important;
+}
+
+.operations-entry-page .submit-button,
+.operations-entry-page .planner-save-button,
+.operations-products-page .submit-button,
+.operations-products-page .planner-save-button,
+.operations-process-page .planner-save-button,
+.operations-process-page .resource-section-header button,
+.operations-process-page .process-setup-card button,
+.operations-process-page .operation-card-heading button {
+  background:
+    linear-gradient(135deg, #22a88e 0%, #2f9fbd 62%, #0f5f55 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.28) !important;
+  border-radius: 8px;
+  box-shadow:
+    0 16px 36px rgba(24, 117, 101, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+  color: #ffffff !important;
+  font-weight: 950;
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-table,
+.operations-products-page .operations-product-list-card .operation-data-table {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-head,
+.operations-products-page .operations-product-list-card .operation-data-head {
+  background: linear-gradient(135deg, #071418 0%, #102b32 100%) !important;
+  border-color: rgba(126, 222, 207, 0.22) !important;
+  box-shadow: 0 14px 34px rgba(7, 20, 24, 0.16);
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-head span,
+.operations-products-page .operations-product-list-card .operation-data-head span {
+  color: rgba(255, 255, 255, 0.84) !important;
+  font-weight: 950;
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head),
+.operations-entry-page .compact-resource-record,
+.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head),
+.operations-products-page .resource-row-grid,
+.operations-process-page .resource-row-grid,
+.operations-process-page .resource-row-meta,
+.operations-process-page .planner-summary-grid > .result-metric-card,
+.operations-process-page .allocation-grid > .result-metric-card,
+.operations-process-page .cost-breakdown > .result-metric-card,
+.operations-process-page .selected-resource-results div {
+  background: linear-gradient(180deg, #ffffff 0%, var(--entry-soft) 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--metric-tone, var(--entry-teal)) 24%, rgba(16, 43, 50, 0.12)) !important;
+  border-left: 5px solid color-mix(in srgb, var(--metric-tone, var(--entry-teal)) 88%, transparent) !important;
+  border-radius: 8px;
+  box-shadow: 0 14px 38px rgba(16, 43, 50, 0.07) !important;
+  color: var(--entry-muted) !important;
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head):nth-child(3n + 1),
+.operations-entry-page .compact-resource-record:nth-child(3n + 1),
+.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head):nth-child(3n + 1),
+.operations-process-page :is(.resource-row-grid, .result-metric-card):nth-child(3n + 1) {
+  --metric-tone: var(--entry-teal);
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head):nth-child(3n + 2),
+.operations-entry-page .compact-resource-record:nth-child(3n + 2),
+.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head):nth-child(3n + 2),
+.operations-process-page :is(.resource-row-grid, .result-metric-card):nth-child(3n + 2) {
+  --metric-tone: var(--entry-cyan);
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head):nth-child(3n),
+.operations-entry-page .compact-resource-record:nth-child(3n),
+.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head):nth-child(3n),
+.operations-process-page :is(.resource-row-grid, .result-metric-card):nth-child(3n) {
+  --metric-tone: var(--entry-amber);
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head) :is(span, strong, small, b),
+.operations-entry-page .compact-resource-record :is(strong, small),
+.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head) :is(span, strong, small, b),
+.operations-products-page .resource-row-grid :is(strong, small),
+.operations-process-page :is(.resource-row-grid, .resource-row-meta, .result-metric-card, .selected-resource-results div) :is(strong, small, span, b) {
+  color: var(--entry-ink) !important;
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head) small,
+.operations-entry-page .compact-resource-record small,
+.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head) small,
+.operations-products-page .resource-row-grid small,
+.operations-process-page :is(.resource-row-grid, .resource-row-meta, .result-metric-card, .selected-resource-results div) small {
+  color: var(--entry-muted) !important;
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head):hover,
+.operations-entry-page .compact-resource-record:hover,
+.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head):hover,
+.operations-process-page .resource-row-grid:hover {
+  background: #eaf8f4 !important;
+  border-color: rgba(24, 117, 101, 0.32) !important;
+  transform: translateY(-1px);
+}
+
+.operations-entry-page .record-copy-button,
+.operations-entry-page .compact-resource-record button {
+  background: linear-gradient(135deg, var(--entry-teal), var(--entry-cyan)) !important;
+  border: 1px solid rgba(24, 117, 101, 0.24) !important;
+  border-radius: 999px;
+  box-shadow:
+    0 12px 30px rgba(24, 117, 101, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26) !important;
+  color: #ffffff !important;
+}
+
+.operations-products-page .operation-data-grid {
+  grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.18fr);
+}
+
+.operations-products-page .operations-product-form-card {
+  display: grid;
+  gap: 16px;
+}
+
+.operations-products-page .operations-product-form-card .operation-data-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.operations-products-page .operations-product-form-card .resource-section {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 249, 247, 0.95)) !important;
+  border: 1px solid var(--entry-line) !important;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.operations-products-page .operations-product-list-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.operations-products-page .operations-product-list-card .operation-data-table {
+  overflow: auto;
+}
+
+.operations-process-page .operation-planner {
+  gap: 22px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+}
+
+.operations-process-page .planner-input-card,
+.operations-process-page .planner-result-card {
+  align-content: start;
+  gap: 16px;
+}
+
+.operations-process-page .planner-input-card > .planner-fields {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 249, 247, 0.95)) !important;
+  border: 1px solid var(--entry-line) !important;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.operations-process-page .resource-section {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 249, 247, 0.95)) !important;
+  border: 1px solid var(--entry-line) !important;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(16, 43, 50, 0.05);
+  padding: 14px;
+}
+
+.operations-process-page .resource-section-header p {
+  color: var(--entry-muted) !important;
+}
+
+.operations-process-page .planner-result-card mark,
+.operations-process-page .process-setup-card mark {
+  border-radius: 999px;
+}
+
+.operations-process-page .planner-result-card mark.ok,
+.operations-process-page .process-setup-card.ready mark {
+  background: #dff7f1 !important;
+  color: #0c655a !important;
+}
+
+.operations-process-page .planner-result-card mark.bad,
+.operations-process-page .process-setup-card.todo mark {
+  background: #fff0c9 !important;
+  color: #7a5200 !important;
+}
+
+.operations-process-page .process-setup-grid {
+  gap: 16px;
+}
+
+.operations-process-page .process-setup-card {
+  min-height: 230px;
+}
+
+.operations-process-page .planner-empty-state,
+.operations-entry-page .planner-empty-state,
+.operations-products-page .planner-empty-state {
+  background: #fffaf0 !important;
+  border: 1px solid rgba(217, 154, 36, 0.34) !important;
+  border-radius: 8px;
+  color: #624515 !important;
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-table::-webkit-scrollbar,
+.operations-entry-page .operations-record-list-card .compact-resource-list::-webkit-scrollbar,
+.operations-entry-page .operations-record-form-card .operation-data-fields::-webkit-scrollbar,
+.operations-products-page .operations-product-list-card .operation-data-table::-webkit-scrollbar,
+.operations-process-page .resource-row-list::-webkit-scrollbar,
+.operations-process-page .planner-result-card::-webkit-scrollbar {
+  width: 8px;
+}
+
+.operations-entry-page .operations-record-list-card .operation-data-table::-webkit-scrollbar-thumb,
+.operations-entry-page .operations-record-list-card .compact-resource-list::-webkit-scrollbar-thumb,
+.operations-entry-page .operations-record-form-card .operation-data-fields::-webkit-scrollbar-thumb,
+.operations-products-page .operations-product-list-card .operation-data-table::-webkit-scrollbar-thumb,
+.operations-process-page .resource-row-list::-webkit-scrollbar-thumb,
+.operations-process-page .planner-result-card::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--entry-teal), var(--entry-cyan), var(--entry-amber));
+  border-radius: 999px;
+}
+
+@media (max-width: 1180px) {
+  .operations-products-page .operation-data-grid,
+  .operations-process-page .operation-planner {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .operations-products-page .operations-product-form-card .operation-data-fields,
+  .operations-process-page .planner-input-card > .planner-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dashboard overview redesign inspired by the executive brief and landing page. */
+.feasibility-dashboard {
+  --overview-ink: #ffffff;
+  --overview-muted: rgba(255, 255, 255, 0.68);
+  --overview-soft: rgba(255, 255, 255, 0.095);
+  --overview-line: rgba(255, 255, 255, 0.14);
+  --overview-line-strong: rgba(255, 255, 255, 0.24);
+  --overview-pink: var(--app-pink, #ff5a8a);
+  --overview-violet: var(--app-violet, #a34cff);
+  --overview-blue: var(--app-blue, #25b8ff);
+  --overview-lime: var(--app-lime, #b9ff66);
+  --overview-coral: var(--app-coral, #ff7a5c);
+  background:
+    radial-gradient(circle at 14% 5%, rgba(37, 184, 255, 0.18), transparent 28rem),
+    radial-gradient(circle at 82% 18%, rgba(255, 90, 138, 0.2), transparent 30rem),
+    linear-gradient(rgba(255, 255, 255, 0.038) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.032) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(5, 5, 9, 0.18), rgba(5, 5, 9, 0.02) 42rem, transparent);
+  background-size: auto, auto, 46px 46px, 46px 46px, auto;
+  gap: clamp(72px, 9vw, 150px);
+  padding-bottom: clamp(88px, 10vw, 170px);
+}
+
+.feasibility-dashboard > :is(
+  .dashboard-assumption-strip,
+  .dashboard-section-group,
+  .dashboard-two-column,
+  .dashboard-financial-detail,
+  .dashboard-logo-row
+) {
+  animation: feasibility-section-rise 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  scroll-margin-top: 110px;
+}
+
+.feasibility-dashboard > .dashboard-assumption-strip {
+  animation-delay: 40ms;
+}
+
+.feasibility-dashboard > .dashboard-section-group:nth-of-type(3) {
+  animation-delay: 120ms;
+}
+
+.feasibility-dashboard > .dashboard-two-column {
+  animation-delay: 200ms;
+}
+
+.feasibility-dashboard > .dashboard-section-group:nth-of-type(5) {
+  animation-delay: 280ms;
+}
+
+.feasibility-dashboard > .dashboard-financial-detail {
+  animation-delay: 360ms;
+}
+
+.feasibility-dashboard > .dashboard-logo-row {
+  animation-delay: 440ms;
+}
+
+.feasibility-dashboard .executive-metric-card,
+.feasibility-dashboard .dashboard-risk-row,
+.feasibility-dashboard .action-sequence article,
+.feasibility-dashboard .module-rollup-card,
+.feasibility-dashboard .business-case-list span {
+  animation: feasibility-card-rise 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.feasibility-dashboard :is(.executive-metric-card, .dashboard-risk-row, .action-sequence article, .module-rollup-card, .business-case-list span):nth-child(2) {
+  animation-delay: 70ms;
+}
+
+.feasibility-dashboard :is(.executive-metric-card, .dashboard-risk-row, .action-sequence article, .module-rollup-card, .business-case-list span):nth-child(3) {
+  animation-delay: 140ms;
+}
+
+.feasibility-dashboard :is(.executive-metric-card, .dashboard-risk-row, .action-sequence article, .module-rollup-card, .business-case-list span):nth-child(4) {
+  animation-delay: 210ms;
+}
+
+.feasibility-dashboard :is(.executive-metric-card, .dashboard-risk-row, .action-sequence article, .module-rollup-card, .business-case-list span):nth-child(n + 5) {
+  animation-delay: 280ms;
+}
+
+@keyframes feasibility-section-rise {
+  from {
+    opacity: 0;
+    transform: translateY(34px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes feasibility-card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feasibility-dashboard > :is(
+    .dashboard-assumption-strip,
+    .dashboard-section-group,
+    .dashboard-two-column,
+    .dashboard-financial-detail,
+    .dashboard-logo-row
+  ) {
+    animation: none;
+  }
+
+  .feasibility-dashboard .dashboard-section-group,
+  .feasibility-dashboard .dashboard-two-column,
+  .feasibility-dashboard .dashboard-financial-detail {
+    transition: none;
+  }
+
+  .feasibility-dashboard :is(.executive-metric-card, .dashboard-risk-row, .action-sequence article, .module-rollup-card, .business-case-list span) {
+    animation: none;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .feasibility-dashboard > :is(
+    .dashboard-section-group,
+    .dashboard-two-column,
+    .dashboard-financial-detail,
+    .dashboard-logo-row
+  ) {
+    animation: feasibility-section-view both;
+    animation-range: entry 0% cover 28%;
+    animation-timeline: view();
+  }
+
+  .feasibility-dashboard .dashboard-section-heading,
+  .feasibility-dashboard :is(.executive-metric-card, .dashboard-risk-row, .action-sequence article, .module-rollup-card, .business-case-list span) {
+    animation: feasibility-card-view both;
+    animation-range: entry 6% cover 30%;
+    animation-timeline: view();
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .feasibility-dashboard > :is(
+      .dashboard-section-group,
+      .dashboard-two-column,
+      .dashboard-financial-detail,
+      .dashboard-logo-row
+    ),
+    .feasibility-dashboard .dashboard-section-heading,
+    .feasibility-dashboard :is(.executive-metric-card, .dashboard-risk-row, .action-sequence article, .module-rollup-card, .business-case-list span) {
+      animation: none;
+    }
+  }
+}
+
+@keyframes feasibility-section-view {
+  from {
+    opacity: 0;
+    transform: translateY(42px) scale(0.982);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes feasibility-card-view {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feasibility-dashboard .executive-topbar,
+.feasibility-dashboard .dashboard-assumption-strip,
+.feasibility-dashboard .dashboard-section-heading,
+.feasibility-dashboard .dashboard-risk-board,
+.feasibility-dashboard .dashboard-action-board,
+.feasibility-dashboard .dashboard-business-case,
+.feasibility-dashboard .dashboard-logo-row {
+  backdrop-filter: blur(22px) saturate(1.16);
+  border: 1px solid var(--overview-line);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  position: relative;
+}
+
+.feasibility-dashboard .executive-topbar {
+  align-items: stretch;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(37, 184, 255, 0.16), transparent 17rem),
+    radial-gradient(circle at 90% 18%, rgba(255, 90, 138, 0.18), transparent 18rem),
+    linear-gradient(145deg, rgba(7, 7, 14, 0.94), rgba(19, 16, 29, 0.84));
+  border-color: rgba(255, 255, 255, 0.16);
+  gap: 12px;
+  overflow: hidden;
+  padding: 12px;
+  z-index: 40;
+}
+
+.feasibility-dashboard .executive-topbar::before {
+  background: linear-gradient(90deg, var(--overview-pink), var(--overview-violet), var(--overview-blue), var(--overview-lime));
+  content: "";
+  height: 3px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.feasibility-dashboard .executive-topbar::after {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.034) 1px, transparent 1px);
+  background-size: 34px 34px;
+  content: "";
+  inset: 0;
+  opacity: 0.42;
+  pointer-events: none;
+  position: absolute;
+}
+
+.feasibility-dashboard .executive-topbar > * {
+  position: relative;
+  z-index: 1;
+}
+
+.feasibility-dashboard .command-context,
+.feasibility-dashboard .command-user,
+.feasibility-dashboard .command-live {
+  align-content: center;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.08), transparent 9rem),
+    rgba(255, 255, 255, 0.078);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 58px;
+  padding: 10px 12px;
+}
+
+.feasibility-dashboard .command-live {
+  align-items: center;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(185, 255, 102, 0.16), transparent 9rem),
+    rgba(255, 255, 255, 0.07);
+  border-color: rgba(185, 255, 102, 0.28);
+  color: var(--overview-ink);
+  justify-content: center;
+}
+
+.feasibility-dashboard .command-run-button {
+  align-self: stretch;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.3), transparent 35%),
+    linear-gradient(135deg, var(--overview-pink), var(--overview-violet) 58%, #171725);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-sizing: border-box;
+  border-radius: 8px;
+  box-shadow:
+    0 18px 46px rgba(163, 76, 255, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  min-height: 58px;
+  transition:
+    box-shadow 180ms ease,
+    filter 180ms ease,
+    transform 180ms ease;
+}
+
+.feasibility-dashboard .command-run-button:hover {
+  box-shadow:
+    0 24px 58px rgba(163, 76, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  filter: saturate(1.08);
+  transform: translateY(-1px);
+}
+
+.feasibility-dashboard .dashboard-assumption-strip {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(37, 184, 255, 0.1), transparent 24rem),
+    radial-gradient(circle at 92% 18%, rgba(255, 90, 138, 0.12), transparent 24rem),
+    linear-gradient(135deg, rgba(8, 8, 15, 0.76), rgba(19, 17, 29, 0.62));
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 20px 72px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  grid-template-columns: minmax(200px, 0.44fr) minmax(0, 1fr);
+  margin-top: -6px;
+  overflow: visible;
+  padding: clamp(18px, 1.8vw, 24px);
+  z-index: 10;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip::before,
+.feasibility-dashboard .dashboard-risk-board::before,
+.feasibility-dashboard .dashboard-action-board::before,
+.feasibility-dashboard .dashboard-business-case::before,
+.feasibility-dashboard .dashboard-logo-row::before {
+  background: linear-gradient(90deg, var(--overview-pink), var(--overview-violet), var(--overview-blue), var(--overview-lime));
+  content: "";
+  height: 3px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-heading h2 {
+  color: var(--overview-ink);
+  font-size: clamp(1.22rem, 2.1vw, 1.88rem);
+  line-height: 1.08;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls {
+  align-items: stretch;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  position: relative;
+  z-index: 8;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls .assumption-control,
+.feasibility-dashboard .assumption-strip-list span {
+  background:
+    linear-gradient(135deg, rgba(9, 9, 17, 0.56), rgba(18, 15, 28, 0.42)) padding-box,
+    linear-gradient(135deg, rgba(255, 90, 138, 0.28), rgba(163, 76, 255, 0.24), rgba(37, 184, 255, 0.18), rgba(255, 255, 255, 0.08)) border-box;
+  border: 1px solid transparent;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls .assumption-control:hover,
+.feasibility-dashboard .assumption-strip-list span:hover {
+  background:
+    linear-gradient(135deg, rgba(9, 9, 17, 0.5), rgba(20, 16, 31, 0.46)) padding-box,
+    linear-gradient(135deg, rgba(255, 90, 138, 0.36), rgba(163, 76, 255, 0.3), rgba(37, 184, 255, 0.24), rgba(255, 255, 255, 0.1)) border-box;
+  box-shadow:
+    0 16px 42px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls .assumption-control {
+  align-content: space-between;
+  display: grid;
+  gap: 8px;
+  height: 100%;
+  isolation: isolate;
+  min-height: 82px;
+  overflow: visible;
+  padding: 12px;
+  position: relative;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls .assumption-control.open {
+  z-index: 35;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls .assumption-control::before {
+  background:
+    linear-gradient(90deg, var(--overview-pink), var(--overview-violet), var(--overview-blue)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent);
+  content: "";
+  height: 3px;
+  inset: 0 18px auto;
+  opacity: 0.82;
+  position: absolute;
+}
+
+.feasibility-dashboard .dashboard-assumption-strip-controls .assumption-control > span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.feasibility-dashboard .assumption-select-trigger {
+  align-items: center;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(255, 255, 255, 0.07), transparent 55%),
+    linear-gradient(135deg, rgba(8, 8, 15, 0.16), rgba(255, 255, 255, 0.045));
+  border: 0;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  cursor: pointer;
+  display: grid;
+  font-size: clamp(0.76rem, 0.9vw, 0.86rem);
+  font-weight: 900;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  justify-self: start;
+  min-height: 38px;
+  padding: 0 7px 0 11px;
+  text-align: left;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+  width: min(100%, 360px);
+}
+
+.feasibility-dashboard .assumption-select-trigger:hover {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(255, 255, 255, 0.09), transparent 55%),
+    linear-gradient(135deg, rgba(8, 8, 15, 0.12), rgba(255, 255, 255, 0.068));
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.feasibility-dashboard .assumption-select-trigger:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 4px rgba(255, 90, 138, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.feasibility-dashboard .assumption-select-trigger strong {
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feasibility-dashboard .assumption-select-trigger i {
+  align-items: center;
+  background:
+    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.28), transparent 44%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.92);
+  display: inline-flex;
+  font-size: 1rem;
+  font-style: normal;
+  font-weight: 950;
+  height: 24px;
+  justify-content: center;
+  line-height: 1;
+  width: 24px;
+}
+
+.feasibility-dashboard .assumption-control::after {
+  display: none;
+}
+
+.feasibility-dashboard .assumption-select-menu {
+  background:
+    linear-gradient(135deg, rgba(250, 252, 255, 0.99), rgba(237, 241, 250, 0.97)) padding-box,
+    linear-gradient(135deg, rgba(255, 90, 138, 0.38), rgba(163, 76, 255, 0.3), rgba(37, 184, 255, 0.28)) border-box;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  display: grid;
+  gap: 6px;
+  left: 12px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px;
+  position: absolute;
+  right: auto;
+  top: calc(100% + 8px);
+  width: min(360px, calc(100% - 24px));
+  z-index: 80;
+}
+
+.feasibility-dashboard .assumption-select-menu button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #202332;
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  min-height: 52px;
+  padding: 10px;
+  text-align: left;
+}
+
+.feasibility-dashboard .assumption-select-menu button:hover,
+.feasibility-dashboard .assumption-select-menu button.selected {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(37, 184, 255, 0.12), transparent 9rem),
+    linear-gradient(135deg, rgba(255, 90, 138, 0.12), rgba(163, 76, 255, 0.08));
+  color: #0f111b;
+}
+
+.feasibility-dashboard .assumption-select-menu span {
+  color: inherit;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.feasibility-dashboard .assumption-select-menu small {
+  color: rgba(32, 35, 50, 0.62);
+  font-size: 0.72rem;
+}
+
+.feasibility-dashboard .assumption-strip-list {
+  align-items: stretch;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.feasibility-dashboard .dashboard-section-group,
+.feasibility-dashboard .dashboard-two-column,
+.feasibility-dashboard .dashboard-financial-detail {
+  gap: clamp(22px, 3vw, 42px);
+  padding-block: clamp(18px, 2.8vw, 46px);
+  position: relative;
+  transition:
+    transform 220ms ease,
+    filter 220ms ease;
+}
+
+.feasibility-dashboard .dashboard-section-group::before,
+.feasibility-dashboard .dashboard-two-column::before,
+.feasibility-dashboard .dashboard-financial-detail::before {
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.13), transparent),
+    linear-gradient(90deg, transparent, rgba(255, 90, 138, 0.16), rgba(37, 184, 255, 0.12), transparent);
+  content: "";
+  height: 1px;
+  left: 4%;
+  opacity: 0.7;
+  position: absolute;
+  right: 4%;
+  top: clamp(-72px, -6vw, -46px);
+}
+
+.feasibility-dashboard .dashboard-section-group::after,
+.feasibility-dashboard .dashboard-two-column::after,
+.feasibility-dashboard .dashboard-financial-detail::after {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 58%);
+  content: "";
+  height: 6px;
+  left: 50%;
+  opacity: 0.42;
+  position: absolute;
+  top: clamp(-75px, -6.1vw, -49px);
+  transform: translateX(-50%);
+  width: min(120px, 22vw);
+}
+
+.feasibility-dashboard .dashboard-section-group:hover,
+.feasibility-dashboard .dashboard-two-column:hover,
+.feasibility-dashboard .dashboard-financial-detail:hover {
+  filter: saturate(1.04);
+  transform: translateY(-2px);
+}
+
+.feasibility-dashboard .dashboard-section-heading {
+  align-items: end;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  padding: clamp(8px, 1.4vw, 16px) 0 2px;
+}
+
+.feasibility-dashboard .dashboard-section-heading::after {
+  background: linear-gradient(90deg, var(--overview-pink), var(--overview-violet), var(--overview-blue), transparent);
+  bottom: -8px;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  width: min(520px, 72%);
+}
+
+.feasibility-dashboard .dashboard-section-heading span,
+.feasibility-dashboard .card-heading span,
+.feasibility-dashboard .command-card > span {
+  color: rgba(255, 218, 229, 0.9);
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.feasibility-dashboard .dashboard-section-heading h2 {
+  color: var(--overview-ink);
+  font-size: clamp(1.75rem, 4vw, 4.15rem);
+  letter-spacing: 0;
+  line-height: 0.94;
+  max-width: 900px;
+}
+
+.feasibility-dashboard .dashboard-section-heading strong {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--overview-line);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 9px 12px;
+}
+
+.feasibility-dashboard .executive-metric-grid {
+  grid-auto-rows: minmax(182px, auto);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.feasibility-dashboard .executive-metric-card {
+  background:
+    radial-gradient(circle at 90% 8%, color-mix(in srgb, var(--metric-tone) 28%, transparent), transparent 14rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.135), rgba(255, 255, 255, 0.055));
+  border: 1px solid color-mix(in srgb, var(--metric-tone) 38%, var(--overview-line));
+  border-radius: 8px;
+  border-left: 0;
+  box-shadow:
+    0 24px 72px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  min-height: 0;
+  overflow: hidden;
+  padding: clamp(18px, 1.7vw, 24px);
+  position: relative;
+}
+
+.feasibility-dashboard .executive-metric-card::before,
+.feasibility-dashboard .module-rollup-card::before {
+  background: linear-gradient(90deg, var(--metric-tone, var(--module-tone)), transparent);
+  content: "";
+  height: 3px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.feasibility-dashboard .executive-metric-card:nth-child(1) {
+  grid-column: span 2;
+}
+
+.feasibility-dashboard .executive-metric-card:nth-child(2) {
+  grid-row: span 2;
+}
+
+.feasibility-dashboard .executive-metric-card span,
+.feasibility-dashboard .executive-metric-card h3,
+.feasibility-dashboard .executive-metric-card small {
+  color: var(--overview-muted);
+}
+
+.feasibility-dashboard .executive-metric-card h3 {
+  font-size: 0.94rem;
+}
+
+.feasibility-dashboard .executive-metric-card strong {
+  color: var(--overview-ink);
+  font-size: clamp(2rem, 4vw, 4.8rem);
+  letter-spacing: 0;
+}
+
+.feasibility-dashboard .dashboard-two-column {
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+}
+
+.feasibility-dashboard .dashboard-two-column > .command-card,
+.feasibility-dashboard .dashboard-section-group > .command-card {
+  height: 100%;
+}
+
+.feasibility-dashboard .dashboard-risk-board,
+.feasibility-dashboard .dashboard-action-board {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(163, 76, 255, 0.12), transparent 20rem),
+    radial-gradient(circle at 8% 100%, rgba(37, 184, 255, 0.08), transparent 20rem),
+    linear-gradient(145deg, rgba(5, 5, 9, 0.94), rgba(12, 11, 19, 0.88));
+}
+
+.feasibility-dashboard .dashboard-business-case .card-heading {
+  border-bottom-color: rgba(255, 255, 255, 0.11);
+}
+
+.feasibility-dashboard .dashboard-business-case .card-heading span {
+  color: rgba(255, 218, 229, 0.82);
+}
+
+.feasibility-dashboard .dashboard-business-case .card-heading h2 {
+  color: #ffffff !important;
+}
+
+.feasibility-dashboard .dashboard-business-case {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(163, 76, 255, 0.12), transparent 20rem),
+    radial-gradient(circle at 8% 100%, rgba(37, 184, 255, 0.08), transparent 20rem),
+    linear-gradient(145deg, rgba(5, 5, 9, 0.94), rgba(12, 11, 19, 0.88));
+  border-radius: 8px;
+  color: var(--overview-ink);
+  overflow: hidden;
+  padding: clamp(18px, 1.8vw, 26px);
+}
+
+.feasibility-dashboard .card-heading {
+  border-bottom: 1px solid var(--overview-line);
+  margin-bottom: 2px;
+  padding-bottom: 16px;
+}
+
+.feasibility-dashboard .card-heading h2,
+.feasibility-dashboard .dashboard-risk-board h2,
+.feasibility-dashboard .dashboard-action-board h2,
+.feasibility-dashboard .dashboard-business-case h2 {
+  color: var(--overview-ink) !important;
+  font-size: clamp(1.35rem, 2.6vw, 2.45rem);
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.feasibility-dashboard .dashboard-risk-list {
+  counter-reset: risk-card;
+}
+
+.feasibility-dashboard .dashboard-risk-row {
+  --metric-tone: var(--overview-coral);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--metric-tone) 20%, transparent), transparent 13rem),
+    rgba(255, 255, 255, 0.075);
+  border: 1px solid color-mix(in srgb, var(--metric-tone) 30%, var(--overview-line));
+  border-left: 0;
+  box-shadow: none;
+  counter-increment: risk-card;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 16px;
+}
+
+.feasibility-dashboard .dashboard-risk-row::before {
+  align-items: center;
+  background: color-mix(in srgb, var(--metric-tone) 28%, rgba(255, 255, 255, 0.08));
+  border: 1px solid color-mix(in srgb, var(--metric-tone) 42%, var(--overview-line));
+  border-radius: 999px;
+  color: #ffffff;
+  content: counter(risk-card, decimal-leading-zero);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 950;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.feasibility-dashboard .dashboard-risk-row > span,
+.feasibility-dashboard .dashboard-risk-row strong,
+.feasibility-dashboard .dashboard-risk-row p,
+.feasibility-dashboard .dashboard-risk-row b {
+  grid-column: 2;
+}
+
+.feasibility-dashboard .dashboard-risk-row > span,
+.feasibility-dashboard .dashboard-risk-row b {
+  color: color-mix(in srgb, var(--metric-tone) 84%, #ffffff);
+}
+
+.feasibility-dashboard .dashboard-risk-row strong,
+.feasibility-dashboard .action-sequence p {
+  color: var(--overview-ink);
+}
+
+.feasibility-dashboard .dashboard-risk-row p,
+.feasibility-dashboard .dashboard-business-case p {
+  color: var(--overview-muted);
+}
+
+.feasibility-dashboard .action-sequence {
+  counter-reset: action-step;
+  gap: 0;
+  position: relative;
+}
+
+.feasibility-dashboard .action-sequence article {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  counter-increment: action-step;
+  grid-template-columns: 48px minmax(0, 1fr);
+  min-height: 94px;
+  padding: 12px 0;
+  position: relative;
+}
+
+.feasibility-dashboard .action-sequence article + article {
+  border-top: 1px solid var(--overview-line);
+}
+
+.feasibility-dashboard .action-sequence article::before {
+  background: linear-gradient(180deg, var(--overview-pink), var(--overview-blue));
+  content: "";
+  height: 100%;
+  left: 16px;
+  opacity: 0.34;
+  position: absolute;
+  top: 0;
+  width: 2px;
+}
+
+.feasibility-dashboard .action-sequence span {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.34), transparent 42%),
+    linear-gradient(135deg, var(--overview-pink), var(--overview-violet));
+  box-shadow: 0 12px 30px rgba(163, 76, 255, 0.26);
+  height: 34px;
+  position: relative;
+  width: 34px;
+  z-index: 1;
+}
+
+.feasibility-dashboard .module-rollup-grid {
+  counter-reset: module-card;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.feasibility-dashboard .module-rollup-card {
+  background:
+    radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--module-tone) 34%, transparent), rgba(255, 255, 255, 0.07) 34%, transparent 62%),
+    linear-gradient(150deg, color-mix(in srgb, var(--module-tone) 10%, rgba(255, 255, 255, 0.13)), rgba(255, 255, 255, 0.052) 70%);
+  border: 1px solid color-mix(in srgb, var(--module-tone) 34%, var(--overview-line));
+  border-left: 0;
+  box-shadow:
+    0 20px 62px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  color: var(--overview-ink);
+  counter-increment: module-card;
+  min-height: 300px;
+  padding: 22px clamp(28px, 4vw, 44px) 24px 22px;
+  position: relative;
+}
+
+.feasibility-dashboard .module-rollup-card::after {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--module-tone) 56%, #ffffff), rgba(255, 255, 255, 0.11) 64%, rgba(255, 255, 255, 0.03));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  content: counter(module-card, decimal-leading-zero);
+  font-size: clamp(5rem, 8vw, 8rem);
+  font-weight: 950;
+  line-height: 0.82;
+  opacity: 0.78;
+  pointer-events: none;
+  position: absolute;
+  right: clamp(16px, 2vw, 28px);
+  top: 18px;
+  bottom: auto;
+  z-index: 0;
+}
+
+.feasibility-dashboard .module-rollup-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.feasibility-dashboard .module-rollup-card span,
+.feasibility-dashboard .module-rollup-card p {
+  color: var(--overview-muted);
+}
+
+.feasibility-dashboard .module-rollup-card strong {
+  color: var(--overview-ink);
+  font-size: clamp(1.24rem, 1.9vw, 1.72rem);
+  line-height: 1.05;
+  margin-top: 72px;
+  position: relative;
+  z-index: 1;
+}
+
+.feasibility-dashboard .module-rollup-card p {
+  line-height: 1.58;
+  max-width: 92%;
+}
+
+.feasibility-dashboard .module-rollup-card b {
+  color: color-mix(in srgb, var(--module-tone) 84%, #ffffff);
+}
+
+.feasibility-dashboard .dashboard-business-case .card-heading button {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.38), transparent 34%),
+    linear-gradient(135deg, var(--overview-pink), var(--overview-violet) 52%, var(--overview-blue));
+  border-color: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  box-shadow:
+    0 16px 42px rgba(163, 76, 255, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  min-height: 42px;
+  padding: 0 18px;
+  transition:
+    box-shadow 180ms ease,
+    filter 180ms ease,
+    transform 180ms ease;
+}
+
+.feasibility-dashboard .dashboard-business-case .card-heading button:hover {
+  box-shadow:
+    0 22px 54px rgba(37, 184, 255, 0.18),
+    0 18px 46px rgba(163, 76, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  filter: saturate(1.1);
+  transform: translateY(-1px);
+}
+
+.feasibility-dashboard .business-case-list {
+  align-items: stretch;
+  counter-reset: signal-card;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.feasibility-dashboard .business-case-list span {
+  --signal-tone: var(--overview-blue);
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--signal-tone) 26%, transparent), transparent 10rem),
+    radial-gradient(circle at 0% 100%, rgba(255, 255, 255, 0.07), transparent 8rem),
+    linear-gradient(145deg, color-mix(in srgb, var(--signal-tone) 8%, rgba(255, 255, 255, 0.1)), rgba(255, 255, 255, 0.045));
+  border: 1px solid color-mix(in srgb, var(--signal-tone) 28%, var(--overview-line));
+  border-left: 0;
+  box-shadow:
+    0 16px 46px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: var(--overview-muted);
+  counter-increment: signal-card;
+  display: grid;
+  gap: 12px;
+  min-height: 142px;
+  overflow: hidden;
+  padding: 18px;
+  position: relative;
+}
+
+.feasibility-dashboard .business-case-list span::before {
+  align-items: center;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(135deg, #050509, #0d0c15 58%, #15111d);
+  border: 1px solid color-mix(in srgb, var(--signal-tone) 18%, rgba(255, 255, 255, 0.11));
+  border-radius: 999px;
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  color: color-mix(in srgb, var(--signal-tone) 36%, #ffffff);
+  content: counter(signal-card, decimal-leading-zero);
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 950;
+  height: 30px;
+  justify-content: center;
+  justify-self: start;
+  width: 30px;
+}
+
+.feasibility-dashboard .business-case-list span:nth-child(4n + 1) {
+  --signal-tone: var(--overview-pink);
+  border-top: 3px solid var(--overview-pink);
+}
+
+.feasibility-dashboard .business-case-list span:nth-child(4n + 2) {
+  --signal-tone: var(--overview-violet);
+  border-top: 3px solid var(--overview-violet);
+}
+
+.feasibility-dashboard .business-case-list span:nth-child(4n + 3) {
+  --signal-tone: var(--overview-blue);
+  border-top: 3px solid var(--overview-blue);
+}
+
+.feasibility-dashboard .business-case-list span:nth-child(4n) {
+  --signal-tone: var(--overview-lime);
+  border-top: 3px solid var(--overview-lime);
+}
+
+.feasibility-dashboard .business-case-list strong {
+  color: var(--overview-ink);
+  font-size: clamp(1.08rem, 1.7vw, 1.44rem);
+  line-height: 1.1;
+  margin-top: auto;
+  text-align: left;
+}
+
+.feasibility-dashboard .business-case-list span:nth-child(1),
+.feasibility-dashboard .business-case-list span:nth-child(2) {
+  min-height: 168px;
+}
+
+.feasibility-dashboard .dashboard-logo-row {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.048));
+  border-radius: 8px;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 14px;
+}
+
+.feasibility-dashboard .dashboard-logo-row .customer-logo-mark,
+.feasibility-dashboard .dashboard-logo-row .atera-logo-mark {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--overview-line);
+  color: var(--overview-ink);
+}
+
+.feasibility-dashboard .dashboard-logo-row :is(span, strong) {
+  color: var(--overview-ink);
+}
+
+.feasibility-dashboard .dashboard-logo-row .customer-logo-mark strong {
+  background: linear-gradient(135deg, var(--overview-pink), var(--overview-violet));
+}
+
+@media (max-width: 1320px) {
+  .feasibility-dashboard .executive-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .feasibility-dashboard .executive-metric-card:nth-child(2) {
+    grid-row: span 1;
+  }
+
+  .feasibility-dashboard .module-rollup-grid,
+  .feasibility-dashboard .business-case-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .feasibility-dashboard .dashboard-assumption-strip,
+  .feasibility-dashboard .dashboard-two-column {
+    grid-template-columns: 1fr;
+  }
+
+  .feasibility-dashboard .dashboard-assumption-strip-controls,
+  .feasibility-dashboard .assumption-strip-list {
+    grid-template-columns: 1fr;
+  }
+
+  .feasibility-dashboard .executive-metric-card:nth-child(1) {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .feasibility-dashboard .executive-metric-grid,
+  .feasibility-dashboard .module-rollup-grid,
+  .feasibility-dashboard .business-case-list {
+    grid-template-columns: 1fr;
+  }
+
+  .feasibility-dashboard .dashboard-section-heading {
+    align-items: start;
+    display: grid;
+  }
+
+  .feasibility-dashboard .dashboard-section-heading h2 {
+    font-size: clamp(1.75rem, 12vw, 3rem);
+  }
+
+  .feasibility-dashboard .dashboard-risk-row {
+    grid-template-columns: 1fr;
+  }
+
+  .feasibility-dashboard .dashboard-risk-row > span,
+  .feasibility-dashboard .dashboard-risk-row strong,
+  .feasibility-dashboard .dashboard-risk-row p,
+  .feasibility-dashboard .dashboard-risk-row b {
+    grid-column: auto;
+  }
+}

@@ -1516,6 +1516,8 @@ function App() {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [currentProfile, setCurrentProfile] = useState(null);
+  const [dashboardSidebarOpen, setDashboardSidebarOpen] = useState(true);
+  const [dashboardAssumptionMenu, setDashboardAssumptionMenu] = useState(null);
   const [authorizationLoading, setAuthorizationLoading] = useState(false);
   const [authorizationStatus, setAuthorizationStatus] = useState("");
   const [authorizationTab, setAuthorizationTab] = useState("roles");
@@ -2220,6 +2222,52 @@ function App() {
         [field]: value,
       },
     }));
+  }
+
+  function copyOperationRecordToForm(entity, row) {
+    if (!row || row.id === "empty") return;
+
+    const nextForm = {
+      machine: {
+        ...emptyOperationForms.machine,
+        availabilityHours: row.availability_hours ?? emptyOperationForms.machine.availabilityHours,
+        concurrentCapacity: row.concurrent_capacity ?? emptyOperationForms.machine.concurrentCapacity,
+        failureProbabilityPercent: row.failure_probability_percent ?? emptyOperationForms.machine.failureProbabilityPercent,
+        hourlyEnergyConsumptionKwh: row.hourly_energy_consumption_kwh ?? emptyOperationForms.machine.hourlyEnergyConsumptionKwh,
+        name: row.name || "",
+        price: row.price ?? emptyOperationForms.machine.price,
+        priceCurrency: row.price_currency || emptyOperationForms.machine.priceCurrency,
+        speedMultiplier: row.speed_multiplier ?? emptyOperationForms.machine.speedMultiplier,
+      },
+      equipment: {
+        ...emptyOperationForms.equipment,
+        name: row.name || "",
+        price: row.price ?? emptyOperationForms.equipment.price,
+        priceCurrency: row.price_currency || emptyOperationForms.equipment.priceCurrency,
+        quantity: row.quantity ?? emptyOperationForms.equipment.quantity,
+      },
+      material: {
+        ...emptyOperationForms.material,
+        name: row.name || "",
+        pricePerUnit: row.price_per_unit ?? emptyOperationForms.material.pricePerUnit,
+        priceCurrency: row.price_currency || emptyOperationForms.material.priceCurrency,
+        unit: row.unit || emptyOperationForms.material.unit,
+      },
+      workforce: {
+        ...emptyOperationForms.workforce,
+        hourlyCost: row.hourly_cost ?? emptyOperationForms.workforce.hourlyCost,
+        hourlyCostCurrency: row.hourly_cost_currency || emptyOperationForms.workforce.hourlyCostCurrency,
+        roleName: row.role_name || "",
+      },
+    }[entity];
+
+    if (!nextForm) return;
+
+    setOperationForms((current) => ({
+      ...current,
+      [entity]: nextForm,
+    }));
+    setOperationsStatus(copy("Record values were copied into the form. Edit and save to create a new record.", "Kayıt değerleri forma kopyalandı. Yeni kayıt oluşturmak için düzenleyip kaydedin."));
   }
 
   function addProductMaterialRow() {
@@ -3777,7 +3825,7 @@ function App() {
 
   function renderOperationRecordForm(entity, fields) {
     return (
-      <form className="operation-card operation-data-form" onSubmit={(event) => handleSaveOperationRecord(entity, event)}>
+      <form className="operation-card operation-data-form operations-record-form-card" onSubmit={(event) => handleSaveOperationRecord(entity, event)}>
         <div className="operation-data-fields">
           {fields.map((field) => (
             <label key={field.name}>
@@ -3820,7 +3868,7 @@ function App() {
 
     return renderDashboardLayout(
       "operations/resources",
-        <section className="operations-workspace operations-modern">
+        <section className="operations-workspace operations-modern operations-entry-page operations-resources-page">
           <div className="operations-header">
             <div>
               <span>Operations / {copy("Resources", "Kaynak")}</span>
@@ -3833,7 +3881,7 @@ function App() {
           </div>
 
           <div className="resource-definition-grid">
-            <form className="operation-card operation-data-form resource-definition-card" onSubmit={(event) => handleSaveOperationRecord("material", event)}>
+            <form className="operation-card operation-data-form resource-definition-card operations-record-form-card" onSubmit={(event) => handleSaveOperationRecord("material", event)}>
               <div className="operation-card-heading">
                 <div>
                   <span>{copy("Add material", "Malzeme ekle")}</span>
@@ -3882,22 +3930,29 @@ function App() {
               </button>
             </form>
 
-            <article className="operation-card resource-definition-card resource-list-card">
+            <article className="operation-card resource-definition-card resource-list-card operations-record-list-card">
               <div className="operation-card-heading">
                 <h2>{copy("Materials", "Malzemeler")}</h2>
                 <span>{operationsWorkspace.materials.length} {copy("records", "kayıt")}</span>
               </div>
               <div className="compact-resource-list">
                 {(operationsWorkspace.materials.length ? operationsWorkspace.materials : [{ id: "empty" }]).map((material) => (
-                  <span key={material.id}>
-                    <strong>{material.id === "empty" ? "-" : material.name}</strong>
-                    <small>{material.id === "empty" ? "-" : `${formatOperationMoney(material.price_per_unit, material.price_currency, exchangeRates, 2)} / ${material.unit}`}</small>
-                  </span>
+                  <div className="compact-resource-record" key={material.id}>
+                    <span>
+                      <strong>{material.id === "empty" ? "-" : material.name}</strong>
+                      <small>{material.id === "empty" ? "-" : `${formatOperationMoney(material.price_per_unit, material.price_currency, exchangeRates, 2)} / ${material.unit}`}</small>
+                    </span>
+                    {material.id !== "empty" && (
+                      <button type="button" onClick={() => copyOperationRecordToForm("material", material)}>
+                        {copy("Copy", "Kopyala")}
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </article>
 
-            <form className="operation-card operation-data-form resource-definition-card" onSubmit={(event) => handleSaveOperationRecord("workforce", event)}>
+            <form className="operation-card operation-data-form resource-definition-card operations-record-form-card" onSubmit={(event) => handleSaveOperationRecord("workforce", event)}>
               <div className="operation-card-heading">
                 <div>
                   <span>{copy("Add human resource", "İnsan kaynağı ekle")}</span>
@@ -3937,17 +3992,24 @@ function App() {
               </button>
             </form>
 
-            <article className="operation-card resource-definition-card resource-list-card">
+            <article className="operation-card resource-definition-card resource-list-card operations-record-list-card">
               <div className="operation-card-heading">
                 <h2>{copy("Human Resources", "İnsan Kaynağı")}</h2>
                 <span>{operationsWorkspace.workforce.length} {copy("records", "kayıt")}</span>
               </div>
               <div className="compact-resource-list">
                 {(operationsWorkspace.workforce.length ? operationsWorkspace.workforce : [{ id: "empty" }]).map((workforce) => (
-                  <span key={workforce.id}>
-                    <strong>{workforce.id === "empty" ? "-" : workforce.role_name}</strong>
-                    <small>{workforce.id === "empty" ? "-" : `${formatOperationMoney(workforce.hourly_cost, workforce.hourly_cost_currency, exchangeRates, 2)} / ${copy("hour", "saat")}`}</small>
-                  </span>
+                  <div className="compact-resource-record" key={workforce.id}>
+                    <span>
+                      <strong>{workforce.id === "empty" ? "-" : workforce.role_name}</strong>
+                      <small>{workforce.id === "empty" ? "-" : `${formatOperationMoney(workforce.hourly_cost, workforce.hourly_cost_currency, exchangeRates, 2)} / ${copy("hour", "saat")}`}</small>
+                    </span>
+                    {workforce.id !== "empty" && (
+                      <button type="button" onClick={() => copyOperationRecordToForm("workforce", workforce)}>
+                        {copy("Copy", "Kopyala")}
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </article>
@@ -4000,7 +4062,7 @@ function App() {
 
     return renderDashboardLayout(
       `operations/${activeOperationsSubmodule.key}`,
-        <section className="operations-workspace operations-modern">
+        <section className="operations-workspace operations-modern operations-entry-page operations-products-page">
           <div className="operations-header">
             <div>
               <span>Operations / {copy("Products", "Ürünler")}</span>
@@ -4013,7 +4075,7 @@ function App() {
           </div>
 
           <div className="operation-data-grid">
-            <form className="operation-card operation-data-form" onSubmit={(event) => handleSaveOperationRecord("product", event)}>
+            <form className="operation-card operation-data-form operations-product-form-card" onSubmit={(event) => handleSaveOperationRecord("product", event)}>
               <div className="operation-data-fields">
                 <label>
                   <span>{copy("Product name", "Ürün adı")}</span>
@@ -4198,7 +4260,7 @@ function App() {
               </button>
             </form>
 
-            <article className="operation-card operation-data-table-card">
+            <article className="operation-card operation-data-table-card operations-product-list-card">
               <div className="operation-card-heading">
                 <h2>{copy("Records", "Kayıtlar")}</h2>
                 <span>{operationsWorkspace.products.length} {copy("records", "kayıt")}</span>
@@ -6953,16 +7015,26 @@ function App() {
       { header: copy("Capacity", "Kapasite"), render: (row) => formatNumber(row.concurrent_capacity || 1) },
       { header: copy("Availability", "Çalışma"), render: (row) => `${formatNumber(row.availability_hours || 8, 2)} ${copy("hours", "saat")}` },
       { header: copy("Speed", "Hız"), render: (row) => `${formatNumber(row.speed_multiplier || 1, 2)}x` },
+      { header: copy("Copy", "Kopyala"), render: (row) => (
+        <button type="button" className="record-copy-button" onClick={() => copyOperationRecordToForm("machine", row)}>
+          {copy("Copy", "Kopyala")}
+        </button>
+      ) },
     ];
     const equipmentColumns = [
       { header: copy("Equipment", "Ekipman"), render: (row) => row.name },
       { header: copy("Price", "Fiyat"), render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates) },
       { header: copy("Quantity", "Miktar"), render: (row) => formatNumber(row.quantity) },
+      { header: copy("Copy", "Kopyala"), render: (row) => (
+        <button type="button" className="record-copy-button" onClick={() => copyOperationRecordToForm("equipment", row)}>
+          {copy("Copy", "Kopyala")}
+        </button>
+      ) },
     ];
 
     return renderDashboardLayout(
       `operations/${activeOperationsSubmodule.key}`,
-        <section className="operations-workspace operations-modern">
+        <section className="operations-workspace operations-modern operations-entry-page operations-machines-page">
           <div className="operations-header">
             <div>
               <span>Operations / {copy("Machines & Equipment", "Makine & Ekipman")}</span>
@@ -6975,9 +7047,9 @@ function App() {
           </div>
 
           <div className="machine-equipment-grid">
-            <div className="operation-data-grid compact">
+            <div className="operation-data-grid compact operations-record-pair">
               {renderOperationRecordForm("machine", machineFields)}
-              <article className="operation-card operation-data-table-card">
+              <article className="operation-card operation-data-table-card operations-record-list-card">
                 <div className="operation-card-heading">
                   <h2>{copy("Machines", "Makineler")}</h2>
                   <span>{operationsWorkspace.machines.length} {copy("records", "kayıt")}</span>
@@ -6997,9 +7069,9 @@ function App() {
               </article>
             </div>
 
-            <div className="operation-data-grid compact">
+            <div className="operation-data-grid compact operations-record-pair">
               {renderOperationRecordForm("equipment", equipmentFields)}
-              <article className="operation-card operation-data-table-card">
+              <article className="operation-card operation-data-table-card operations-record-list-card">
                 <div className="operation-card-heading">
                   <h2>{copy("Equipment", "Ekipman")}</h2>
                   <span>{(operationsWorkspace.equipment || []).length} {copy("records", "kayıt")}</span>
@@ -7252,6 +7324,10 @@ function App() {
     ["5y", copy("Next 60 months", "Gelecek 60 ay")],
   ];
   const periodLabel = financialHorizonOptions.find(([value]) => value === financialHorizon)?.[1] || financialHorizonOptions[0][1];
+  const dashboardProductSelectLabel = dashboardSelectedProduct
+    ? dashboardSelectedProduct.name || dashboardSelectedProduct.product_code || copy("Unnamed product", "İsimsiz ürün")
+    : copy("No products yet", "Henüz ürün yok");
+  const dashboardHorizonSelectLabel = periodLabel;
   const recentReports = [
     dashboardSelectedProduct && [
       copy("Product Definition Snapshot", "Ürün Tanımı Anlık Görünümü"),
@@ -7586,7 +7662,6 @@ function App() {
     },
   ].filter(Boolean).slice(0, 5);
   const dashboardAssumptionRows = [
-    [copy("Working days / month", "Aylık çalışma günü"), formatNumber(dashboardWorkingDays)],
     [copy("Monthly capacity", "Aylık kapasite"), activePlanResults.length ? `${formatNumber(monthlyProductionCapacity, 2)} ${latestPlanResult?.productUnit || copy("units", "adet")}` : noDataValue],
     [copy("Average monthly demand", "Ortalama aylık talep"), hasSalesForecast ? `${formatNumber(averageMonthlyDemand)} ${copy("units", "adet")}` : noDataValue],
     [copy("Unit margin", "Birim marj"), operationUnitSalePrice ? `${formatNumber(operationProfitMargin, 1)}%` : noDataValue],
@@ -7594,13 +7669,24 @@ function App() {
 
   function renderDashboardLayout(activePage, children) {
     return (
-      <main className="dashboard-shell">
+      <main className={`dashboard-shell ${dashboardSidebarOpen ? "sidebar-open" : "sidebar-collapsed"}`}>
         <aside className="dashboard-sidebar" aria-label="Dashboard navigation">
           <div className="dashboard-brand-block">
-            <button type="button" className="landing-brand dashboard-brand" onClick={() => goTo("/dashboard", "login")}>
-              <img src={logoUrl} alt="Atera logo" />
-              <strong>Atera</strong>
-            </button>
+            <div className="dashboard-sidebar-top">
+              <button type="button" className="landing-brand dashboard-brand" onClick={() => goTo("/dashboard", "login")}>
+                <img src={logoUrl} alt="Atera logo" />
+                <strong>Atera</strong>
+              </button>
+              <button
+                type="button"
+                className="dashboard-sidebar-toggle"
+                aria-label={dashboardSidebarOpen ? copy("Close menu", "Menüyü kapat") : copy("Open menu", "Menüyü aç")}
+                aria-expanded={dashboardSidebarOpen}
+                onClick={() => setDashboardSidebarOpen((isOpen) => !isOpen)}
+              >
+                <span aria-hidden="true">{dashboardSidebarOpen ? "<" : ">"}</span>
+              </button>
+            </div>
 
             <div className="dashboard-controls">
               <label className="language-picker">
@@ -7942,32 +8028,86 @@ function App() {
               <span>{copy("Assumption snapshot", "Varsayım özeti")}</span>
               <h2>{copy("What this dashboard is based on", "Bu dashboard neye dayanıyor")}</h2>
             </div>
-            <div className="dashboard-assumption-strip-controls">
-              <label className="assumption-control product-control">
+            <div
+              className="dashboard-assumption-strip-controls"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  setDashboardAssumptionMenu(null);
+                }
+              }}
+            >
+              <div className={`assumption-control product-control ${dashboardAssumptionMenu === "product" ? "open" : ""}`}>
                 <span>{copy("Product", "Ürün")}</span>
-                <select
-                  value={dashboardSelectedProductId}
-                  onChange={(event) => handleDashboardProductChange(event.target.value)}
+                <button
+                  type="button"
+                  className="assumption-select-trigger"
+                  onClick={() => setDashboardAssumptionMenu((current) => (current === "product" ? null : "product"))}
                   disabled={!operationsWorkspace.products.length}
+                  aria-expanded={dashboardAssumptionMenu === "product"}
                 >
-                  {!operationsWorkspace.products.length && (
-                    <option value="">{copy("No products yet", "Henüz ürün yok")}</option>
-                  )}
-                  {operationsWorkspace.products.map((product) => (
-                    <option value={product.id} key={product.id}>
-                      {product.name || product.product_code || copy("Unnamed product", "İsimsiz ürün")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="assumption-control horizon-control">
+                  <strong>{dashboardProductSelectLabel}</strong>
+                  <i aria-hidden="true">⌄</i>
+                </button>
+                {dashboardAssumptionMenu === "product" && Boolean(operationsWorkspace.products.length) && (
+                  <div className="assumption-select-menu" role="listbox">
+                    {operationsWorkspace.products.map((product) => {
+                      const label = product.name || product.product_code || copy("Unnamed product", "İsimsiz ürün");
+                      const isSelected = product.id === dashboardSelectedProductId;
+                      return (
+                        <button
+                          type="button"
+                          className={isSelected ? "selected" : ""}
+                          onClick={() => {
+                            handleDashboardProductChange(product.id);
+                            setDashboardAssumptionMenu(null);
+                          }}
+                          role="option"
+                          aria-selected={isSelected}
+                          key={product.id}
+                        >
+                          <span>{label}</span>
+                          <small>{product.product_code || product.product_group || copy("Product", "Ürün")}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className={`assumption-control horizon-control ${dashboardAssumptionMenu === "horizon" ? "open" : ""}`}>
                 <span>{copy("Projection horizon", "Projeksiyon ufku")}</span>
-                <select value={financialHorizon} onChange={(event) => loadFinancialData(event.target.value)}>
-                  {financialHorizonOptions.map(([value, label]) => (
-                    <option value={value} key={value}>{label}</option>
-                  ))}
-                </select>
-              </label>
+                <button
+                  type="button"
+                  className="assumption-select-trigger"
+                  onClick={() => setDashboardAssumptionMenu((current) => (current === "horizon" ? null : "horizon"))}
+                  aria-expanded={dashboardAssumptionMenu === "horizon"}
+                >
+                  <strong>{dashboardHorizonSelectLabel}</strong>
+                  <i aria-hidden="true">⌄</i>
+                </button>
+                {dashboardAssumptionMenu === "horizon" && (
+                  <div className="assumption-select-menu" role="listbox">
+                    {financialHorizonOptions.map(([value, label]) => {
+                      const isSelected = value === financialHorizon;
+                      return (
+                        <button
+                          type="button"
+                          className={isSelected ? "selected" : ""}
+                          onClick={() => {
+                            loadFinancialData(value);
+                            setDashboardAssumptionMenu(null);
+                          }}
+                          role="option"
+                          aria-selected={isSelected}
+                          key={value}
+                        >
+                          <span>{label}</span>
+                          <small>{value === "6m" ? copy("Short range", "Kısa ufuk") : value === "1y" ? copy("Annual range", "Yıllık ufuk") : copy("Long range", "Uzun ufuk")}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="assumption-strip-list">
               {dashboardAssumptionRows.map(([label, value]) => (
@@ -8217,7 +8357,7 @@ function App() {
 
       return renderDashboardLayout(
         `operations/${activeOperationsSubmodule.key}`,
-          <section className="operations-workspace operations-modern">
+          <section className="operations-workspace operations-modern operations-process-page">
             <div className="operations-header">
               <div>
                 <span>Operations / {copy("Process Definition", "Süreç Tanımlama")}</span>
