@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabaseClient";
 import {
   createDemoFinancialLoanRows,
@@ -73,6 +73,53 @@ function formatLira(value, maximumFractionDigits = 0) {
     maximumFractionDigits,
     style: "currency",
   }).format(value || 0);
+}
+
+function useMatchedPanelHeight(dependencyKey) {
+  const sourceRef = useRef(null);
+  const [height, setHeight] = useState(null);
+
+  useLayoutEffect(() => {
+    const element = sourceRef.current;
+
+    if (!element) {
+      setHeight(null);
+      return undefined;
+    }
+
+    let frameId = 0;
+
+    const measure = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+
+      frameId = requestAnimationFrame(() => {
+        const nextHeight = Math.ceil(element.getBoundingClientRect().height);
+        setHeight((currentHeight) => (Math.abs((currentHeight || 0) - nextHeight) > 1 ? nextHeight : currentHeight));
+      });
+    };
+
+    measure();
+
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    resizeObserver?.observe(element);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [dependencyKey]);
+
+  return [
+    sourceRef,
+    height ? { "--matched-record-card-height": `${height}px` } : undefined,
+  ];
 }
 
 function InfoTip({ label = "Info", text }) {
@@ -1567,6 +1614,12 @@ function App() {
   const labels = text[form.language] || text.en;
   const copy = (en, tr) => (form.language === "tr" ? tr : en);
   const locale = form.language === "tr" ? "tr-TR" : "en-US";
+  const heightMatchKey = `${path}|${form.language}`;
+  const [materialFormRef, materialListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|material`);
+  const [workforceFormRef, workforceListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|workforce`);
+  const [productFormRef, productListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|product`);
+  const [machineFormRef, machineListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|machine`);
+  const [equipmentFormRef, equipmentListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|equipment`);
 
   const initials = useMemo(() => {
     const source = form.username || form.email || "A";
@@ -3147,13 +3200,14 @@ function App() {
     return (
       <section className="operation-planner" aria-label={copy("Resource planning calculator", "Kaynak planlama hesaplayıcı")}>
         <form className="operation-card planner-input-card" onSubmit={handleSaveOperationPlan}>
-          <div className="operation-card-heading">
+          <div className="operation-card-heading process-planner-heading">
             <div>
               <span>{copy("Process Definition", "Süreç Tanımlama")}</span>
               <h2>{copy("Batch / flow operation model", "Batch / akış operasyon modeli")}</h2>
             </div>
             <button
               type="button"
+              className="process-default-button"
               onClick={() => setOperationPlan({
                 ...emptyOperationPlan,
                 ...getProductFlowDefaults(operationsWorkspace.product),
@@ -3167,7 +3221,24 @@ function App() {
               {copy("Load Default", "Varsayılanı Yükle")}
             </button>
           </div>
-          <div className="planner-fields">
+          <div className="process-planner-overview" aria-label={copy("Process plan snapshot", "Süreç planı özeti")}>
+            <article>
+              <span>{copy("Product", "Ürün")}</span>
+              <strong>{selectedProduct?.name || "-"}</strong>
+              <small>{selectedProduct ? `${formatOperationMoney(selectedProduct.price, selectedProduct.price_currency, exchangeRates, 2)} / ${selectedProduct.unit || copy("pcs", "adet")}` : copy("select a product", "ürün seçin")}</small>
+            </article>
+            <article>
+              <span>{copy("Flow", "Akış")}</span>
+              <strong>{flowStrategyLabels[operationPlan.flowStrategy] || flowStrategyLabels.flow}</strong>
+              <small>{formatNumber(operationPlan.batchSize || 0)} {copy("batch", "batch")} / {copy("min", "min")} {formatNumber(operationPlan.minimumTransferQuantity || 0)}</small>
+            </article>
+            <article>
+              <span>{copy("Setup", "Kurgu")}</span>
+              <strong>{formatNumber(operationRows.length)} {copy("steps", "adım")}</strong>
+              <small>{formatNumber(machineRows.length)} {copy("machines", "makine")} / {formatNumber(workforceRows.length)} {copy("roles", "rol")}</small>
+            </article>
+          </div>
+          <div className="planner-fields process-core-fields">
             <label>
               {infoLabel(
                 copy("Plan name", "Plan adı"),
@@ -3291,25 +3362,20 @@ function App() {
             </label>
           </div>
 
-          <div className="resource-section">
-            <div className="resource-section-header">
+          <details className="resource-section process-accordion process-accordion-flow">
+            <summary className="resource-section-header process-accordion-summary">
               <div>
-                <span className="label-with-info">
-                  {copy("Operation flow", "Operasyon akışı")}
-                  <InfoTip
-                    label={copy("Operation flow info", "Operasyon akışı bilgisi")}
-                    text={copy(
-                      "This is the precedence chain. Operation 2 can only start for a batch after Operation 1 finishes that same batch, so packaging cannot run before pureeing creates output.",
-                      "Bu öncelik zinciridir. Operasyon 2 ancak Operasyon 1 aynı batch'i bitirdikten sonra başlayabilir; yani paketleme, püreleme çıktı üretmeden çalışamaz.",
-                    )}
-                  />
-                </span>
+                <span>{copy("Operation flow", "Operasyon akışı")}</span>
                 <p>{copy("Define the ordered precedence chain: each batch can enter the next operation only after the previous operation finishes.", "Sıralı öncelik zincirini tanımlayın: her batch bir sonraki operasyona ancak önceki operasyon tamamlanınca geçer.")}</p>
               </div>
-              <button type="button" onClick={() => addOperationPlanRow("operationRows", defaultOperationRow)}>
+              <small>{formatNumber(operationRows.length)} {copy("steps", "adım")}</small>
+            </summary>
+            <div className="process-accordion-body">
+              <div className="process-section-actions">
+                <button type="button" onClick={() => addOperationPlanRow("operationRows", defaultOperationRow)}>
                 {copy("Add Operation", "Operasyon Ekle")}
-              </button>
-            </div>
+                </button>
+              </div>
             <div className="resource-row-list">
               {operationRows.length ? operationRows.map((row, index) => {
                 const selectedMachine = operationsWorkspace.machines.find((machine) => machine.id === row.machineId);
@@ -3417,25 +3483,19 @@ function App() {
                 <p className="planner-empty-state">{copy("Add operation steps such as Pureeing then Packaging to activate batch/flow simulation.", "Batch/akış simülasyonunu açmak için Püreleme sonra Paketleme gibi operasyon adımları ekleyin.")}</p>
               )}
             </div>
-          </div>
+            </div>
+          </details>
 
-          <div className="resource-section">
-            <div className="resource-section-header">
+          <details className="resource-section process-accordion process-accordion-costs">
+            <summary className="resource-section-header process-accordion-summary">
               <div>
-                <span className="label-with-info">
-                  {copy("Optimization costs", "Optimizasyon maliyetleri")}
-                  <InfoTip
-                    label={copy("Optimization costs info", "Optimizasyon maliyetleri bilgisi")}
-                    text={copy(
-                      "These weights turn scheduling tradeoffs into money. The optimizer compares batch sizes by total time plus waiting, inventory, delay, and idle-capacity penalties.",
-                      "Bu ağırlıklar planlama takaslarını paraya çevirir. Optimizasyon batch boyutlarını toplam süre + bekleme, stok, gecikme ve boş kapasite cezalarına göre karşılaştırır.",
-                    )}
-                  />
-                </span>
+                <span>{copy("Optimization costs", "Optimizasyon maliyetleri")}</span>
                 <p>{copy("Optional cost weights let the batch optimizer balance time, queue waiting, inventory in buffer, idle capacity, and delay.", "Opsiyonel maliyet ağırlıkları batch optimizasyonunun süre, bekleme, buffer stoku, boş kapasite ve gecikmeyi dengelemesini sağlar.")}</p>
               </div>
-            </div>
-            <div className="planner-fields compact-planner-fields">
+              <small>{copy("4 weights", "4 ağırlık")}</small>
+            </summary>
+            <div className="process-accordion-body">
+              <div className="planner-fields compact-planner-fields">
               <label>
                 {infoLabel(
                   copy("Waiting cost / hour", "Bekleme maliyeti / saat"),
@@ -3472,29 +3532,25 @@ function App() {
                   <input min="0" step="0.01" type="number" value={operationPlan.capacityLossCostPerHour ?? ""} onChange={(event) => updateOperationPlan("capacityLossCostPerHour", event.target.value)} />
                 </div>
               </label>
+              </div>
             </div>
-          </div>
+          </details>
 
-          <div className="resource-section">
-            <div className="resource-section-header">
+          <details className="resource-section process-accordion process-accordion-machines">
+            <summary className="resource-section-header process-accordion-summary">
               <div>
-                <span className="label-with-info">
-                  {copy("Machine selection", "Makine seçimi")}
-                  <InfoTip
-                    label={copy("Machine selection info", "Makine seçimi bilgisi")}
-                    text={copy(
-                      "This legacy resource section is still used for existing cost and finance flows. When operation steps are defined, machine usage is calculated from the operation schedule.",
-                      "Bu eski kaynak bölümü mevcut maliyet ve finans akışlarında hâlâ kullanılır. Operasyon adımları tanımlıysa makine kullanımı operasyon takviminden hesaplanır.",
-                    )}
-                  />
-                </span>
+                <span>{copy("Machine selection", "Makine seçimi")}</span>
                 <p>{copy("Enter which machine will be used and how many hours per day it will run for the product.", "Ürünü üretirken hangi makinenin günde kaç saat kullanılacağını girin.")}</p>
               </div>
-              <button type="button" onClick={() => addOperationPlanRow("machineRows", defaultMachineRow)}>
+              <small>{formatNumber(machineRows.length)} {copy("machines", "makine")}</small>
+            </summary>
+            <div className="process-accordion-body">
+              <div className="process-section-actions">
+                <button type="button" onClick={() => addOperationPlanRow("machineRows", defaultMachineRow)}>
                 {copy("Add Machine", "Makine Ekle")}
-              </button>
-            </div>
-            <div className="resource-row-list">
+                </button>
+              </div>
+              <div className="resource-row-list">
               {machineRows.length ? machineRows.map((row, index) => {
                 const selectedMachine = operationsWorkspace.machines.find((machine) => machine.id === row.machineId);
 
@@ -3539,29 +3595,25 @@ function App() {
               }) : (
                 <p className="planner-empty-state">{copy("No machine records yet. Add a real machine from Machines & Equipment first.", "Makine kaydı yok. Önce Makine & Ekipman ekranından gerçek makine ekleyin.")}</p>
               )}
+              </div>
             </div>
-          </div>
+          </details>
 
-          <div className="resource-section">
-            <div className="resource-section-header">
+          <details className="resource-section process-accordion process-accordion-workforce">
+            <summary className="resource-section-header process-accordion-summary">
               <div>
-                <span className="label-with-info">
-                  {copy("Workforce selection", "İşgücü seçimi")}
-                  <InfoTip
-                    label={copy("Workforce selection info", "İşgücü seçimi bilgisi")}
-                    text={copy(
-                      "Labor cost remains separate from the machine schedule: assigned people x daily hours x hourly cost. This lets human resource cost stay integrated with flow plans.",
-                      "İşgücü maliyeti makine takviminden ayrı hesaplanır: atanan kişi x günlük saat x saatlik maliyet. Böylece insan kaynağı maliyeti flow planlarıyla entegre kalır.",
-                    )}
-                  />
-                </span>
+                <span>{copy("Workforce selection", "İşgücü seçimi")}</span>
                 <p>{copy("Enter how many people from each role will work and for how many hours per day.", "Hangi rolden kaç kişinin günde kaç saat çalışacağını girin.")}</p>
               </div>
-              <button type="button" onClick={() => addOperationPlanRow("workforceRows", defaultWorkforceRow)}>
+              <small>{formatNumber(workforceRows.length)} {copy("roles", "rol")}</small>
+            </summary>
+            <div className="process-accordion-body">
+              <div className="process-section-actions">
+                <button type="button" onClick={() => addOperationPlanRow("workforceRows", defaultWorkforceRow)}>
                 {copy("Add Workforce", "İşgücü Ekle")}
-              </button>
-            </div>
-            <div className="resource-row-list">
+                </button>
+              </div>
+              <div className="resource-row-list">
               {workforceRows.length ? workforceRows.map((row, index) => {
                 const selectedWorkforce = operationsWorkspace.workforce.find((workforce) => workforce.id === row.workforceId);
 
@@ -3619,26 +3671,20 @@ function App() {
               }) : (
                 <p className="planner-empty-state">{copy("No workforce records yet. Add a role from Human Resources first.", "İşgücü kaydı yok. Önce İnsan Kaynağı ekranından rol ekleyin.")}</p>
               )}
-            </div>
-          </div>
-
-          <div className="resource-section">
-            <div className="resource-section-header">
-              <div>
-                <span className="label-with-info">
-                  {copy("Product materials", "Ürün malzemeleri")}
-                  <InfoTip
-                    label={copy("Product materials info", "Ürün malzemeleri bilgisi")}
-                    text={copy(
-                      "Materials are not manually scheduled. The system multiplies produced quantity by the product recipe to calculate required material quantity and cost.",
-                      "Malzemeler manuel takvimlenmez. Sistem üretilen adedi ürün reçetesiyle çarparak gerekli malzeme miktarını ve maliyeti hesaplar.",
-                    )}
-                  />
-                </span>
-                <p>{copy("Material quantities are calculated automatically from the selected product recipe and produced quantity.", "Malzeme miktarları seçilen ürün reçetesinden ve hesaplanan üretim adedinden otomatik hesaplanır.")}</p>
               </div>
             </div>
-            <div className="resource-row-list">
+          </details>
+
+          <details className="resource-section process-accordion process-accordion-materials">
+            <summary className="resource-section-header process-accordion-summary">
+              <div>
+                <span>{copy("Product materials", "Ürün malzemeleri")}</span>
+                <p>{copy("Material quantities are calculated automatically from the selected product recipe and produced quantity.", "Malzeme miktarları seçilen ürün reçetesinden ve hesaplanan üretim adedinden otomatik hesaplanır.")}</p>
+              </div>
+              <small>{formatNumber(selectedProductMaterials.length)} {copy("materials", "malzeme")}</small>
+            </summary>
+            <div className="process-accordion-body">
+              <div className="resource-row-list">
               {selectedProductMaterials.length ? selectedProductMaterials.map((row, index) => (
                   <div className="resource-row-grid material-plan-row" key={row.id || row.material_id || `product-material-${index}`}>
                     <div className="resource-row-meta">
@@ -3653,8 +3699,9 @@ function App() {
                 )) : (
                 <p className="planner-empty-state">{copy("This product has no recipe yet. Add required materials on the Products screen first.", "Bu ürün için reçete yok. Önce Ürünler ekranında gerekli malzemeleri ekleyin.")}</p>
               )}
+              </div>
             </div>
-          </div>
+          </details>
 
           <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
             {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save to Supabase and Calculate", "Supabase'e Kaydet ve Hesapla")}
@@ -3756,65 +3803,87 @@ function App() {
                     copy("Optimizer score: total production minutes plus waiting, inventory, delay, and capacity-loss costs. Lower is better.", "Optimizasyon skoru: toplam üretim dakikası ile bekleme, stok, gecikme ve kapasite kaybı maliyetlerinin toplamı. Düşük olması daha iyidir."),
                   )}
               </div>
-              <div className="selected-resource-results">
-                <div>
-                  <h3 className="label-with-info">
-                    {copy("Operation schedule", "Operasyon takvimi")}
-                    <InfoTip
-                      label={copy("Operation schedule info", "Operasyon takvimi bilgisi")}
-                      text={copy("Shows each operation's selected machine and total busy time after batch flow and precedence rules are simulated.", "Batch akışı ve öncelik kuralları simüle edildikten sonra her operasyonun seçili makinesini ve toplam meşgul süresini gösterir.")}
-                    />
-                  </h3>
+              <div className="selected-resource-results process-result-accordions">
+                <details className="process-result-detail process-accordion">
+                  <summary className="process-result-summary process-accordion-summary">
+                    <div>
+                      <span>{copy("Operation schedule", "Operasyon takvimi")}</span>
+                      <p>{copy("Selected machines and busy time after batch flow rules are simulated.", "Batch akışı simüle edildikten sonra seçili makineler ve meşgul süreleri.")}</p>
+                    </div>
+                    <small>{formatNumber(resultOperationRows.length)} {copy("rows", "satır")}</small>
+                  </summary>
+                  <div className="process-accordion-body">
                   {(resultOperationRows.length ? resultOperationRows : [{ operationId: "empty", operationName: "-", machineName: "-" }]).map((row, index) => (
                     <span key={row.operationId || `operation-result-${index}`}>
                       {row.operationName} <strong>{row.machineName || "-"} / {formatMinutesDuration(row.busyMinutes || 0)}</strong>
                     </span>
                   ))}
-                </div>
-                <div>
-                  <h3 className="label-with-info">
-                    {copy("Buffers", "Buffer")}
-                    <InfoTip
-                      label={copy("Buffer result info", "Buffer sonucu bilgisi")}
-                      text={copy("Shows temporary stock between two operations. Max WIP is the highest amount waiting there at any point in the simulated timeline.", "İki operasyon arasındaki geçici stoğu gösterir. Maks WIP, simüle edilen zaman çizelgesinde o ara noktada bekleyen en yüksek miktardır.")}
-                    />
-                  </h3>
+                  </div>
+                </details>
+                <details className="process-result-detail process-accordion">
+                  <summary className="process-result-summary process-accordion-summary">
+                    <div>
+                      <span>{copy("Buffers", "Buffer")}</span>
+                      <p>{copy("Temporary stock between operations and the highest WIP point.", "Operasyonlar arasındaki geçici stok ve en yüksek WIP noktası.")}</p>
+                    </div>
+                    <small>{formatNumber(resultBufferRows.length)} {copy("buffers", "buffer")}</small>
+                  </summary>
+                  <div className="process-accordion-body">
                   {(resultBufferRows.length ? resultBufferRows : [{ fromOperationName: "-", toOperationName: "-", maxWip: 0 }]).map((row, index) => (
                     <span key={`${row.fromOperationName}-${row.toOperationName}-${index}`}>
                       {row.fromOperationName} -&gt; {row.toOperationName} <strong>{formatNumber(row.maxWip, 2)} WIP</strong>
                     </span>
                   ))}
-                </div>
-                <div>
-                  <h3 className="label-with-info">
-                    {copy("Machine breakdown", "Makine kırılımı")}
-                    <InfoTip
-                      label={copy("Machine breakdown info", "Makine kırılımı bilgisi")}
-                      text={copy("Shows calculated energy and utilization for machines used by the schedule. Utilization is busy time divided by available/simulated time.", "Takvimde kullanılan makinelerin hesaplanan enerji ve kullanım oranını gösterir. Kullanım oranı meşgul sürenin kullanılabilir/simüle edilen süreye bölünmesidir.")}
-                    />
-                  </h3>
+                  </div>
+                </details>
+                <details className="process-result-detail process-accordion">
+                  <summary className="process-result-summary process-accordion-summary">
+                    <div>
+                      <span>{copy("Machine breakdown", "Makine kırılımı")}</span>
+                      <p>{copy("Calculated energy and utilization for machines used by the schedule.", "Takvimde kullanılan makineler için hesaplanan enerji ve kullanım.")}</p>
+                    </div>
+                    <small>{formatNumber(resultMachineRows.length)} {copy("machines", "makine")}</small>
+                  </summary>
+                  <div className="process-accordion-body">
                   {resultMachineRows.map((row, index) => (
                     <span key={row.machineId || `machine-result-${index}`}>
                       {row.name} <strong>{formatNumber(row.energyConsumptionKwh, 2)} kWh{Number.isFinite(Number(row.utilizationPercent)) ? ` / ${formatNumber(row.utilizationPercent, 1)}%` : ""}</strong>
                     </span>
                   ))}
-                </div>
-                <div>
-                  <h3>{copy("Workforce breakdown", "İşgücü kırılımı")}</h3>
+                  </div>
+                </details>
+                <details className="process-result-detail process-accordion">
+                  <summary className="process-result-summary process-accordion-summary">
+                    <div>
+                      <span>{copy("Workforce breakdown", "İşgücü kırılımı")}</span>
+                      <p>{copy("Labor roles, assigned hours, and calculated cost contribution.", "İşgücü rolleri, atanmış saatler ve hesaplanan maliyet etkisi.")}</p>
+                    </div>
+                    <small>{formatNumber(resultWorkforceRows.length)} {copy("roles", "rol")}</small>
+                  </summary>
+                  <div className="process-accordion-body">
                   {resultWorkforceRows.map((row, index) => (
                     <span key={row.workforceId || `workforce-result-${index}`}>
                       {row.roleName} <strong>{formatLira(row.cost)}</strong>
                     </span>
                   ))}
-                </div>
-                <div>
-                  <h3>{copy("Material breakdown", "Malzeme kırılımı")}</h3>
+                  </div>
+                </details>
+                <details className="process-result-detail process-accordion">
+                  <summary className="process-result-summary process-accordion-summary">
+                    <div>
+                      <span>{copy("Material breakdown", "Malzeme kırılımı")}</span>
+                      <p>{copy("Recipe-driven material usage and cost for the produced quantity.", "Üretilen miktar için reçeteye bağlı malzeme kullanımı ve maliyeti.")}</p>
+                    </div>
+                    <small>{formatNumber(resultMaterialRows.length)} {copy("materials", "malzeme")}</small>
+                  </summary>
+                  <div className="process-accordion-body">
                   {resultMaterialRows.map((row, index) => (
                     <span key={row.materialId || `material-result-${index}`}>
                       {row.name} <strong>{formatLira(row.cost)}</strong>
                     </span>
                   ))}
-                </div>
+                  </div>
+                </details>
               </div>
             </>
           )}
@@ -3823,9 +3892,42 @@ function App() {
     );
   }
 
-  function renderOperationRecordForm(entity, fields) {
+  function renderOperationRecordForm(entity, fields, options = {}) {
+    const formClassName = [
+      "operation-card operation-data-form operations-record-form-card",
+      options.className,
+    ].filter(Boolean).join(" ");
+    const recordFormLabels = {
+      equipment: {
+        eyebrow: copy("Register equipment", "Ekipman kaydı"),
+        title: copy("Equipment details", "Ekipman detayları"),
+      },
+      machine: {
+        eyebrow: copy("Register machine", "Makine kaydı"),
+        title: copy("Machine capability", "Makine kabiliyeti"),
+      },
+      material: {
+        eyebrow: copy("Register material", "Malzeme kaydı"),
+        title: copy("Material details", "Malzeme detayları"),
+      },
+      workforce: {
+        eyebrow: copy("Register workforce", "İşgücü kaydı"),
+        title: copy("Workforce details", "İşgücü detayları"),
+      },
+    };
+    const recordFormLabel = recordFormLabels[entity] || {
+      eyebrow: copy("New record", "Yeni kayıt"),
+      title: copy("Record details", "Kayıt detayları"),
+    };
+
     return (
-      <form className="operation-card operation-data-form operations-record-form-card" onSubmit={(event) => handleSaveOperationRecord(entity, event)}>
+      <form ref={options.formRef} className={formClassName} onSubmit={(event) => handleSaveOperationRecord(entity, event)}>
+        <div className="operation-card-heading">
+          <div>
+            <span>{recordFormLabel.eyebrow}</span>
+            <h2>{recordFormLabel.title}</h2>
+          </div>
+        </div>
         <div className="operation-data-fields">
           {fields.map((field) => (
             <label key={field.name}>
@@ -3865,6 +3967,11 @@ function App() {
 
   function renderResourcesPage() {
     const unitOptions = ["kg", "gr", "mg", "adet", "metre", "litre", "ml"];
+    const resourceCurrencyCount = new Set([
+      ...operationsWorkspace.materials.map((material) => material.price_currency || "TRY"),
+      ...operationsWorkspace.workforce.map((workforce) => workforce.hourly_cost_currency || "TRY"),
+    ]).size;
+    const pricedMaterialCount = operationsWorkspace.materials.filter((material) => toFiniteNumber(material.price_per_unit) > 0).length;
 
     return renderDashboardLayout(
       "operations/resources",
@@ -3876,12 +3983,30 @@ function App() {
               <p>{copy("Add materials, semi-finished items, and services used by production and costing workflows.", "Üretim ve maliyet akışlarında kullanılan malzeme, yarı mamül ve hizmetleri ekleyin.")}</p>
             </div>
             <div className="operations-actions">
-              <button type="button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
+              <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
             </div>
           </div>
 
+          <div className="process-summary-grid operations-entry-summary">
+            <article className="operation-card process-summary-card">
+              <span>{copy("Materials", "Malzemeler")}</span>
+              <strong>{formatNumber(operationsWorkspace.materials.length)}</strong>
+              <small>{copy("priced production inputs", "fiyatlı üretim girdileri")}: {formatNumber(pricedMaterialCount)}</small>
+            </article>
+            <article className="operation-card process-summary-card">
+              <span>{copy("Workforce roles", "İşgücü rolleri")}</span>
+              <strong>{formatNumber(operationsWorkspace.workforce.length)}</strong>
+              <small>{copy("available for process plans", "süreç planlarına hazır")}</small>
+            </article>
+            <article className="operation-card process-summary-card">
+              <span>{copy("Currencies", "Para birimleri")}</span>
+              <strong>{formatNumber(resourceCurrencyCount)}</strong>
+              <small>{copy("converted in financial analysis", "finans analizinde çevrilir")}</small>
+            </article>
+          </div>
+
           <div className="resource-definition-grid">
-            <form className="operation-card operation-data-form resource-definition-card operations-record-form-card" onSubmit={(event) => handleSaveOperationRecord("material", event)}>
+            <form ref={materialFormRef} className="operation-card operation-data-form resource-definition-card operations-record-form-card operations-material-form-card" onSubmit={(event) => handleSaveOperationRecord("material", event)}>
               <div className="operation-card-heading">
                 <div>
                   <span>{copy("Add material", "Malzeme ekle")}</span>
@@ -3930,29 +4055,39 @@ function App() {
               </button>
             </form>
 
-            <article className="operation-card resource-definition-card resource-list-card operations-record-list-card">
+            <article className="operation-card resource-definition-card operation-data-table-card operations-record-list-card operations-material-list-card" style={materialListHeightStyle}>
               <div className="operation-card-heading">
                 <h2>{copy("Materials", "Malzemeler")}</h2>
                 <span>{operationsWorkspace.materials.length} {copy("records", "kayıt")}</span>
               </div>
-              <div className="compact-resource-list">
+              <div className="operation-data-table">
+                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: "1.2fr 0.6fr 0.9fr 0.7fr" }}>
+                  <span>{copy("Material", "Malzeme")}</span>
+                  <span>{copy("Unit", "Birim")}</span>
+                  <span>{copy("Unit price", "Birim fiyat")}</span>
+                  <span>{copy("Currency", "Para birimi")}</span>
+                </div>
                 {(operationsWorkspace.materials.length ? operationsWorkspace.materials : [{ id: "empty" }]).map((material) => (
-                  <div className="compact-resource-record" key={material.id}>
-                    <span>
-                      <strong>{material.id === "empty" ? "-" : material.name}</strong>
-                      <small>{material.id === "empty" ? "-" : `${formatOperationMoney(material.price_per_unit, material.price_currency, exchangeRates, 2)} / ${material.unit}`}</small>
-                    </span>
-                    {material.id !== "empty" && (
-                      <button type="button" onClick={() => copyOperationRecordToForm("material", material)}>
-                        {copy("Copy", "Kopyala")}
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    className="operation-data-row operation-data-button-row"
+                    style={{ gridTemplateColumns: "1.2fr 0.6fr 0.9fr 0.7fr" }}
+                    key={material.id}
+                    onClick={() => {
+                      if (material.id === "empty") return;
+                      copyOperationRecordToForm("material", material);
+                    }}
+                  >
+                    <span>{material.id === "empty" ? "-" : material.name}</span>
+                    <span>{material.id === "empty" ? "-" : material.unit}</span>
+                    <span>{material.id === "empty" ? "-" : formatOperationMoney(material.price_per_unit, material.price_currency, exchangeRates, 2)}</span>
+                    <span>{material.id === "empty" ? "-" : material.price_currency || "TRY"}</span>
+                  </button>
                 ))}
               </div>
             </article>
 
-            <form className="operation-card operation-data-form resource-definition-card operations-record-form-card" onSubmit={(event) => handleSaveOperationRecord("workforce", event)}>
+            <form ref={workforceFormRef} className="operation-card operation-data-form resource-definition-card operations-record-form-card operations-workforce-form-card" onSubmit={(event) => handleSaveOperationRecord("workforce", event)}>
               <div className="operation-card-heading">
                 <div>
                   <span>{copy("Add human resource", "İnsan kaynağı ekle")}</span>
@@ -3992,24 +4127,32 @@ function App() {
               </button>
             </form>
 
-            <article className="operation-card resource-definition-card resource-list-card operations-record-list-card">
+            <article className="operation-card resource-definition-card operation-data-table-card operations-record-list-card operations-workforce-list-card" style={workforceListHeightStyle}>
               <div className="operation-card-heading">
                 <h2>{copy("Human Resources", "İnsan Kaynağı")}</h2>
                 <span>{operationsWorkspace.workforce.length} {copy("records", "kayıt")}</span>
               </div>
-              <div className="compact-resource-list">
+              <div className="operation-data-table">
+                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: "1.2fr 0.9fr 0.7fr" }}>
+                  <span>{copy("Role", "Rol")}</span>
+                  <span>{copy("Hourly cost", "Saatlik maliyet")}</span>
+                  <span>{copy("Currency", "Para birimi")}</span>
+                </div>
                 {(operationsWorkspace.workforce.length ? operationsWorkspace.workforce : [{ id: "empty" }]).map((workforce) => (
-                  <div className="compact-resource-record" key={workforce.id}>
-                    <span>
-                      <strong>{workforce.id === "empty" ? "-" : workforce.role_name}</strong>
-                      <small>{workforce.id === "empty" ? "-" : `${formatOperationMoney(workforce.hourly_cost, workforce.hourly_cost_currency, exchangeRates, 2)} / ${copy("hour", "saat")}`}</small>
-                    </span>
-                    {workforce.id !== "empty" && (
-                      <button type="button" onClick={() => copyOperationRecordToForm("workforce", workforce)}>
-                        {copy("Copy", "Kopyala")}
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    className="operation-data-row operation-data-button-row"
+                    style={{ gridTemplateColumns: "1.2fr 0.9fr 0.7fr" }}
+                    key={workforce.id}
+                    onClick={() => {
+                      if (workforce.id === "empty") return;
+                      copyOperationRecordToForm("workforce", workforce);
+                    }}
+                  >
+                    <span>{workforce.id === "empty" ? "-" : workforce.role_name}</span>
+                    <span>{workforce.id === "empty" ? "-" : `${formatOperationMoney(workforce.hourly_cost, workforce.hourly_cost_currency, exchangeRates, 2)} / ${copy("hour", "saat")}`}</span>
+                    <span>{workforce.id === "empty" ? "-" : workforce.hourly_cost_currency || "TRY"}</span>
+                  </button>
                 ))}
               </div>
             </article>
@@ -4054,6 +4197,9 @@ function App() {
 
   function renderProductDataPage() {
     const productMaterialRows = operationForms.product.materialRows || [];
+    const productsWithRecipe = operationsWorkspace.products.filter((product) => asObjectArray(product.material_rows).length > 0).length;
+    const productRecipeLinkCount = operationsWorkspace.products.reduce((total, product) => total + asObjectArray(product.material_rows).length, 0);
+    const pricedProductCount = operationsWorkspace.products.filter((product) => toFiniteNumber(product.price) > 0).length;
     const productFlowStrategyLabels = {
       batch: copy("Batch", "Toplu"),
       flow: copy("Flow / Pull", "Akış / Pull"),
@@ -4070,12 +4216,36 @@ function App() {
               <p>{copy("Keep the product recipe, unit, price, cycle time, and default transfer rules used in process definition calculations.", "Süreç tanımlama hesaplamasında kullanılacak ürün reçetesini, birimini, fiyatını, çevrim süresini ve varsayılan transfer kurallarını tutun.")}</p>
             </div>
             <div className="operations-actions">
-              <button type="button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
+              <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
             </div>
           </div>
 
+          <div className="process-summary-grid operations-entry-summary">
+            <article className="operation-card process-summary-card">
+              <span>{copy("Products", "Ürünler")}</span>
+              <strong>{formatNumber(operationsWorkspace.products.length)}</strong>
+              <small>{copy("priced", "fiyatlı")}: {formatNumber(pricedProductCount)}</small>
+            </article>
+            <article className="operation-card process-summary-card">
+              <span>{copy("Recipes", "Reçeteler")}</span>
+              <strong>{formatNumber(productsWithRecipe)}</strong>
+              <small>{formatNumber(productRecipeLinkCount)} {copy("material links", "malzeme bağlantısı")}</small>
+            </article>
+            <article className="operation-card process-summary-card">
+              <span>{copy("Flow defaults", "Akış varsayılanı")}</span>
+              <strong>{formatNumber(operationsWorkspace.products.length)}</strong>
+              <small>{copy("ready for process definition", "süreç tanımlamaya hazır")}</small>
+            </article>
+          </div>
+
           <div className="operation-data-grid">
-            <form className="operation-card operation-data-form operations-product-form-card" onSubmit={(event) => handleSaveOperationRecord("product", event)}>
+            <form ref={productFormRef} className="operation-card operation-data-form operations-product-form-card" onSubmit={(event) => handleSaveOperationRecord("product", event)}>
+              <div className="operation-card-heading">
+                <div>
+                  <span>{copy("Product definition", "Ürün tanımı")}</span>
+                  <h2>{copy("Commercial and production defaults", "Ticari ve üretim varsayılanları")}</h2>
+                </div>
+              </div>
               <div className="operation-data-fields">
                 <label>
                   <span>{copy("Product name", "Ürün adı")}</span>
@@ -4260,7 +4430,7 @@ function App() {
               </button>
             </form>
 
-            <article className="operation-card operation-data-table-card operations-product-list-card">
+            <article className="operation-card operation-data-table-card operations-product-list-card" style={productListHeightStyle}>
               <div className="operation-card-heading">
                 <h2>{copy("Records", "Kayıtlar")}</h2>
                 <span>{operationsWorkspace.products.length} {copy("records", "kayıt")}</span>
@@ -4338,8 +4508,8 @@ function App() {
               <p>{copy("Track production plans saved to Supabase and their calculated production/cost results.", "Supabase'e kaydedilen üretim planlarını ve hesaplanan üretim/maliyet sonuçlarını takip edin.")}</p>
             </div>
             <div className="operations-actions">
-              <button type="button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
-              <button type="button" className="primary" onClick={() => goTo("/operations/data-entry", "login")}>{copy("New Plan", "Yeni Plan")}</button>
+              <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
+              <button type="button" className="operations-refresh-button" onClick={() => goTo("/operations/data-entry", "login")}>{copy("New Plan", "Yeni Plan")}</button>
             </div>
           </div>
 
@@ -6961,7 +7131,7 @@ function App() {
               <p>{description}</p>
             </div>
             <div className="operations-actions">
-              <button type="button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
+              <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
             </div>
           </div>
 
@@ -7031,6 +7201,15 @@ function App() {
         </button>
       ) },
     ];
+    const machineInvestmentTry = operationsWorkspace.machines.reduce(
+      (total, machine) => total + convertMoneyToTry(machine.price, machine.price_currency, exchangeRates),
+      0,
+    );
+    const equipmentInvestmentTry = (operationsWorkspace.equipment || []).reduce(
+      (total, equipment) => total + convertMoneyToTry(toFiniteNumber(equipment.price) * Math.max(1, toFiniteNumber(equipment.quantity, 1)), equipment.price_currency, exchangeRates),
+      0,
+    );
+    const totalMachineHours = operationsWorkspace.machines.reduce((total, machine) => total + toFiniteNumber(machine.availability_hours, 8), 0);
 
     return renderDashboardLayout(
       `operations/${activeOperationsSubmodule.key}`,
@@ -7042,14 +7221,32 @@ function App() {
               <p>{copy("Keep machines used in production plans separate from simple equipment records.", "Üretim planlarında kullanılacak makineleri sade ekipman kayıtlarından ayrı tutun.")}</p>
             </div>
             <div className="operations-actions">
-              <button type="button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
+              <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
             </div>
           </div>
 
+          <div className="process-summary-grid operations-entry-summary">
+            <article className="operation-card process-summary-card">
+              <span>{copy("Machines", "Makineler")}</span>
+              <strong>{formatNumber(operationsWorkspace.machines.length)}</strong>
+              <small>{formatNumber(totalMachineHours, 1)} {copy("available hours", "çalışma saati")}</small>
+            </article>
+            <article className="operation-card process-summary-card">
+              <span>{copy("Equipment", "Ekipman")}</span>
+              <strong>{formatNumber((operationsWorkspace.equipment || []).length)}</strong>
+              <small>{copy("supporting investment records", "destek yatırım kayıtları")}</small>
+            </article>
+            <article className="operation-card process-summary-card">
+              <span>{copy("Registered investment", "Kayıtlı yatırım")}</span>
+              <strong>{formatLira(machineInvestmentTry + equipmentInvestmentTry)}</strong>
+              <small>{copy("converted to TRY for finance", "finans için TL'ye çevrilir")}</small>
+            </article>
+          </div>
+
           <div className="machine-equipment-grid">
-            <div className="operation-data-grid compact operations-record-pair">
-              {renderOperationRecordForm("machine", machineFields)}
-              <article className="operation-card operation-data-table-card operations-record-list-card">
+            <div className="operation-data-grid compact operations-record-pair operations-machine-record-pair">
+              {renderOperationRecordForm("machine", machineFields, { className: "operations-machine-form-card", formRef: machineFormRef })}
+              <article className="operation-card operation-data-table-card operations-record-list-card operations-machine-list-card" style={machineListHeightStyle}>
                 <div className="operation-card-heading">
                   <h2>{copy("Machines", "Makineler")}</h2>
                   <span>{operationsWorkspace.machines.length} {copy("records", "kayıt")}</span>
@@ -7069,9 +7266,9 @@ function App() {
               </article>
             </div>
 
-            <div className="operation-data-grid compact operations-record-pair">
-              {renderOperationRecordForm("equipment", equipmentFields)}
-              <article className="operation-card operation-data-table-card operations-record-list-card">
+            <div className="operation-data-grid compact operations-record-pair operations-equipment-record-pair">
+              {renderOperationRecordForm("equipment", equipmentFields, { className: "operations-equipment-form-card", formRef: equipmentFormRef })}
+              <article className="operation-card operation-data-table-card operations-record-list-card operations-equipment-list-card" style={equipmentListHeightStyle}>
                 <div className="operation-card-heading">
                   <h2>{copy("Equipment", "Ekipman")}</h2>
                   <span>{(operationsWorkspace.equipment || []).length} {copy("records", "kayıt")}</span>
@@ -8354,6 +8551,7 @@ function App() {
         },
       ];
       const isProcessSetupReady = processSetupItems.every((item) => item.isReady);
+      const processReadyCount = processSetupItems.filter((item) => item.isReady).length;
 
       return renderDashboardLayout(
         `operations/${activeOperationsSubmodule.key}`,
@@ -8365,8 +8563,30 @@ function App() {
                 <p>{copy("Build a daily process plan only after the required product, machine, and workforce records exist.", "Gerekli ürün, makine ve işgücü kayıtları oluştuktan sonra günlük süreç planını kurun.")}</p>
               </div>
               <div className="operations-actions">
-                <button type="button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
+                <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
               </div>
+            </div>
+            <div className="process-summary-grid operations-entry-summary process-definition-summary">
+              <article className="operation-card process-summary-card">
+                <span>{copy("Readiness", "Hazırlık")}</span>
+                <strong>{processReadyCount}/{processSetupItems.length}</strong>
+                <small>{isProcessSetupReady ? copy("planner can run", "planlayıcı çalışabilir") : copy("complete source records first", "önce kaynak kayıtlarını tamamlayın")}</small>
+              </article>
+              <article className="operation-card process-summary-card">
+                <span>{copy("Products", "Ürünler")}</span>
+                <strong>{formatNumber(operationsWorkspace.products.length)}</strong>
+                <small>{copy("available for selection", "seçim için hazır")}</small>
+              </article>
+              <article className="operation-card process-summary-card">
+                <span>{copy("Machines", "Makineler")}</span>
+                <strong>{formatNumber(operationsWorkspace.machines.length)}</strong>
+                <small>{copy("capacity sources", "kapasite kaynağı")}</small>
+              </article>
+              <article className="operation-card process-summary-card">
+                <span>{copy("Workforce", "İşgücü")}</span>
+                <strong>{formatNumber(operationsWorkspace.workforce.length)}</strong>
+                <small>{copy("cost roles", "maliyet rolleri")}</small>
+              </article>
             </div>
             {!isProcessSetupReady ? (
               <div className="process-setup-grid">

@@ -9859,6 +9859,63 @@ textarea:focus-visible {
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.18);
 }
 
+.operations-workspace.operations-modern .operations-actions .operations-refresh-button {
+  backdrop-filter: none;
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(102, 193, 212, 0.24), transparent 9rem),
+    linear-gradient(135deg, #071418 0%, var(--color-navy) 58%, #123d42 100%);
+  border: 1px solid rgba(126, 222, 207, 0.28);
+  box-shadow:
+    0 16px 34px rgba(7, 20, 24, 0.22),
+    inset 0 1px 0 rgba(126, 222, 207, 0.18);
+  color: #ffffff;
+  text-shadow: 0 1px 10px rgba(4, 35, 43, 0.36);
+  transition:
+    background 220ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.operations-workspace.operations-modern .operations-actions .operations-refresh-button::before {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.052) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 18px 18px;
+  content: "";
+  inset: 0;
+  opacity: 0.34;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 180ms ease;
+  z-index: -1;
+}
+
+.operations-workspace.operations-modern .operations-actions .operations-refresh-button:hover {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(102, 193, 212, 0.34), transparent 9rem),
+    linear-gradient(135deg, #0a1d22 0%, #102b32 54%, #176066 100%);
+  border-color: rgba(126, 222, 207, 0.48);
+  box-shadow:
+    0 20px 42px rgba(7, 20, 24, 0.28),
+    inset 0 1px 0 rgba(126, 222, 207, 0.24);
+  transform: translateY(-2px);
+}
+
+.operations-workspace.operations-modern .operations-actions .operations-refresh-button:hover::before {
+  opacity: 0.42;
+}
+
+.operations-workspace.operations-modern .operations-actions .operations-refresh-button:active {
+  box-shadow:
+    0 10px 22px rgba(7, 20, 24, 0.22),
+    inset 0 1px 0 rgba(126, 222, 207, 0.16);
+  transform: translateY(0);
+}
+
 .operations-workspace.operations-modern .operations-actions .primary,
 .operations-workspace.operations-modern .planner-save-button,
 .operations-overview .placeholder-grid button {
@@ -13690,11 +13747,11 @@ textarea:focus-visible {
 }
 
 .operations-workspace.operations-modern .operations-actions {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--ops-radius);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding: 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
 }
 
 .operations-workspace.operations-modern .operations-actions button,
@@ -13989,7 +14046,7 @@ textarea:focus-visible {
   }
 
   .operations-workspace.operations-modern .operations-actions {
-    padding: 6px;
+    padding: 0;
   }
 
   .operations-overview > div:first-child::after,
@@ -16185,386 +16242,6 @@ textarea:focus-visible {
   }
 }
 
-/* Mevcut Surecler-inspired visual pass for the editable Operations pages. */
-.operations-entry-page,
-.operations-process-page {
-  --entry-ink: #101827;
-  --entry-muted: #4c5968;
-  --entry-soft: #f4faf8;
-  --entry-line: rgba(16, 43, 50, 0.13);
-  --entry-line-strong: rgba(24, 117, 101, 0.28);
-  --entry-teal: #187565;
-  --entry-cyan: #2f9fbd;
-  --entry-amber: #d99a24;
-}
-
-.operations-entry-page .operations-record-form-card,
-.operations-entry-page .operations-record-list-card,
-.operations-products-page .operations-product-form-card,
-.operations-products-page .operations-product-list-card,
-.operations-process-page .planner-input-card,
-.operations-process-page .planner-result-card,
-.operations-process-page .process-setup-card {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(242, 249, 247, 0.96)) !important;
-  border: 1px solid var(--entry-line-strong) !important;
-  border-radius: 8px;
-  box-shadow:
-    0 22px 58px rgba(7, 21, 32, 0.09),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
-  color: var(--entry-ink);
-  overflow: hidden;
-  position: relative;
-}
-
-.operations-entry-page .operations-record-form-card::after,
-.operations-entry-page .operations-record-list-card::after,
-.operations-products-page .operations-product-form-card::after,
-.operations-products-page .operations-product-list-card::after,
-.operations-process-page .planner-input-card::after,
-.operations-process-page .planner-result-card::after,
-.operations-process-page .process-setup-card::after {
-  background: linear-gradient(90deg, var(--entry-teal), var(--entry-cyan), var(--entry-amber));
-  content: "";
-  height: 4px;
-  inset: 0 0 auto;
-  position: absolute;
-}
-
-.operations-entry-page .operation-card-heading,
-.operations-products-page .operation-card-heading,
-.operations-process-page .operation-card-heading,
-.operations-process-page .resource-section-header {
-  background: rgba(255, 255, 255, 0.58);
-  border: 1px solid rgba(16, 43, 50, 0.1);
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.operations-entry-page .operation-card-heading h2,
-.operations-products-page .operation-card-heading h2,
-.operations-process-page .operation-card-heading h2,
-.operations-process-page .resource-section-header h2 {
-  color: var(--entry-ink) !important;
-}
-
-.operations-entry-page .operation-card-heading span,
-.operations-entry-page .operation-data-fields label,
-.operations-entry-page .label-with-info,
-.operations-products-page .operation-data-fields label,
-.operations-products-page .resource-row-grid label,
-.operations-products-page .label-with-info,
-.operations-process-page .operation-card-heading span,
-.operations-process-page .resource-section-header span,
-.operations-process-page .planner-fields label,
-.operations-process-page .resource-row-grid label,
-.operations-process-page .label-with-info {
-  color: var(--entry-muted) !important;
-  letter-spacing: 0;
-}
-
-.operations-entry-page .operation-card-heading span,
-.operations-products-page .operation-card-heading span,
-.operations-process-page .operation-card-heading span,
-.operations-process-page .resource-section-header span {
-  color: var(--entry-teal) !important;
-  font-weight: 950;
-}
-
-.operations-entry-page .operation-data-fields,
-.operations-products-page .operation-data-fields,
-.operations-process-page .planner-fields {
-  gap: 12px;
-}
-
-.operations-entry-page .operation-data-fields input,
-.operations-entry-page .operation-data-fields select,
-.operations-entry-page .operation-data-fields textarea,
-.operations-products-page .operation-data-fields input,
-.operations-products-page .operation-data-fields select,
-.operations-products-page .operation-data-fields textarea,
-.operations-products-page .resource-row-grid input,
-.operations-products-page .resource-row-grid select,
-.operations-process-page .planner-fields input,
-.operations-process-page .planner-fields select,
-.operations-process-page .resource-row-grid input,
-.operations-process-page .resource-row-grid select {
-  background: #ffffff !important;
-  border: 1px solid color-mix(in srgb, var(--entry-line) 72%, var(--entry-cyan)) !important;
-  border-radius: 8px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
-  color: var(--entry-ink) !important;
-  font-weight: 850;
-  min-height: 42px;
-}
-
-.operations-process-page .planner-fields label > div {
-  background: #ffffff !important;
-  border: 1px solid color-mix(in srgb, var(--entry-line) 72%, var(--entry-cyan)) !important;
-  border-radius: 8px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
-}
-
-.operations-entry-page .operation-data-fields input:focus,
-.operations-entry-page .operation-data-fields select:focus,
-.operations-entry-page .operation-data-fields textarea:focus,
-.operations-products-page .operation-data-fields input:focus,
-.operations-products-page .operation-data-fields select:focus,
-.operations-products-page .operation-data-fields textarea:focus,
-.operations-products-page .resource-row-grid input:focus,
-.operations-products-page .resource-row-grid select:focus,
-.operations-process-page .planner-fields label:focus-within,
-.operations-process-page .resource-row-grid input:focus,
-.operations-process-page .resource-row-grid select:focus {
-  border-color: var(--entry-cyan) !important;
-  box-shadow: 0 0 0 4px rgba(47, 159, 189, 0.16) !important;
-}
-
-.operations-entry-page .submit-button,
-.operations-entry-page .planner-save-button,
-.operations-products-page .submit-button,
-.operations-products-page .planner-save-button,
-.operations-process-page .planner-save-button,
-.operations-process-page .resource-section-header button,
-.operations-process-page .process-setup-card button,
-.operations-process-page .operation-card-heading button {
-  background:
-    linear-gradient(135deg, #22a88e 0%, #2f9fbd 62%, #0f5f55 100%) !important;
-  border: 1px solid rgba(24, 117, 101, 0.28) !important;
-  border-radius: 8px;
-  box-shadow:
-    0 16px 36px rgba(24, 117, 101, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
-  color: #ffffff !important;
-  font-weight: 950;
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-table,
-.operations-products-page .operations-product-list-card .operation-data-table {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  padding-right: 4px;
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-head,
-.operations-products-page .operations-product-list-card .operation-data-head {
-  background: linear-gradient(135deg, #071418 0%, #102b32 100%) !important;
-  border-color: rgba(126, 222, 207, 0.22) !important;
-  box-shadow: 0 14px 34px rgba(7, 20, 24, 0.16);
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-head span,
-.operations-products-page .operations-product-list-card .operation-data-head span {
-  color: rgba(255, 255, 255, 0.84) !important;
-  font-weight: 950;
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head),
-.operations-entry-page .compact-resource-record,
-.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head),
-.operations-products-page .resource-row-grid,
-.operations-process-page .resource-row-grid,
-.operations-process-page .resource-row-meta,
-.operations-process-page .planner-summary-grid > .result-metric-card,
-.operations-process-page .allocation-grid > .result-metric-card,
-.operations-process-page .cost-breakdown > .result-metric-card,
-.operations-process-page .selected-resource-results div {
-  background: linear-gradient(180deg, #ffffff 0%, var(--entry-soft) 100%) !important;
-  border: 1px solid color-mix(in srgb, var(--metric-tone, var(--entry-teal)) 24%, rgba(16, 43, 50, 0.12)) !important;
-  border-left: 5px solid color-mix(in srgb, var(--metric-tone, var(--entry-teal)) 88%, transparent) !important;
-  border-radius: 8px;
-  box-shadow: 0 14px 38px rgba(16, 43, 50, 0.07) !important;
-  color: var(--entry-muted) !important;
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head):nth-child(3n + 1),
-.operations-entry-page .compact-resource-record:nth-child(3n + 1),
-.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head):nth-child(3n + 1),
-.operations-process-page :is(.resource-row-grid, .result-metric-card):nth-child(3n + 1) {
-  --metric-tone: var(--entry-teal);
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head):nth-child(3n + 2),
-.operations-entry-page .compact-resource-record:nth-child(3n + 2),
-.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head):nth-child(3n + 2),
-.operations-process-page :is(.resource-row-grid, .result-metric-card):nth-child(3n + 2) {
-  --metric-tone: var(--entry-cyan);
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head):nth-child(3n),
-.operations-entry-page .compact-resource-record:nth-child(3n),
-.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head):nth-child(3n),
-.operations-process-page :is(.resource-row-grid, .result-metric-card):nth-child(3n) {
-  --metric-tone: var(--entry-amber);
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head) :is(span, strong, small, b),
-.operations-entry-page .compact-resource-record :is(strong, small),
-.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head) :is(span, strong, small, b),
-.operations-products-page .resource-row-grid :is(strong, small),
-.operations-process-page :is(.resource-row-grid, .resource-row-meta, .result-metric-card, .selected-resource-results div) :is(strong, small, span, b) {
-  color: var(--entry-ink) !important;
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head) small,
-.operations-entry-page .compact-resource-record small,
-.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head) small,
-.operations-products-page .resource-row-grid small,
-.operations-process-page :is(.resource-row-grid, .resource-row-meta, .result-metric-card, .selected-resource-results div) small {
-  color: var(--entry-muted) !important;
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-row:not(.operation-data-head):hover,
-.operations-entry-page .compact-resource-record:hover,
-.operations-products-page .operations-product-list-card .operation-data-row:not(.operation-data-head):hover,
-.operations-process-page .resource-row-grid:hover {
-  background: #eaf8f4 !important;
-  border-color: rgba(24, 117, 101, 0.32) !important;
-  transform: translateY(-1px);
-}
-
-.operations-entry-page .record-copy-button,
-.operations-entry-page .compact-resource-record button {
-  background: linear-gradient(135deg, var(--entry-teal), var(--entry-cyan)) !important;
-  border: 1px solid rgba(24, 117, 101, 0.24) !important;
-  border-radius: 999px;
-  box-shadow:
-    0 12px 30px rgba(24, 117, 101, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.26) !important;
-  color: #ffffff !important;
-}
-
-.operations-products-page .operation-data-grid {
-  grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.18fr);
-}
-
-.operations-products-page .operations-product-form-card {
-  display: grid;
-  gap: 16px;
-}
-
-.operations-products-page .operations-product-form-card .operation-data-fields {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.operations-products-page .operations-product-form-card .resource-section {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 249, 247, 0.95)) !important;
-  border: 1px solid var(--entry-line) !important;
-  border-radius: 8px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
-}
-
-.operations-products-page .operations-product-list-card {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
-}
-
-.operations-products-page .operations-product-list-card .operation-data-table {
-  overflow: auto;
-}
-
-.operations-process-page .operation-planner {
-  gap: 22px;
-  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
-}
-
-.operations-process-page .planner-input-card,
-.operations-process-page .planner-result-card {
-  align-content: start;
-  gap: 16px;
-}
-
-.operations-process-page .planner-input-card > .planner-fields {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 249, 247, 0.95)) !important;
-  border: 1px solid var(--entry-line) !important;
-  border-radius: 8px;
-  padding: 14px;
-}
-
-.operations-process-page .resource-section {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 249, 247, 0.95)) !important;
-  border: 1px solid var(--entry-line) !important;
-  border-radius: 8px;
-  box-shadow: 0 12px 30px rgba(16, 43, 50, 0.05);
-  padding: 14px;
-}
-
-.operations-process-page .resource-section-header p {
-  color: var(--entry-muted) !important;
-}
-
-.operations-process-page .planner-result-card mark,
-.operations-process-page .process-setup-card mark {
-  border-radius: 999px;
-}
-
-.operations-process-page .planner-result-card mark.ok,
-.operations-process-page .process-setup-card.ready mark {
-  background: #dff7f1 !important;
-  color: #0c655a !important;
-}
-
-.operations-process-page .planner-result-card mark.bad,
-.operations-process-page .process-setup-card.todo mark {
-  background: #fff0c9 !important;
-  color: #7a5200 !important;
-}
-
-.operations-process-page .process-setup-grid {
-  gap: 16px;
-}
-
-.operations-process-page .process-setup-card {
-  min-height: 230px;
-}
-
-.operations-process-page .planner-empty-state,
-.operations-entry-page .planner-empty-state,
-.operations-products-page .planner-empty-state {
-  background: #fffaf0 !important;
-  border: 1px solid rgba(217, 154, 36, 0.34) !important;
-  border-radius: 8px;
-  color: #624515 !important;
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-table::-webkit-scrollbar,
-.operations-entry-page .operations-record-list-card .compact-resource-list::-webkit-scrollbar,
-.operations-entry-page .operations-record-form-card .operation-data-fields::-webkit-scrollbar,
-.operations-products-page .operations-product-list-card .operation-data-table::-webkit-scrollbar,
-.operations-process-page .resource-row-list::-webkit-scrollbar,
-.operations-process-page .planner-result-card::-webkit-scrollbar {
-  width: 8px;
-}
-
-.operations-entry-page .operations-record-list-card .operation-data-table::-webkit-scrollbar-thumb,
-.operations-entry-page .operations-record-list-card .compact-resource-list::-webkit-scrollbar-thumb,
-.operations-entry-page .operations-record-form-card .operation-data-fields::-webkit-scrollbar-thumb,
-.operations-products-page .operations-product-list-card .operation-data-table::-webkit-scrollbar-thumb,
-.operations-process-page .resource-row-list::-webkit-scrollbar-thumb,
-.operations-process-page .planner-result-card::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--entry-teal), var(--entry-cyan), var(--entry-amber));
-  border-radius: 999px;
-}
-
-@media (max-width: 1180px) {
-  .operations-products-page .operation-data-grid,
-  .operations-process-page .operation-planner {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 760px) {
-  .operations-products-page .operations-product-form-card .operation-data-fields,
-  .operations-process-page .planner-input-card > .planner-fields {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* Dashboard overview redesign inspired by the executive brief and landing page. */
 .feasibility-dashboard {
   --overview-ink: #ffffff;
@@ -17651,5 +17328,988 @@ textarea:focus-visible {
   .feasibility-dashboard .dashboard-risk-row p,
   .feasibility-dashboard .dashboard-risk-row b {
     grid-column: auto;
+  }
+}
+
+/* Source page interface: Kaynak, Urunler, Makine & Ekipman, Surec Tanimlama. */
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) {
+  --source-ink: #101827;
+  --source-muted: #4f5f5b;
+  --source-soft-muted: #667571;
+  --source-surface: #ffffff;
+  --source-card: #f4faf8;
+  --source-section: rgba(242, 249, 247, 0.94);
+  --source-line: rgba(16, 43, 50, 0.13);
+  --source-line-strong: rgba(24, 117, 101, 0.3);
+  --source-teal: #187565;
+  --source-teal-strong: #0f5f55;
+  --source-cyan: #2f9fbd;
+  --source-amber: #d99a24;
+  --source-radius: 8px;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .resource-definition-grid,
+  .machine-equipment-grid,
+  .operation-data-grid,
+  .operation-planner,
+  .process-setup-grid
+) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-card,
+  .operations-record-form-card,
+  .operations-record-list-card,
+  .operations-product-form-card,
+  .operations-product-list-card,
+  .resource-guidance-card,
+  .operation-data-table-card,
+  .planner-input-card,
+  .planner-result-card,
+  .process-setup-card
+) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(242, 249, 247, 0.97)) !important;
+  border: 1px solid rgba(24, 117, 101, 0.22) !important;
+  border-radius: var(--source-radius) !important;
+  box-shadow:
+    0 22px 60px rgba(7, 21, 32, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  color: var(--source-ink) !important;
+  overflow: hidden !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-card,
+  .operations-record-form-card,
+  .operations-record-list-card,
+  .operations-product-form-card,
+  .operations-product-list-card,
+  .resource-guidance-card,
+  .operation-data-table-card,
+  .planner-input-card,
+  .planner-result-card,
+  .process-setup-card
+)::before {
+  background: linear-gradient(90deg, var(--source-teal), var(--source-cyan), var(--source-amber)) !important;
+  height: 4px !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operations-record-form-card,
+  .operations-record-list-card,
+  .operations-product-form-card,
+  .operations-product-list-card,
+  .planner-input-card,
+  .planner-result-card,
+  .process-setup-card,
+  .resource-guidance-card
+) {
+  padding: 20px !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) .operations-entry-summary {
+  gap: 14px !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) .operations-entry-summary .process-summary-card {
+  --metric-tone: var(--source-teal);
+  background:
+    linear-gradient(180deg, #ffffff 0%, var(--source-card) 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--metric-tone) 24%, rgba(16, 43, 50, 0.12)) !important;
+  border-left: 5px solid color-mix(in srgb, var(--metric-tone) 88%, transparent) !important;
+  box-shadow: 0 14px 38px rgba(16, 43, 50, 0.07) !important;
+  min-height: 124px !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) .operations-entry-summary .process-summary-card:nth-child(3n + 2) {
+  --metric-tone: var(--source-cyan);
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) .operations-entry-summary .process-summary-card:nth-child(3n) {
+  --metric-tone: var(--source-amber);
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-card-heading,
+  .resource-section-header
+) {
+  align-items: start !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(16, 43, 50, 0.1) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  gap: 12px !important;
+  padding: 0 0 12px !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  h2,
+  h3,
+  .operation-card-heading h2,
+  .resource-section-header h2,
+  .process-setup-card h2,
+  .process-summary-card strong,
+  .compact-resource-record strong,
+  .operation-data-row:not(.operation-data-head) span:first-child,
+  .operation-data-row:not(.operation-data-head) strong,
+  .resource-row-meta strong,
+  .result-metric-card strong,
+  .selected-resource-results div strong
+) {
+  color: var(--source-ink) !important;
+  letter-spacing: 0 !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  p,
+  small,
+  label,
+  .process-summary-card span,
+  .process-summary-card small,
+  .operation-data-row:not(.operation-data-head) span,
+  .operation-data-row:not(.operation-data-head) small,
+  .compact-resource-record small,
+  .resource-section-header p,
+  .planner-fields label,
+  .resource-row-grid label,
+  .label-with-info,
+  .result-metric-label
+) {
+  color: var(--source-muted) !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-card-heading span,
+  .resource-section-header span
+) {
+  color: var(--source-teal-strong) !important;
+  font-weight: 950 !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) .operations-header p {
+  color: #e6efec !important;
+  font-weight: 720 !important;
+  line-height: 1.6 !important;
+  max-width: 800px !important;
+  text-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-data-fields input,
+  .operation-data-fields select,
+  .operation-data-fields textarea,
+  .planner-fields label > div,
+  .planner-fields input,
+  .planner-fields select,
+  .resource-row-grid input,
+  .resource-row-grid select
+) {
+  background: #ffffff !important;
+  border: 1px solid rgba(16, 43, 50, 0.16) !important;
+  border-radius: var(--source-radius) !important;
+  color: var(--source-ink) !important;
+  font-weight: 850 !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-data-fields input:focus,
+  .operation-data-fields select:focus,
+  .operation-data-fields textarea:focus,
+  .planner-fields label:focus-within,
+  .resource-row-grid input:focus,
+  .resource-row-grid select:focus
+) {
+  border-color: var(--source-cyan) !important;
+  box-shadow: 0 0 0 4px rgba(47, 159, 189, 0.16) !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .resource-section,
+  .operation-planner .planner-input-card > .planner-fields,
+  .operations-product-form-card .resource-section,
+  .selected-resource-results div > span
+) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), var(--source-section)) !important;
+  border: 1px solid rgba(16, 43, 50, 0.12) !important;
+  border-radius: var(--source-radius) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76) !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-data-row:not(.operation-data-head),
+  .compact-resource-record,
+  .resource-row-grid,
+  .resource-row-meta,
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card,
+  .selected-resource-results div
+) {
+  --metric-tone: var(--source-teal);
+  background:
+    linear-gradient(180deg, #ffffff 0%, var(--source-card) 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--metric-tone) 24%, rgba(16, 43, 50, 0.12)) !important;
+  border-left: 5px solid color-mix(in srgb, var(--metric-tone) 88%, transparent) !important;
+  border-radius: var(--source-radius) !important;
+  box-shadow: 0 14px 38px rgba(16, 43, 50, 0.07) !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-data-row:not(.operation-data-head),
+  .compact-resource-record,
+  .resource-row-grid,
+  .planner-summary-grid > .result-metric-card
+):nth-child(3n + 2) {
+  --metric-tone: var(--source-cyan);
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-data-row:not(.operation-data-head),
+  .compact-resource-record,
+  .resource-row-grid,
+  .planner-summary-grid > .result-metric-card
+):nth-child(3n) {
+  --metric-tone: var(--source-amber);
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .operation-data-row:not(.operation-data-head):hover,
+  .compact-resource-record:hover,
+  .resource-row-grid:hover
+) {
+  background: #eaf8f4 !important;
+  border-color: rgba(24, 117, 101, 0.32) !important;
+  transform: translateY(-1px);
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) .operation-data-head {
+  background: linear-gradient(135deg, #071418 0%, #102b32 100%) !important;
+  border: 1px solid rgba(126, 222, 207, 0.22) !important;
+  box-shadow: 0 14px 34px rgba(7, 20, 24, 0.18) !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) .operation-data-head span {
+  color: rgba(255, 255, 255, 0.84) !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .submit-button,
+  .planner-save-button,
+  .record-copy-button,
+  .compact-resource-record button,
+  .resource-section-header button,
+  .operation-card-heading button
+) {
+  background:
+    linear-gradient(135deg, #22a88e 0%, #2f9fbd 62%, #0f5f55 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: var(--source-radius) !important;
+  box-shadow:
+    0 16px 36px rgba(24, 117, 101, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+  color: #ffffff !important;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .submit-button,
+  .planner-save-button,
+  .record-copy-button,
+  .compact-resource-record button,
+  .resource-section-header button,
+  .operation-card-heading button
+):hover {
+  box-shadow:
+    0 20px 42px rgba(24, 117, 101, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
+  transform: translateY(-1px);
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) .resource-remove-button {
+  background: #fff0e9 !important;
+  border: 1px solid rgba(157, 91, 63, 0.26) !important;
+  color: #87472f !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+  .planner-empty-state,
+  .status-message
+) {
+  background: #fffaf0 !important;
+  border: 1px solid rgba(217, 154, 36, 0.34) !important;
+  color: #624515 !important;
+}
+
+.operations-workspace.operations-modern.operations-process-page .process-setup-card.ready {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #edf9f5 100%) !important;
+  border-color: rgba(24, 117, 101, 0.26) !important;
+}
+
+.operations-workspace.operations-modern.operations-process-page .process-setup-card.todo {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fff8ea 100%) !important;
+  border-color: rgba(217, 154, 36, 0.32) !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(.process-setup-card.ready mark, .planner-result-card mark.ok) {
+  background: #dff7f1 !important;
+  color: #0c655a !important;
+}
+
+.operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(.process-setup-card.todo mark, .planner-result-card mark.bad) {
+  background: #fff0c9 !important;
+  color: #7a5200 !important;
+}
+
+@media (max-width: 760px) {
+  .operations-workspace.operations-modern:is(.operations-entry-page, .operations-process-page) :is(
+    .operations-record-form-card,
+    .operations-record-list-card,
+    .operations-product-form-card,
+    .operations-product-list-card,
+    .planner-input-card,
+    .planner-result-card,
+    .process-setup-card,
+    .resource-guidance-card
+  ) {
+    padding: 14px !important;
+  }
+}
+
+/* Source page record ergonomics: readable lists, natural form height, contained table scroll. */
+.operations-workspace.operations-modern.operations-entry-page :is(
+  .resource-definition-grid,
+  .operation-data-grid,
+  .operations-record-pair
+) {
+  align-items: start !important;
+}
+
+.operations-workspace.operations-modern.operations-entry-page :is(
+  .operations-record-form-card,
+  .operations-record-list-card
+) {
+  align-self: start !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.operations-workspace.operations-modern.operations-entry-page .operations-record-form-card {
+  grid-template-rows: auto auto !important;
+  max-height: none !important;
+}
+
+.operations-workspace.operations-modern.operations-entry-page .operations-record-form-card .operation-data-fields {
+  overflow: visible !important;
+  padding-right: 0 !important;
+}
+
+.operations-workspace.operations-modern.operations-entry-page .operations-record-list-card {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  height: var(--matched-record-card-height, auto) !important;
+  max-height: var(--matched-record-card-height, none) !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .operations-record-list-card {
+  max-height: var(--matched-record-card-height, clamp(300px, 40svh, 390px)) !important;
+}
+
+.operations-workspace.operations-modern.operations-machines-page .operations-record-list-card {
+  max-height: var(--matched-record-card-height, clamp(380px, 54svh, 560px)) !important;
+}
+
+.operations-workspace.operations-modern.operations-entry-page .operations-record-list-card :is(
+  .compact-resource-list,
+  .operation-data-table
+) {
+  min-height: 0 !important;
+  overflow: auto !important;
+  scrollbar-gutter: stable;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .compact-resource-list {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 2px 4px 8px 0 !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .compact-resource-record {
+  align-items: center !important;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f2fbf8 100%) !important;
+  border: 1px solid rgba(16, 43, 50, 0.13) !important;
+  border-left: 5px solid var(--source-teal-strong) !important;
+  border-radius: var(--source-radius) !important;
+  box-shadow: 0 12px 28px rgba(16, 43, 50, 0.075) !important;
+  display: grid !important;
+  gap: 12px !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  min-height: 58px !important;
+  padding: 11px 12px !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .compact-resource-record:nth-child(2n) {
+  border-left-color: var(--source-cyan) !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .compact-resource-record > span {
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .compact-resource-record strong {
+  color: var(--source-ink) !important;
+  font-size: 0.94rem !important;
+  line-height: 1.22 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .compact-resource-record small {
+  color: var(--source-muted) !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  line-height: 1.35 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .compact-resource-record button {
+  border-radius: 999px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  white-space: nowrap !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .operations-record-list-card,
+.operations-workspace.operations-modern.operations-products-page .operations-product-list-card {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  height: var(--matched-record-card-height, auto) !important;
+  max-height: var(--matched-record-card-height, none) !important;
+  overflow: hidden !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .operations-record-list-card .operation-data-table,
+.operations-workspace.operations-modern.operations-products-page .operations-product-list-card .operation-data-table {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: auto !important;
+  scrollbar-gutter: stable;
+  width: 100% !important;
+}
+
+.operations-workspace.operations-modern.operations-resources-page .operations-record-list-card .operation-data-row {
+  min-width: 620px !important;
+}
+
+.operations-workspace.operations-modern.operations-products-page .operations-product-list-card .operation-data-row {
+  min-width: 960px !important;
+}
+
+@media (max-width: 980px) {
+  .operations-workspace.operations-modern.operations-entry-page :is(
+    .operations-record-form-card,
+    .operations-record-list-card,
+    .operations-product-list-card
+  ) {
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .operations-workspace.operations-modern.operations-entry-page .operations-record-list-card :is(
+    .compact-resource-list,
+    .operation-data-table
+  ) {
+    max-height: 420px !important;
+  }
+
+  .operations-workspace.operations-modern.operations-products-page .operations-product-list-card .operation-data-row {
+    min-width: 900px !important;
+  }
+
+  .operations-workspace.operations-modern.operations-resources-page .operations-record-list-card .operation-data-row {
+    min-width: 620px !important;
+  }
+}
+
+.dashboard-shell .operations-workspace.operations-modern:is(
+  .operations-entry-page,
+  .operations-process-page
+) > .operations-header > div > p {
+  color: #e6efec !important;
+  -webkit-text-fill-color: #e6efec !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button {
+  background: color-mix(in srgb, var(--source-teal) 12%, #ffffff) !important;
+  border: 1px solid color-mix(in srgb, var(--source-teal) 34%, rgba(16, 43, 50, 0.14)) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  color: var(--source-teal-strong) !important;
+  cursor: help !important;
+  font-size: 0.68rem !important;
+  font-weight: 950 !important;
+  height: 19px !important;
+  line-height: 1 !important;
+  min-height: 19px !important;
+  padding: 0 !important;
+  text-shadow: none !important;
+  transform: none !important;
+  width: 19px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button:hover,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip:focus-within button {
+  background: color-mix(in srgb, var(--source-teal) 18%, #ffffff) !important;
+  border-color: color-mix(in srgb, var(--source-teal) 48%, rgba(16, 43, 50, 0.14)) !important;
+  box-shadow: 0 0 0 3px rgba(24, 117, 101, 0.12) !important;
+  color: var(--source-teal-strong) !important;
+  transform: none !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner :is(
+  .operation-card-heading > button,
+  .resource-section-header > button,
+  .planner-save-button
+) {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(255, 255, 255, 0.34), transparent 7rem),
+    linear-gradient(135deg, #187565 0%, #2f9fbd 58%, #0f5f55 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 999px !important;
+  box-shadow:
+    0 18px 38px rgba(24, 117, 101, 0.24),
+    0 8px 18px rgba(47, 159, 189, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
+  color: #ffffff !important;
+  font-weight: 950 !important;
+  letter-spacing: 0 !important;
+  min-height: 42px !important;
+  padding: 0 18px !important;
+  text-shadow: 0 1px 12px rgba(6, 18, 22, 0.2);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    filter 180ms ease !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner :is(
+  .operation-card-heading > button,
+  .resource-section-header > button,
+  .planner-save-button
+):hover {
+  border-color: rgba(255, 255, 255, 0.46) !important;
+  box-shadow:
+    0 22px 48px rgba(24, 117, 101, 0.3),
+    0 10px 22px rgba(47, 159, 189, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
+  filter: saturate(1.08);
+  transform: translateY(-2px);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner :is(
+  .operation-card-heading > button,
+  .resource-section-header > button,
+  .planner-save-button
+):active {
+  box-shadow:
+    0 12px 26px rgba(24, 117, 101, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24) !important;
+  transform: translateY(0);
+}
+
+/* Process Definition redesign: closed-by-default accordions and smoother controls. */
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner {
+  gap: 18px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-input-card,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(243, 250, 248, 0.98)) !important;
+  border: 1px solid rgba(24, 117, 101, 0.22) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 26px 70px rgba(7, 21, 32, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  color: var(--source-ink) !important;
+  display: grid !important;
+  gap: 16px !important;
+  overflow: hidden !important;
+  padding: 20px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading {
+  align-items: center !important;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(135deg, #071418 0%, #102b32 58%, #0f4b48 100%) !important;
+  background-size: 30px 30px, 30px 30px, auto !important;
+  border: 1px solid rgba(126, 222, 207, 0.22) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 20px 48px rgba(7, 20, 24, 0.18) !important;
+  padding: 18px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading span {
+  color: #a7f0e0 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading h2 {
+  color: #ffffff !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f2fbf8 100%);
+  border: 1px solid rgba(24, 117, 101, 0.18);
+  border-left: 5px solid var(--source-teal);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(16, 43, 50, 0.07);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article:nth-child(2) {
+  border-left-color: var(--source-cyan);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article:nth-child(3) {
+  border-left-color: var(--source-amber);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview small {
+  color: var(--source-muted) !important;
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview strong {
+  color: var(--source-ink) !important;
+  font-size: clamp(1.05rem, 1.7vw, 1.45rem);
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-core-fields {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4faf8 100%) !important;
+  border: 1px solid rgba(16, 43, 50, 0.12) !important;
+  border-radius: 8px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88) !important;
+  padding: 14px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f5fbf9 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.2) !important;
+  border-left: 5px solid var(--source-teal) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 16px 42px rgba(16, 43, 50, 0.075) !important;
+  color: var(--source-ink) !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion:nth-of-type(2n) {
+  border-left-color: var(--source-cyan) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion:nth-of-type(3n) {
+  border-left-color: var(--source-amber) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] {
+  box-shadow:
+    0 22px 58px rgba(16, 43, 50, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+  align-items: center !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 249, 246, 0.96)) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  cursor: pointer;
+  display: grid !important;
+  gap: 14px !important;
+  grid-template-columns: minmax(0, 1fr) auto 34px;
+  list-style: none;
+  min-height: 76px;
+  padding: 15px 16px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary::-webkit-details-marker {
+  display: none;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary::after {
+  align-items: center;
+  background:
+    radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.42), transparent 1.8rem),
+    linear-gradient(135deg, var(--source-teal), var(--source-cyan));
+  border-radius: 999px;
+  box-shadow:
+    0 10px 22px rgba(24, 117, 101, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  content: "+";
+  display: inline-flex;
+  font-size: 1.15rem;
+  font-weight: 950;
+  height: 32px;
+  justify-content: center;
+  line-height: 1;
+  width: 32px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] > .process-accordion-summary {
+  border-bottom: 1px solid rgba(16, 43, 50, 0.11) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] > .process-accordion-summary::after {
+  content: "-";
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary span {
+  color: var(--source-teal-strong) !important;
+  font-size: 0.78rem;
+  font-weight: 950 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary p {
+  color: var(--source-muted) !important;
+  font-size: 0.9rem;
+  font-weight: 760;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary small {
+  background: #e7f7f2;
+  border: 1px solid rgba(24, 117, 101, 0.16);
+  border-radius: 999px;
+  color: var(--source-teal-strong) !important;
+  font-size: 0.74rem;
+  font-weight: 950;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-body {
+  display: grid;
+  gap: 14px;
+  padding: 16px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-section-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner :is(
+  .process-default-button,
+  .process-section-actions button,
+  .planner-save-button
+) {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(255, 255, 255, 0.34), transparent 7rem),
+    linear-gradient(135deg, #187565 0%, #2f9fbd 58%, #0f5f55 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 999px !important;
+  box-shadow:
+    0 18px 38px rgba(24, 117, 101, 0.24),
+    0 8px 18px rgba(47, 159, 189, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
+  color: #ffffff !important;
+  font-weight: 950 !important;
+  min-height: 42px !important;
+  padding: 0 18px !important;
+  text-shadow: 0 1px 12px rgba(6, 18, 22, 0.2);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner :is(
+  .process-default-button,
+  .process-section-actions button,
+  .planner-save-button
+):hover {
+  border-color: rgba(255, 255, 255, 0.46) !important;
+  box-shadow:
+    0 22px 48px rgba(24, 117, 101, 0.3),
+    0 10px 22px rgba(47, 159, 189, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
+  transform: translateY(-2px);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-save-button {
+  justify-self: start;
+  min-height: 48px !important;
+  padding: 0 22px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-list {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid {
+  align-items: end;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4faf8 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.17) !important;
+  border-left: 5px solid color-mix(in srgb, var(--source-teal) 86%, transparent) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 12px 32px rgba(16, 43, 50, 0.065) !important;
+  gap: 12px !important;
+  padding: 14px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid:nth-child(2n) {
+  border-left-color: color-mix(in srgb, var(--source-cyan) 86%, transparent) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid label,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-fields label {
+  color: var(--source-muted) !important;
+  font-weight: 850 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-remove-button {
+  align-self: stretch;
+  border-radius: 999px !important;
+  min-height: 42px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button {
+  background: color-mix(in srgb, var(--source-teal) 12%, #ffffff) !important;
+  border: 1px solid color-mix(in srgb, var(--source-teal) 34%, rgba(16, 43, 50, 0.14)) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  color: var(--source-teal-strong) !important;
+  cursor: help !important;
+  font-size: 0.68rem !important;
+  font-weight: 950 !important;
+  height: 19px !important;
+  line-height: 1 !important;
+  min-height: 19px !important;
+  padding: 0 !important;
+  text-shadow: none !important;
+  transform: none !important;
+  width: 19px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button:hover,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip:focus-within button {
+  background: color-mix(in srgb, var(--source-teal) 18%, #ffffff) !important;
+  box-shadow: 0 0 0 3px rgba(24, 117, 101, 0.12) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card > .operation-card-heading {
+  background:
+    linear-gradient(135deg, #071418 0%, #102b32 58%, #0f4b48 100%) !important;
+  border: 1px solid rgba(126, 222, 207, 0.2) !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card > .operation-card-heading :is(span, h2) {
+  color: #ffffff !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card :is(
+  .planner-summary-grid,
+  .allocation-grid,
+  .cost-breakdown
+) {
+  gap: 12px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card :is(
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card
+) {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4faf8 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.18) !important;
+  border-left: 5px solid color-mix(in srgb, var(--source-teal) 86%, transparent) !important;
+  box-shadow: 0 12px 32px rgba(16, 43, 50, 0.07) !important;
+  color: var(--source-ink) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-accordions {
+  display: grid !important;
+  gap: 12px !important;
+  grid-template-columns: 1fr !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-detail .process-accordion-body {
+  gap: 10px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-detail .process-accordion-body > span {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4faf8 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.16) !important;
+  border-left: 5px solid color-mix(in srgb, var(--source-cyan) 82%, transparent) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 26px rgba(16, 43, 50, 0.06) !important;
+  color: var(--source-muted) !important;
+  display: flex !important;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 12px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-detail .process-accordion-body > span strong {
+  color: var(--source-ink) !important;
+}
+
+@media (max-width: 980px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+    grid-template-columns: minmax(0, 1fr) 34px;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary small {
+    justify-self: start;
+    grid-column: 1 / -1;
   }
 }
