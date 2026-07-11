@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabaseClient";
 import {
   createDemoFinancialLoanRows,
@@ -476,6 +476,12 @@ function formatMonthLabel(date) {
   return new Intl.DateTimeFormat(locale, { month: "short", year: "numeric" }).format(date);
 }
 
+function formatCompactMonthLabel(date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+  return `${month}/${year}`;
+}
+
 function formatTrendAxisAmount(value) {
   const safeValue = toFiniteNumber(value);
   const absoluteValue = Math.abs(safeValue);
@@ -487,6 +493,27 @@ function formatTrendAxisAmount(value) {
   if (absoluteValue >= 1_000) return `${sign}${formatNumber(absoluteValue / 1_000, 1)} ${isTurkish ? "Bin" : "K"}`;
 
   return `${sign}${formatNumber(absoluteValue)}`;
+}
+
+function getNiceTrendTickStep(maxValue, targetSegments = 6) {
+  const rawStep = Math.max(1, toFiniteNumber(maxValue) / targetSegments);
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+  const normalized = rawStep / magnitude;
+  const niceMultiplier = [1, 2, 5, 10].find((candidate) => normalized <= candidate) || 10;
+
+  return niceMultiplier * magnitude;
+}
+
+function getTrendAxisScale(maxValue) {
+  const tickStep = getNiceTrendTickStep(maxValue);
+  const axisMax = Math.max(tickStep, Math.ceil(Math.max(1, toFiniteNumber(maxValue)) / tickStep) * tickStep);
+  const tickValues = [];
+
+  for (let value = 0; value <= axisMax + (tickStep / 2); value += tickStep) {
+    tickValues.push(Math.min(value, axisMax));
+  }
+
+  return { axisMax, tickStep, tickValues: Array.from(new Set(tickValues)) };
 }
 
 function getFinancialTrendRowDate(row, index) {
@@ -513,12 +540,14 @@ function buildIncomeExpenseTrendChart(rows = []) {
     1,
     ...sanitizedRows.flatMap((row) => [row.revenue, row.cost]),
   );
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+  const axisScale = getTrendAxisScale(maxValue);
+  const yTicks = axisScale.tickValues.map((value) => {
+    const ratio = value / axisScale.axisMax;
     const y = plot.bottom - (ratio * (plot.bottom - plot.top));
 
     return {
-      label: formatTrendAxisAmount(maxValue * ratio),
-      value: maxValue * ratio,
+      label: formatTrendAxisAmount(value),
+      value,
       y,
     };
   });
@@ -527,7 +556,7 @@ function buildIncomeExpenseTrendChart(rows = []) {
       ? plot.left
       : plot.left + (index * ((plot.right - plot.left) / (sanitizedRows.length - 1)))
   );
-  const getY = (value) => plot.bottom - ((Math.max(0, value) / maxValue) * (plot.bottom - plot.top));
+  const getY = (value) => plot.bottom - ((Math.max(0, value) / axisScale.axisMax) * (plot.bottom - plot.top));
   const getPoints = (field) => sanitizedRows.map((row, index) => ({
     value: row[field],
     x: getX(index),
@@ -577,6 +606,7 @@ function buildIncomeExpenseTrendChart(rows = []) {
 
   return {
     axisPath: `M${plot.left} ${plot.top} V${plot.bottom} H${plot.right}`,
+    axisMax: axisScale.axisMax,
     costAreaPath: buildAreaPath(costPath, costPoints),
     costPath,
     costPoints,
@@ -694,7 +724,7 @@ function buildFinancialLoanPaymentCalendar(loans = []) {
     return {
       date,
       key: getMonthKey(date),
-      label: formatMonthLabel(date),
+      label: formatCompactMonthLabel(date),
       totals: new Map(),
     };
   });
@@ -1203,7 +1233,11 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
       cashBalance,
       cashFlow,
       cashIn,
+      electricityCost,
       forecastUnits,
+      incomeTax,
+      loanInterest,
+      materialCost,
       netIncome,
       netSoldUnits: channelMonth.netSoldUnits,
       period: index + 1,
@@ -1212,6 +1246,7 @@ function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput,
       totalCost,
       unsoldUnits,
       vatPayable,
+      workforceCost,
       writeOffCost,
       writeOffUnits,
     });
@@ -1595,11 +1630,14 @@ function App() {
   const [managedUserForm, setManagedUserForm] = useState(emptyManagedUserForm);
   const [financialExtraCostForm, setFinancialExtraCostForm] = useState(emptyFinancialExtraCostForm);
   const [financialHorizon, setFinancialHorizon] = useState("6m");
+  const [financialStatementPeriod, setFinancialStatementPeriod] = useState("quarterly");
   const [financialModel, setFinancialModel] = useState(emptyFinancialModel);
   const [financialSettingsForm, setFinancialSettingsForm] = useState(defaultFinancialSettings);
   const [financialStatus, setFinancialStatus] = useState("");
   const [financialLoading, setFinancialLoading] = useState(false);
   const [financialOverviewWidgets, setFinancialOverviewWidgets] = useState([]);
+  const [incomeExpenseChartInView, setIncomeExpenseChartInView] = useState(false);
+  const [incomeExpenseChartNode, setIncomeExpenseChartNode] = useState(null);
   const [exchangeRates, setExchangeRates] = useState(defaultExchangeRates);
   const [financeWindow, setFinanceWindow] = useState("today");
   const [financeDateRange, setFinanceDateRange] = useState({ start: "", end: "" });
@@ -1640,6 +1678,11 @@ function App() {
   const [productFormRef, productListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|product`);
   const [machineFormRef, machineListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|machine`);
   const [equipmentFormRef, equipmentListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|equipment`);
+  const incomeExpenseChartRef = useRef(null);
+  const setIncomeExpenseChartElement = useCallback((node) => {
+    incomeExpenseChartRef.current = node;
+    setIncomeExpenseChartNode(node);
+  }, []);
 
   const initials = useMemo(() => {
     const source = form.username || form.email || "A";
@@ -1667,6 +1710,33 @@ function App() {
       setProcessDefinitionOpen(false);
     }
   }, [path]);
+
+  useEffect(() => {
+    setIncomeExpenseChartInView(false);
+    const chartNode = incomeExpenseChartNode;
+    if (!chartNode) return undefined;
+    if (!("IntersectionObserver" in window)) {
+      setIncomeExpenseChartInView(true);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.22) {
+          setIncomeExpenseChartInView(true);
+          observer.disconnect();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "0px 0px -14% 0px",
+        threshold: [0.22],
+      },
+    );
+
+    observer.observe(chartNode);
+    return () => observer.disconnect();
+  }, [incomeExpenseChartNode, path, financialHorizon]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -1914,7 +1984,7 @@ function App() {
         typeId: salesStrategy.campaignTypes?.[0]?.id || "digital",
       },
       channels: {
-        advancedOpen: true,
+        advancedOpen: false,
         basketSize: "",
         capacityLimit: "",
         churnRatePercent: "",
@@ -4607,6 +4677,9 @@ function App() {
 
   function renderFinancialModellingPage() {
     const model = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, financialHorizon);
+    const statementProjectionModel = financialHorizon === "5y"
+      ? model
+      : buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, "5y");
     const summary = model.summary || emptyFinancialModel.summary;
     const incomeExpenseTrendChart = buildIncomeExpenseTrendChart(model.trendRows || []);
     const currentFinancialPage = activeFinancialSubmodule || financialSubmodules[0];
@@ -4637,6 +4710,18 @@ function App() {
       const costPoints = incomeExpenseTrendChart.costPoints || [];
       const latestRevenuePoint = revenuePoints[revenuePoints.length - 1];
       const latestCostPoint = costPoints[costPoints.length - 1];
+      const chartToken = [
+        "income-expense",
+        financialHorizon,
+        revenuePoints.length,
+        Math.round(latestRevenuePoint?.value || 0),
+        Math.round(latestCostPoint?.value || 0),
+      ].join("-");
+      const incomeSurfaceId = `${chartToken}-income-surface`;
+      const expenseSurfaceId = `${chartToken}-expense-surface`;
+      const incomeStrokeId = `${chartToken}-income-stroke`;
+      const expenseStrokeId = `${chartToken}-expense-stroke`;
+      const trendGlowId = `${chartToken}-soft-glow`;
       const badgeHeight = 34;
       const badgeMinGap = 8;
       const badgeTop = 36;
@@ -4670,18 +4755,38 @@ function App() {
       }
 
       return (
+        <div className={`financial-trend-stage ${incomeExpenseChartInView ? "is-visible" : ""}`} ref={setIncomeExpenseChartElement} key={chartToken}>
         <svg className="trend-chart finance-model-chart" viewBox="0 0 560 280" role="img" aria-label={ariaLabel}>
           <defs>
-            <linearGradient id="incomeTrendSurface" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-cyan)" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="var(--color-cyan)" stopOpacity="0.02" />
+            <linearGradient id={incomeSurfaceId} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-cyan)" stopOpacity="0.34" />
+              <stop offset="70%" stopColor="var(--color-teal)" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="var(--color-cyan)" stopOpacity="0" />
             </linearGradient>
-            <linearGradient id="expenseTrendSurface" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-amber)" stopOpacity="0.2" />
-              <stop offset="100%" stopColor="var(--color-amber)" stopOpacity="0.02" />
+            <linearGradient id={expenseSurfaceId} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-amber)" stopOpacity="0.3" />
+              <stop offset="72%" stopColor="var(--color-clay)" stopOpacity="0.07" />
+              <stop offset="100%" stopColor="var(--color-amber)" stopOpacity="0" />
             </linearGradient>
+            <linearGradient id={incomeStrokeId} x1={incomeExpenseTrendChart.plot.left} x2={incomeExpenseTrendChart.plot.right} y1="0" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="var(--color-teal)" />
+              <stop offset="45%" stopColor="var(--color-cyan)" />
+              <stop offset="100%" stopColor="#7c5cff" />
+            </linearGradient>
+            <linearGradient id={expenseStrokeId} x1={incomeExpenseTrendChart.plot.left} x2={incomeExpenseTrendChart.plot.right} y1="0" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#d99a24" />
+              <stop offset="52%" stopColor="var(--color-amber)" />
+              <stop offset="100%" stopColor="#ff5a8a" />
+            </linearGradient>
+            <filter id={trendGlowId} x="-20%" y="-35%" width="140%" height="170%">
+              <feGaussianBlur stdDeviation="3.2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
-          <rect className="chart-panel" x="50" y="20" width="490" height="224" rx="8" />
+          <rect className="chart-panel" x="50" y="20" width="490" height="224" rx="18" />
           <text className="axis-label axis-label-y chart-axis-title" x={incomeExpenseTrendChart.plot.left} y="18">{copy("Amount (TRY)", "Tutar (TRY)")}</text>
           <text className="axis-label axis-label-x" x="260" y="266">{copy("Date", "Tarih")}</text>
           <path className="chart-grid" d={incomeExpenseTrendChart.gridPath} />
@@ -4699,20 +4804,22 @@ function App() {
               {tick.label}
             </text>
           ))}
-          {incomeExpenseTrendChart.revenueAreaPath && <path className="trend-area sales" d={incomeExpenseTrendChart.revenueAreaPath} />}
-          {incomeExpenseTrendChart.costAreaPath && <path className="trend-area costs" d={incomeExpenseTrendChart.costAreaPath} />}
+          {incomeExpenseTrendChart.revenueAreaPath && <path className="trend-area sales chart-area-fill" d={incomeExpenseTrendChart.revenueAreaPath} style={{ fill: `url(#${incomeSurfaceId})` }} />}
+          {incomeExpenseTrendChart.costAreaPath && <path className="trend-area costs chart-area-fill" d={incomeExpenseTrendChart.costAreaPath} style={{ fill: `url(#${expenseSurfaceId})` }} />}
           <line className="chart-badge-rail" x1="448" x2="448" y1="34" y2="218" />
-          {incomeExpenseTrendChart.revenuePath && <path className="trend-line sales" d={incomeExpenseTrendChart.revenuePath} />}
-          {incomeExpenseTrendChart.costPath && <path className="trend-line costs" d={incomeExpenseTrendChart.costPath} />}
+          {incomeExpenseTrendChart.revenuePath && <path className="trend-line-glow sales chart-draw-line" d={incomeExpenseTrendChart.revenuePath} filter={`url(#${trendGlowId})`} pathLength="1" style={{ stroke: `url(#${incomeStrokeId})` }} />}
+          {incomeExpenseTrendChart.costPath && <path className="trend-line-glow costs chart-draw-line" d={incomeExpenseTrendChart.costPath} filter={`url(#${trendGlowId})`} pathLength="1" style={{ stroke: `url(#${expenseStrokeId})` }} />}
+          {incomeExpenseTrendChart.revenuePath && <path className="trend-line sales chart-draw-line" d={incomeExpenseTrendChart.revenuePath} pathLength="1" style={{ stroke: `url(#${incomeStrokeId})` }} />}
+          {incomeExpenseTrendChart.costPath && <path className="trend-line costs chart-draw-line" d={incomeExpenseTrendChart.costPath} pathLength="1" style={{ stroke: `url(#${expenseStrokeId})` }} />}
           {revenuePoints.map((point, index) => (
-            <circle className="trend-point sales" cx={point.x} cy={point.y} r={index === revenuePoints.length - 1 ? 4.8 : 3.2} key={`sales-${index}`} />
+            <circle className="trend-point sales" cx={point.x} cy={point.y} r={index === revenuePoints.length - 1 ? 4.8 : 3.2} style={{ animationDelay: `${760 + (index * 36)}ms` }} key={`sales-${index}`} />
           ))}
           {costPoints.map((point, index) => (
-            <circle className="trend-point costs" cx={point.x} cy={point.y} r={index === costPoints.length - 1 ? 4.8 : 3.2} key={`cost-${index}`} />
+            <circle className="trend-point costs" cx={point.x} cy={point.y} r={index === costPoints.length - 1 ? 4.8 : 3.2} style={{ animationDelay: `${820 + (index * 36)}ms` }} key={`cost-${index}`} />
           ))}
           {latestRevenuePoint && (
             <>
-              <path className="chart-badge-connector sales" d={`M${latestRevenuePoint.x + 7} ${latestRevenuePoint.y} C${latestRevenuePoint.x + 28} ${latestRevenuePoint.y}, ${badgeX - 18} ${revenueBadgeY + 17}, ${badgeX} ${revenueBadgeY + 17}`} />
+              <path className="chart-badge-connector sales" d={`M${latestRevenuePoint.x + 7} ${latestRevenuePoint.y} C${latestRevenuePoint.x + 28} ${latestRevenuePoint.y}, ${badgeX - 18} ${revenueBadgeY + 17}, ${badgeX} ${revenueBadgeY + 17}`} pathLength="1" />
               <g className="chart-value-badge sales" transform={`translate(${badgeX} ${revenueBadgeY})`}>
                 <rect width="86" height={badgeHeight} rx="8" />
                 <text className="chart-value-badge-label" x="12" y="13">{copy("Income", "Gelir")}</text>
@@ -4722,7 +4829,7 @@ function App() {
           )}
           {latestCostPoint && (
             <>
-              <path className="chart-badge-connector costs" d={`M${latestCostPoint.x + 7} ${latestCostPoint.y} C${latestCostPoint.x + 28} ${latestCostPoint.y}, ${badgeX - 18} ${costBadgeY + 17}, ${badgeX} ${costBadgeY + 17}`} />
+              <path className="chart-badge-connector costs" d={`M${latestCostPoint.x + 7} ${latestCostPoint.y} C${latestCostPoint.x + 28} ${latestCostPoint.y}, ${badgeX - 18} ${costBadgeY + 17}, ${badgeX} ${costBadgeY + 17}`} pathLength="1" />
               <g className="chart-value-badge costs" transform={`translate(${badgeX} ${costBadgeY})`}>
                 <rect width="86" height={badgeHeight} rx="8" />
                 <text className="chart-value-badge-label" x="12" y="13">{copy("Expense", "Gider")}</text>
@@ -4731,6 +4838,7 @@ function App() {
             </>
           )}
         </svg>
+        </div>
       );
     };
     const financialPageMeta = {
@@ -4897,8 +5005,8 @@ function App() {
       );
     };
     const renderExchangeRatePanel = () => (
-      <section className="financial-input-section exchange-rate-section">
-        <div className="financial-input-section-heading">
+      <details className="financial-input-section exchange-rate-section progressive-input-box">
+        <summary className="financial-input-section-heading progressive-section-summary">
           <div>
             <span className="heading-with-info">
               {copy("TCMB FX rates", "TCMB döviz kurları")}
@@ -4921,12 +5029,20 @@ function App() {
             </p>
           </div>
           <div className="exchange-rate-actions">
-            <button type="button" onClick={handleFetchExchangeRates} disabled={exchangeRates.status === "loading"}>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                handleFetchExchangeRates();
+              }}
+              disabled={exchangeRates.status === "loading"}
+            >
               {exchangeRates.status === "loading" ? copy("Fetching...", "Çekiliyor...") : copy("Fetch Prices", "Fiyatları Çek")}
             </button>
             <strong>{exchangeRates.status === "ready" ? exchangeRates.source : exchangeRates.status === "loading" ? copy("Loading", "Yükleniyor") : copy("Manual", "Manuel")}</strong>
           </div>
-        </div>
+        </summary>
         <div className="exchange-rate-grid">
           {[
             ["USD", exchangeRates.USD],
@@ -4939,64 +5055,64 @@ function App() {
             </article>
           ))}
         </div>
-      </section>
+      </details>
     );
     const renderFinancialInputs = () => (
       <div className="financial-controls finance-input-panel">
         <form className="financial-assumption-form" onSubmit={handleSaveFinancialSettings}>
           {renderExchangeRatePanel()}
 
-          <section className="financial-input-section">
-            <div className="financial-input-section-heading">
+          <details className="financial-input-section progressive-input-box">
+            <summary className="financial-input-section-heading progressive-section-summary">
               <div>
                 <span>{copy("Required inputs", "Zorunlu girdiler")}</span>
                 <p>{copy("These assumptions must be present for the financial model to be saved.", "Finansal modelin kaydedilmesi için bu varsayımlar girilmelidir.")}</p>
               </div>
               <strong>{requiredFinancialSettingFields.length}</strong>
-            </div>
+            </summary>
             <div className="financial-input-grid">
               {requiredFinancialSettingFields.map((field) => renderFinancialField(field, true))}
             </div>
-          </section>
+          </details>
 
-          <section className="financial-input-section general-financial-assumptions">
-            <div className="financial-input-section-heading">
+          <details className="financial-input-section general-financial-assumptions progressive-input-box">
+            <summary className="financial-input-section-heading progressive-section-summary">
               <div>
                 <span>{copy("General financial assumptions", "Genel finansal varsayımlar")}</span>
                 <p>{copy("Grant, tax, VAT, collection, supplier payment, stock holding and starting capacity assumptions.", "Yatırım/hibe, vergi, KDV, tahsilat, tedarikçi ödeme, stok tutma ve başlangıç kapasitesi varsayımları.")}</p>
               </div>
               <strong>{generalFinancialAssumptionFields.length}</strong>
-            </div>
+            </summary>
             <div className="financial-input-grid">
               {generalFinancialAssumptionFields.map((field) => renderFinancialField(field, true))}
             </div>
-          </section>
+          </details>
 
-          <section className="financial-input-section optional-macro-section">
-            <div className="financial-input-section-heading">
+          <details className="financial-input-section optional-macro-section progressive-input-box">
+            <summary className="financial-input-section-heading progressive-section-summary">
               <div>
                 <span>{copy("Optional macro assumptions", "Opsiyonel makro varsayımlar")}</span>
                 <p>{copy("These percentages can inflate material, wage, energy and overhead projections month by month. Leave empty or zero to ignore.", "Bu yüzdeler malzeme, ücret, enerji ve genel gider projeksiyonlarını aylık artırabilir. Dikkate almak istemiyorsanız boş veya sıfır bırakın.")}</p>
               </div>
               <strong>{optionalMacroFinancialSettingFields.length}</strong>
-            </div>
+            </summary>
             <div className="financial-input-grid">
               {optionalMacroFinancialSettingFields.map((field) => renderFinancialField(field, false))}
             </div>
-          </section>
+          </details>
 
-          <section className="financial-input-section inflation-revaluation-section">
-            <div className="financial-input-section-heading">
+          <details className="financial-input-section inflation-revaluation-section progressive-input-box">
+            <summary className="financial-input-section-heading progressive-section-summary">
               <div>
                 <span>{copy("Inflation and revaluation", "Enflasyon ve yeniden değerleme")}</span>
                 <p>{copy("Annual COGS, OpEx, price increase and asset value policies. Frequency controls how annual increases step through the projection.", "Yıllık SMM, OpEx, fiyat artışı ve varlık değer politikaları. Artış sıklığı yıllık artışların projeksiyona nasıl dağıtılacağını belirler.")}</p>
               </div>
               <strong>{inflationRevaluationFinancialFields.length}</strong>
-            </div>
+            </summary>
             <div className="financial-input-grid">
               {inflationRevaluationFinancialFields.map((field) => renderFinancialField(field, true))}
             </div>
-          </section>
+          </details>
 
           <button type="submit" disabled={financialLoading}>{copy("Save Assumptions", "Varsayımları Kaydet")}</button>
         </form>
@@ -5104,7 +5220,7 @@ function App() {
         <div className="financial-loan-calendar-scroll">
           <div
             className="financial-loan-calendar-grid"
-            style={{ gridTemplateColumns: `minmax(190px, 0.9fr) repeat(${loanPaymentCalendar.months.length}, minmax(136px, 1fr))` }}
+            style={{ gridTemplateColumns: `minmax(122px, 0.72fr) repeat(${loanPaymentCalendar.months.length}, minmax(64px, 1fr))` }}
           >
             <div className="loan-calendar-cell loan-calendar-corner">{copy("Loan", "Kredi")}</div>
             {loanPaymentCalendar.months.map((month) => (
@@ -5212,29 +5328,37 @@ function App() {
           })}
         </section>
 
-        <section className="financial-input-section optional financial-loan-section">
-          <div className="financial-input-section-heading">
+        <details className="financial-input-section optional financial-loan-section progressive-input-box">
+          <summary className="financial-input-section-heading progressive-section-summary">
             <div>
               <span>{copy("Loan records", "Kredi kayıtları")}</span>
               <p>{copy("Every loan row must include amount, annual interest, grace period, and term. Leave this page empty if there is no loan.", "Her kredi satırında tutar, yıllık faiz, ödemesiz ay ve vade girilmelidir. Kredi yoksa bu sayfayı boş bırakabilirsiniz.")}</p>
             </div>
             <strong>{financialLoanRows.length}</strong>
-          </div>
+          </summary>
           <div className="financial-loan-list">
             {financialLoanRows.length ? financialLoanRows.map((loan, index) => {
               const calculatedLoan = calculatedLoanRows.find((row) => row.id === loan.id) || calculatedLoanRows[index] || {};
 
               return (
-                <article className="financial-loan-card" key={loan.id || `loan-${index}`}>
-                  <div className="financial-loan-card-heading">
+                <details className="financial-loan-card progressive-input-box financial-loan-record-box" key={loan.id || `loan-${index}`}>
+                  <summary className="financial-loan-card-heading progressive-section-summary">
                     <div>
                       <span>{loan.name?.trim() || `${copy("Loan", "Kredi")} ${index + 1}`}</span>
                       <h3>{formatCurrencyAmount(toFiniteNumber(loan.amount), loan.currency)}</h3>
                     </div>
-                    <button type="button" className="resource-remove-button" onClick={() => removeFinancialLoanRow(index)}>
+                    <button
+                      type="button"
+                      className="resource-remove-button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        removeFinancialLoanRow(index);
+                      }}
+                    >
                       x
                     </button>
-                  </div>
+                  </summary>
                   <div className="financial-loan-row">
                     <label className="optional-financial-field">
                       <span>
@@ -5337,13 +5461,13 @@ function App() {
                     <span>{copy("Repayment term", "Ödeme vadesi")}<strong>{formatNumber(calculatedLoan.repaymentTermMonths || 0)} {copy("mo", "ay")}</strong></span>
                     <span>{copy("Monthly payment", "Aylık ödeme")}<strong>{formatCurrencyAmount(calculatedLoan.monthlyPayment || 0, calculatedLoan.currency)}</strong></span>
                   </div>
-                </article>
+                </details>
               );
             }) : (
               <p className="planner-empty-state loan-empty-state">{copy("No loan added. The model will use zero loan.", "Kredi eklenmedi. Model sıfır kredi kullanacak.")}</p>
             )}
           </div>
-        </section>
+        </details>
         {renderFinancialLoanPaymentCalendar()}
         <div className="financial-loan-actions">
           <button type="button" onClick={addFinancialLoanRow}>{copy("Add Loan", "Kredi Ekle")}</button>
@@ -5352,7 +5476,7 @@ function App() {
       </form>
     );
     const renderFinancialTrendCard = () => (
-      <article className="financial-card financial-overview-wide">
+      <article className="financial-card financial-overview-wide financial-trend-card">
         <div className="financial-card-heading">
           <h2>{copy("Income and Expense Projection", "Gelir ve Gider Projeksiyonu")}</h2>
           <div className="mini-tabs">
@@ -5382,94 +5506,156 @@ function App() {
         {renderIncomeExpenseTrendSvg(copy("Income and expense projection chart", "Gelir ve gider projeksiyon grafiği"))}
       </article>
     );
-    const overviewFinancialRows = [
-      { amount: summary.salesRevenue, id: "salesRevenue", source: copy("Sales Strategy", "Satış Stratejisi"), tone: "income", type: copy("Return", "Getiri") },
-      { amount: summary.investmentGrantAmount, id: "investmentGrant", source: copy("Financial inputs", "Finansal girdiler"), tone: "financing", type: copy("Grant / subsidy", "Hibe / teşvik") },
-      { amount: summary.materialCost, id: "materialCost", source: copy("Operations material plans", "Operations malzeme planları"), tone: "cost", type: copy("Operating input", "Operasyon girdisi") },
-      { amount: summary.workforceCost, id: "workforceCost", source: copy("Operations workforce plan", "Operations işgücü planı"), tone: "cost", type: copy("Operating input", "Operasyon girdisi") },
-      { amount: summary.electricityCost, id: "electricityCost", source: copy("Operations energy x input price", "Operations enerji x girdi fiyatı"), tone: "cost", type: copy("Operating input", "Operasyon girdisi") },
-      { amount: summary.expiredWriteOffCost, id: "writeOffCost", source: copy("Sales returns and spoilage", "Satış iadesi ve fire"), tone: "cost", type: copy("Risk cost", "Risk gideri") },
-      { amount: summary.machinePurchaseCost, id: "machinePurchase", source: copy("Operations machines", "Operations makineleri"), tone: "investment", type: copy("Investment input", "Yatırım girdisi") },
-      { amount: summary.equipmentPurchaseCost, id: "equipmentPurchase", source: copy("Operations equipment", "Operations ekipmanları"), tone: "investment", type: copy("Investment input", "Yatırım girdisi") },
-      { amount: summary.extraInitialCost, id: "extraInitialCost", source: copy("Optional expenses input", "Opsiyonel gider girdisi"), tone: "investment", type: copy("Initial expense", "Başlangıç gideri") },
-      { amount: summary.extraRecurringCost, id: "recurringExtraCost", source: copy("Optional expenses input", "Opsiyonel gider girdisi"), tone: "cost", type: copy("Recurring expense", "Tekrarlayan gider") },
-      { amount: summary.workingCapitalRequirement, id: "workingCapital", source: copy("Financial inputs", "Finansal girdiler"), tone: "investment", type: copy("Working capital", "İşletme sermayesi") },
-      { amount: summary.loanAmount, id: "loanAmount", source: copy("Loans page", "Krediler sayfası"), tone: "financing", type: copy("Financing input", "Finansman girdisi") },
-      { amount: summary.loanInterest, id: "loanInterest", source: copy("Loans page", "Krediler sayfası"), tone: "cost", type: copy("Financing cost", "Finansman gideri") },
-      { amount: summary.loanPaymentTotal, id: "loanPaymentTotal", source: copy("Loans page", "Krediler sayfası"), tone: "cash", type: copy("Cash outflow", "Nakit çıkışı") },
-      { amount: summary.vatPayable, id: "vatPayable", source: copy("Tax inputs", "Vergi girdileri"), tone: "cost", type: copy("Tax", "Vergi") },
-      { amount: summary.incomeTax, id: "incomeTax", source: copy("Tax inputs", "Vergi girdileri"), tone: "cost", type: copy("Tax", "Vergi") },
-      { amount: summary.netIncome, id: "netIncome", label: copy("Net return", "Net getiri"), source: copy("Calculated", "Hesaplanan"), tone: "net", type: copy("Result", "Sonuç") },
-      { amount: summary.totalCashFlow, id: "cashFlow", label: copy("Total cash flow", "Toplam nakit akışı"), source: copy("Calculated", "Hesaplanan"), tone: "cash", type: copy("Result", "Sonuç") },
+    const statementProjectionRows = statementProjectionModel.trendRows || [];
+    const projectionPeriodMonths = financialStatementPeriod === "yearly" ? 12 : 3;
+    const projectionPeriodCountLabel = financialStatementPeriod === "yearly"
+      ? copy("4 years", "4 yıl")
+      : copy("4 quarters", "4 çeyrek");
+    const formatProjectionDate = (date) => new Intl.DateTimeFormat(document.documentElement.lang === "tr" ? "tr-TR" : "en-US", {
+      month: "short",
+      year: "numeric",
+    }).format(date);
+    const getProjectionDateAtOffset = (offset) => {
+      const date = getMonthStart(new Date());
+      date.setMonth(date.getMonth() + offset);
+      return date;
+    };
+    const getProjectionRangeLabel = (startOffset, monthSpan) => {
+      const startDate = getProjectionDateAtOffset(startOffset);
+      const endDate = getProjectionDateAtOffset(startOffset + Math.max(0, monthSpan - 1));
+      return `${formatProjectionDate(startDate)} - ${formatProjectionDate(endDate)}`;
+    };
+    const buildProjectionPeriod = (index) => {
+      const startIndex = index * projectionPeriodMonths;
+      const periodRows = statementProjectionRows.slice(startIndex, startIndex + projectionPeriodMonths);
+      const sum = (key) => periodRows.reduce((total, row) => total + toFiniteNumber(row[key]), 0);
+      const firstRow = periodRows[0] || {};
+      const lastRow = periodRows[periodRows.length - 1] || {};
+      const salesRevenue = sum("salesRevenue");
+      const materialCost = sum("materialCost");
+      const workforceCost = sum("workforceCost");
+      const electricityCost = sum("electricityCost");
+      const writeOffCost = sum("writeOffCost");
+      const grossProfit = salesRevenue - materialCost - workforceCost - electricityCost - writeOffCost;
+      const netIncome = sum("netIncome");
+
+      return {
+        cashFlow: sum("cashFlow"),
+        endingCash: toFiniteNumber(lastRow.cashBalance),
+        grossMargin: salesRevenue ? (grossProfit / salesRevenue) * 100 : 0,
+        grossProfit,
+        incomeTax: sum("incomeTax"),
+        label: financialStatementPeriod === "yearly" ? copy(`Year ${index + 1}`, `Yıl ${index + 1}`) : copy(`Q${index + 1}`, `Ç${index + 1}`),
+        loanInterest: sum("loanInterest"),
+        materialCost,
+        netIncome,
+        netMargin: salesRevenue ? (netIncome / salesRevenue) * 100 : 0,
+        netSoldUnits: sum("netSoldUnits"),
+        periodRows,
+        producedUnits: sum("producedUnits"),
+        rangeLabel: getProjectionRangeLabel(startIndex, projectionPeriodMonths),
+        salesRevenue,
+        startingCash: toFiniteNumber(firstRow.cashBalance) - toFiniteNumber(firstRow.cashFlow),
+        totalCost: sum("totalCost"),
+        vatPayable: sum("vatPayable"),
+        writeOffCost,
+        workforceCost,
+        electricityCost,
+      };
+    };
+    const financialStatementPeriods = Array.from({ length: 4 }, (_, index) => buildProjectionPeriod(index));
+    const statementGridTemplate = `minmax(240px, 1.22fr) repeat(${financialStatementPeriods.length}, minmax(132px, 1fr))`;
+    const projectionRows = [
+      { id: "income-section", section: copy("Income Statement", "Gelir Tablosu") },
+      { detail: copy("From channel sales forecast", "Kanal satış tahmininden"), emphasis: true, format: "money", id: "salesRevenue", label: copy("Net Sales", "Net Satışlar"), tone: "income", value: (period) => period.salesRevenue },
+      { detail: copy("Material input cost", "Malzeme girdi maliyeti"), format: "money", id: "materialCost", label: copy("Materials", "Malzemeler"), tone: "cost", value: (period) => period.materialCost },
+      { detail: copy("Labor and salary cost", "İşçilik ve maaş maliyeti"), format: "money", id: "workforceCost", label: copy("Labor", "İşçilik"), tone: "cost", value: (period) => period.workforceCost },
+      { detail: copy("Energy cost from operations", "Operasyonlardan gelen enerji maliyeti"), format: "money", id: "electricityCost", label: copy("Energy", "Enerji"), tone: "cost", value: (period) => period.electricityCost },
+      { detail: copy("Returns, spoilage and expired stock", "İade, fire ve SKT kaynaklı stok"), format: "money", id: "writeOffCost", label: copy("Write-off Cost", "Fire / İade Maliyeti"), tone: "cost", value: (period) => period.writeOffCost },
+      { detail: copy("Revenue after direct production costs", "Direkt üretim maliyetleri sonrası gelir"), emphasis: true, format: "money", id: "grossProfit", label: copy("Gross Profit", "Brüt Kâr"), signed: true, value: (period) => period.grossProfit },
+      { detail: copy("Interest accrued from active loans", "Aktif kredilerden işleyen faiz"), format: "money", id: "loanInterest", label: copy("Loan Interest", "Kredi Faizi"), tone: "cost", value: (period) => period.loanInterest },
+      { detail: copy("Income tax calculated from profit", "Kârdan hesaplanan gelir vergisi"), format: "money", id: "incomeTax", label: copy("Income Tax", "Gelir Vergisi"), tone: "tax", value: (period) => period.incomeTax },
+      { detail: copy("All cost lines carried by the model", "Modelin taşıdığı tüm maliyet satırları"), emphasis: true, format: "money", id: "totalCost", label: copy("Total Expenses", "Toplam Giderler"), tone: "cost", value: (period) => period.totalCost },
+      { detail: copy("After all operating, financing and tax costs", "Tüm operasyon, finansman ve vergi maliyetlerinden sonra"), emphasis: true, format: "money", id: "netIncome", label: copy("Net Profit", "Net Kâr"), signed: true, value: (period) => period.netIncome },
+      { detail: copy("Net profit divided by net sales", "Net kârın net satışlara oranı"), format: "percent", id: "netMargin", label: copy("Net Profit Margin", "Net Kâr Marjı"), signed: true, value: (period) => period.netMargin },
+      { id: "cash-section", section: copy("Cash Flow", "Nakit Akışı") },
+      { detail: copy("Cash at the start of the period", "Dönem başındaki nakit"), format: "money", id: "startingCash", label: copy("Starting Cash", "Dönem Başı Nakit"), signed: true, value: (period) => period.startingCash },
+      { detail: copy("Net movement inside the period", "Dönem içi net hareket"), emphasis: true, format: "money", id: "cashFlow", label: copy("Net Cash Flow", "Net Nakit Akışı"), signed: true, value: (period) => period.cashFlow },
+      { detail: copy("Cash left after the period closes", "Dönem kapandıktan sonra kalan nakit"), emphasis: true, format: "money", id: "endingCash", label: copy("Ending Cash", "Dönem Sonu Nakit"), signed: true, value: (period) => period.endingCash },
+      { detail: copy("Sales VAT position in the model", "Modeldeki satış KDV pozisyonu"), format: "money", id: "vatPayable", label: copy("VAT Payable", "Ödenecek KDV"), tone: "tax", value: (period) => period.vatPayable },
+      { id: "operations-section", section: copy("Operating Volume", "Operasyon Hacmi") },
+      { detail: copy("Units produced by active process plans", "Aktif süreç planlarıyla üretilen adet"), format: "number", id: "producedUnits", label: copy("Produced Units", "Üretilen Adet"), value: (period) => period.producedUnits },
+      { detail: copy("Units sold after returns", "İadeler sonrası satılan adet"), format: "number", id: "netSoldUnits", label: copy("Net Sold Units", "Net Satılan Adet"), value: (period) => period.netSoldUnits },
     ];
-    const overviewFinancialGroups = [
-      {
-        detail: copy("Sales income and non-loan support entering the model.", "Modele giren satış geliri ve kredi dışı destek."),
-        rows: overviewFinancialRows.filter((row) => ["salesRevenue", "investmentGrant"].includes(row.id)),
-        tone: "income",
-        title: copy("Income", "Gelirler"),
-      },
-      {
-        detail: copy("Recurring costs created by operations, sales risk and optional overhead.", "Operations, satış riski ve opsiyonel genel giderlerden gelen tekrarlayan maliyetler."),
-        rows: overviewFinancialRows.filter((row) => ["materialCost", "workforceCost", "electricityCost", "writeOffCost", "recurringExtraCost"].includes(row.id)),
-        tone: "cost",
-        title: copy("Operating Expenses", "Operasyonel Giderler"),
-      },
-      {
-        detail: copy("Initial asset purchases and cash locked into working capital.", "Başlangıç varlık alımları ve işletme sermayesine bağlanan nakit."),
-        rows: overviewFinancialRows.filter((row) => ["machinePurchase", "equipmentPurchase", "extraInitialCost", "workingCapital"].includes(row.id)),
-        tone: "investment",
-        title: copy("Investment & Working Capital", "Yatırım & İşletme Sermayesi"),
-      },
-      {
-        detail: copy("Loans, repayment cash flow and tax obligations.", "Krediler, geri ödeme nakit çıkışı ve vergi yükümlülükleri."),
-        rows: overviewFinancialRows.filter((row) => ["loanAmount", "loanInterest", "loanPaymentTotal", "vatPayable", "incomeTax"].includes(row.id)),
-        tone: "financing",
-        title: copy("Financing & Tax", "Finansman & Vergi"),
-      },
-      {
-        detail: copy("Calculated bottom-line results from the current model.", "Mevcut modelden hesaplanan nihai sonuçlar."),
-        rows: overviewFinancialRows.filter((row) => ["netIncome", "cashFlow"].includes(row.id)),
-        tone: "net",
-        title: copy("Net Result", "Net Sonuç"),
-      },
-    ].map((group) => ({
-      ...group,
-      total: group.rows.reduce((total, row) => total + toFiniteNumber(row.amount), 0),
-    }));
+    const formatProjectionValue = (row, period) => {
+      const value = toFiniteNumber(row.value(period));
+      if (row.format === "percent") return `${formatNumber(value, 1)}%`;
+      if (row.format === "number") return formatNumber(value);
+      return formatLira(value);
+    };
+    const getProjectionValueTone = (row, period) => {
+      if (!row.signed) return row.tone || "";
+      return toFiniteNumber(row.value(period)) >= 0 ? "positive" : "negative";
+    };
     const renderOverviewFinancialRows = () => (
       <article className="financial-card income-card financial-overview-wide">
         <div className="financial-card-heading">
           <div>
             <h2>{copy("Financial Statement", "Finansal Tablo")}</h2>
-            <p>{copy("Grouped income, expense, investment, financing and result rows.", "Gelir, gider, yatırım, finansman ve sonuç satırları gruplandı.")}</p>
+            <p>{copy("Forward projection view for the next four periods.", "Önümüzdeki dört dönem için projeksiyon görünümü.")}</p>
           </div>
-          <span className="financial-row-count">{overviewFinancialGroups.length} {copy("groups", "grup")}</span>
+          <div className="financial-statement-controls">
+            <span className="financial-row-count">{projectionPeriodCountLabel}</span>
+            <div className="financial-statement-toggle" role="group" aria-label={copy("Statement period", "Tablo dönemi")}>
+              {[
+                ["quarterly", copy("Quarterly", "Çeyreklik")],
+                ["yearly", copy("Yearly", "Yıllık")],
+              ].map(([value, label]) => (
+                <button
+                  type="button"
+                  className={financialStatementPeriod === value ? "active" : ""}
+                  onClick={() => setFinancialStatementPeriod(value)}
+                  key={value}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="financial-statement">
-          {overviewFinancialGroups.map((group) => (
-            <section className={`financial-row-group ${group.tone}`} key={group.title}>
-              <header>
+        <div className="financial-statement financial-projection-statement">
+          <div className="financial-projection-scroll">
+            <div className="financial-projection-row financial-projection-head" style={{ gridTemplateColumns: statementGridTemplate }}>
+              <span>{copy("Line Item", "Kalem")}</span>
+              {financialStatementPeriods.map((period) => (
+                <span key={period.label}>
+                  <strong>{period.label}</strong>
+                  <small>{period.rangeLabel}</small>
+                </span>
+              ))}
+            </div>
+            {projectionRows.map((row) => row.section ? (
+              <div className="financial-projection-row financial-projection-section" style={{ gridTemplateColumns: statementGridTemplate }} key={row.id}>
+                <strong>{row.section}</strong>
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+            ) : (
+              <div className={`financial-projection-row financial-projection-line ${row.emphasis ? "emphasis" : ""}`} style={{ gridTemplateColumns: statementGridTemplate }} key={row.id}>
                 <div>
-                  <span>{group.title}</span>
-                  <p>{group.detail}</p>
+                  <strong>{row.label}</strong>
+                  <small>{row.detail}</small>
                 </div>
-                <strong>{formatLira(group.total)}</strong>
-              </header>
-              <div className="financial-row-subgroup">
-                {group.rows.map((row) => (
-                  <div className={`financial-statement-row ${row.tone || ""}`} key={row.id}>
-                    <div>
-                      <strong>{row.label || getFinancialRowLabel(row)}</strong>
-                      <small>{row.source}</small>
-                    </div>
-                    <span>{row.type}</span>
-                    <b>{formatLira(row.amount)}</b>
-                  </div>
+                {financialStatementPeriods.map((period) => (
+                  <b className={getProjectionValueTone(row, period)} key={`${row.id}-${period.label}`}>
+                    {formatProjectionValue(row, period)}
+                  </b>
                 ))}
               </div>
-            </section>
-          ))}
+            ))}
+          </div>
         </div>
       </article>
     );
@@ -5626,7 +5812,6 @@ function App() {
       return true;
     });
     const overviewMonthCount = Math.max(1, getProjectionMonthCount(financialHorizon));
-    const overviewTrendRows = model.trendRows || [];
     const overviewHasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
     const overviewIsDecisionReady = Boolean(summary.planCount && overviewHasSalesForecast && financialModel.settingsSaved);
     const overviewMonthlyRevenue = toFiniteNumber(summary.salesRevenue) / overviewMonthCount;
@@ -5634,42 +5819,10 @@ function App() {
     const overviewMonthlyNet = toFiniteNumber(summary.netIncome) / overviewMonthCount;
     const overviewProductionCost = toFiniteNumber(summary.materialCost) + toFiniteNumber(summary.workforceCost) + toFiniteNumber(summary.electricityCost) + toFiniteNumber(summary.expiredWriteOffCost);
     const overviewTaxAndFinanceCost = toFiniteNumber(summary.vatPayable) + toFiniteNumber(summary.incomeTax) + toFiniteNumber(summary.loanInterest);
-    const overviewUnmetSalesUnits = Math.max(0, toFiniteNumber(summary.forecastSalesUnits) - toFiniteNumber(summary.netSoldUnits));
     const overviewInvestmentBase = Math.max(0, investmentTotal);
     const overviewRoiPercent = overviewInvestmentBase ? (toFiniteNumber(summary.netIncome) / overviewInvestmentBase) * 100 : 0;
     const overviewMarginPercent = summary.salesRevenue ? (toFiniteNumber(summary.netIncome) / toFiniteNumber(summary.salesRevenue)) * 100 : 0;
     const overviewCashRunwayLimit = Math.min(overviewMonthCount, 6);
-    const overviewVerdict = !overviewIsDecisionReady
-      ? {
-          action: copy("Complete missing inputs", "Eksik girdileri tamamla"),
-          body: copy("The model needs an active process plan, product-linked sales forecast, and saved finance assumptions before it should be used for a customer decision.", "Modelin müşteri kararı için kullanılmadan önce aktif süreç planı, ürüne bağlı satış tahmini ve kayıtlı finans varsayımlarına ihtiyacı var."),
-          path: !summary.planCount ? "/operations/data-entry" : !overviewHasSalesForecast ? "/sales-strategy" : "/financial-modelling/girdiler",
-          title: copy("Not ready for decision", "Karar için hazır değil"),
-          tone: "amber",
-        }
-      : (overviewMonthlyNet > 0 && summary.cashRunwayMonths >= overviewCashRunwayLimit && overviewUnmetSalesUnits <= 0)
-        ? {
-            action: copy("Open simulation", "Simülasyonu aç"),
-            body: copy("The current plan is profitable in the selected horizon, cash stays alive, and the sales promise is covered by available production.", "Mevcut plan seçilen ufukta kârlı, nakit ayakta kalıyor ve satış sözü mevcut üretimle karşılanıyor."),
-            path: "/simulation/current-situation",
-            title: copy("Looks decision-ready", "Karara yakın görünüyor"),
-            tone: "teal",
-          }
-        : overviewMonthlyNet > 0
-          ? {
-              action: copy("Review risks", "Riskleri incele"),
-              body: copy("Profitability is positive, but cash runway, inventory, or sales-capacity balance needs attention before committing.", "Kârlılık pozitif; ancak karar vermeden önce nakit dayanma, stok veya satış-kapasite dengesi kontrol edilmeli."),
-              path: "/financial-modelling/analiz",
-              title: copy("Feasible with watchouts", "Dikkatle fizibl"),
-              tone: "amber",
-            }
-          : {
-              action: copy("Improve plan", "Planı iyileştir"),
-              body: copy("The current assumptions do not yet support a healthy return. Start with price, production cost, channel commission, or financing.", "Mevcut varsayımlar sağlıklı getiri üretmiyor. Fiyat, üretim maliyeti, kanal komisyonu veya finansmandan başlayın."),
-              path: "/financial-modelling/analiz",
-              title: copy("High risk", "Yüksek risk"),
-              tone: "clay",
-            };
     const overviewDecisionMetrics = [
       {
         detail: copy("Average of the selected projection horizon", "Seçili projeksiyon ufkunun aylık ortalaması"),
@@ -5695,83 +5848,6 @@ function App() {
         tone: overviewRoiPercent >= 0 ? "good" : "risk",
         value: overviewIsDecisionReady && overviewInvestmentBase ? `${formatNumber(overviewRoiPercent, 1)}%` : "-",
       },
-    ];
-    const overviewActionItems = [
-      !summary.planCount && {
-        action: copy("Open Operations", "Operations'a Git"),
-        detail: copy("Save a daily process plan so production capacity, material, labor, and energy costs become real.", "Üretim kapasitesi, malzeme, işçilik ve enerji maliyetleri gerçek hesaplansın diye günlük süreç planı kaydedin."),
-        path: "/operations/data-entry",
-        title: copy("Process plan is missing", "Süreç planı eksik"),
-        tone: "amber",
-      },
-      !overviewHasSalesForecast && {
-        action: copy("Open Sales", "Satışa Git"),
-        detail: copy("Add product-linked channels with monthly units so revenue, stock, and collection timing can be calculated.", "Ciro, stok ve tahsilat vadesi hesaplansın diye ürüne bağlı aylık satış kanalları ekleyin."),
-        path: "/sales-strategy",
-        title: copy("Sales forecast is missing", "Satış tahmini eksik"),
-        tone: "amber",
-      },
-      !financialModel.settingsSaved && {
-        action: copy("Open Inputs", "Girdilere Git"),
-        detail: copy("Save tax, cash, working capital, inflation, and payment assumptions before reading the output as final.", "Çıktıyı nihai okumadan önce vergi, nakit, işletme sermayesi, enflasyon ve vade varsayımlarını kaydedin."),
-        path: "/financial-modelling/girdiler",
-        title: copy("Finance assumptions are not saved", "Finans varsayımları kaydedilmemiş"),
-        tone: "amber",
-      },
-      overviewIsDecisionReady && overviewUnmetSalesUnits > 0 && {
-        action: copy("Balance capacity", "Kapasiteyi dengele"),
-        detail: copy("Forecast demand is above sellable production. Increase capacity, reduce sales promise, or add outsourcing.", "Talep satılabilir üretimin üstünde. Kapasiteyi artırın, satış sözünü azaltın veya dış üretim ekleyin."),
-        path: "/operations/data-entry",
-        title: copy("Sales demand exceeds capacity", "Satış talebi kapasiteyi aşıyor"),
-        tone: "clay",
-      },
-      overviewIsDecisionReady && summary.unsoldInventoryUnits > 0 && {
-        action: copy("Review sales plan", "Satış planını incele"),
-        detail: copy("Production is above sales. Reduce output, add channels, or finance inventory explicitly.", "Üretim satışın üstünde. Çıktıyı azaltın, kanal ekleyin veya stoku açıkça finanse edin."),
-        path: "/sales-strategy",
-        title: copy("Unsold inventory risk", "Satılmayan stok riski"),
-        tone: "amber",
-      },
-      overviewIsDecisionReady && overviewMonthlyNet <= 0 && {
-        action: copy("Open cost rows", "Maliyet satırlarını aç"),
-        detail: copy("Net is negative. Check unit price, material cost, labor hours, energy, taxes, and channel commission first.", "Net negatif. Önce birim fiyat, malzeme maliyeti, işçilik saati, enerji, vergi ve kanal komisyonunu kontrol edin."),
-        path: "/financial-modelling/analiz",
-        title: copy("Profitability is weak", "Kârlılık zayıf"),
-        tone: "clay",
-      },
-      overviewIsDecisionReady && summary.cashRunwayMonths < Math.min(overviewMonthCount, 3) && {
-        action: copy("Review cash", "Nakti incele"),
-        detail: copy("Cash runway is short. Increase initial cash, adjust loan timing, or defer non-critical initial spend.", "Nakit dayanma kısa. Başlangıç nakdini artırın, kredi zamanlamasını düzeltin veya kritik olmayan başlangıç harcamasını erteleyin."),
-        path: "/financial-modelling/girdiler",
-        title: copy("Cash runway is short", "Nakit dayanma kısa"),
-        tone: "clay",
-      },
-    ].filter(Boolean).slice(0, 5);
-    const overviewFundingReady = financialModel.settingsSaved && (
-      toFiniteNumber(summary.initialCashRequired) <= 0 ||
-      (toFiniteNumber(summary.initialCash) + toFiniteNumber(summary.loanAmount) + toFiniteNumber(summary.investmentGrantAmount)) >= toFiniteNumber(summary.initialCashRequired) ||
-      toFiniteNumber(summary.cashRunwayMonths) >= Math.min(overviewMonthCount, 3)
-    );
-    const overviewReadinessItems = [
-      { done: toFiniteNumber(summary.planCount) > 0, label: copy("Process plan", "Süreç planı"), path: "/operations/data-entry" },
-      { done: overviewHasSalesForecast, label: copy("Sales forecast", "Satış tahmini"), path: "/sales-strategy" },
-      { done: financialModel.settingsSaved, label: copy("Finance inputs", "Finans girdileri"), path: "/financial-modelling/girdiler" },
-      { done: overviewFundingReady, label: copy("Cash plan", "Nakit planı"), path: "/financial-modelling/krediler" },
-    ];
-    const overviewReadinessPercent = Math.round((overviewReadinessItems.filter((item) => item.done).length / overviewReadinessItems.length) * 100);
-    const overviewPlainSummary = overviewIsDecisionReady
-      ? copy(
-          `Monthly net is ${formatLira(overviewMonthlyNet)} with ${formatNumber(summary.cashRunwayMonths)} months runway and ${formatNumber(overviewMarginPercent, 1)}% net margin.`,
-          `Aylık net ${formatLira(overviewMonthlyNet)}, nakit dayanma ${formatNumber(summary.cashRunwayMonths)} ay ve net marj ${formatNumber(overviewMarginPercent, 1)}%.`,
-        )
-      : copy(
-          "Complete the connected inputs first; until then, the financial output should be treated as a draft model.",
-          "Önce bağlı girdileri tamamlayın; o zamana kadar finansal çıktıyı taslak model olarak okuyun.",
-        );
-    const overviewProofPoints = [
-      [copy("Monthly net", "Aylık net"), overviewIsDecisionReady ? formatLira(overviewMonthlyNet) : "-", overviewMonthlyNet >= 0 ? "good" : "risk"],
-      [copy("Runway", "Dayanma"), overviewIsDecisionReady ? `${formatNumber(summary.cashRunwayMonths)} ${copy("mo", "ay")}` : "-", summary.cashRunwayMonths >= overviewCashRunwayLimit ? "good" : "risk"],
-      [copy("Required cash", "Gerekli nakit"), overviewIsDecisionReady ? formatLira(summary.initialCashRequired) : "-", overviewFundingReady ? "good" : "risk"],
     ];
     const overviewMoneyFlowRows = [
       {
@@ -5805,7 +5881,6 @@ function App() {
         tone: "net",
       },
     ];
-    const overviewTimelineRows = overviewTrendRows.slice(0, financialHorizon === "5y" ? 12 : 6);
     const overviewCostBreakdownRows = [
       { amount: overviewProductionCost, id: "productionCost", label: copy("Production cost", "Üretim maliyeti"), tone: "cost" },
       { amount: summary.extraRecurringCost, id: "recurringExtraCost", label: copy("Recurring overhead", "Tekrarlayan genel gider"), tone: "cost" },
@@ -5825,7 +5900,7 @@ function App() {
                 <h1>{financialPageMeta.title}</h1>
                 <p>{financialPageMeta.description}</p>
               </div>
-              <button type="button" className="primary" onClick={() => loadFinancialData()}>
+              <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
                 {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
               </button>
             </div>
@@ -5863,7 +5938,7 @@ function App() {
                 <h1>{financialPageMeta.title}</h1>
                 <p>{financialPageMeta.description}</p>
               </div>
-              <button type="button" className="primary" onClick={() => loadFinancialData()}>
+              <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
                 {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
               </button>
             </div>
@@ -5902,7 +5977,7 @@ function App() {
                 <h1>{financialPageMeta.title}</h1>
                 <p>{financialPageMeta.description}</p>
               </div>
-              <button type="button" className="primary" onClick={() => loadFinancialData()}>
+              <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
                 {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
               </button>
             </div>
@@ -5914,64 +5989,6 @@ function App() {
               {renderFinancialTrendCard()}
             </div>
 
-            <section className={`financial-decision-hero ${overviewVerdict.tone}`}>
-              <div className="financial-decision-copy">
-                <span>{copy("Decision summary", "Karar özeti")}</span>
-                <h2>{overviewVerdict.title}</h2>
-                <p>{overviewVerdict.body}</p>
-                <p className="financial-plain-summary">{overviewPlainSummary}</p>
-                <div className="financial-proof-points" aria-label={copy("Financial proof points", "Finansal kanıt noktaları")}>
-                  {overviewProofPoints.map(([label, value, tone]) => (
-                    <span className={tone} key={label}>
-                      {label}
-                      <strong>{value}</strong>
-                    </span>
-                  ))}
-                </div>
-                <div className="financial-hero-actions">
-                  <button type="button" className="primary" onClick={() => goTo(overviewVerdict.path, "login")}>
-                    {overviewVerdict.action}
-                  </button>
-                  <button type="button" className="secondary" onClick={() => goTo("/simulation/current-situation", "login")}>
-                    {copy("Stress test", "Stres testi")}
-                  </button>
-                  <div className="mini-tabs financial-horizon-control">
-                    {[
-                      ["6m", copy("6 Months", "6 Ay")],
-                      ["1y", copy("1 Year", "1 Yıl")],
-                      ["5y", copy("5 Years", "5 Yıl")],
-                    ].map(([value, label]) => (
-                      <button
-                        type="button"
-                        className={financialHorizon === value ? "active" : ""}
-                        onClick={() => {
-                          setFinancialHorizon(value);
-                          loadFinancialData(value);
-                        }}
-                        key={value}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="financial-decision-score" aria-label={copy("Financial model readiness", "Finansal model hazırlığı")}>
-                <div className="readiness-ring" style={{ "--readiness": `${overviewReadinessPercent}%` }}>
-                  <strong>{overviewReadinessPercent}%</strong>
-                  <span>{copy("Ready", "Hazır")}</span>
-                </div>
-                <div className="financial-readiness-list">
-                  {overviewReadinessItems.map((item) => (
-                    <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
-                      <span>{item.label}</span>
-                      <strong>{item.done ? copy("Done", "Tamam") : copy("Needed", "Gerekli")}</strong>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
-
             <div className="financial-decision-metrics">
               {overviewDecisionMetrics.map((metric) => (
                 <article className={`financial-decision-card ${metric.tone}`} key={metric.label}>
@@ -5982,32 +5999,7 @@ function App() {
               ))}
             </div>
 
-            <div className="financial-overview-layout">
-              <article className="financial-panel financial-priority-panel">
-                <div className="financial-panel-heading">
-                  <div>
-                    <span>{copy("What to fix first", "Önce ne düzeltilmeli")}</span>
-                    <h2>{copy("Action list", "Aksiyon listesi")}</h2>
-                  </div>
-                  <strong>{overviewActionItems.length || copy("OK", "Tamam")}</strong>
-                </div>
-                <div className="financial-action-list">
-                  {(overviewActionItems.length ? overviewActionItems : [{
-                    action: copy("Open Simulation", "Simülasyonu Aç"),
-                    detail: copy("No critical blocker is visible in the selected horizon. Use simulation to test price, demand, and cost sensitivity.", "Seçili ufukta kritik engel görünmüyor. Fiyat, talep ve maliyet hassasiyetini test etmek için simülasyonu kullanın."),
-                    path: "/simulation/current-situation",
-                    title: copy("No urgent blocker", "Acil engel yok"),
-                    tone: "teal",
-                  }]).map((item) => (
-                    <button type="button" className={`financial-action-item ${item.tone}`} onClick={() => goTo(item.path, "login")} key={item.title}>
-                      <span>{item.title}</span>
-                      <p>{item.detail}</p>
-                      <strong>{item.action}</strong>
-                    </button>
-                  ))}
-                </div>
-              </article>
-
+            <div className="financial-overview-layout financial-overview-two-up">
               <article className="financial-panel financial-flow-panel">
                 <div className="financial-panel-heading">
                   <div>
@@ -6022,36 +6014,6 @@ function App() {
                       <span>{row.label}</span>
                       <strong>{overviewIsDecisionReady ? formatLira(row.amount) : "-"}</strong>
                       <small>{row.detail}</small>
-                    </div>
-                  ))}
-                </div>
-              </article>
-            </div>
-
-            <div className="financial-overview-layout secondary">
-              <article className="financial-panel financial-timeline-panel">
-                <div className="financial-panel-heading">
-                  <div>
-                    <span>{copy("Monthly projection", "Aylık projeksiyon")}</span>
-                    <h2>{copy("Cash and profit by month", "Ay bazında nakit ve kâr")}</h2>
-                  </div>
-                  <strong>{overviewTimelineRows.length} {copy("mo", "ay")}</strong>
-                </div>
-                <div className="financial-month-table">
-                  <div className="financial-month-row financial-month-head">
-                    <span>{copy("Month", "Ay")}</span>
-                    <span>{copy("Revenue", "Ciro")}</span>
-                    <span>{copy("Cost", "Maliyet")}</span>
-                    <span>{copy("Net", "Net")}</span>
-                    <span>{copy("Cash", "Nakit")}</span>
-                  </div>
-                  {(overviewTimelineRows.length ? overviewTimelineRows : [{ period: "-", salesRevenue: 0, totalCost: 0, netIncome: 0, cashBalance: 0 }]).map((row) => (
-                    <div className={`financial-month-row ${toFiniteNumber(row.netIncome) >= 0 ? "positive" : "negative"}`} key={row.period}>
-                      <strong>{row.period === "-" ? "-" : `${row.period}. ${copy("mo", "ay")}`}</strong>
-                      <span>{overviewIsDecisionReady ? formatLira(row.salesRevenue) : "-"}</span>
-                      <span>{overviewIsDecisionReady ? formatLira(row.totalCost) : "-"}</span>
-                      <span>{overviewIsDecisionReady ? formatLira(row.netIncome) : "-"}</span>
-                      <span>{overviewIsDecisionReady ? formatLira(row.cashBalance) : "-"}</span>
                     </div>
                   ))}
                 </div>
@@ -6109,7 +6071,7 @@ function App() {
               <h1>{financialPageMeta.title}</h1>
               <p>{financialPageMeta.description}</p>
             </div>
-            <button type="button" className="primary" onClick={() => loadFinancialData()}>
+            <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
               {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
             </button>
           </div>
@@ -6811,10 +6773,10 @@ function App() {
               <p>{copy("Plan sales channels by product, monthly sales quantity, commission, campaign duration, and monthly or quarterly expectation multipliers. Financial Modelling reads these product-linked quantities directly.", "Satış kanallarını ürün, aylık satış adedi, komisyon, kampanya süresi ve aylık ya da çeyreklik beklenti çarpanlarıyla planlayın. Finansal Modelleme bu ürün bağlantılı adetleri doğrudan kullanır.")}</p>
             </div>
             <div className="sales-header-actions">
-              <button type="button" onClick={loadPlanningData} disabled={salesLoading}>
+              <button type="button" className="app-command-button" onClick={loadPlanningData} disabled={salesLoading}>
                 {copy("Refresh Data", "Verileri Yenile")}
               </button>
-              <button type="button" className="primary" onClick={handleSaveSalesStrategy} disabled={salesLoading}>
+              <button type="button" className="primary app-command-button" onClick={handleSaveSalesStrategy} disabled={salesLoading}>
                 {salesLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Strategy", "Stratejiyi Kaydet")}
               </button>
             </div>
@@ -6868,8 +6830,8 @@ function App() {
           </div>
 
           <div className="sales-grid">
-            <article className="sales-card sales-forecast-card">
-              <div className="sales-card-heading">
+            <details className="sales-card sales-forecast-card progressive-input-box">
+              <summary className="sales-card-heading progressive-section-summary">
                 <div>
                   <span className="heading-with-info">
                     {copy("Expectation multiplier period", "Beklenti çarpanı periyodu")}
@@ -6892,13 +6854,17 @@ function App() {
                       className={period === multiplierPeriod ? "active" : ""}
                       key={period}
                       type="button"
-                      onClick={() => updateSalesCompany("multiplierPeriod", period)}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        updateSalesCompany("multiplierPeriod", period);
+                      }}
                     >
                       {label}
                     </button>
                   ))}
                 </div>
-              </div>
+              </summary>
               <div className="sales-forecast-grid">
                 {multiplierInputs.map((multiplier, index) => (
                   <label key={`forecast-${index}`}>
@@ -6913,22 +6879,51 @@ function App() {
                   </label>
                 ))}
               </div>
-            </article>
+            </details>
 
-            <article className="sales-card channels-card">
-              <div className="sales-card-heading">
+            <details className="sales-card channels-card progressive-input-box">
+              <summary className="sales-card-heading progressive-section-summary">
                 <div>
                   <span>{copy("Sales channels", "Satış kanalları")}</span>
                   <h2>{copy("Product, monthly quantity and commission", "Ürün, aylık adet ve komisyon")}</h2>
                 </div>
-                <button type="button" onClick={() => addSalesItem("channels")}>{copy("Add Channel", "Kanal Ekle")}</button>
-              </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    addSalesItem("channels");
+                  }}
+                >{copy("Add Channel", "Kanal Ekle")}</button>
+              </summary>
               <div className="sales-channel-grid">
-                {salesStrategy.channels.map((channel) => (
-                  <div className="sales-edit-card" key={channel.id}>
+                {salesStrategy.channels.map((channel, index) => {
+                  const channelProduct = productMap.get(channel.productId) || channel.product || {};
+                  const channelType = salesChannelTypeOptions.find((type) => type.id === (channel.typeId || "direct"));
+
+                  return (
+                  <details className="sales-edit-card progressive-input-box sales-item-box" key={channel.id}>
+                    <summary className="sales-item-summary progressive-section-summary">
+                      <div>
+                        <span>{`${copy("Channel", "Kanal")} ${index + 1}`}</span>
+                        <strong>{channel.name?.trim() || copy("Unnamed channel", "Adsız kanal")}</strong>
+                        <small>{[channelProduct.name, channelType ? getSalesTypeLabel(channelType) : ""].filter(Boolean).join(" / ") || copy("No product selected", "Ürün seçilmedi")}</small>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={copy("Delete channel", "Kanalı sil")}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          removeSalesItem("channels", channel.id);
+                        }}
+                      >
+                        -
+                      </button>
+                    </summary>
+                    <div className="sales-item-fields">
                     <div className="sales-channel-title wide-field">
                       <label><span>{copy("Channel name", "Kanal adı")} *</span><input required value={channel.name} onChange={(event) => updateSalesItem("channels", channel.id, "name", event.target.value)} /></label>
-                      <button type="button" aria-label={copy("Delete channel", "Kanalı sil")} onClick={() => removeSalesItem("channels", channel.id)}>-</button>
                     </div>
                     <label>
                       <span>{copy("Channel type", "Kanal tipi")} *</span>
@@ -6980,7 +6975,7 @@ function App() {
                     ))}
                     <details
                       className="advanced-channel-panel wide-field"
-                      open={channel.advancedOpen ?? true}
+                      open={channel.advancedOpen ?? false}
                       onToggle={(event) => updateSalesItem("channels", channel.id, "advancedOpen", event.currentTarget.open)}
                     >
                       <summary>{copy("Advanced Channel Parameters", "Gelişmiş Kanal Parametreleri")}</summary>
@@ -7043,23 +7038,42 @@ function App() {
                         </div>
                       ) : null;
                     })()}
-                  </div>
-                ))}
+                    </div>
+                  </details>
+                  );
+                })}
               </div>
-            </article>
+            </details>
 
-            <article className="sales-card campaigns-card">
-              <div className="sales-card-heading">
+            <details className="sales-card campaigns-card progressive-input-box">
+              <summary className="sales-card-heading progressive-section-summary">
                 <div>
                   <span>{copy("Marketing campaigns", "Pazarlama kampanyaları")}</span>
                   <h2>{copy("Budget, campaign type, duration in days and target channel", "Bütçe, kampanya tipi, gün bazlı süre ve hedef kanal")}</h2>
                 </div>
-                <button type="button" onClick={() => addSalesItem("campaigns")}>{copy("Add Campaign", "Kampanya Ekle")}</button>
-              </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    addSalesItem("campaigns");
+                  }}
+                >{copy("Add Campaign", "Kampanya Ekle")}</button>
+              </summary>
               <div className="sales-table">
-                <div className="sales-table-row sales-table-head campaign-row-layout"><span>{copy("Campaign", "Kampanya")}</span><span>{copy("Type", "Tip")}</span><span>{copy("Channel", "Kanal")}</span><span>{copy("Budget", "Bütçe")}</span><span>{copy("Duration days", "Süre gün")}</span></div>
-                {salesStrategy.campaigns.map((campaign) => (
-                  <div className="sales-table-row campaign-row campaign-row-layout" key={campaign.id}>
+                {salesStrategy.campaigns.map((campaign, index) => {
+                  const selectedType = campaignTypeOptions.find((type) => type.id === (campaign.typeId || "digital"));
+
+                  return (
+                  <details className="sales-table-row campaign-row campaign-row-layout progressive-input-box sales-campaign-box" key={campaign.id}>
+                    <summary className="sales-item-summary progressive-section-summary">
+                      <div>
+                        <span>{`${copy("Campaign", "Kampanya")} ${index + 1}`}</span>
+                        <strong>{campaign.name?.trim() || copy("Unnamed campaign", "Adsız kampanya")}</strong>
+                        <small>{[selectedType ? getSalesTypeLabel(selectedType) : "", campaign.channel, formatLira(toFiniteNumber(campaign.budget))].filter(Boolean).join(" / ")}</small>
+                      </div>
+                    </summary>
+                    <div className="sales-campaign-fields campaign-row-layout">
                     <label><input value={campaign.name} onChange={(event) => updateSalesItem("campaigns", campaign.id, "name", event.target.value)} /></label>
                     <label>
                       <select value={campaign.typeId || "digital"} onChange={(event) => updateSalesItem("campaigns", campaign.id, "typeId", event.target.value)}>
@@ -7079,8 +7093,6 @@ function App() {
                     <label><input min="0" step="1000" type="number" value={campaign.budget} onChange={(event) => updateSalesItem("campaigns", campaign.id, "budget", event.target.value)} /></label>
                     <label><input min="0" step="1" type="number" value={campaign.durationDays} onChange={(event) => updateSalesItem("campaigns", campaign.id, "durationDays", event.target.value)} /></label>
                     {(() => {
-                      const selectedType = campaignTypeOptions.find((type) => type.id === (campaign.typeId || "digital"));
-
                       return selectedType ? (
                         <div className="sales-type-info campaign-type-info">
                           <span>{copy("Avg acquisition", "Ort. müşteri kazanımı")}<strong>{formatNumber(selectedType.averageCustomerAcquisitionRate, 1)}%</strong></span>
@@ -7091,25 +7103,27 @@ function App() {
                       ) : null;
                     })()}
                     <textarea value={campaign.goal} onChange={(event) => updateSalesItem("campaigns", campaign.id, "goal", event.target.value)} />
-                  </div>
-                ))}
+                    </div>
+                  </details>
+                  );
+                })}
               </div>
-            </article>
+            </details>
 
-            <article className="sales-card sales-decision-card">
-              <div className="sales-card-heading">
+            <details className="sales-card sales-decision-card progressive-input-box">
+              <summary className="sales-card-heading progressive-section-summary">
                 <div>
                   <span>{copy("Strategy readout", "Strateji okuması")}</span>
                   <h2>{copy("Manual inputs translated into decision signals", "Manuel girdilerden karar sinyalleri")}</h2>
                 </div>
-              </div>
+              </summary>
               <div className="sales-signal-grid">
                 <span>{copy("Products in channels", "Kanallardaki ürün")} <strong>{formatNumber(activeProductCount)}</strong><small>{copy("selected from Operations products", "Operations ürünlerinden seçildi")}</small></span>
                 <span>{copy("Campaign budget", "Kampanya bütçesi")} <strong>{formatLira(totalCampaignBudget)}</strong><small>{copy("total planned marketing spend", "toplam planlanan pazarlama bütçesi")}</small></span>
                 <span>{copy("Average multiplier", "Ortalama çarpan")} <strong>{formatNumber(averageMultiplier, 2)}x</strong><small>{multiplierPeriod === "quarterly" ? copy("quarterly values expanded to 12 months", "çeyrek değerleri 12 aya yayıldı") : copy("across 12 months", "12 ay genelinde")}</small></span>
                 <span>{copy("Ready remaining", "Hazır kalan")} <strong>{formatNumber(totalReadyUnits)}</strong><small>{copy("after planned channel quantities", "planlanan kanal adetlerinden sonra")}</small></span>
               </div>
-            </article>
+            </details>
           </div>
         </section>,
     );

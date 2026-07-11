@@ -5926,19 +5926,33 @@ textarea:focus-visible {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin-top: 3px;
+}
+
+.financial-hero-actions > button,
+.financial-hero-actions .financial-horizon-control {
+  border-radius: 8px;
+  min-height: 38px;
+}
+
+.financial-hero-actions > button {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  line-height: 1;
+  min-width: 116px;
 }
 
 .financial-hero-actions .primary {
   background: color-mix(in srgb, var(--hero-tone) 18%, var(--color-surface));
   border: 1px solid color-mix(in srgb, var(--hero-tone) 38%, var(--color-line));
   border-radius: 8px;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--hero-tone) 16%, transparent);
   color: var(--color-heading);
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 950;
-  min-height: 42px;
   padding: 0 14px;
 }
 
@@ -5950,12 +5964,38 @@ textarea:focus-visible {
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 950;
-  min-height: 42px;
   padding: 0 14px;
 }
 
 .financial-horizon-control {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-surface) 74%, var(--color-section));
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 20%, var(--color-line));
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
   width: max-content;
+}
+
+.financial-hero-actions .financial-horizon-control button {
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 950;
+  line-height: 1;
+  min-height: 30px;
+  padding: 0 12px;
+}
+
+.financial-hero-actions .financial-horizon-control button:first-child {
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.financial-hero-actions .financial-horizon-control button.active {
+  background: color-mix(in srgb, var(--hero-tone) 18%, var(--color-surface));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--hero-tone) 14%, transparent);
+  color: var(--color-heading);
 }
 
 .financial-decision-score {
@@ -16532,6 +16572,369 @@ textarea:focus-visible {
   transform: translateY(-1px);
 }
 
+.dashboard-shell .app-command-button {
+  align-items: center;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.2), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--overview-pink, var(--app-pink, #ff5fa2)) 88%, #ffffff), var(--overview-violet, var(--app-violet, #8057ff)) 58%, #242235) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px;
+  box-shadow:
+    0 10px 24px rgba(109, 81, 214, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  color: #ffffff !important;
+  display: inline-flex;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  text-align: center;
+  transition:
+    box-shadow 180ms ease,
+    filter 180ms ease,
+    transform 180ms ease;
+  white-space: nowrap;
+}
+
+.dashboard-shell .app-command-button:hover {
+  box-shadow:
+    0 14px 30px rgba(109, 81, 214, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
+  filter: saturate(1.04);
+  transform: translateY(-1px);
+}
+
+.dashboard-shell .app-command-button:disabled {
+  cursor: wait;
+  filter: grayscale(0.1);
+  opacity: 0.68;
+  transform: none;
+}
+
+.dashboard-shell .sales-header-actions .app-command-button {
+  flex: 0 0 148px;
+  width: 148px;
+}
+
+.dashboard-shell .info-tip button,
+.operations-workspace .info-tip button,
+.operations-workspace.operations-modern .info-tip button,
+.info-tip button {
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--color-teal) 84%, #ffffff), var(--color-cyan)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.42) !important;
+  border-radius: 999px !important;
+  box-shadow:
+    0 5px 14px rgba(10, 109, 117, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  color: #ffffff !important;
+  font-size: 0.66rem !important;
+  font-weight: 950 !important;
+  height: 16px !important;
+  line-height: 1 !important;
+  min-height: 16px !important;
+  min-width: 16px !important;
+  padding: 0 !important;
+  width: 16px !important;
+}
+
+.dashboard-shell .info-tip button:hover,
+.dashboard-shell .info-tip:focus-within button,
+.operations-workspace .info-tip button:hover,
+.operations-workspace .info-tip:focus-within button,
+.operations-workspace.operations-modern .info-tip button:hover,
+.operations-workspace.operations-modern .info-tip:focus-within button,
+.info-tip button:hover,
+.info-tip:focus-within button {
+  box-shadow:
+    0 7px 18px rgba(10, 109, 117, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.dashboard-shell .sales-command-hero .sales-readiness-list {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(16, 43, 50, 0.12);
+  box-shadow:
+    0 18px 44px rgba(16, 43, 50, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.dashboard-shell .sales-command-hero .sales-readiness-list button {
+  background: rgba(255, 255, 255, 0.84);
+  border-color: color-mix(in srgb, var(--hero-tone) 24%, rgba(16, 43, 50, 0.16));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.66);
+  color: var(--color-heading);
+  min-height: 38px;
+  padding: 7px 9px;
+}
+
+.dashboard-shell .sales-command-hero .sales-readiness-list button.done {
+  background: color-mix(in srgb, var(--hero-tone) 13%, #ffffff);
+  border-color: color-mix(in srgb, var(--hero-tone) 38%, rgba(16, 43, 50, 0.14));
+}
+
+.dashboard-shell .sales-command-hero .sales-readiness-list :is(span, strong, p, small) {
+  color: var(--color-heading);
+}
+
+.dashboard-shell .sales-command-hero .sales-readiness-list span {
+  font-size: 0.72rem;
+  font-weight: 820;
+  line-height: 1.2;
+}
+
+.dashboard-shell .sales-command-hero .sales-readiness-list strong {
+  color: var(--hero-tone);
+  font-size: 0.66rem;
+  letter-spacing: 0;
+}
+
+.dashboard-shell .sales-period-toggle {
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  border-color: color-mix(in srgb, var(--color-teal) 18%, var(--color-line));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52);
+}
+
+.dashboard-shell .sales-period-toggle button {
+  color: var(--color-heading);
+  font-size: 0.8rem;
+  font-weight: 950;
+  min-height: 34px;
+  opacity: 0.82;
+}
+
+.dashboard-shell .sales-period-toggle button.active {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-teal) 18%, #ffffff), color-mix(in srgb, var(--color-cyan) 16%, #ffffff));
+  box-shadow:
+    0 7px 18px rgba(18, 122, 132, 0.14),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-teal) 34%, var(--color-line));
+  color: var(--color-heading);
+  opacity: 1;
+}
+
+.dashboard-shell .financial-trend-card {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(47, 159, 189, 0.26), transparent 18rem),
+    radial-gradient(circle at 88% 10%, rgba(255, 90, 138, 0.18), transparent 17rem),
+    linear-gradient(135deg, #0c1420 0%, #111827 46%, #181325 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 24px 68px rgba(5, 8, 14, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  position: relative;
+}
+
+.dashboard-shell .financial-trend-card .financial-card-heading h2 {
+  color: #ffffff;
+}
+
+.dashboard-shell .financial-trend-card .chart-legend span {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.dashboard-shell .financial-trend-card .mini-tabs {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+
+.dashboard-shell .financial-trend-card .mini-tabs button {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.dashboard-shell .financial-trend-card .mini-tabs button.active {
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
+}
+
+.dashboard-shell .financial-trend-stage {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(47, 159, 189, 0.2), transparent 13rem),
+    radial-gradient(circle at 82% 14%, rgba(217, 154, 36, 0.16), transparent 12rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.035));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  margin: 0 auto;
+  max-width: 920px;
+  padding: 10px;
+  width: 100%;
+}
+
+.dashboard-shell .finance-model-chart {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  display: block;
+  height: clamp(220px, 27vw, 288px);
+  min-height: 0;
+  overflow: visible;
+  padding: 0;
+  width: 100%;
+}
+
+.dashboard-shell .finance-model-chart .chart-panel {
+  fill: rgba(255, 255, 255, 0.055);
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.dashboard-shell .finance-model-chart .chart-grid {
+  stroke: rgba(255, 255, 255, 0.09);
+  stroke-width: 1;
+}
+
+.dashboard-shell .finance-model-chart .chart-x-guide {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-dasharray: 2 10;
+}
+
+.dashboard-shell .finance-model-chart .chart-axis {
+  stroke: rgba(255, 255, 255, 0.24);
+  stroke-width: 1.2;
+}
+
+.dashboard-shell .finance-model-chart .axis-label {
+  fill: rgba(255, 255, 255, 0.64);
+  font-size: 0.62rem;
+  font-weight: 820;
+}
+
+.dashboard-shell .finance-model-chart .chart-axis-title {
+  fill: rgba(126, 222, 207, 0.82);
+  font-size: 0.58rem;
+  letter-spacing: 0;
+}
+
+.dashboard-shell .finance-model-chart .chart-tick {
+  fill: rgba(255, 255, 255, 0.58);
+  font-size: 0.55rem;
+  font-weight: 780;
+}
+
+.dashboard-shell .finance-model-chart .chart-area-fill {
+  opacity: 0;
+  transform: scaleX(0.04);
+  transform-box: fill-box;
+  transform-origin: left bottom;
+}
+
+.dashboard-shell .finance-model-chart .chart-draw-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.dashboard-shell .finance-model-chart .trend-line {
+  filter: drop-shadow(0 10px 12px rgba(8, 12, 18, 0.14));
+  stroke-width: 5.2;
+}
+
+.dashboard-shell .finance-model-chart .trend-line-glow {
+  fill: none;
+  opacity: 0.26;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 11;
+}
+
+.dashboard-shell .finance-model-chart .trend-point {
+  opacity: 0;
+  transform: scale(0.5);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.dashboard-shell .finance-model-chart .chart-badge-connector {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.dashboard-shell .finance-model-chart .chart-value-badge {
+  opacity: 0;
+}
+
+.dashboard-shell .finance-model-chart .chart-value-badge rect {
+  filter: drop-shadow(0 12px 18px rgba(8, 12, 18, 0.16));
+}
+
+.dashboard-shell .finance-model-chart .chart-value-badge text {
+  fill: rgba(255, 255, 255, 0.92);
+}
+
+.dashboard-shell .finance-model-chart .chart-value-badge-label {
+  fill: rgba(255, 255, 255, 0.66);
+}
+
+.dashboard-shell .finance-model-chart .chart-value-badge.sales rect {
+  fill: rgba(47, 159, 189, 0.22);
+  stroke: rgba(126, 222, 207, 0.42);
+}
+
+.dashboard-shell .finance-model-chart .chart-value-badge.costs rect {
+  fill: rgba(217, 154, 36, 0.22);
+  stroke: rgba(255, 197, 112, 0.42);
+}
+
+.dashboard-shell .financial-trend-stage.is-visible .chart-area-fill {
+  animation: trendAreaReveal 950ms cubic-bezier(0.2, 0.8, 0.2, 1) 260ms forwards;
+}
+
+.dashboard-shell .financial-trend-stage.is-visible .chart-draw-line {
+  animation: trendLineDraw 1250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.dashboard-shell .financial-trend-stage.is-visible .trend-point {
+  animation-name: trendPointPop;
+  animation-duration: 360ms;
+  animation-fill-mode: forwards;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.26, 1.28);
+}
+
+.dashboard-shell .financial-trend-stage.is-visible .chart-badge-connector {
+  animation: trendLineDraw 560ms ease 950ms forwards;
+}
+
+.dashboard-shell .financial-trend-stage.is-visible .chart-value-badge {
+  animation: trendBadgeIn 420ms ease 1080ms forwards;
+}
+
+@keyframes trendLineDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes trendAreaReveal {
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes trendPointPop {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes trendBadgeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-shell .financial-trend-stage :is(.chart-draw-line, .chart-area-fill, .trend-point, .chart-badge-connector, .chart-value-badge) {
+    animation: none !important;
+    opacity: 1 !important;
+    stroke-dashoffset: 0 !important;
+    transform: none !important;
+  }
+}
+
 .feasibility-dashboard .dashboard-assumption-strip {
   background:
     radial-gradient(circle at 10% 0%, rgba(37, 184, 255, 0.1), transparent 24rem),
@@ -18070,23 +18473,16 @@ textarea:focus-visible {
 }
 
 .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary::after {
-  align-items: center;
   background:
-    radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.42), transparent 1.8rem),
-    linear-gradient(135deg, var(--source-teal), var(--source-cyan));
+    linear-gradient(90deg, color-mix(in srgb, var(--source-teal) 28%, transparent), color-mix(in srgb, var(--source-cyan) 36%, transparent));
   border-radius: 999px;
-  box-shadow:
-    0 10px 22px rgba(24, 117, 101, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  color: #ffffff;
-  content: "+";
-  display: inline-flex;
-  font-size: 1.15rem;
-  font-weight: 950;
-  height: 32px;
-  justify-content: center;
-  line-height: 1;
-  width: 32px;
+  content: "";
+  display: block;
+  height: 5px;
+  transition:
+    background 180ms ease,
+    width 180ms ease;
+  width: 44px;
 }
 
 .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] > .process-accordion-summary {
@@ -18094,7 +18490,9 @@ textarea:focus-visible {
 }
 
 .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] > .process-accordion-summary::after {
-  content: "-";
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--source-teal) 44%, transparent), color-mix(in srgb, var(--source-cyan) 52%, transparent));
+  width: 66px;
 }
 
 .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary > div {
@@ -20249,6 +20647,595 @@ textarea:focus-visible {
   }
 }
 
+.dashboard-shell .progressive-input-box {
+  overflow: hidden;
+}
+
+.dashboard-shell .progressive-section-summary {
+  cursor: pointer;
+  list-style: none;
+  outline: none;
+  padding-bottom: 17px;
+  position: relative;
+  user-select: none;
+}
+
+.dashboard-shell .progressive-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.dashboard-shell .progressive-section-summary::after {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-teal) 20%, transparent), color-mix(in srgb, var(--color-cyan) 28%, transparent));
+  border: 0;
+  border-radius: 999px;
+  bottom: 3px;
+  content: "";
+  display: block;
+  height: 4px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  transition:
+    background 180ms ease,
+    opacity 180ms ease,
+    width 180ms ease;
+  width: 42px;
+}
+
+.dashboard-shell .progressive-input-box[open] > .progressive-section-summary::after {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-teal) 38%, transparent), color-mix(in srgb, var(--color-cyan) 44%, transparent));
+  opacity: 0.9;
+  width: 64px;
+}
+
+.dashboard-shell .progressive-section-summary:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-cyan) 22%, transparent);
+}
+
+.dashboard-shell .financial-input-section.progressive-input-box:not([open]),
+.dashboard-shell .sales-card.progressive-input-box:not([open]),
+.dashboard-shell .financial-loan-card.progressive-input-box:not([open]) {
+  gap: 0;
+}
+
+.dashboard-shell .financial-input-section.progressive-input-box:not([open]),
+.dashboard-shell .sales-card.progressive-input-box:not([open]) {
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+}
+
+.dashboard-shell .financial-input-section.progressive-input-box > .financial-input-section-heading,
+.dashboard-shell .sales-card.progressive-input-box > .sales-card-heading,
+.dashboard-shell .financial-loan-card.progressive-input-box > .financial-loan-card-heading {
+  margin: 0;
+}
+
+.dashboard-shell .financial-input-section.progressive-input-box[open] > .financial-input-section-heading,
+.dashboard-shell .sales-card.progressive-input-box[open] > .sales-card-heading,
+.dashboard-shell .financial-loan-card.progressive-input-box[open] > .financial-loan-card-heading {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-line) 72%, transparent);
+  padding-bottom: 10px;
+}
+
+.dashboard-shell .financial-loan-card.financial-loan-record-box {
+  box-shadow: none;
+}
+
+.dashboard-shell .financial-loan-card.financial-loan-record-box:not([open]) {
+  padding-bottom: 14px;
+}
+
+.dashboard-shell .sales-card.progressive-input-box > .sales-card-heading button,
+.dashboard-shell .financial-input-section.progressive-input-box > .financial-input-section-heading button,
+.dashboard-shell .financial-loan-card.progressive-input-box > .financial-loan-card-heading button {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-shell .sales-item-box {
+  grid-template-columns: 1fr;
+}
+
+.dashboard-shell .sales-item-summary {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.dashboard-shell .sales-item-summary div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dashboard-shell .sales-item-summary span {
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .sales-item-summary strong {
+  color: var(--color-heading);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell .sales-item-summary small {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell .sales-item-summary button {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-clay) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-clay) 22%, transparent);
+  border-radius: 999px;
+  color: var(--color-clay);
+  display: inline-grid;
+  flex: 0 0 auto;
+  font-size: 1rem;
+  font-weight: 900;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  position: relative;
+  width: 34px;
+  z-index: 1;
+}
+
+.dashboard-shell .sales-item-fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-shell .sales-edit-card.progressive-input-box[open] > .sales-item-summary,
+.dashboard-shell .sales-campaign-box.progressive-input-box[open] > .sales-item-summary {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-line) 72%, transparent);
+  padding-bottom: 10px;
+}
+
+.dashboard-shell .sales-campaign-box {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-width: 820px;
+}
+
+.dashboard-shell .sales-campaign-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-shell .sales-campaign-fields textarea {
+  grid-column: 1 / -1;
+}
+
+/* Final projection chart contrast override. */
+.dashboard-shell .financial-workspace .financial-trend-card {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(47, 159, 189, 0.34), transparent 18rem),
+    radial-gradient(circle at 86% 10%, rgba(124, 92, 255, 0.24), transparent 16rem),
+    radial-gradient(circle at 58% 92%, rgba(255, 90, 138, 0.14), transparent 18rem),
+    linear-gradient(135deg, #060914 0%, #0a1020 48%, #150d22 100%) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    0 28px 78px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.dashboard-shell .financial-workspace .financial-trend-stage {
+  background:
+    linear-gradient(135deg, rgba(47, 159, 189, 0.46), rgba(124, 92, 255, 0.28) 46%, rgba(255, 90, 138, 0.3)) !important;
+  border: 0 !important;
+  padding: 3px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 46px rgba(0, 0, 0, 0.22) !important;
+}
+
+.dashboard-shell .financial-workspace .financial-trend-stage .finance-model-chart {
+  background: #000000 !important;
+  border-radius: 6px;
+}
+
+.dashboard-shell .financial-workspace .finance-model-chart .chart-panel {
+  fill: #000000 !important;
+  stroke: rgba(255, 255, 255, 0.14) !important;
+}
+
+.dashboard-shell .financial-workspace .finance-model-chart .chart-grid,
+.dashboard-shell .financial-workspace .finance-model-chart .chart-x-guide {
+  stroke: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dashboard-shell .financial-workspace .finance-model-chart .chart-axis {
+  stroke: rgba(255, 255, 255, 0.3) !important;
+}
+
+.dashboard-shell .financial-workspace .finance-model-chart :is(.axis-label, .chart-tick) {
+  fill: rgba(255, 255, 255, 0.68) !important;
+}
+
+.dashboard-shell .financial-workspace .finance-model-chart .chart-axis-title {
+  fill: rgba(126, 222, 207, 0.9) !important;
+}
+
+/* Financial statement: compact market-table treatment. */
+.dashboard-shell .financial-workspace .income-card {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  box-shadow:
+    0 18px 48px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+.dashboard-shell .financial-workspace .income-card .financial-card-heading {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  padding-bottom: 12px;
+}
+
+.dashboard-shell .financial-workspace .income-card .financial-card-heading h2 {
+  color: #0f172a;
+  font-size: 1.08rem;
+}
+
+.dashboard-shell .financial-workspace .financial-row-count {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+  font-size: 0.7rem;
+  padding: 4px 9px;
+}
+
+.dashboard-shell .financial-workspace .financial-statement {
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-head {
+  align-items: center;
+  background: #f8fafc;
+  border-bottom: 1px solid #dbe3ee;
+  color: #64748b;
+  display: grid;
+  font-size: 0.68rem;
+  font-weight: 900;
+  grid-template-columns: minmax(260px, 1.4fr) minmax(150px, 0.58fr) minmax(150px, 0.58fr);
+  letter-spacing: 0.04em;
+  min-height: 34px;
+  padding: 0 14px;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-head span:last-child {
+  text-align: right;
+}
+
+.dashboard-shell .financial-workspace .financial-row-group {
+  background: #ffffff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: visible;
+}
+
+.dashboard-shell .financial-workspace .financial-row-group + .financial-row-group {
+  border-top: 1px solid #cbd5e1 !important;
+}
+
+.dashboard-shell .financial-workspace .financial-row-group header {
+  background:
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+  border-left: 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.84);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(260px, 1.4fr) minmax(150px, 0.58fr) minmax(150px, 0.58fr);
+  min-height: 42px;
+  padding: 8px 14px;
+}
+
+.dashboard-shell .financial-workspace .financial-row-group header div {
+  gap: 2px;
+}
+
+.dashboard-shell .financial-workspace .financial-row-group header span {
+  color: #0f172a !important;
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.dashboard-shell .financial-workspace .financial-row-group header p {
+  color: #64748b !important;
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.dashboard-shell .financial-workspace .financial-row-group header strong {
+  align-self: center;
+  color: #0f172a !important;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  grid-column: 3;
+  justify-self: end;
+  text-align: right;
+}
+
+.dashboard-shell .financial-workspace .financial-row-group header::before {
+  align-self: center;
+  background: color-mix(in srgb, var(--group-tone) 12%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--group-tone) 28%, #dbe3ee);
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--group-tone) 72%, #0f172a);
+  content: "Subtotal";
+  font-size: 0.66rem;
+  font-weight: 900;
+  grid-column: 2;
+  justify-self: start;
+  padding: 4px 8px;
+  text-transform: uppercase;
+}
+
+:root[lang="tr"] .dashboard-shell .financial-workspace .financial-row-group header::before {
+  content: "Ara toplam";
+}
+
+.dashboard-shell .financial-workspace .financial-row-subgroup {
+  display: grid;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-row {
+  background: #ffffff;
+  border-top: 1px solid #eef2f7;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(260px, 1.4fr) minmax(150px, 0.58fr) minmax(150px, 0.58fr);
+  min-height: 40px;
+  padding: 7px 14px;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-row:nth-child(even) {
+  background: #fbfdff;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-row:hover {
+  background: #f8fafc;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-row div {
+  gap: 1px;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-row strong {
+  color: #0f172a !important;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-row small {
+  color: #64748b !important;
+  font-size: 0.66rem;
+  font-weight: 720;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-row span {
+  align-self: center;
+  background: transparent !important;
+  border: 0 !important;
+  color: #64748b !important;
+  font-size: 0.7rem;
+  font-weight: 760;
+  justify-self: start;
+  padding: 0;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-row b {
+  align-self: center;
+  color: #0f172a !important;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  justify-self: end;
+  text-align: right;
+}
+
+/* Financial statement: four-period projection view. */
+.dashboard-shell .financial-workspace .financial-statement-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-toggle {
+  align-items: center;
+  background: #e8edf5;
+  border: 1px solid #d3dce8;
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-toggle button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 850;
+  min-height: 28px;
+  padding: 0 10px;
+  transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.dashboard-shell .financial-workspace .financial-statement-toggle button.active {
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-statement {
+  border-color: #cfd8e6;
+  overflow: hidden;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-scroll {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-row {
+  align-items: stretch;
+  display: grid;
+  min-width: 780px;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-head {
+  background: #f8fafc;
+  border-bottom: 1px solid #dbe3ee;
+  color: #64748b;
+  min-height: 44px;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-head > span {
+  align-items: center;
+  border-left: 1px solid #e5ebf3;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.66rem;
+  font-weight: 900;
+  justify-content: center;
+  min-width: 0;
+  padding: 7px 10px;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-head > span:first-child {
+  align-items: flex-start;
+  border-left: 0;
+  color: #475569;
+  text-align: left;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-head strong {
+  color: #0f172a;
+  font-size: 0.76rem;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-head small {
+  color: #94a3b8;
+  font-size: 0.61rem;
+  font-weight: 800;
+  margin-top: 1px;
+  text-transform: none;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-section {
+  background: #eef3f9;
+  border-bottom: 1px solid #dbe3ee;
+  border-top: 1px solid #dbe3ee;
+  min-height: 34px;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-section strong {
+  align-items: center;
+  color: #0f172a;
+  display: flex;
+  font-size: 0.74rem;
+  font-weight: 950;
+  padding: 8px 12px;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line {
+  background: #ffffff;
+  border-bottom: 1px solid #edf1f7;
+  min-height: 44px;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line:nth-child(even) {
+  background: #fbfdff;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line:hover {
+  background: #f8fafc;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line > div {
+  align-self: center;
+  border-right: 1px solid #edf1f7;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 8px 12px;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line strong {
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 880;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line small {
+  color: #64748b;
+  font-size: 0.64rem;
+  font-weight: 720;
+  line-height: 1.2;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line b {
+  align-items: center;
+  border-left: 1px solid #edf1f7;
+  color: #0f172a;
+  display: flex;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 820;
+  justify-content: flex-end;
+  min-width: 0;
+  padding: 8px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line.emphasis b,
+.dashboard-shell .financial-workspace .financial-projection-line.emphasis strong {
+  font-weight: 950;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line b.income,
+.dashboard-shell .financial-workspace .financial-projection-line b.positive {
+  color: #047857;
+}
+
+.dashboard-shell .financial-workspace .financial-projection-line b.cost,
+.dashboard-shell .financial-workspace .financial-projection-line b.tax,
+.dashboard-shell .financial-workspace .financial-projection-line b.negative {
+  color: #b91c1c;
+}
+
+.dashboard-shell .financial-workspace .financial-overview-two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.dashboard-shell .financial-workspace .financial-overview-two-up > .financial-panel {
+  min-width: 0;
+}
+
 @media (max-width: 780px) {
   .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-gate.open,
   .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-controls,
@@ -20281,4 +21268,129 @@ textarea:focus-visible {
     grid-column: 1 / -1;
     justify-self: stretch;
   }
+
+  .dashboard-shell .financial-workspace .financial-overview-two-up {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Final override: decision summary action controls must render as one visual family. */
+.dashboard-shell .financial-workspace .financial-decision-hero .financial-hero-actions {
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.dashboard-shell .financial-workspace .financial-decision-hero .financial-hero-actions > button,
+.dashboard-shell .financial-workspace .financial-decision-hero .financial-hero-actions .financial-horizon-control {
+  border-radius: 8px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+}
+
+.dashboard-shell .financial-workspace .financial-decision-hero .financial-hero-actions > button {
+  align-items: center !important;
+  display: inline-flex !important;
+  font-size: 0.76rem !important;
+  font-weight: 950 !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  min-width: 118px !important;
+  padding: 0 14px !important;
+}
+
+.dashboard-shell .financial-workspace .financial-decision-hero .financial-hero-actions .primary {
+  background: color-mix(in srgb, var(--hero-tone) 18%, var(--color-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 38%, var(--color-line)) !important;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--hero-tone) 16%, transparent) !important;
+  color: var(--color-heading) !important;
+}
+
+.dashboard-shell .financial-workspace .financial-decision-hero .financial-hero-actions .secondary {
+  background: color-mix(in srgb, var(--color-surface) 78%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 24%, var(--color-line)) !important;
+  box-shadow: none !important;
+  color: var(--color-heading) !important;
+}
+
+.dashboard-shell .financial-workspace .financial-decision-hero .financial-hero-actions .financial-horizon-control {
+  align-items: center !important;
+  background: color-mix(in srgb, var(--color-surface) 74%, var(--color-section)) !important;
+  border: 1px solid color-mix(in srgb, var(--hero-tone) 20%, var(--color-line)) !important;
+  display: inline-flex !important;
+  gap: 2px !important;
+  padding: 3px !important;
+  width: max-content !important;
+}
+
+.dashboard-shell .financial-workspace .financial-decision-hero .financial-hero-actions .financial-horizon-control button {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  color: var(--color-muted) !important;
+  font-size: 0.76rem !important;
+  font-weight: 950 !important;
+  height: 30px !important;
+  line-height: 1 !important;
+  min-height: 30px !important;
+  padding: 0 12px !important;
+}
+
+.dashboard-shell .financial-workspace .financial-decision-hero .financial-hero-actions .financial-horizon-control button.active {
+  background: color-mix(in srgb, var(--hero-tone) 18%, var(--color-surface)) !important;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--hero-tone) 14%, transparent) !important;
+  color: var(--color-heading) !important;
+}
+
+/* Compact loan payment calendar so more months fit in one view. */
+.dashboard-shell .financial-workspace .financial-loan-calendar-section {
+  gap: 10px;
+}
+
+.dashboard-shell .financial-workspace .financial-loan-calendar-scroll {
+  border-radius: 7px;
+}
+
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid {
+  font-size: 0.72rem;
+}
+
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-cell {
+  min-height: 34px !important;
+  padding: 4px 5px !important;
+}
+
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-corner,
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-month {
+  min-height: 28px !important;
+}
+
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-month strong,
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-total-label strong,
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-loan strong {
+  font-size: 0.62rem !important;
+  line-height: 1.05 !important;
+}
+
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-loan span,
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-total span {
+  font-size: 0.56rem !important;
+  line-height: 1.1 !important;
+}
+
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-payment {
+  border-left-width: 3px !important;
+  border-radius: 5px !important;
+  box-shadow: none !important;
+  gap: 0 !important;
+  min-height: 28px !important;
+  padding: 4px 5px !important;
+}
+
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-payment strong {
+  font-size: 0.58rem !important;
+  line-height: 1.05 !important;
+}
+
+.dashboard-shell .financial-workspace .financial-loan-calendar-grid .loan-calendar-payment span {
+  display: none !important;
 }
