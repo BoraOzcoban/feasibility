@@ -18313,3 +18313,1972 @@ textarea:focus-visible {
     grid-column: 1 / -1;
   }
 }
+
+/* Gamified Process Definition pass: mission cards without adding visual complexity. */
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page {
+  --game-ink: #10202a;
+  --game-muted: #5f706c;
+  --game-teal: #187565;
+  --game-cyan: #2f9fbd;
+  --game-gold: #d99a24;
+  --game-line: rgba(16, 43, 50, 0.12);
+  --game-panel: #f6fbf8;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-input-card {
+  counter-reset: process-quest;
+  background:
+    linear-gradient(rgba(24, 117, 101, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 159, 189, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, #ffffff 0%, #f3faf7 100%) !important;
+  background-size: 30px 30px, 30px 30px, auto !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.075) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(135deg, #071418 0%, #102b32 56%, #155b5a 100%) !important;
+  background-size: 26px 26px, 26px 26px, auto !important;
+  overflow: hidden;
+  position: relative;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading::after {
+  background: linear-gradient(90deg, var(--game-cyan), var(--game-teal), var(--game-gold));
+  bottom: 0;
+  content: "";
+  height: 4px;
+  left: 18px;
+  position: absolute;
+  right: 18px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading .process-planner-intro {
+  color: #dcefeb !important;
+  font-size: 0.92rem;
+  font-weight: 760;
+  line-height: 1.55;
+  margin: 8px 0 0;
+  max-width: 620px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f7fcf9 100%) !important;
+  border-color: rgba(24, 117, 101, 0.18) !important;
+  box-shadow:
+    0 12px 28px rgba(16, 43, 50, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  min-height: 112px;
+  position: relative;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article::after {
+  background: linear-gradient(90deg, rgba(24, 117, 101, 0.12), rgba(47, 159, 189, 0.14));
+  border-radius: 999px;
+  bottom: 12px;
+  content: "";
+  height: 5px;
+  left: 14px;
+  position: absolute;
+  right: 14px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article:nth-child(3)::after {
+  background: linear-gradient(90deg, rgba(217, 154, 36, 0.22), rgba(47, 159, 189, 0.14));
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-core-fields {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 251, 248, 0.98)) !important;
+  gap: 12px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-core-fields > label {
+  background: #ffffff !important;
+  border: 1px solid rgba(24, 117, 101, 0.16) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 24px rgba(16, 43, 50, 0.045) !important;
+  padding: 12px !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-core-fields > label:focus-within {
+  border-color: rgba(47, 159, 189, 0.46) !important;
+  box-shadow: 0 12px 30px rgba(47, 159, 189, 0.11) !important;
+  transform: translateY(-1px);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner :is(input, select) {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f7fbf9 100%) !important;
+  border: 1px solid rgba(16, 43, 50, 0.14) !important;
+  border-radius: 8px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fcfa 100%) !important;
+  border-color: rgba(24, 117, 101, 0.18) !important;
+  box-shadow:
+    0 10px 26px rgba(16, 43, 50, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+  grid-template-columns: minmax(0, 1fr) auto 34px;
+  min-height: 82px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary::after {
+  background:
+    linear-gradient(135deg, var(--game-teal), var(--game-cyan)) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion:not([open]) .process-accordion-summary {
+  background:
+    linear-gradient(135deg, #ffffff 0%, #f2faf7 100%) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] .process-accordion-summary {
+  background:
+    linear-gradient(135deg, #f8fffc 0%, #eaf8f4 100%) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary p {
+  max-width: 760px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary small {
+  background:
+    linear-gradient(180deg, #f0fbf7 0%, #e0f5ef 100%) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner :is(
+  .process-default-button,
+  .process-section-actions button,
+  .planner-save-button
+) {
+  background:
+    linear-gradient(135deg, #155b5a 0%, #2f9fbd 52%, #187565 100%) !important;
+  box-shadow:
+    0 14px 30px rgba(24, 117, 101, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-save-button {
+  background:
+    linear-gradient(135deg, #102b32 0%, #187565 48%, #d99a24 100%) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f9fdfb 100%) !important;
+  box-shadow:
+    0 10px 24px rgba(16, 43, 50, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-detail .process-accordion-body > span {
+  align-items: center;
+  min-height: 50px;
+}
+
+@media (max-width: 980px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+    grid-template-columns: 48px minmax(0, 1fr) 34px;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary small {
+    grid-column: 2 / -1;
+  }
+}
+
+/* Process Definition readability/spaciousness corrections. */
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner {
+  gap: 24px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-input-card,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card {
+  gap: 22px !important;
+  padding: 24px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview {
+  gap: 16px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article {
+  padding: 18px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-core-fields {
+  gap: 16px !important;
+  padding: 18px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+  grid-template-columns: minmax(0, 1fr) auto 36px !important;
+  min-height: 96px;
+  padding: 22px 24px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary::before {
+  content: none !important;
+  display: none !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-body {
+  gap: 18px !important;
+  padding: 22px 24px 24px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-list {
+  gap: 16px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid {
+  gap: 16px !important;
+  padding: 18px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .result-metric-label,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .result-metric-label .label-with-info,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .process-accordion-summary span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .process-accordion-summary p,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .process-result-detail .process-accordion-body > span {
+  color: var(--source-muted) !important;
+  -webkit-text-fill-color: var(--source-muted) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .process-accordion-summary span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .result-metric-card strong,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .process-result-detail .process-accordion-body > span strong {
+  color: var(--source-ink) !important;
+  -webkit-text-fill-color: var(--source-ink) !important;
+}
+
+@media (max-width: 980px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+    grid-template-columns: minmax(0, 1fr) 36px !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary small {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+/* Process Definition polish: clearer sections, table results, calmer actions. */
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-section-header > div {
+  padding-left: 0 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-section-header > div::before,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-input-card > .resource-section .resource-section-header > div::before {
+  content: none !important;
+  display: none !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion {
+  margin-block: 4px 18px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+  border-bottom: 0 !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  padding-bottom: 28px !important;
+  position: relative;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary::after {
+  background:
+    linear-gradient(90deg, rgba(24, 117, 101, 0.3), rgba(47, 159, 189, 0.4)) !important;
+  border-radius: 999px !important;
+  bottom: 12px;
+  box-shadow: none !important;
+  color: transparent !important;
+  content: "" !important;
+  height: 5px !important;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 46px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] > .process-accordion-summary::after {
+  background:
+    linear-gradient(90deg, rgba(217, 154, 36, 0.38), rgba(47, 159, 189, 0.44)) !important;
+  content: "" !important;
+  width: 72px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] > .process-accordion-summary {
+  border-bottom: 1px solid rgba(16, 43, 50, 0.1) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-default-button {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)) !important;
+  border: 1px solid rgba(167, 240, 224, 0.32) !important;
+  box-shadow:
+    0 12px 28px rgba(7, 20, 24, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  color: #f7fffc !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-default-button:hover {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.12)) !important;
+  border-color: rgba(167, 240, 224, 0.5) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-save-button {
+  background:
+    linear-gradient(135deg, #0f5f55 0%, #2f9fbd 64%, #187565 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 18px 42px rgba(24, 117, 101, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  justify-self: stretch !important;
+  max-width: 520px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-remove-button {
+  background: #fff7f4 !important;
+  border: 1px solid rgba(157, 91, 63, 0.24) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #8a4631 !important;
+  font-weight: 950 !important;
+  min-height: 42px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-remove-button:hover {
+  background: #ffece4 !important;
+  border-color: rgba(157, 91, 63, 0.38) !important;
+  box-shadow: 0 10px 22px rgba(157, 91, 63, 0.12) !important;
+  transform: translateY(-1px);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card :is(
+  .planner-summary-grid,
+  .allocation-grid,
+  .cost-breakdown
+) {
+  background: #ffffff !important;
+  border: 1px solid rgba(16, 43, 50, 0.12) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 14px 34px rgba(16, 43, 50, 0.06) !important;
+  display: grid !important;
+  gap: 0 !important;
+  grid-template-columns: 1fr !important;
+  overflow: hidden;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card :is(
+  .planner-summary-grid,
+  .allocation-grid,
+  .cost-breakdown
+)::before {
+  background:
+    linear-gradient(135deg, #071418 0%, #102b32 100%);
+  border-bottom: 1px solid rgba(126, 222, 207, 0.22);
+  color: rgba(255, 255, 255, 0.82);
+  content: "Metrik      Deger";
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 950;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 0.8fr);
+  letter-spacing: 0.08em;
+  padding: 11px 14px;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card :is(
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card
+) {
+  align-items: center !important;
+  background: #ffffff !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(16, 43, 50, 0.09) !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  display: grid !important;
+  gap: 14px !important;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 0.8fr);
+  min-height: 54px !important;
+  padding: 12px 14px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card :is(
+  .planner-summary-grid > .result-metric-card,
+  .allocation-grid > .result-metric-card,
+  .cost-breakdown > .result-metric-card
+):nth-child(even) {
+  background: #f7fbf9 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card :is(
+  .planner-summary-grid > .result-metric-card:last-child,
+  .allocation-grid > .result-metric-card:last-child,
+  .cost-breakdown > .result-metric-card:last-child
+) {
+  border-bottom: 0 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .result-metric-label {
+  align-items: center;
+  color: #445650 !important;
+  display: inline-flex;
+  font-size: 0.86rem !important;
+  font-weight: 900 !important;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .result-metric-card strong {
+  color: #10202a !important;
+  font-size: 0.95rem !important;
+  justify-self: end;
+  line-height: 1.25;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card :is(
+    .planner-summary-grid,
+    .allocation-grid,
+    .cost-breakdown
+  )::before,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card :is(
+    .planner-summary-grid > .result-metric-card,
+    .allocation-grid > .result-metric-card,
+    .cost-breakdown > .result-metric-card
+  ) {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card .result-metric-card strong {
+    justify-self: start;
+    text-align: left;
+  }
+}
+
+/* Process Definition final rebuild. */
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page {
+  --process-ink: #10202a;
+  --process-muted: #4f625c;
+  --process-soft: #f5faf7;
+  --process-soft-2: #edf7f3;
+  --process-line: rgba(16, 43, 50, 0.13);
+  --process-teal: #187565;
+  --process-teal-dark: #0f5f55;
+  --process-cyan: #2f9fbd;
+  --process-gold: #d99a24;
+  --process-danger: #9d4f38;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner {
+  align-items: start !important;
+  display: grid !important;
+  gap: 28px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-input-card,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card {
+  background:
+    linear-gradient(rgba(24, 117, 101, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 159, 189, 0.03) 1px, transparent 1px),
+    linear-gradient(180deg, #ffffff 0%, #f6fbf8 100%) !important;
+  background-size: 34px 34px, 34px 34px, auto !important;
+  border: 1px solid rgba(24, 117, 101, 0.22) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 24px 70px rgba(7, 21, 32, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
+  color: var(--process-ink) !important;
+  display: grid !important;
+  gap: 24px !important;
+  overflow: visible !important;
+  padding: 26px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card > .operation-card-heading {
+  align-items: center !important;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    radial-gradient(circle at 92% 12%, rgba(47, 159, 189, 0.34), transparent 15rem),
+    linear-gradient(135deg, #071418 0%, #102b32 58%, #155b5a 100%) !important;
+  background-size: 28px 28px, 28px 28px, auto, auto !important;
+  border: 1px solid rgba(126, 222, 207, 0.22) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 20px 48px rgba(7, 20, 24, 0.18) !important;
+  display: grid !important;
+  gap: 16px !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  overflow: hidden !important;
+  padding: 20px !important;
+  position: relative;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading::after,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card > .operation-card-heading::after {
+  background: linear-gradient(90deg, var(--process-cyan), var(--process-teal), var(--process-gold));
+  bottom: 0;
+  content: "";
+  height: 4px;
+  left: 20px;
+  position: absolute;
+  right: 20px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading > div,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card > .operation-card-heading > div {
+  min-width: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card > .operation-card-heading span {
+  color: #a7f0e0 !important;
+  -webkit-text-fill-color: #a7f0e0 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading h2,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card > .operation-card-heading h2 {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading .process-planner-intro {
+  color: #d9ece8 !important;
+  -webkit-text-fill-color: #d9ece8 !important;
+  font-size: 0.94rem;
+  font-weight: 780;
+  line-height: 1.55;
+  margin: 8px 0 0;
+  max-width: 720px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-default-button {
+  background:
+    radial-gradient(circle at 85% 0%, rgba(255, 255, 255, 0.25), transparent 5.8rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(167, 240, 224, 0.1)) !important;
+  border: 1px solid rgba(167, 240, 224, 0.38) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 14px 32px rgba(7, 20, 24, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+  color: #f7fffc !important;
+  min-height: 44px !important;
+  padding: 0 18px !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, filter 160ms ease !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-default-button:hover {
+  border-color: rgba(167, 240, 224, 0.6) !important;
+  box-shadow:
+    0 18px 38px rgba(7, 20, 24, 0.22),
+    0 0 0 4px rgba(167, 240, 224, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+  filter: saturate(1.08);
+  transform: translateY(-1px);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview {
+  display: grid !important;
+  gap: 18px !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f5fbf8 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.18) !important;
+  border-left: 5px solid var(--process-teal) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 14px 32px rgba(16, 43, 50, 0.065),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  display: grid;
+  gap: 7px;
+  min-height: 118px;
+  min-width: 0;
+  padding: 18px !important;
+  position: relative;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article:nth-child(2) {
+  border-left-color: var(--process-cyan) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article:nth-child(3) {
+  border-left-color: var(--process-gold) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article::after {
+  background: linear-gradient(90deg, rgba(24, 117, 101, 0.14), rgba(47, 159, 189, 0.15));
+  border-radius: 999px;
+  bottom: 14px;
+  content: "";
+  height: 5px;
+  left: 18px;
+  position: absolute;
+  right: 18px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview article:nth-child(3)::after {
+  background: linear-gradient(90deg, rgba(217, 154, 36, 0.24), rgba(47, 159, 189, 0.12));
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview small {
+  color: var(--process-muted) !important;
+  -webkit-text-fill-color: var(--process-muted) !important;
+  font-weight: 850 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview strong {
+  color: var(--process-ink) !important;
+  -webkit-text-fill-color: var(--process-ink) !important;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-core-fields {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 251, 248, 0.98)) !important;
+  border: 1px solid var(--process-line) !important;
+  border-radius: 8px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  gap: 16px !important;
+  padding: 18px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-core-fields > label,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid {
+  background: #ffffff !important;
+  border: 1px solid rgba(24, 117, 101, 0.16) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 10px 26px rgba(16, 43, 50, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-core-fields > label {
+  padding: 13px !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-core-fields > label:focus-within,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid:focus-within {
+  border-color: rgba(47, 159, 189, 0.46) !important;
+  box-shadow:
+    0 14px 34px rgba(47, 159, 189, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-section-header > div,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-accordion-summary > div {
+  padding-left: 0 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-section-header > div::before,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-input-card > .resource-section .resource-section-header > div::before,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-accordion-summary::before {
+  content: none !important;
+  display: none !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fcfa 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.2) !important;
+  border-left: 6px solid var(--process-teal) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 14px 34px rgba(16, 43, 50, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion + .process-accordion {
+  margin-top: 18px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-costs,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-workforce {
+  border-left-color: var(--process-cyan) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-machines,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-materials {
+  border-left-color: var(--process-gold) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] {
+  box-shadow:
+    0 22px 58px rgba(16, 43, 50, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+  align-items: center !important;
+  background:
+    linear-gradient(135deg, #ffffff 0%, #f1faf6 100%) !important;
+  border: 0 !important;
+  cursor: pointer;
+  display: grid !important;
+  gap: 16px !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  list-style: none !important;
+  min-height: 104px !important;
+  padding: 24px 24px 32px !important;
+  position: relative;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary::-webkit-details-marker {
+  display: none;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary::after {
+  background:
+    linear-gradient(90deg, rgba(24, 117, 101, 0.3), rgba(47, 159, 189, 0.42)) !important;
+  border-radius: 999px !important;
+  bottom: 14px !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  content: "" !important;
+  display: block !important;
+  height: 5px !important;
+  left: 50% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  position: absolute !important;
+  transform: translateX(-50%) !important;
+  width: 52px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] > .process-accordion-summary {
+  background:
+    linear-gradient(135deg, #f8fffc 0%, #eaf8f4 100%) !important;
+  border-bottom: 1px solid rgba(16, 43, 50, 0.1) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion[open] > .process-accordion-summary::after {
+  background:
+    linear-gradient(90deg, rgba(217, 154, 36, 0.42), rgba(47, 159, 189, 0.48)) !important;
+  content: "" !important;
+  width: 82px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary span {
+  color: var(--process-teal-dark) !important;
+  -webkit-text-fill-color: var(--process-teal-dark) !important;
+  font-size: 0.84rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary p {
+  color: var(--process-muted) !important;
+  -webkit-text-fill-color: var(--process-muted) !important;
+  font-size: 0.95rem !important;
+  font-weight: 780 !important;
+  line-height: 1.55 !important;
+  margin: 0 !important;
+  max-width: 820px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary small {
+  background:
+    linear-gradient(180deg, #f0fbf7 0%, #e2f5ef 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.16) !important;
+  border-radius: 999px !important;
+  color: var(--process-teal-dark) !important;
+  -webkit-text-fill-color: var(--process-teal-dark) !important;
+  font-size: 0.76rem !important;
+  font-weight: 950 !important;
+  justify-self: end;
+  padding: 8px 12px !important;
+  white-space: nowrap;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-body {
+  background:
+    linear-gradient(180deg, rgba(248, 252, 250, 0.8) 0%, rgba(255, 255, 255, 0.96) 100%) !important;
+  display: grid;
+  gap: 18px !important;
+  padding: 22px 24px 24px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-section-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-section-actions button,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-save-button {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(255, 255, 255, 0.32), transparent 6.5rem),
+    linear-gradient(135deg, var(--process-teal-dark) 0%, var(--process-cyan) 58%, var(--process-teal) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 16px 34px rgba(24, 117, 101, 0.22),
+    0 8px 18px rgba(47, 159, 189, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
+  color: #ffffff !important;
+  font-weight: 950 !important;
+  min-height: 44px !important;
+  padding: 0 18px !important;
+  text-shadow: 0 1px 12px rgba(6, 18, 22, 0.18);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, filter 160ms ease !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-section-actions button:hover,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-save-button:hover {
+  border-color: rgba(255, 255, 255, 0.48) !important;
+  box-shadow:
+    0 20px 44px rgba(24, 117, 101, 0.28),
+    0 10px 22px rgba(47, 159, 189, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36) !important;
+  filter: saturate(1.08);
+  transform: translateY(-1px);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-save-button {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(255, 255, 255, 0.3), transparent 7rem),
+    linear-gradient(135deg, #0c4e49 0%, var(--process-teal) 52%, var(--process-gold) 100%) !important;
+  justify-self: start !important;
+  min-height: 52px !important;
+  padding: 0 24px !important;
+  width: min(100%, 520px);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-list {
+  display: grid !important;
+  gap: 16px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid {
+  align-items: end !important;
+  gap: 16px !important;
+  padding: 18px !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .operation-plan-row,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .machine-plan-row,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .workforce-plan-row,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .material-plan-row {
+  border-left: 5px solid rgba(24, 117, 101, 0.76) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid:nth-child(2n) {
+  border-left-color: rgba(47, 159, 189, 0.72) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-row-grid label,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-fields label {
+  color: var(--process-muted) !important;
+  -webkit-text-fill-color: var(--process-muted) !important;
+  font-weight: 850 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner :is(input, select) {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fcfa 100%) !important;
+  border: 1px solid rgba(16, 43, 50, 0.15) !important;
+  border-radius: 8px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  color: var(--process-ink) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner :is(input, select):focus {
+  border-color: rgba(47, 159, 189, 0.5) !important;
+  box-shadow:
+    0 0 0 4px rgba(47, 159, 189, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  outline: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-remove-button {
+  align-self: stretch !important;
+  background:
+    linear-gradient(180deg, #fff8f5 0%, #ffefe9 100%) !important;
+  border: 1px solid rgba(157, 79, 56, 0.25) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: var(--process-danger) !important;
+  -webkit-text-fill-color: var(--process-danger) !important;
+  font-weight: 950 !important;
+  min-height: 42px !important;
+  padding: 0 14px !important;
+  text-shadow: none !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-remove-button:hover {
+  background:
+    linear-gradient(180deg, #fff2ed 0%, #ffe4da 100%) !important;
+  border-color: rgba(157, 79, 56, 0.42) !important;
+  box-shadow: 0 10px 22px rgba(157, 79, 56, 0.12) !important;
+  transform: translateY(-1px);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #e9f8f3 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.28) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  color: var(--process-teal-dark) !important;
+  -webkit-text-fill-color: var(--process-teal-dark) !important;
+  cursor: help !important;
+  font-size: 0.68rem !important;
+  font-weight: 950 !important;
+  height: 19px !important;
+  line-height: 1 !important;
+  min-height: 19px !important;
+  padding: 0 !important;
+  text-shadow: none !important;
+  transform: none !important;
+  width: 19px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button:hover,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip:focus-within button {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #ddf4ee 100%) !important;
+  box-shadow: 0 0 0 3px rgba(24, 117, 101, 0.12) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card {
+  gap: 20px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card > .operation-card-heading mark {
+  background:
+    linear-gradient(180deg, rgba(167, 240, 224, 0.18), rgba(167, 240, 224, 0.1)) !important;
+  border: 1px solid rgba(167, 240, 224, 0.32) !important;
+  border-radius: 999px !important;
+  color: #f7fffc !important;
+  -webkit-text-fill-color: #f7fffc !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table {
+  background: #ffffff !important;
+  border: 1px solid rgba(16, 43, 50, 0.13) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 16px 38px rgba(16, 43, 50, 0.075),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94) !important;
+  display: grid;
+  overflow: hidden;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table-row {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(112px, 0.42fr) minmax(180px, 1fr) minmax(150px, 0.72fr);
+  min-height: 50px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table-row:not(.process-result-table-head) {
+  border-bottom: 1px solid rgba(16, 43, 50, 0.08);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table-row:not(.process-result-table-head):nth-child(odd) {
+  background: #f8fcfa;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table-row:last-child {
+  border-bottom: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table-head {
+  background:
+    linear-gradient(135deg, #071418 0%, #102b32 100%) !important;
+  color: rgba(255, 255, 255, 0.84) !important;
+  min-height: 44px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table-head span {
+  color: rgba(255, 255, 255, 0.84) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.84) !important;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table-row > * {
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-group {
+  color: var(--process-teal-dark) !important;
+  -webkit-text-fill-color: var(--process-teal-dark) !important;
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-metric,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-metric .label-with-info {
+  align-items: center;
+  color: #445650 !important;
+  -webkit-text-fill-color: #445650 !important;
+  display: inline-flex;
+  font-size: 0.9rem !important;
+  font-weight: 880 !important;
+  gap: 7px;
+  line-height: 1.35;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-value {
+  color: var(--process-ink) !important;
+  -webkit-text-fill-color: var(--process-ink) !important;
+  font-size: 0.95rem;
+  font-weight: 950;
+  justify-self: stretch;
+  line-height: 1.3;
+  text-align: right;
+  white-space: normal;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-accordions {
+  display: grid !important;
+  gap: 14px !important;
+  grid-template-columns: 1fr !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-detail {
+  border-left-width: 5px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-detail .process-accordion-summary {
+  min-height: 92px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-detail .process-accordion-body {
+  gap: 10px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-detail .process-accordion-body > span {
+  align-items: center !important;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f6fbf8 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.16) !important;
+  border-left: 5px solid rgba(47, 159, 189, 0.72) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 26px rgba(16, 43, 50, 0.055) !important;
+  color: var(--process-muted) !important;
+  -webkit-text-fill-color: var(--process-muted) !important;
+  display: flex !important;
+  gap: 12px;
+  justify-content: space-between;
+  line-height: 1.4;
+  min-height: 50px !important;
+  padding: 12px 14px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-detail .process-accordion-body > span strong {
+  color: var(--process-ink) !important;
+  -webkit-text-fill-color: var(--process-ink) !important;
+  text-align: right;
+}
+
+@media (max-width: 980px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-planner-heading,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card > .operation-card-heading {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-planner-overview {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary small {
+    justify-self: start !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table-row {
+    grid-template-columns: minmax(96px, 0.42fr) minmax(160px, 1fr) minmax(130px, 0.78fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-input-card,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-result-card {
+    padding: 18px !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-summary {
+    min-height: 112px !important;
+    padding: 20px 18px 32px !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-accordion-body {
+    padding: 18px !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table {
+    overflow-x: auto;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-result-table-row {
+    grid-template-columns: 108px minmax(190px, 1fr) minmax(150px, 0.75fr);
+    min-width: 520px;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .planner-save-button {
+    width: 100%;
+  }
+}
+
+/* Process Definition journey correction: product -> process -> resources -> result. */
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path article {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f7fcfa 100%) !important;
+  border: 1px solid rgba(16, 43, 50, 0.11);
+  border-left: 4px solid rgba(24, 117, 101, 0.42);
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(16, 43, 50, 0.05);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  position: relative;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path article::after {
+  background: linear-gradient(90deg, rgba(24, 117, 101, 0.2), rgba(47, 159, 189, 0.16));
+  border-radius: 999px;
+  content: "";
+  height: 4px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path article.done {
+  border-left-color: var(--process-teal);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path article.active {
+  border-left-color: var(--process-cyan);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path span {
+  color: var(--process-teal-dark);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path strong {
+  color: var(--process-ink);
+  font-size: 0.94rem;
+  line-height: 1.25;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path p {
+  color: var(--process-muted);
+  font-size: 0.82rem;
+  font-weight: 780;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-flow-preview {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-flow-preview span {
+  align-items: center;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #edf8f4 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.16);
+  border-radius: 999px;
+  color: var(--process-teal-dark) !important;
+  display: inline-flex;
+  font-size: 0.72rem !important;
+  font-weight: 920 !important;
+  letter-spacing: 0 !important;
+  min-height: 27px;
+  padding: 0 10px;
+  position: relative;
+  text-transform: none !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-flow-preview span:not(:last-child)::after {
+  color: rgba(24, 117, 101, 0.5);
+  content: ">";
+  font-size: 0.78rem;
+  font-weight: 950;
+  position: absolute;
+  right: -9px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-summary-preview {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-summary-preview span {
+  background:
+    radial-gradient(circle at 50% 36%, #f1c19d 0 28%, transparent 29%),
+    linear-gradient(180deg, #2f9fbd 0 100%);
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 6px 14px rgba(16, 43, 50, 0.12);
+  height: 28px;
+  margin-left: -17px;
+  width: 28px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-summary-preview span:first-child {
+  margin-left: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-summary-preview span:nth-child(2) {
+  background:
+    radial-gradient(circle at 50% 36%, #d99f78 0 28%, transparent 29%),
+    linear-gradient(180deg, #ff5a8a 0 100%);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-summary-preview span:nth-child(3) {
+  background:
+    radial-gradient(circle at 50% 36%, #e7b58e 0 28%, transparent 29%),
+    linear-gradient(180deg, #7c5cff 0 100%);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-summary-preview em {
+  color: var(--process-muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-section-actions {
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-add-button {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #edf8f4 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.22) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 8px 18px rgba(16, 43, 50, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  color: var(--process-teal-dark) !important;
+  -webkit-text-fill-color: var(--process-teal-dark) !important;
+  font-size: 0.82rem !important;
+  font-weight: 950 !important;
+  min-height: 34px !important;
+  padding: 0 12px !important;
+  text-shadow: none !important;
+  width: auto !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-add-button:hover {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #e3f4ee 100%) !important;
+  border-color: rgba(24, 117, 101, 0.34) !important;
+  box-shadow:
+    0 10px 22px rgba(16, 43, 50, 0.075),
+    0 0 0 3px rgba(24, 117, 101, 0.08) !important;
+  transform: translateY(-1px);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-flow-lane {
+  gap: 18px !important;
+  overflow: visible;
+  padding-left: 18px;
+  position: relative;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-flow-lane::before {
+  background: linear-gradient(180deg, rgba(47, 159, 189, 0.2), rgba(24, 117, 101, 0.44), rgba(217, 154, 36, 0.22));
+  border-radius: 999px;
+  bottom: 18px;
+  content: "";
+  left: 30px;
+  position: absolute;
+  top: 18px;
+  width: 3px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .operation-plan-row {
+  align-items: stretch !important;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fcfa 100%) !important;
+  border-left: 0 !important;
+  display: grid !important;
+  gap: 12px !important;
+  grid-template-columns: minmax(150px, 0.65fr) repeat(4, minmax(118px, 1fr)) minmax(112px, auto) !important;
+  overflow: visible !important;
+  padding: 14px !important;
+  position: relative;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .operation-plan-row::before {
+  background:
+    radial-gradient(circle at center, #ffffff 0 34%, transparent 35%),
+    linear-gradient(135deg, var(--process-cyan), var(--process-teal));
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgba(24, 117, 101, 0.22);
+  content: "";
+  height: 20px;
+  left: -31px;
+  position: absolute;
+  top: 24px;
+  width: 20px;
+  z-index: 1;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .operation-plan-row:not(:last-child)::after {
+  background:
+    linear-gradient(135deg, transparent 48%, rgba(24, 117, 101, 0.55) 50%, transparent 52%),
+    linear-gradient(45deg, transparent 48%, rgba(24, 117, 101, 0.55) 50%, transparent 52%);
+  content: "";
+  height: 14px;
+  left: -28px;
+  position: absolute;
+  top: calc(100% + 2px);
+  width: 14px;
+  z-index: 1;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-flow-node {
+  align-content: start;
+  background:
+    radial-gradient(circle at 90% 8%, rgba(47, 159, 189, 0.16), transparent 5rem),
+    linear-gradient(180deg, #102b32 0%, #123d42 100%);
+  border: 1px solid rgba(126, 222, 207, 0.18);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  display: grid;
+  gap: 7px;
+  grid-row: span 2;
+  min-height: 100%;
+  padding: 13px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-flow-node span {
+  color: #9ee8d8;
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-flow-node strong {
+  color: #ffffff;
+  font-size: 1rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-flow-node small {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.78rem;
+  font-weight: 820;
+  line-height: 1.35;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .operation-plan-row label {
+  min-height: 74px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .operation-plan-row .resource-row-meta {
+  grid-column: span 2;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .operation-plan-row .resource-remove-button {
+  align-self: center !important;
+  justify-self: end !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-crew-panel {
+  align-items: center;
+  background:
+    radial-gradient(circle at 8% 12%, rgba(255, 90, 138, 0.1), transparent 9rem),
+    linear-gradient(135deg, #11111a 0%, #102b32 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 16px 34px rgba(7, 20, 24, 0.12);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 16px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .crew-avatar-cluster,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-role-badge {
+  display: flex;
+  isolation: isolate;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .crew-avatar-cluster span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-role-badge span {
+  background:
+    radial-gradient(circle at 50% 36%, #f1c19d 0 28%, transparent 29%),
+    linear-gradient(180deg, #2f9fbd 0 100%);
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.16);
+  display: block;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .crew-avatar-cluster span {
+  height: 42px;
+  margin-left: -10px;
+  width: 42px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .crew-avatar-cluster span:first-child,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-role-badge span:first-child {
+  margin-left: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .crew-avatar-cluster span:nth-child(2),
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-role-badge span:nth-child(2) {
+  background:
+    radial-gradient(circle at 50% 36%, #d99f78 0 28%, transparent 29%),
+    linear-gradient(180deg, #ff5a8a 0 100%);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .crew-avatar-cluster span:nth-child(3),
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-role-badge span:nth-child(3) {
+  background:
+    radial-gradient(circle at 50% 36%, #e7b58e 0 28%, transparent 29%),
+    linear-gradient(180deg, #7c5cff 0 100%);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-crew-panel strong {
+  color: #ffffff;
+  display: block;
+  font-size: 1rem;
+  line-height: 1.25;
+  margin-bottom: 4px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-crew-panel p {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.86rem;
+  font-weight: 760;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .workforce-plan-row {
+  grid-template-columns: 64px minmax(170px, 1.25fr) minmax(92px, 0.5fr) minmax(92px, 0.5fr) minmax(170px, 1fr) auto !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-role-badge {
+  align-self: center;
+  justify-self: center;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-role-badge span {
+  height: 28px;
+  margin-left: -9px;
+  width: 28px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-remove-button {
+  align-self: center !important;
+  background: transparent !important;
+  border: 1px solid rgba(157, 79, 56, 0.22) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #8d4934 !important;
+  -webkit-text-fill-color: #8d4934 !important;
+  font-size: 0.78rem !important;
+  font-weight: 920 !important;
+  justify-self: end;
+  min-height: 34px !important;
+  padding: 0 11px !important;
+  width: auto !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .resource-remove-button:hover {
+  background: #fff3ee !important;
+  border-color: rgba(157, 79, 56, 0.38) !important;
+  box-shadow: 0 8px 18px rgba(157, 79, 56, 0.1) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-save-panel {
+  align-items: center;
+  background:
+    linear-gradient(135deg, #ffffff 0%, #f1faf6 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.18);
+  border-left: 5px solid var(--process-teal);
+  border-radius: 8px;
+  box-shadow:
+    0 14px 34px rgba(16, 43, 50, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 16px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-save-panel span {
+  color: var(--process-teal-dark);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-save-panel strong {
+  color: var(--process-ink);
+  display: block;
+  font-size: 1.02rem;
+  line-height: 1.3;
+  margin-top: 4px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-save-panel p {
+  color: var(--process-muted);
+  font-size: 0.86rem;
+  font-weight: 760;
+  line-height: 1.45;
+  margin: 4px 0 0;
+  max-width: 720px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-save-panel .planner-save-button {
+  background:
+    linear-gradient(135deg, #102b32 0%, #187565 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.24) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 14px 30px rgba(16, 43, 50, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+  font-size: 0.9rem !important;
+  min-height: 42px !important;
+  padding: 0 16px !important;
+  width: auto !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-save-panel .planner-save-button:hover {
+  box-shadow:
+    0 18px 38px rgba(16, 43, 50, 0.2),
+    0 0 0 4px rgba(24, 117, 101, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+@media (max-width: 1120px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .operation-plan-row,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .workforce-plan-row {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-flow-node,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-role-badge {
+    grid-column: 1 / -1;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .operation-plan-row .resource-row-meta {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-builder-path,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-save-panel,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .workforce-crew-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .process-save-panel .planner-save-button {
+    width: 100% !important;
+  }
+}
+
+/* Simplified product-first Process Definition flow. */
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-definition-builder {
+  grid-template-columns: 1fr !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-definition-builder.is-closed {
+  align-items: start;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-definition-builder.is-closed .process-definition-form {
+  margin: 0 auto !important;
+  max-width: 820px !important;
+  width: min(100%, 820px) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-definition-form {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fcfa 100%) !important;
+  border: 1px solid rgba(16, 43, 50, 0.12) !important;
+  box-shadow: 0 18px 48px rgba(16, 43, 50, 0.08) !important;
+  display: grid !important;
+  gap: 18px !important;
+  padding: 20px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-gate {
+  background:
+    linear-gradient(135deg, #ffffff 0%, #eef8f4 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.18) !important;
+  border-left: 5px solid var(--color-teal) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 14px 32px rgba(16, 43, 50, 0.065) !important;
+  display: grid !important;
+  gap: 16px !important;
+  padding: 18px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-gate.open {
+  grid-template-columns: minmax(0, 0.72fr) minmax(340px, 1fr) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-copy {
+  align-content: center;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-copy span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-toolbar span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-save-panel span {
+  color: var(--process-teal-dark, var(--color-teal-strong)) !important;
+  font-size: 0.72rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-copy h2 {
+  color: var(--process-ink, var(--color-heading)) !important;
+  font-size: clamp(1.28rem, 2.2vw, 2rem) !important;
+  line-height: 1.12 !important;
+  margin: 0 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-controls {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1fr) auto;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-controls label,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-run-settings label,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid label {
+  color: var(--process-muted, var(--color-muted)) !important;
+  display: grid !important;
+  font-size: 0.74rem !important;
+  font-weight: 850 !important;
+  gap: 7px !important;
+  min-width: 0;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-controls label > span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-run-settings label > span,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid label > span {
+  color: var(--process-muted, var(--color-muted)) !important;
+  font-size: 0.72rem !important;
+  font-weight: 900 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-controls select,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-run-settings input,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid input,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid select {
+  background: #ffffff !important;
+  border: 1px solid rgba(16, 43, 50, 0.15) !important;
+  border-radius: 8px !important;
+  color: var(--process-ink, var(--color-heading)) !important;
+  font-weight: 850 !important;
+  min-height: 42px !important;
+  min-width: 0;
+  width: 100% !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-open-button,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-add-button {
+  background:
+    linear-gradient(135deg, #102b32 0%, #187565 100%) !important;
+  border: 1px solid rgba(24, 117, 101, 0.24) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 12px 26px rgba(16, 43, 50, 0.14) !important;
+  color: #ffffff !important;
+  cursor: pointer;
+  font-weight: 950 !important;
+  min-height: 42px !important;
+  padding: 0 16px !important;
+  white-space: nowrap;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-open-button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+  opacity: 0.55;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-selected {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-selected span {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(24, 117, 101, 0.13);
+  border-radius: 8px;
+  color: var(--process-muted, var(--color-muted));
+  display: grid;
+  font-size: 0.74rem;
+  font-weight: 800;
+  gap: 4px;
+  padding: 10px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-selected strong {
+  color: var(--process-ink, var(--color-heading));
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-run-settings {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(240px, 1fr) minmax(180px, 0.45fr);
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-run-settings label,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(16, 43, 50, 0.12) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 26px rgba(16, 43, 50, 0.05) !important;
+  padding: 14px !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-recipe-warning {
+  margin: 0 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-workspace {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-toolbar strong {
+  color: var(--process-ink, var(--color-heading));
+  display: block;
+  font-size: 1.04rem;
+  line-height: 1.25;
+  margin-top: 3px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-list {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-card {
+  border-left: 5px solid var(--color-teal) !important;
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-card:nth-child(2n) {
+  border-left-color: var(--color-cyan) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-card-header {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-index {
+  align-items: center;
+  background:
+    linear-gradient(135deg, var(--color-navy) 0%, var(--color-teal) 100%);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.92rem;
+  font-weight: 950;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-card-header span {
+  color: var(--process-teal-dark, var(--color-teal-strong));
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-card-header strong {
+  color: var(--process-ink, var(--color-heading));
+  display: block;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-card-header small {
+  color: var(--process-muted, var(--color-muted));
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 780;
+  margin-top: 2px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid.compact {
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid small,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-run-settings small {
+  color: var(--process-muted, var(--color-muted));
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-advanced {
+  border-top: 1px solid rgba(16, 43, 50, 0.1);
+  padding-top: 10px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-advanced summary {
+  color: var(--process-teal-dark, var(--color-teal-strong));
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-advanced .process-step-grid {
+  margin-top: 10px;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-advanced-options {
+  margin: 0 !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-compact-options {
+  grid-template-columns: repeat(4, minmax(150px, 1fr)) !important;
+}
+
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-definition-result {
+  margin: 0 auto !important;
+  width: 100% !important;
+}
+
+@media (max-width: 1180px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-compact-options {
+    grid-template-columns: repeat(2, minmax(160px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 780px) {
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-gate.open,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-controls,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-product-selected,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-run-settings,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-grid.compact,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-compact-options {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-toolbar,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-save-panel {
+    align-items: stretch !important;
+    flex-direction: column;
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-open-button,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-add-button,
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-save-panel .planner-save-button {
+    width: 100% !important;
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-card-header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .dashboard-shell .operations-workspace.operations-modern.operations-process-page .process-step-card-header .resource-remove-button {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+}
