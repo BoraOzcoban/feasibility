@@ -2992,6 +2992,27 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
+  function downloadReportPlaceholder(report, format) {
+    const extension = format.extension || format.key;
+    const fileSafeName = `${report.key || "report"}-${new Date().toISOString().slice(0, 10)}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+    const body = [
+      "Atera report export placeholder",
+      `Report: ${report.label || report.title}`,
+      `Format: ${format.label}`,
+      `Period: ${periodLabel}`,
+      `Created by: ${currentProfile?.username || currentProfile?.email || "Atera"}`,
+      "",
+      "Real PDF/XLSX/PPTX generation will be connected later. This file is downloaded locally only and is not saved to the database.",
+    ].join("\n");
+    const blob = new Blob([body], { type: format.mime || "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileSafeName}.${extension}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function normalizeRole(role) {
     const permissions = {};
 
@@ -6566,23 +6587,25 @@ function App() {
                 </div>
               </article>
 
-              <article className="simulation-card monte-chart-card">
+              <article className="simulation-card monte-chart-card simulation-trend-card">
                 <div className="simulation-card-heading">
                   <div>
                     <span>{copy("Break-even graph", "Başa baş grafiği")}</span>
                     <h2>{copy("Revenue, cost and break-even estimate", "Gelir, gider ve başa baş tahmini")}</h2>
                   </div>
                 </div>
-                <svg className="monte-chart break-even-chart" viewBox="0 0 620 280" role="img" aria-label={copy("Break-even chart", "Başa baş grafiği")}>
-                  <path className="chart-grid" d="M42 40 H580 M42 90 H580 M42 140 H580 M42 190 H580 M42 240 H580" />
-                  <path className="chart-axis" d="M42 28 V240 H585" />
-                  <path className="break-even-cost" d="M50 218 L130 202 L210 184 L290 166 L370 148 L450 130 L570 104" />
-                  <path className="break-even-revenue" d="M50 232 L130 206 L210 178 L290 150 L370 122 L450 94 L570 52" />
-                  <line className="break-even-marker" x1="285" x2="285" y1="42" y2="240" />
-                  <text className="chart-tick" x="294" y="68">{copy("Break-even", "Başa baş")}</text>
-                  <text className="chart-tick" x="48" y="262">{copy("Volume", "Hacim")}</text>
-                  <text className="chart-tick chart-tick-end" x="502" y="262">{copy("Projected sales", "Projeksiyon satış")}</text>
-                </svg>
+                <div className="simulation-chart-stage">
+                  <svg className="monte-chart break-even-chart" viewBox="0 0 620 280" role="img" aria-label={copy("Break-even chart", "Başa baş grafiği")}>
+                    <path className="chart-grid" d="M42 40 H580 M42 90 H580 M42 140 H580 M42 190 H580 M42 240 H580" />
+                    <path className="chart-axis" d="M42 28 V240 H585" />
+                    <path className="break-even-cost" d="M50 218 L130 202 L210 184 L290 166 L370 148 L450 130 L570 104" />
+                    <path className="break-even-revenue" d="M50 232 L130 206 L210 178 L290 150 L370 122 L450 94 L570 52" />
+                    <line className="break-even-marker" x1="285" x2="285" y1="42" y2="240" />
+                    <text className="chart-tick" x="294" y="68">{copy("Break-even", "Başa baş")}</text>
+                    <text className="chart-tick" x="48" y="262">{copy("Volume", "Hacim")}</text>
+                    <text className="chart-tick chart-tick-end" x="502" y="262">{copy("Projected sales", "Projeksiyon satış")}</text>
+                  </svg>
+                </div>
                 <div className="chart-legend">
                   <span className="legend-sales">{copy("Revenue", "Gelir")}</span>
                   <span className="legend-costs">{copy("Cost", "Gider")}</span>
@@ -6590,7 +6613,7 @@ function App() {
                 </div>
               </article>
 
-              <article className="simulation-card income-simulation-card">
+              <article className="simulation-card income-simulation-card simulation-trend-card">
                 <div className="simulation-card-heading">
                   <div>
                     <span>{copy("Income statement", "Gelir gider tablosu")}</span>
@@ -6606,21 +6629,23 @@ function App() {
                       </div>
                     ))}
                   </div>
-                  <svg className="monte-chart income-bars-chart" viewBox="0 0 520 250" aria-hidden="true">
-                    <path className="chart-grid" d="M34 35 H500 M34 85 H500 M34 135 H500 M34 185 H500" />
-                    {incomeRows.map(([label, value], index) => {
-                      const height = Math.max(14, (Math.abs(value) / Math.max(maxRevenue, maxNetAbs)) * 165);
-                      const x = 58 + index * 88;
-                      const y = value >= 0 ? 202 - height : 202;
-                      return (
-                        <React.Fragment key={label}>
-                          <rect className={value >= 0 ? "income-positive" : "income-negative"} x={x} y={y} width="46" height={height} rx="6" />
-                          <text className="chart-tick" x={x - 8} y="230">{index + 1}</text>
-                        </React.Fragment>
-                      );
-                    })}
-                    <path className="chart-axis" d="M34 22 V202 H500" />
-                  </svg>
+                  <div className="simulation-chart-stage">
+                    <svg className="monte-chart income-bars-chart" viewBox="0 0 520 250" aria-hidden="true">
+                      <path className="chart-grid" d="M34 35 H500 M34 85 H500 M34 135 H500 M34 185 H500" />
+                      {incomeRows.map(([label, value], index) => {
+                        const height = Math.max(14, (Math.abs(value) / Math.max(maxRevenue, maxNetAbs)) * 165);
+                        const x = 58 + index * 88;
+                        const y = value >= 0 ? 202 - height : 202;
+                        return (
+                          <React.Fragment key={label}>
+                            <rect className={value >= 0 ? "income-positive" : "income-negative"} x={x} y={y} width="46" height={height} rx="6" />
+                            <text className="chart-tick" x={x - 8} y="230">{index + 1}</text>
+                          </React.Fragment>
+                        );
+                      })}
+                      <path className="chart-axis" d="M34 22 V202 H500" />
+                    </svg>
+                  </div>
                 </div>
               </article>
             </main>
@@ -6640,20 +6665,22 @@ function App() {
                 </div>
               </article>
 
-              <article className="simulation-card path-preview-card">
+              <article className="simulation-card path-preview-card simulation-trend-card">
                 <div className="simulation-card-heading">
                   <div>
                     <span>{copy("Sales path", "Satış yolu")}</span>
                     <h2>{copy("Revenue sensitivity preview", "Gelir hassasiyeti önizlemesi")}</h2>
                   </div>
                 </div>
-                <svg className="monte-chart path-preview-chart" viewBox="0 0 420 220" aria-hidden="true">
-                  <path className="chart-grid" d="M24 42 H396 M24 88 H396 M24 134 H396 M24 180 H396" />
-                  <path className="percentile-band" d="M28 166 C76 144 118 154 162 126 S248 108 294 82 360 80 392 58 L392 128 C340 140 312 154 266 166 S178 174 128 188 62 196 28 202 Z" />
-                  <path className="path-worst" d="M28 196 C74 184 118 190 164 176 S244 166 294 152 350 150 392 136" />
-                  <path className="path-likely" d="M28 168 C82 148 124 158 168 128 S248 118 296 90 352 82 392 68" />
-                  <path className="path-good" d="M28 142 C78 112 122 120 168 92 S248 74 296 54 350 46 392 34" />
-                </svg>
+                <div className="simulation-chart-stage">
+                  <svg className="monte-chart path-preview-chart" viewBox="0 0 420 220" aria-hidden="true">
+                    <path className="chart-grid" d="M24 42 H396 M24 88 H396 M24 134 H396 M24 180 H396" />
+                    <path className="percentile-band" d="M28 166 C76 144 118 154 162 126 S248 108 294 82 360 80 392 58 L392 128 C340 140 312 154 266 166 S178 174 128 188 62 196 28 202 Z" />
+                    <path className="path-worst" d="M28 196 C74 184 118 190 164 176 S244 166 294 152 350 150 392 136" />
+                    <path className="path-likely" d="M28 168 C82 148 124 158 168 128 S248 118 296 90 352 82 392 68" />
+                    <path className="path-good" d="M28 142 C78 112 122 120 168 92 S248 74 296 54 350 46 392 34" />
+                  </svg>
+                </div>
                 <p>{copy("This preview shows how the selected sales assumptions can move revenue across low, likely, and high outcomes.", "Bu önizleme seçilen satış varsayımlarının geliri düşük, olası ve yüksek çıktılarda nasıl oynatabileceğini gösterir.")}</p>
               </article>
 
@@ -7564,34 +7591,54 @@ function App() {
       reportAuthor,
     ],
   ].filter(Boolean);
-  const reportCategoryCounts = recentReports.reduce((counts, report) => {
-    counts[report[1]] = (counts[report[1]] || 0) + 1;
-    return counts;
-  }, {});
-  const reportCategories = Object.entries(reportCategoryCounts).map(([category, count]) => [
-    category,
-    recentReports.length ? Math.round((count / recentReports.length) * 100) : 0,
-  ]);
   const reportTabs = [
-    { key: "all", label: copy("All Reports", "Tüm Raporlar") },
-    { category: copy("Production Reports", "Üretim Raporları"), key: "production", label: copy("Production Reports", "Üretim Raporları") },
-    { category: copy("Financial Reports", "Finansal Raporlar"), key: "financial", label: copy("Financial Reports", "Finansal Raporlar") },
-    { category: copy("Sales Reports", "Satış Raporları"), key: "sales", label: copy("Sales Reports", "Satış Raporları") },
-    { category: copy("Capacity Reports", "Kapasite Raporları"), key: "capacity", label: copy("Capacity Reports", "Kapasite Raporları") },
+    {
+      detail: copy("A concise decision pack for investors, founders, and management meetings.", "Yatırımcı, kurucu ve yönetim toplantıları için kısa karar paketi."),
+      includes: [copy("Executive overview", "Yönetici özeti"), copy("Cost & return", "Maliyet & getiri"), copy("Scenario signals", "Senaryo sinyalleri")],
+      key: "executive",
+      label: copy("Executive Decision Pack", "Yönetici Karar Paketi"),
+      tone: "blue",
+    },
+    {
+      detail: copy("Financial assumptions, income-expense projection, cash needs, ROI, and payback.", "Finansal varsayımlar, gelir-gider projeksiyonu, nakit ihtiyacı, ROI ve geri dönüş."),
+      includes: [copy("Income / expense", "Gelir / gider"), copy("Cash flow", "Nakit akışı"), copy("Investment return", "Yatırım getirisi")],
+      key: "financial",
+      label: copy("Financial Export", "Finansal Export"),
+      tone: "violet",
+    },
+    {
+      detail: copy("Production capacity, resource plan, process outputs, cycle time, and tracked cost.", "Üretim kapasitesi, kaynak planı, süreç çıktıları, çevrim süresi ve takip edilen maliyet."),
+      includes: [copy("Process plan", "Süreç planı"), copy("Capacity", "Kapasite"), copy("Tracked cost", "Takip edilen maliyet")],
+      key: "operations",
+      label: copy("Operations Export", "Operasyon Export"),
+      tone: "teal",
+    },
+    {
+      detail: copy("Sales channels, forecast, campaign inputs, market assumptions, and revenue quality.", "Satış kanalları, tahmin, kampanya girdileri, pazar varsayımları ve gelir kalitesi."),
+      includes: [copy("Sales forecast", "Satış tahmini"), copy("Channels", "Kanallar"), copy("Revenue quality", "Gelir kalitesi")],
+      key: "sales",
+      label: copy("Sales Export", "Satış Export"),
+      tone: "lime",
+    },
+    {
+      detail: copy("A full model export that combines operations, sales, finance, and simulation outputs.", "Operasyon, satış, finans ve simülasyon çıktılarını birleştiren tam model exportu."),
+      includes: [copy("Full model", "Tam model"), copy("All modules", "Tüm modüller"), copy("Appendix", "Ekler")],
+      key: "full",
+      label: copy("Full Feasibility Pack", "Tam Fizibilite Paketi"),
+      tone: "pink",
+    },
   ];
   const activeReportTab = reportTabs.find((tab) => tab.key === reportsTab) || reportTabs[0];
-  const normalizedReportSearch = reportsSearch.trim().toLocaleLowerCase(locale);
-  const visibleRecentReports = recentReports.filter((report) => {
-    const matchesTab = !activeReportTab.category || report[1] === activeReportTab.category;
-    const matchesSearch = !normalizedReportSearch || report.join(" ").toLocaleLowerCase(locale).includes(normalizedReportSearch);
-    return matchesTab && matchesSearch;
-  });
+  const reportFormats = [
+    { extension: "pdf", key: "pdf", label: "PDF", mime: "application/pdf", note: copy("presentation-ready document", "sunuma hazır doküman") },
+    { extension: "xlsx", key: "xlsx", label: "XLSX", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", note: copy("spreadsheet model extract", "tablo model çıktısı") },
+    { extension: "pptx", key: "pptx", label: "PPTX", mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", note: copy("slide deck for meetings", "toplantı sunum dosyası") },
+  ];
   const reportStats = [
-    [copy("Available Snapshots", "Mevcut Anlık Rapor"), formatNumber(recentReports.length), copy("derived from Supabase data", "Supabase verisinden türetildi")],
-    [copy("Products", "Ürünler"), formatNumber(operationsWorkspace.products.length), copy("operation product records", "operasyon ürün kayıtları")],
-    [copy("Process Plans", "Süreç Planları"), formatNumber(operationsWorkspace.activePlans.length), copy("saved backend results", "kayıtlı backend sonuçları")],
-    [copy("Sales Channels", "Satış Kanalları"), formatNumber(salesStrategy.channels.length), copy("strategy records", "strateji kayıtları")],
-    [copy("Latest Snapshot", "Son Anlık Rapor"), recentReports[0]?.[0] || noDataValue, recentReports[0]?.[2] || copy("No data yet", "Henüz veri yok")],
+    [copy("Selected pack", "Seçili paket"), activeReportTab.label, copy("choose one report type", "tek rapor türü seçin")],
+    [copy("Output formats", "Çıktı formatları"), "PDF / XLSX / PPTX", copy("download only", "yalnızca indir")],
+    [copy("Storage", "Kayıt"), copy("Local file", "Lokal dosya"), copy("not saved to database", "database'e kaydedilmez")],
+    [copy("Period", "Dönem"), periodLabel, copy("uses current horizon", "mevcut ufku kullanır")],
   ];
   const financeWindowLabel =
     financeWindow === "custom"
@@ -8814,34 +8861,21 @@ function App() {
           <section className="reports-workspace">
             <div className="reports-header">
               <div>
-                <span>{dashboardCompanyName} / {dashboardProductContext}</span>
-                <h1>{copy("Reports", "Raporlar")}</h1>
-                <p>{copy("Reports here are generated from Supabase records already loaded into Operations, Sales Strategy, and Financial Modelling.", "Buradaki raporlar Operations, Satış Stratejisi ve Finansal Modelleme'de Supabase'ten gelen kayıtlardan oluşturulur.")}</p>
+                <span>{dashboardCompanyName} / {copy("Export center", "Export merkezi")}</span>
+                <h1>{copy("Report Downloads", "Rapor İndirme")}</h1>
+                <p>{copy("Choose one report pack and download it as PDF, XLSX, or PPTX. This page does not save reports to Supabase or keep a report archive.", "Bir rapor paketi seçin ve PDF, XLSX veya PPTX olarak indirin. Bu sayfa raporları Supabase'e kaydetmez ve rapor arşivi tutmaz.")}</p>
+              </div>
+              <div className="reports-header-panel" aria-label={copy("Download behavior", "İndirme davranışı")}>
+                <strong>{copy("Download only", "Sadece indir")}</strong>
+                <span>{copy("No database save", "Database kaydı yok")}</span>
               </div>
             </div>
 
             <div className="reports-tabs" role="tablist" aria-label={copy("Report types", "Rapor türleri")}>
               {reportTabs.map((tab) => (
-                <button type="button" className={reportsTab === tab.key ? "active" : ""} onClick={() => setReportsTab(tab.key)} key={tab.key}>{tab.label}</button>
+                <button type="button" className={activeReportTab.key === tab.key ? "active" : ""} onClick={() => setReportsTab(tab.key)} key={tab.key}>{tab.label}</button>
               ))}
             </div>
-
-            <div className="reports-controls">
-              <label><span>{copy("Search reports", "Rapor ara")}</span><input placeholder={copy("Search reports...", "Rapor ara...")} value={reportsSearch} onChange={(event) => setReportsSearch(event.target.value)} /></label>
-              <button type="button" className={reportsFilterOpen ? "active" : ""} onClick={() => setReportsFilterOpen((current) => !current)}>{copy("Filters", "Filtreler")}</button>
-              <select value={financialHorizon} onChange={(event) => loadFinancialData(event.target.value)}>
-                <option value="6m">{copy("Next 6 months", "Gelecek 6 ay")}</option>
-                <option value="1y">{copy("Next 12 months", "Gelecek 12 ay")}</option>
-                <option value="5y">{copy("Next 60 months", "Gelecek 60 ay")}</option>
-              </select>
-              <button type="button" className="primary" onClick={() => exportReportsCsv(visibleRecentReports)}>{copy("Export", "Dışa Aktar")}</button>
-            </div>
-            {reportsFilterOpen && (
-              <div className="reports-filter-summary">
-                {copy("Showing", "Gösterilen")} <strong>{activeReportTab.label}</strong>
-                {reportsSearch ? ` / ${copy("search", "arama")}: ${reportsSearch}` : ""}
-              </div>
-            )}
 
             <div className="report-stat-grid">
               {reportStats.map(([label, value, detail]) => (
@@ -8853,45 +8887,63 @@ function App() {
               ))}
             </div>
 
-            <div className="reports-grid">
-              <article className="reports-card distribution-card">
-                <h2>{copy("Distribution by Report Category", "Rapor Kategorilerine Göre Dağılım")}</h2>
-                <div className="distribution-body">
-                  <div className="donut-chart report-donut" aria-hidden="true"><span>{formatNumber(recentReports.length)}<small>{copy("Total", "Toplam")}</small></span></div>
-                  <div className="report-category-list">
-                    {(reportCategories.length ? reportCategories : [[copy("No report data yet", "Henüz rapor verisi yok"), 0]]).map(([item, percent]) => (
-                      <span key={item}>{item}<strong>{percent}%</strong></span>
+            <div className="reports-export-layout">
+              <section className="reports-pack-grid" aria-label={copy("Report packs", "Rapor paketleri")}>
+                {reportTabs.map((tab) => (
+                  <article className={`reports-pack-card ${tab.tone} ${activeReportTab.key === tab.key ? "active" : ""}`} key={tab.key}>
+                    <button type="button" onClick={() => setReportsTab(tab.key)}>
+                      <span>{copy("Report pack", "Rapor paketi")}</span>
+                      <strong>{tab.label}</strong>
+                      <small>{tab.detail}</small>
+                    </button>
+                    <div className="reports-pack-includes">
+                      {tab.includes.map((item) => <em key={item}>{item}</em>)}
+                    </div>
+                  </article>
+                ))}
+              </section>
+
+              <aside className="reports-export-panel">
+                <article className="reports-card reports-selected-card">
+                  <div className="reports-card-heading">
+                    <div>
+                      <span>{copy("Selected export", "Seçili export")}</span>
+                      <h2>{activeReportTab.label}</h2>
+                    </div>
+                  </div>
+                  <p>{activeReportTab.detail}</p>
+                  <div className="reports-selected-includes">
+                    {activeReportTab.includes.map((item) => <span key={item}>{item}</span>)}
+                  </div>
+                </article>
+
+                <article className="reports-card reports-format-card">
+                  <div className="reports-card-heading">
+                    <div>
+                      <span>{copy("Download format", "İndirme formatı")}</span>
+                      <h2>{copy("Choose file type", "Dosya türü seçin")}</h2>
+                    </div>
+                  </div>
+                  <div className="reports-format-grid">
+                    {reportFormats.map((format) => (
+                      <button type="button" onClick={() => downloadReportPlaceholder(activeReportTab, format)} key={format.key}>
+                        <strong>{format.label}</strong>
+                        <span>{format.note}</span>
+                        <small>{copy("Download", "İndir")}</small>
+                      </button>
                     ))}
                   </div>
-                </div>
-              </article>
+                  <p>{copy("These buttons currently download placeholder files with the selected extension. Real report rendering can be connected later.", "Bu butonlar şimdilik seçilen uzantıyla placeholder dosya indirir. Gerçek rapor üretimi daha sonra bağlanabilir.")}</p>
+                </article>
 
-              <article className="reports-card usage-card">
-                <div className="reports-card-heading"><h2>{copy("Report Usage Trend", "Rapor Kullanım Trendi")}</h2><select defaultValue="daily"><option value="daily">{copy("Daily", "Günlük")}</option><option value="weekly">{copy("Weekly", "Haftalık")}</option></select></div>
-                <svg className="reports-trend" viewBox="0 0 620 230" aria-hidden="true">
-                  <path className="chart-grid" d="M30 42 H590 M30 92 H590 M30 142 H590 M30 192 H590" />
-                  <path className="trend-line sales" d={projectedFinancialModel.trendChart?.salesPath || ""} />
-                  <path className="trend-line gross" d={projectedFinancialModel.trendChart?.costPath || ""} />
-                  <path className="trend-line net" d={projectedFinancialModel.trendChart?.netPath || ""} />
-                </svg>
-              </article>
-
-              <article className="reports-card recent-reports-card">
-                <div className="reports-card-heading"><h2>{copy("Recent Reports", "Son Raporlar")}</h2><button type="button" onClick={() => { setReportsTab("all"); setReportsSearch(""); }}>{copy("View All", "Tümünü Gör")}</button></div>
-                <div className="recent-report-table">
-                  <div className="recent-report-row report-head"><span>{copy("Report Name", "Rapor Adı")}</span><span>{copy("Category", "Kategori")}</span><span>{copy("Created Date", "Oluşturulma Tarihi")}</span><span>{copy("Period", "Dönem")}</span><span>{copy("Created By", "Oluşturan")}</span><span>{copy("Actions", "İşlemler")}</span></div>
-                  {(visibleRecentReports.length ? visibleRecentReports : [[copy("No report snapshots match the current filter", "Geçerli filtreyle eşleşen rapor yok"), copy("Input required", "Girdi gerekli"), "-", "-", reportAuthor]]).map((report) => (
-                    <div className="recent-report-row" key={report[0]}>
-                      {report.map((cell, index) => index === 0 ? <strong key={cell}>{cell}</strong> : <span key={`${report[0]}-${index}`}>{cell}</span>)}
-                      <span className="report-actions">-</span>
+                <article className="reports-card reports-readiness-card">
+                  <div className="reports-card-heading">
+                    <div>
+                      <span>{copy("Source readiness", "Kaynak hazırlığı")}</span>
+                      <h2>{copy("What the report can use", "Raporun kullanabileceği kaynaklar")}</h2>
                     </div>
-                  ))}
-                </div>
-              </article>
-
-              <aside className="reports-side">
-                <article className="reports-card schedule-card">
-                  <div className="reports-card-heading"><h2>{copy("Data Readiness", "Veri Hazırlığı")}</h2><button type="button" onClick={loadPlanningData}>{copy("Refresh", "Yenile")}</button></div>
+                    <button type="button" onClick={loadPlanningData}>{copy("Refresh", "Yenile")}</button>
+                  </div>
                   {[
                     [copy("Product record", "Ürün kaydı"), operationsWorkspace.product ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                     [copy("Process backend result", "Süreç backend sonucu"), activePlanResults.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
@@ -8900,25 +8952,10 @@ function App() {
                   ].map(([item, state]) => (
                     <div className="schedule-row" key={item}>
                       <strong>{item}</strong>
-                      <span>{copy("Stored in Supabase", "Supabase'te kayıtlı")}</span>
+                      <span>{copy("Used only for export", "Sadece export için kullanılır")}</span>
                       <mark>{state}</mark>
                     </div>
                   ))}
-                </article>
-
-                <article className="reports-card quick-report-card">
-                  <h2>{copy("Create Quick Report", "Hızlı Rapor Oluştur")}</h2>
-                  <div className="quick-report-grid">
-                    {[
-                      [copy("Production Report", "Üretim Raporu"), "production"],
-                      [copy("Financial Summary", "Finansal Özet"), "financial"],
-                      [copy("Sales Analysis", "Satış Analizi"), "sales"],
-                      [copy("Capacity Analysis", "Kapasite Analizi"), "capacity"],
-                      [copy("Custom Report", "Özel Rapor"), "all"],
-                    ].map(([item, tabKey]) => (
-                      <button type="button" onClick={() => { setReportsTab(tabKey); setReportsSearch(""); }} key={item}>{item}</button>
-                    ))}
-                  </div>
                 </article>
               </aside>
             </div>
