@@ -133,6 +133,416 @@ function InfoTip({ label = "Info", text }) {
   );
 }
 
+const glossaryEntries = [
+  {
+    en: ["Dashboard", "Overview"],
+    tr: ["Dashboard", "Genel Bakış"],
+    infoEn: "The main workspace where readiness, risks, and module status are summarized.",
+    infoTr: "Hazırlık, risk ve modül durumlarının özetlendiği ana çalışma alanı.",
+  },
+  {
+    en: ["Product", "Product record", "Product definition", "Product to produce", "Product Name", "Product Code", "Product Group"],
+    tr: ["Ürün", "Ürün kaydı", "Ürün tanımı", "Üretilecek ürün", "Ürün Adı", "Ürün Kodu", "Ürün Grubu"],
+    infoEn: "The sellable item whose recipe, price, process, and demand drive feasibility.",
+    infoTr: "Reçete, fiyat, süreç ve talep bilgileriyle fizibiliteyi belirleyen satılabilir kalem.",
+  },
+  {
+    en: ["Recipe", "No recipe", "Recipe qty", "Materials & Components"],
+    tr: ["Reçete", "Reçete yok", "Reçete miktarı", "Malzeme & Bileşenler"],
+    infoEn: "The materials and quantities needed to make one unit of the product.",
+    infoTr: "Ürünün bir birimini üretmek için gereken malzeme ve miktarlar.",
+  },
+  {
+    en: ["Material", "Material Cost", "Material cost"],
+    tr: ["Malzeme", "Malzeme Maliyeti", "Malzeme maliyeti"],
+    infoEn: "An input consumed during production and included in unit or total cost.",
+    infoTr: "Üretimde tüketilen ve birim ya da toplam maliyete giren girdi.",
+  },
+  {
+    en: ["Machine", "Machine Pool", "Machine hours", "Machine Hours", "Machine Value", "Selected Machine Value"],
+    tr: ["Makine", "Makine Havuzu", "Makine saati", "Makine Saati", "Makine Değeri", "Seçili Makine Değeri"],
+    infoEn: "Production equipment used to calculate capacity, time, energy, and asset value.",
+    infoTr: "Kapasite, süre, enerji ve varlık değerini hesaplamakta kullanılan üretim ekipmanı.",
+  },
+  {
+    en: ["Equipment"],
+    tr: ["Ekipman"],
+    infoEn: "Supporting production asset or tool used by a process step.",
+    infoTr: "Bir süreç adımında kullanılan destekleyici üretim varlığı veya araç.",
+  },
+  {
+    en: ["Workforce", "Crew role", "People", "Crew hours", "Workforce Hours", "Workforce Cost"],
+    tr: ["İşgücü", "Ekip rolü", "Kişi", "Ekip saati", "İşgücü Saati", "İşgücü Maliyeti"],
+    infoEn: "Human labor capacity and cost assigned to production activities.",
+    infoTr: "Üretim faaliyetlerine atanan insan emeği kapasitesi ve maliyeti.",
+  },
+  {
+    en: ["Process", "Process name", "Process Definition", "Required processes", "Operation", "Operation Flow"],
+    tr: ["Süreç", "Süreç adı", "Süreç Tanımlama", "Gerekli süreçler", "Operasyon", "Operasyon Akışı"],
+    infoEn: "A production step or workflow used to turn inputs into finished output.",
+    infoTr: "Girdileri bitmiş çıktıya dönüştüren üretim adımı veya iş akışı.",
+  },
+  {
+    en: ["Capacity", "Production capacity", "Capacity gap", "Monthly capacity"],
+    tr: ["Kapasite", "Üretim kapasitesi", "Kapasite açığı", "Aylık kapasite"],
+    infoEn: "The amount that can be produced with available time, machines, and labor.",
+    infoTr: "Mevcut zaman, makine ve işgücüyle üretilebilecek miktar.",
+  },
+  {
+    en: ["Cycle", "Cycle Time", "Effective Cycle"],
+    tr: ["Çevrim", "Çevrim Süresi", "Efektif çevrim"],
+    infoEn: "Elapsed production time per unit or per completed flow after constraints are included.",
+    infoTr: "Kısıtlar dahil edildiğinde birim veya tamamlanan akış başına geçen üretim süresi.",
+  },
+  {
+    en: ["Bottleneck"],
+    tr: ["Darboğaz"],
+    infoEn: "The limiting operation that constrains output and is usually the first improvement target.",
+    infoTr: "Çıktıyı sınırlayan ve genellikle ilk iyileştirme hedefi olan operasyon.",
+  },
+  {
+    en: ["WIP", "Max WIP"],
+    tr: ["WIP", "Maks WIP"],
+    infoEn: "Work in progress: unfinished units waiting or moving between operations.",
+    infoTr: "Yarı mamul: operasyonlar arasında bekleyen veya ilerleyen tamamlanmamış ürünler.",
+  },
+  {
+    en: ["Setup", "Setup min"],
+    tr: ["Setup", "Setup dk"],
+    infoEn: "Preparation time before production can run at normal speed.",
+    infoTr: "Üretimin normal hızda başlamasından önceki hazırlık süresi.",
+  },
+  {
+    en: ["Speed"],
+    tr: ["Hız"],
+    infoEn: "The rate or multiplier that affects how quickly a process step is completed.",
+    infoTr: "Bir süreç adımının ne kadar hızlı tamamlandığını etkileyen oran veya çarpan.",
+  },
+  {
+    en: ["Batch", "Transfer Batch", "Best batch size"],
+    tr: ["Toplu", "Transfer batch", "En iyi batch"],
+    infoEn: "A group of units processed or transferred together during production.",
+    infoTr: "Üretimde birlikte işlenen veya aktarılan ürün grubu.",
+  },
+  {
+    en: ["Flow", "Flow / Pull", "Default flow"],
+    tr: ["Akış", "Akış / Pull", "Varsayılan akış"],
+    infoEn: "The production movement logic between steps, often used to reduce waiting and WIP.",
+    infoTr: "Adımlar arasındaki üretim hareket mantığı; bekleme ve WIP azaltmak için kullanılır.",
+  },
+  {
+    en: ["Cost", "Daily Cost", "Monthly cost", "Estimated Cost", "Tracked Daily Cost", "Unit production cost"],
+    tr: ["Maliyet", "Günlük Maliyet", "Aylık maliyet", "Tahmini Maliyet", "Takip Edilen Günlük Maliyet", "Birim üretim maliyeti"],
+    infoEn: "Money spent to produce, operate, finance, or deliver the planned activity.",
+    infoTr: "Planlanan faaliyeti üretmek, işletmek, finanse etmek veya teslim etmek için harcanan para.",
+  },
+  {
+    en: ["Revenue", "Monthly revenue", "Estimated Revenue", "Income"],
+    tr: ["Ciro", "Aylık ciro", "Tahmini Ciro", "Gelir"],
+    infoEn: "Sales income generated from product demand and selling price.",
+    infoTr: "Ürün talebi ve satış fiyatından oluşan satış geliri.",
+  },
+  {
+    en: ["Margin", "Net margin", "Unit margin", "Profit Margin", "Net Profit Margin"],
+    tr: ["Marj", "Net marj", "Birim marj", "Kâr Marjı", "Net Kâr Marjı"],
+    infoEn: "The share of revenue left after related costs are deducted.",
+    infoTr: "İlgili maliyetler düşüldükten sonra cirodan kalan pay.",
+  },
+  {
+    en: ["Break-even"],
+    tr: ["Başa baş"],
+    infoEn: "The point where accumulated income covers accumulated costs.",
+    infoTr: "Birikmiş gelirin birikmiş maliyeti karşıladığı nokta.",
+  },
+  {
+    en: ["Working capital"],
+    tr: ["İşletme sermayesi"],
+    infoEn: "Cash needed to carry operations before customer collections arrive.",
+    infoTr: "Müşteri tahsilatları gelmeden operasyonu taşımak için gereken nakit.",
+  },
+  {
+    en: ["Cash runway"],
+    tr: ["Nakit dayanma", "Kısa nakit dayanma"],
+    infoEn: "How long available cash can support the plan before it runs out.",
+    infoTr: "Mevcut nakdin planı tükenmeden ne kadar süre taşıyabileceği.",
+  },
+  {
+    en: ["Loan", "Loans", "Loan amount", "Total loan", "Loan records"],
+    tr: ["Kredi", "Krediler", "Kredi tutarı", "Toplam kredi", "Kredi kayıtları"],
+    infoEn: "Borrowed financing that affects cash inflow, repayment, interest, and runway.",
+    infoTr: "Nakit girişi, geri ödeme, faiz ve nakit dayanmayı etkileyen borç finansmanı.",
+  },
+  {
+    en: ["Term", "Loan term months", "Longest term", "Repayment term"],
+    tr: ["Vade", "Kredi vadesi ay", "En uzun vade", "Ödeme vadesi"],
+    infoEn: "The time period over which a loan or payment schedule runs.",
+    infoTr: "Kredi veya ödeme planının geçerli olduğu süre.",
+  },
+  {
+    en: ["Grace period", "Grace period months", "Longest grace"],
+    tr: ["Ödemesiz", "Ödemesiz ay", "En uzun ödemesiz"],
+    infoEn: "Months before cash repayment starts for a loan.",
+    infoTr: "Bir kredide nakit geri ödemenin başlamasından önceki aylar.",
+  },
+  {
+    en: ["Annual interest", "Annual interest %", "Estimated interest"],
+    tr: ["Yıllık faiz", "Yıllık faiz %", "Tahmini faiz"],
+    infoEn: "Financing cost charged yearly on borrowed money.",
+    infoTr: "Borç alınan para üzerinden yıllık hesaplanan finansman maliyeti.",
+  },
+  {
+    en: ["Currency", "FX", "Exchange rate"],
+    tr: ["Döviz", "Kur", "Döviz kuru"],
+    infoEn: "The money unit and conversion rate used for foreign-currency values.",
+    infoTr: "Yabancı para değerlerini çevirmek için kullanılan para birimi ve dönüşüm oranı.",
+  },
+  {
+    en: ["Demand", "Market demand", "Average monthly demand", "Unmet sales"],
+    tr: ["Talep", "Pazar talebi", "Ortalama aylık talep", "Karşılanmayan satış"],
+    infoEn: "Expected customer need used to calculate sales, capacity coverage, and stock risk.",
+    infoTr: "Satış, kapasite karşılama ve stok riskini hesaplamakta kullanılan beklenen müşteri ihtiyacı.",
+  },
+  {
+    en: ["Sales forecast", "Forecast", "Channel sales plan"],
+    tr: ["Satış tahmini", "Tahmin", "Kanal satış planı"],
+    infoEn: "Expected future sales by product, channel, timing, and volume.",
+    infoTr: "Ürün, kanal, zamanlama ve hacme göre beklenen gelecek satışlar.",
+  },
+  {
+    en: ["Inventory", "Inventory risk", "Unsold inventory", "Inventory Cost"],
+    tr: ["Stok", "Stok riski", "Satılmayan stok", "Stok maliyeti"],
+    infoEn: "Units held before sale and the risk or cost of carrying them.",
+    infoTr: "Satış öncesi elde tutulan ürünler ve bunları taşımanın riski veya maliyeti.",
+  },
+  {
+    en: ["Scenario", "Scenario test", "Simulation", "Variant"],
+    tr: ["Senaryo", "Senaryo testi", "Simülasyon", "Varyant"],
+    infoEn: "A test version of assumptions used to compare possible outcomes.",
+    infoTr: "Olası sonuçları karşılaştırmak için kullanılan varsayım testi.",
+  },
+  {
+    en: ["Risk", "Risk board", "Blocker", "High", "Medium", "Controlled"],
+    tr: ["Risk", "Risk panosu", "Engel", "Yüksek", "Orta", "Kontrollü"],
+    infoEn: "A condition that can reduce feasibility or require action before committing.",
+    infoTr: "Fizibiliteyi düşürebilecek veya karar öncesi aksiyon gerektiren durum.",
+  },
+  {
+    en: ["Report", "Report pack", "Report Downloads", "Export"],
+    tr: ["Rapor", "Rapor paketi", "Rapor İndirme", "Export"],
+    infoEn: "A packaged view of the current plan and evidence for review or sharing.",
+    infoTr: "Mevcut planı ve dayanaklarını incelemek veya paylaşmak için paketlenmiş görünüm.",
+  },
+  {
+    en: ["Permission", "Permissions", "Read", "Write", "Role", "User"],
+    tr: ["İzin", "İzinler", "Okuma", "Yazma", "Yetki", "Kullanıcı"],
+    infoEn: "Access control settings that determine who can view or change modules.",
+    infoTr: "Modülleri kimin görüntüleyip değiştirebileceğini belirleyen erişim ayarları.",
+  },
+  {
+    en: ["Status", "Ready", "Needed", "Needs input"],
+    tr: ["Durum", "Hazır", "Gerekli", "Girdi gerekli"],
+    infoEn: "A readiness signal showing whether the item can be used in the workflow.",
+    infoTr: "Öğenin iş akışında kullanılabilir olup olmadığını gösteren hazırlık işareti.",
+  },
+  {
+    en: ["Required", "Optional"],
+    tr: ["Zorunlu", "Opsiyonel"],
+    infoEn: "Shows whether the field must be filled before saving or calculation.",
+    infoTr: "Alanının kayıt veya hesaplama öncesi doldurulmasının gerekip gerekmediğini gösterir.",
+  },
+];
+
+function normalizeGlossaryText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/[()]/g, "")
+    .replace(/[:：]+$/g, "")
+    .trim()
+    .toLocaleLowerCase("tr-TR");
+}
+
+function getDirectTextContent(element) {
+  return Array.from(element.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildGlossaryLookup(language) {
+  return glossaryEntries.flatMap((entry) => {
+    const terms = language === "tr" ? entry.tr : entry.en;
+    const text = language === "tr" ? entry.infoTr : entry.infoEn;
+
+    return terms.map((term) => ({
+      key: normalizeGlossaryText(term),
+      label: term,
+      text,
+      wordCount: normalizeGlossaryText(term).split(" ").filter(Boolean).length,
+    }));
+  }).sort((left, right) => right.key.length - left.key.length);
+}
+
+const obviousGlossaryLabels = new Set([
+  "dashboard",
+  "overview",
+  "product",
+  "ürün",
+  "recipe",
+  "reçete",
+  "material",
+  "malzeme",
+  "machine",
+  "makine",
+  "equipment",
+  "ekipman",
+  "workforce",
+  "işgücü",
+  "process",
+  "süreç",
+  "capacity",
+  "kapasite",
+  "cycle",
+  "çevrim",
+  "speed",
+  "hız",
+  "flow",
+  "akış",
+  "cost",
+  "maliyet",
+  "revenue",
+  "ciro",
+  "income",
+  "gelir",
+  "loan",
+  "kredi",
+  "currency",
+  "döviz",
+  "kur",
+  "demand",
+  "talep",
+  "inventory",
+  "stok",
+  "scenario",
+  "senaryo",
+  "simulation",
+  "simülasyon",
+  "variant",
+  "varyant",
+  "risk",
+  "report",
+  "rapor",
+  "permission",
+  "izin",
+  "role",
+  "yetki",
+  "user",
+  "kullanıcı",
+  "status",
+  "durum",
+  "ready",
+  "hazır",
+  "needed",
+  "gerekli",
+  "required",
+  "zorunlu",
+  "optional",
+  "opsiyonel",
+]);
+
+function findGlossaryEntry(label, lookup) {
+  const normalized = normalizeGlossaryText(label);
+  if (!normalized || /^\d+([.,]\d+)?$/.test(normalized)) return null;
+  if (obviousGlossaryLabels.has(normalized)) return null;
+
+  return lookup.find((entry) => (
+    normalized === entry.key
+    || (entry.wordCount > 1 && (
+      normalized.startsWith(`${entry.key} `)
+      || normalized.endsWith(` ${entry.key}`)
+      || normalized.includes(` ${entry.key} `)
+    ))
+  ));
+}
+
+function createGlossaryInfoTip(entry, language) {
+  const wrapper = document.createElement("span");
+  wrapper.className = "info-tip global-term-infobar";
+  wrapper.dataset.globalTermInfobar = "true";
+
+  const trigger = document.createElement("span");
+  trigger.className = "info-tip-icon";
+  trigger.setAttribute("aria-label", `${entry.label} ${language === "tr" ? "bilgi" : "info"}`);
+  trigger.setAttribute("role", "button");
+  trigger.setAttribute("tabindex", "0");
+  trigger.textContent = "i";
+
+  const panel = document.createElement("span");
+  panel.className = "info-tip-panel";
+  panel.setAttribute("role", "tooltip");
+  panel.textContent = entry.text;
+
+  wrapper.append(trigger, panel);
+  return wrapper;
+}
+
+function applyGlobalTermInfobars(root, language) {
+  if (!root) return;
+
+  const lookup = buildGlossaryLookup(language);
+  const selector = [
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "dt",
+    "th",
+    "mark",
+    "label > span",
+    "summary span",
+    "article > span",
+    ".operations-tabs button",
+    ".mini-tabs button",
+    ".reports-tabs button",
+    ".financial-loan-summary-card > span",
+    ".financial-loan-card-metrics > span",
+    ".dashboard-detail-list span",
+    ".dashboard-kpi-card span",
+    ".process-product-selected span",
+    ".machine-row span:first-child",
+  ].join(",");
+
+  root.querySelectorAll(selector).forEach((element) => {
+    if (
+      element.dataset.termInfobarApplied
+      || element.closest(".info-tip")
+      || element.closest(".dashboard-sidebar")
+      || element.closest(".landing-nav")
+      || element.closest(".dashboard-nav")
+      || element.closest(".dashboard-subnav")
+      || element.closest(".operations-header")
+      || element.closest(".reports-header")
+      || element.closest(".financial-loan-hero")
+      || element.closest(".financial-header")
+      || element.closest(".simulation-header")
+      || element.closest(".sales-header")
+      || element.querySelector(":scope > .global-term-infobar")
+      || element.matches("input, select, textarea, option")
+    ) {
+      return;
+    }
+
+    const label = getDirectTextContent(element);
+    const entry = findGlossaryEntry(label, lookup);
+    if (!entry) return;
+
+    element.dataset.termInfobarApplied = "true";
+    element.classList.add("term-with-infobar");
+    element.appendChild(createGlossaryInfoTip(entry, language));
+  });
+}
+
 function normalizeCurrencyCode(value) {
   const currency = String(value || "TRY").trim().toUpperCase();
   return /^[A-Z]{3}$/.test(currency) ? currency : "TRY";
@@ -1651,6 +2061,7 @@ function App() {
   const [processDefinitionOpen, setProcessDefinitionOpen] = useState(false);
   const [operationsLoading, setOperationsLoading] = useState(false);
   const [operationsStatus, setOperationsStatus] = useState("");
+  const [tableControls, setTableControls] = useState({});
   const [salesStrategy, setSalesStrategy] = useState(emptySalesStrategy);
   const [salesStatus, setSalesStatus] = useState("");
   const [salesLoading, setSalesLoading] = useState(false);
@@ -1704,6 +2115,47 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = form.language;
   }, [form.language]);
+
+  useEffect(() => {
+    const root = document.body;
+    let frameId = 0;
+    let observer;
+
+    const refreshInfobars = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+
+      frameId = requestAnimationFrame(() => {
+        observer?.disconnect();
+        document.querySelectorAll(".global-term-infobar").forEach((node) => node.remove());
+        document.querySelectorAll("[data-term-infobar-applied]").forEach((node) => {
+          node.classList.remove("term-with-infobar");
+          delete node.dataset.termInfobarApplied;
+        });
+        applyGlobalTermInfobars(root, form.language);
+        observer?.observe(root, { childList: true, subtree: true });
+      });
+    };
+
+    refreshInfobars();
+
+    observer = new MutationObserver((mutations) => {
+      if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest(".info-tip"))) {
+        return;
+      }
+      refreshInfobars();
+    });
+
+    observer.observe(root, { childList: true, subtree: true });
+
+    return () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+      observer.disconnect();
+    };
+  }, [form.language, path]);
 
   useEffect(() => {
     if (path === "/operations/data-entry") {
@@ -3367,6 +3819,221 @@ function App() {
     goTo("/login", "login");
   }
 
+  const updateTableControl = (tableId, patch) => {
+    setTableControls((current) => ({
+      ...current,
+      [tableId]: {
+        ...(current[tableId] || {}),
+        ...patch,
+      },
+    }));
+  };
+
+  const getNextTableSortPatch = (control, key) => {
+    if (control.sortKey !== key) {
+      return { direction: "asc", sortKey: key };
+    }
+
+    if (control.direction === "asc") {
+      return { direction: "desc", sortKey: key };
+    }
+
+    return { direction: undefined, sortKey: undefined };
+  };
+
+  const getTableColumnKey = (column, index) => column.key || column.header || `column-${index}`;
+
+  const getTableCellValue = (column, row) => {
+    if (column.value) return column.value(row);
+    if (column.sortValue) return column.sortValue(row);
+    if (column.filterValue) return column.filterValue(row);
+    if (column.render) return column.render(row);
+    return "";
+  };
+
+  const normalizeTableValue = (value) => {
+    if (value == null || value === false) return "";
+    if (typeof value === "number") return value;
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) return value.map(normalizeTableValue).join(" ");
+    if (React.isValidElement(value)) return "";
+    return String(value);
+  };
+
+  const getSortableTableRows = (tableId, rows, columns) => {
+    const control = tableControls[tableId] || {};
+    const query = normalizeGlossaryText(control.query || "");
+    const filteredRows = rows.filter((row) => {
+      if (!query) return true;
+
+      return columns.some((column) => {
+        const rawValue = column.filterValue ? column.filterValue(row) : getTableCellValue(column, row);
+        return normalizeGlossaryText(normalizeTableValue(rawValue)).includes(query);
+      });
+    });
+
+    if (!control.sortKey) return filteredRows;
+
+    const column = columns.find((item, index) => getTableColumnKey(item, index) === control.sortKey);
+    if (!column || column.sortable === false) return filteredRows;
+
+    const direction = control.direction === "desc" ? -1 : 1;
+    return [...filteredRows].sort((leftRow, rightRow) => {
+      const leftValue = normalizeTableValue(column.sortValue ? column.sortValue(leftRow) : getTableCellValue(column, leftRow));
+      const rightValue = normalizeTableValue(column.sortValue ? column.sortValue(rightRow) : getTableCellValue(column, rightRow));
+
+      if (typeof leftValue === "number" && typeof rightValue === "number") {
+        return (leftValue - rightValue) * direction;
+      }
+
+      return String(leftValue).localeCompare(String(rightValue), locale, { numeric: true, sensitivity: "base" }) * direction;
+    });
+  };
+
+  const renderTableToolbar = (tableId, rows, visibleRows) => {
+    const control = tableControls[tableId] || {};
+
+    return (
+      <div className="table-control-bar">
+        <label>
+          <span>{copy("Filter", "Filtrele")}</span>
+          <input
+            type="search"
+            value={control.query || ""}
+            placeholder={copy("Search table", "Tabloda ara")}
+            onChange={(event) => updateTableControl(tableId, { query: event.target.value })}
+          />
+        </label>
+        <strong>{formatNumber(visibleRows.length)} / {formatNumber(rows.length)}</strong>
+      </div>
+    );
+  };
+
+  const renderSortableTableHead = (tableId, columns, gridTemplateColumns) => {
+    const control = tableControls[tableId] || {};
+
+    return (
+      <div className="operation-data-row operation-data-head sortable-table-head" style={{ gridTemplateColumns }}>
+        {columns.map((column, index) => {
+          const key = getTableColumnKey(column, index);
+          const active = control.sortKey === key;
+
+          return (
+            <button
+              type="button"
+              className={active ? "active" : ""}
+              disabled={column.sortable === false}
+              key={key}
+              onClick={() => updateTableControl(tableId, getNextTableSortPatch(control, key))}
+            >
+              <span>{column.header}</span>
+              {column.sortable !== false && <small aria-hidden="true">{active ? (control.direction === "desc" ? "DESC" : "ASC") : "SORT"}</small>}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderSortableDataTable = ({
+    columns,
+    emptyLabel,
+    gridTemplateColumns,
+    getRowKey = (row) => row.id,
+    onRowClick,
+    rows,
+    tableId,
+    useButtonRows = false,
+  }) => {
+    const visibleRows = getSortableTableRows(tableId, rows, columns);
+    const displayRows = visibleRows.length ? visibleRows : [{ id: "empty" }];
+    const rowElement = useButtonRows ? "button" : "div";
+
+    return (
+      <>
+        {renderTableToolbar(tableId, rows, visibleRows)}
+        <div className="operation-data-table">
+          {renderSortableTableHead(tableId, columns, gridTemplateColumns)}
+          {displayRows.map((row) => {
+            const isEmpty = row.id === "empty";
+            const RowTag = rowElement;
+
+            return (
+              <RowTag
+                type={useButtonRows ? "button" : undefined}
+                className={`operation-data-row${useButtonRows ? " operation-data-button-row" : ""}${isEmpty ? " table-empty-row" : ""}`}
+                style={{ gridTemplateColumns }}
+                key={isEmpty ? `${tableId}-empty` : getRowKey(row)}
+                onClick={useButtonRows ? () => {
+                  if (!isEmpty && onRowClick) onRowClick(row);
+                } : undefined}
+              >
+                {isEmpty ? (
+                  <span className="table-empty-cell">{emptyLabel || copy("No matching records", "Eşleşen kayıt yok")}</span>
+                ) : columns.map((column, index) => (
+                  <span key={getTableColumnKey(column, index)}>{column.render ? column.render(row) : normalizeTableValue(getTableCellValue(column, row))}</span>
+                ))}
+              </RowTag>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
+
+  const renderSimpleSortableGrid = ({
+    columns,
+    emptyLabel,
+    getRowKey = (row) => row.id,
+    gridTemplateColumns,
+    headClassName,
+    rowClassName,
+    rows,
+    tableClassName,
+    tableId,
+  }) => {
+    const visibleRows = getSortableTableRows(tableId, rows, columns);
+    const control = tableControls[tableId] || {};
+
+    return (
+      <>
+        {renderTableToolbar(tableId, rows, visibleRows)}
+        <div className={tableClassName}>
+          <div className={`${rowClassName} ${headClassName} sortable-table-head`} style={{ gridTemplateColumns }}>
+            {columns.map((column, index) => {
+              const key = getTableColumnKey(column, index);
+              const active = control.sortKey === key;
+
+              return (
+                <button
+                  type="button"
+                  className={active ? "active" : ""}
+                  disabled={column.sortable === false}
+                  key={key}
+                  onClick={() => updateTableControl(tableId, getNextTableSortPatch(control, key))}
+                >
+                  <span>{column.header}</span>
+                  {column.sortable !== false && <small aria-hidden="true">{active ? (control.direction === "desc" ? "DESC" : "ASC") : "SORT"}</small>}
+                </button>
+              );
+            })}
+          </div>
+          {(visibleRows.length ? visibleRows : [{ id: "empty" }]).map((row) => (
+            <div className={`${rowClassName}${row.id === "empty" ? " table-empty-row" : ""}`} style={{ gridTemplateColumns }} key={row.id === "empty" ? `${tableId}-empty` : getRowKey(row)}>
+              {row.id === "empty" ? (
+                <span className="table-empty-cell">{emptyLabel || copy("No matching records", "Eşleşen kayıt yok")}</span>
+              ) : columns.map((column, index) => {
+                const content = column.render ? column.render(row) : normalizeTableValue(getTableCellValue(column, row));
+                const CellTag = index === 0 && (rowClassName.includes("users-row") || rowClassName.includes("permissions-row")) ? "strong" : "span";
+                return <CellTag key={getTableColumnKey(column, index)}>{content}</CellTag>;
+              })}
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  };
+
   function renderOperationPlanner() {
     const result = operationPlanResult
       ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, operationsWorkspaceForFinance, { optimize: false })
@@ -3404,6 +4071,11 @@ function App() {
         <InfoTip label={`${label} ${copy("info", "bilgi")}`} text={info} />
       </span>
     );
+    const resultSummaryColumns = [
+      { header: copy("Category", "Kategori"), key: "category", render: (row) => row.group, value: (row) => row.group },
+      { header: copy("Metric", "Metrik"), key: "metric", render: (row) => (row.info ? infoLabel(row.label, row.info) : row.label), value: (row) => row.label },
+      { header: copy("Value", "Değer"), key: "value", render: (row) => row.value, value: (row) => row.value },
+    ];
     const resultTableRows = result ? [
       {
         id: "product",
@@ -3954,22 +4626,15 @@ function App() {
               </div>
               <mark className="ok">{`${formatNumber(result.energyConsumptionKwh, 2)} kWh`}</mark>
             </div>
-            <div className="process-result-table" role="table" aria-label={copy("Flow and cost summary", "Akış ve maliyet özeti")}>
-              <div className="process-result-table-row process-result-table-head" role="row">
-                <span role="columnheader">{copy("Category", "Kategori")}</span>
-                <span role="columnheader">{copy("Metric", "Metrik")}</span>
-                <span role="columnheader">{copy("Value", "Değer")}</span>
-              </div>
-              {resultTableRows.map((row) => (
-                <div className="process-result-table-row" role="row" key={row.id}>
-                  <span className="process-result-group" role="cell">{row.group}</span>
-                  <span className="process-result-metric" role="cell">
-                    {row.info ? infoLabel(row.label, row.info) : row.label}
-                  </span>
-                  <strong className="process-result-value" role="cell">{row.value}</strong>
-                </div>
-              ))}
-            </div>
+            {renderSimpleSortableGrid({
+              columns: resultSummaryColumns,
+              gridTemplateColumns: "0.72fr 1.15fr 1fr",
+              headClassName: "process-result-table-head",
+              rowClassName: "process-result-table-row",
+              rows: resultTableRows,
+              tableClassName: "process-result-table",
+              tableId: "process-result-summary",
+            })}
           </article>
         )}
       </section>
@@ -4058,6 +4723,29 @@ function App() {
       ...operationsWorkspace.workforce.map((workforce) => workforce.hourly_cost_currency || "TRY"),
     ]).size;
     const pricedMaterialCount = operationsWorkspace.materials.filter((material) => toFiniteNumber(material.price_per_unit) > 0).length;
+    const materialColumns = [
+      { header: copy("Material", "Malzeme"), key: "material", render: (row) => row.name, value: (row) => row.name },
+      { header: copy("Unit", "Birim"), key: "unit", render: (row) => row.unit, value: (row) => row.unit },
+      {
+        header: copy("Unit price", "Birim fiyat"),
+        key: "unit-price",
+        render: (row) => formatOperationMoney(row.price_per_unit, row.price_currency, exchangeRates, 2),
+        sortValue: (row) => toFiniteNumber(row.price_per_unit),
+        filterValue: (row) => `${row.price_per_unit} ${formatOperationMoney(row.price_per_unit, row.price_currency, exchangeRates, 2)}`,
+      },
+      { header: copy("Currency", "Para birimi"), key: "currency", render: (row) => row.price_currency || "TRY", value: (row) => row.price_currency || "TRY" },
+    ];
+    const workforceColumns = [
+      { header: copy("Role", "Rol"), key: "role", render: (row) => row.role_name, value: (row) => row.role_name },
+      {
+        header: copy("Hourly cost", "Saatlik maliyet"),
+        key: "hourly-cost",
+        render: (row) => `${formatOperationMoney(row.hourly_cost, row.hourly_cost_currency, exchangeRates, 2)} / ${copy("hour", "saat")}`,
+        sortValue: (row) => toFiniteNumber(row.hourly_cost),
+        filterValue: (row) => `${row.hourly_cost} ${formatOperationMoney(row.hourly_cost, row.hourly_cost_currency, exchangeRates, 2)}`,
+      },
+      { header: copy("Currency", "Para birimi"), key: "currency", render: (row) => row.hourly_cost_currency || "TRY", value: (row) => row.hourly_cost_currency || "TRY" },
+    ];
 
     return renderDashboardLayout(
       "operations/resources",
@@ -4146,31 +4834,14 @@ function App() {
                 <h2>{copy("Materials", "Malzemeler")}</h2>
                 <span>{operationsWorkspace.materials.length} {copy("records", "kayıt")}</span>
               </div>
-              <div className="operation-data-table">
-                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: "1.2fr 0.6fr 0.9fr 0.7fr" }}>
-                  <span>{copy("Material", "Malzeme")}</span>
-                  <span>{copy("Unit", "Birim")}</span>
-                  <span>{copy("Unit price", "Birim fiyat")}</span>
-                  <span>{copy("Currency", "Para birimi")}</span>
-                </div>
-                {(operationsWorkspace.materials.length ? operationsWorkspace.materials : [{ id: "empty" }]).map((material) => (
-                  <button
-                    type="button"
-                    className="operation-data-row operation-data-button-row"
-                    style={{ gridTemplateColumns: "1.2fr 0.6fr 0.9fr 0.7fr" }}
-                    key={material.id}
-                    onClick={() => {
-                      if (material.id === "empty") return;
-                      copyOperationRecordToForm("material", material);
-                    }}
-                  >
-                    <span>{material.id === "empty" ? "-" : material.name}</span>
-                    <span>{material.id === "empty" ? "-" : material.unit}</span>
-                    <span>{material.id === "empty" ? "-" : formatOperationMoney(material.price_per_unit, material.price_currency, exchangeRates, 2)}</span>
-                    <span>{material.id === "empty" ? "-" : material.price_currency || "TRY"}</span>
-                  </button>
-                ))}
-              </div>
+              {renderSortableDataTable({
+                columns: materialColumns,
+                gridTemplateColumns: "1.2fr 0.6fr 0.9fr 0.7fr",
+                onRowClick: (material) => copyOperationRecordToForm("material", material),
+                rows: operationsWorkspace.materials,
+                tableId: "materials",
+                useButtonRows: true,
+              })}
             </article>
 
             <form ref={workforceFormRef} className="operation-card operation-data-form resource-definition-card operations-record-form-card operations-workforce-form-card" onSubmit={(event) => handleSaveOperationRecord("workforce", event)}>
@@ -4218,29 +4889,14 @@ function App() {
                 <h2>{copy("Human Resources", "İnsan Kaynağı")}</h2>
                 <span>{operationsWorkspace.workforce.length} {copy("records", "kayıt")}</span>
               </div>
-              <div className="operation-data-table">
-                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: "1.2fr 0.9fr 0.7fr" }}>
-                  <span>{copy("Role", "Rol")}</span>
-                  <span>{copy("Hourly cost", "Saatlik maliyet")}</span>
-                  <span>{copy("Currency", "Para birimi")}</span>
-                </div>
-                {(operationsWorkspace.workforce.length ? operationsWorkspace.workforce : [{ id: "empty" }]).map((workforce) => (
-                  <button
-                    type="button"
-                    className="operation-data-row operation-data-button-row"
-                    style={{ gridTemplateColumns: "1.2fr 0.9fr 0.7fr" }}
-                    key={workforce.id}
-                    onClick={() => {
-                      if (workforce.id === "empty") return;
-                      copyOperationRecordToForm("workforce", workforce);
-                    }}
-                  >
-                    <span>{workforce.id === "empty" ? "-" : workforce.role_name}</span>
-                    <span>{workforce.id === "empty" ? "-" : `${formatOperationMoney(workforce.hourly_cost, workforce.hourly_cost_currency, exchangeRates, 2)} / ${copy("hour", "saat")}`}</span>
-                    <span>{workforce.id === "empty" ? "-" : workforce.hourly_cost_currency || "TRY"}</span>
-                  </button>
-                ))}
-              </div>
+              {renderSortableDataTable({
+                columns: workforceColumns,
+                gridTemplateColumns: "1.2fr 0.9fr 0.7fr",
+                onRowClick: (workforce) => copyOperationRecordToForm("workforce", workforce),
+                rows: operationsWorkspace.workforce,
+                tableId: "workforce",
+                useButtonRows: true,
+              })}
             </article>
 
             <article className="operation-card resource-definition-card resource-guidance-card">
@@ -4290,6 +4946,54 @@ function App() {
       batch: copy("Batch", "Toplu"),
       flow: copy("Flow / Pull", "Akış / Pull"),
       parallel: copy("Parallel simulation", "Paralel simülasyon"),
+    };
+    const getProductRecipeSummary = (product) => (
+      (product.material_rows || []).map((row) => `${row.material?.name || "-"}: ${formatNumber(row.quantity_per_unit, 4)} ${row.material?.unit || ""}`).join(", ") || "-"
+    );
+    const getProductFlowSummary = (product) => {
+      const flowDefaults = getProductFlowDefaults(product);
+      return `${productFlowStrategyLabels[flowDefaults.flowStrategy]} / ${formatNumber(flowDefaults.batchSize, 0)} / min ${formatNumber(flowDefaults.minimumTransferQuantity, 0)}`;
+    };
+    const productColumns = [
+      { header: copy("Product", "Ürün"), key: "product", render: (row) => row.name, value: (row) => row.name },
+      { header: copy("Unit", "Birim"), key: "unit", render: (row) => row.unit || "adet", value: (row) => row.unit || "adet" },
+      {
+        header: copy("Price", "Fiyat"),
+        key: "price",
+        render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates, 2),
+        sortValue: (row) => toFiniteNumber(row.price),
+        filterValue: (row) => `${row.price} ${row.price_currency || "TRY"} ${formatOperationMoney(row.price, row.price_currency, exchangeRates, 2)}`,
+      },
+      {
+        header: copy("Cycle", "Çevrim"),
+        key: "cycle",
+        render: (row) => formatCycleTime(row.cycle_time_minutes || 1, row.cycle_time_unit || "minute"),
+        sortValue: (row) => toFiniteNumber(row.cycle_time_minutes || 1),
+      },
+      { header: copy("Flow defaults", "Akış varsayılanı"), key: "flow", render: getProductFlowSummary, value: getProductFlowSummary },
+      { header: copy("Materials", "Malzemeler"), key: "materials", render: getProductRecipeSummary, value: getProductRecipeSummary },
+    ];
+    const copyProductToForm = (product) => {
+      const flowDefaults = getProductFlowDefaults(product);
+
+      setOperationForms((current) => ({
+        ...current,
+        product: {
+          ...getCycleTimeInputFromMinutes(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute"),
+          defaultBatchSize: flowDefaults.batchSize,
+          defaultFlowStrategy: flowDefaults.flowStrategy,
+          id: product.id,
+          materialRows: (product.material_rows || []).map((row) => ({
+            materialId: row.material_id,
+            quantityPerUnit: row.quantity_per_unit,
+          })),
+          minimumTransferQuantity: flowDefaults.minimumTransferQuantity,
+          name: product.name || "",
+          price: product.price || 0,
+          priceCurrency: product.price_currency || "TRY",
+          unit: product.unit || "adet",
+        },
+      }));
     };
 
     return renderDashboardLayout(
@@ -4521,54 +5225,14 @@ function App() {
                 <h2>{copy("Records", "Kayıtlar")}</h2>
                 <span>{operationsWorkspace.products.length} {copy("records", "kayıt")}</span>
               </div>
-              <div className="operation-data-table">
-                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: "1.2fr 0.6fr 0.8fr 0.8fr 1fr 1.4fr" }}>
-                  <span>{copy("Product", "Ürün")}</span>
-                  <span>{copy("Unit", "Birim")}</span>
-                  <span>{copy("Price", "Fiyat")}</span>
-                  <span>{copy("Cycle", "Çevrim")}</span>
-                  <span>{copy("Flow defaults", "Akış varsayılanı")}</span>
-                  <span>{copy("Materials", "Malzemeler")}</span>
-                </div>
-                {(operationsWorkspace.products.length ? operationsWorkspace.products : [{ id: "empty" }]).map((product) => (
-                  <button
-                    type="button"
-                    className="operation-data-row operation-data-button-row"
-                    style={{ gridTemplateColumns: "1.2fr 0.6fr 0.8fr 0.8fr 1fr 1.4fr" }}
-                    key={product.id}
-                    onClick={() => {
-                      if (product.id === "empty") return;
-                      const flowDefaults = getProductFlowDefaults(product);
-
-                      setOperationForms((current) => ({
-                        ...current,
-                        product: {
-                          ...getCycleTimeInputFromMinutes(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute"),
-                          defaultBatchSize: flowDefaults.batchSize,
-                          defaultFlowStrategy: flowDefaults.flowStrategy,
-                          id: product.id,
-                          materialRows: (product.material_rows || []).map((row) => ({
-                            materialId: row.material_id,
-                            quantityPerUnit: row.quantity_per_unit,
-                          })),
-                          minimumTransferQuantity: flowDefaults.minimumTransferQuantity,
-                          name: product.name || "",
-                          price: product.price || 0,
-                          priceCurrency: product.price_currency || "TRY",
-                          unit: product.unit || "adet",
-                        },
-                      }));
-                    }}
-                  >
-                    <span>{product.id === "empty" ? "-" : product.name}</span>
-                    <span>{product.id === "empty" ? "-" : product.unit || "adet"}</span>
-                    <span>{product.id === "empty" ? "-" : formatOperationMoney(product.price, product.price_currency, exchangeRates, 2)}</span>
-                    <span>{product.id === "empty" ? "-" : formatCycleTime(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute")}</span>
-                    <span>{product.id === "empty" ? "-" : `${productFlowStrategyLabels[getProductFlowDefaults(product).flowStrategy]} / ${formatNumber(getProductFlowDefaults(product).batchSize, 0)} / min ${formatNumber(getProductFlowDefaults(product).minimumTransferQuantity, 0)}`}</span>
-                    <span>{product.id === "empty" ? "-" : (product.material_rows || []).map((row) => `${row.material?.name || "-"}: ${formatNumber(row.quantity_per_unit, 4)} ${row.material?.unit || ""}`).join(", ") || "-"}</span>
-                  </button>
-                ))}
-              </div>
+              {renderSortableDataTable({
+                columns: productColumns,
+                gridTemplateColumns: "1.2fr 0.6fr 0.8fr 0.8fr 1fr 1.4fr",
+                onRowClick: copyProductToForm,
+                rows: operationsWorkspace.products,
+                tableId: "products",
+                useButtonRows: true,
+              })}
             </article>
           </div>
           {operationsStatus && <p className="status-message">{operationsStatus}</p>}
@@ -5297,16 +5961,7 @@ function App() {
       <form className="financial-loan-form" onSubmit={handleSaveFinancialSettings}>
         <section className="financial-loan-hero">
           <div>
-            <span className="heading-with-info">
-              {copy("Financing plan", "Finansman planı")}
-              <InfoTip
-                label={copy("Loan calculation info", "Kredi hesaplama bilgisi")}
-                text={copy(
-                  "TRY-based loan total is calculated as TRY loans + USD loans x USD/TRY + EUR loans x EUR/TRY. Monthly payments use the same currency conversion.",
-                  "TL bazlı kredi toplamı TL krediler + USD krediler x USD/TRY + EUR krediler x EUR/TRY olarak hesaplanır. Aylık ödemelerde de aynı dönüşüm kullanılır.",
-                )}
-              />
-            </span>
+            <span>{copy("Financing plan", "Finansman planı")}</span>
             <h2>{copy("Loans", "Krediler")}</h2>
             <p>{copy("Add each loan separately, including its no-payment grace period. The feasibility model starts cash payments after the grace months.", "Her krediyi ayrı ekleyin; ilk kaç ay ödeme olmayacağını belirtin. Fizibilite modeli nakit ödemeleri ödemesiz aylar bittikten sonra başlatır.")}</p>
           </div>
@@ -6760,6 +7415,18 @@ function App() {
     ];
     const getSalesTypeLabel = (type) => (form.language === "tr" ? type.nameTr || type.nameEn : type.nameEn || type.nameTr) || type.id;
     const getSalesTypeDescription = (type) => (form.language === "tr" ? type.descriptionTr || type.descriptionEn : type.descriptionEn || type.descriptionTr) || "";
+    const getCampaignTypeLabel = (campaign) => {
+      const selectedType = campaignTypeOptions.find((type) => type.id === (campaign.typeId || "digital"));
+      return selectedType ? getSalesTypeLabel(selectedType) : "";
+    };
+    const campaignTableColumns = [
+      { header: copy("Campaign", "Kampanya"), key: "campaign", render: (row) => row.name || "", value: (row) => row.name || "" },
+      { header: copy("Type", "Tip"), key: "type", render: getCampaignTypeLabel, value: getCampaignTypeLabel },
+      { header: copy("Channel", "Kanal"), key: "channel", render: (row) => row.channel || "", value: (row) => row.channel || "" },
+      { header: copy("Budget", "Bütçe"), key: "budget", render: (row) => formatLira(toFiniteNumber(row.budget)), sortValue: (row) => toFiniteNumber(row.budget) },
+      { header: copy("Duration", "Süre"), key: "duration", render: (row) => toFiniteNumber(row.durationDays), sortValue: (row) => toFiniteNumber(row.durationDays) },
+    ];
+    const visibleCampaignRows = getSortableTableRows("sales-campaigns", salesStrategy.campaigns, campaignTableColumns);
     const salesChannelRequiredFields = [
       { field: "startMonth", info: copy("The first model month where this channel can sell. Earlier months contribute zero sales for this channel.", "Bu kanalın satışa başlayacağı ilk model ayı. Önceki aylar bu kanal için sıfır satış üretir."), label: copy("Start month", "Başlangıç Ayı"), min: 1, step: "1" },
       { field: "monthlySalesUnits", info: copy("Base sales promise for the first active month. Forecast then applies growth, expectation multiplier, seasonality, traffic score, returns, and limits.", "İlk aktif ay için temel satış vaadi. Tahmin sonrasında büyüme, beklenti çarpanı, sezonsallık, trafik skoru, iadeler ve limitler uygulanır."), label: copy("First month sales (units)", "İlk Ay Satış (Adet)"), min: 0, step: "1" },
@@ -7087,8 +7754,35 @@ function App() {
                   }}
                 >{copy("Add Campaign", "Kampanya Ekle")}</button>
               </summary>
+              {renderTableToolbar("sales-campaigns", salesStrategy.campaigns, visibleCampaignRows)}
               <div className="sales-table">
-                {salesStrategy.campaigns.map((campaign, index) => {
+                <div className="sales-table-row sales-table-head campaign-row-layout sortable-table-head">
+                  {campaignTableColumns.map((column, columnIndex) => {
+                    const key = getTableColumnKey(column, columnIndex);
+                    const control = tableControls["sales-campaigns"] || {};
+                    const active = control.sortKey === key;
+
+                    return (
+                      <button
+                        type="button"
+                        className={active ? "active" : ""}
+                        key={key}
+                        onClick={() => updateTableControl("sales-campaigns", getNextTableSortPatch(control, key))}
+                      >
+                        <span>{column.header}</span>
+                        <small aria-hidden="true">{active ? (control.direction === "desc" ? "DESC" : "ASC") : "SORT"}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+                {(visibleCampaignRows.length ? visibleCampaignRows : [{ id: "empty" }]).map((campaign, index) => {
+                  if (campaign.id === "empty") {
+                    return (
+                      <div className="sales-table-row campaign-row-layout table-empty-row" key="sales-campaigns-empty">
+                        <span className="table-empty-cell">{copy("No matching records", "Eşleşen kayıt yok")}</span>
+                      </div>
+                    );
+                  }
                   const selectedType = campaignTypeOptions.find((type) => type.id === (campaign.typeId || "digital"));
 
                   return (
@@ -7178,18 +7872,12 @@ function App() {
                 <h2>{copy("Records", "Kayıtlar")}</h2>
                 <span>{rows.length} {copy("records", "kayıt")}</span>
               </div>
-              <div className="operation-data-table">
-                <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(120px, 1fr))` }}>
-                  {columns.map((column) => <span key={column.header}>{column.header}</span>)}
-                </div>
-                {(rows.length ? rows : [{ id: "empty" }]).map((row) => (
-                  <div className="operation-data-row" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(120px, 1fr))` }} key={row.id}>
-                    {columns.map((column) => (
-                      <span key={column.header}>{row.id === "empty" ? "-" : column.render(row)}</span>
-                    ))}
-                  </div>
-                ))}
-              </div>
+              {renderSortableDataTable({
+                columns,
+                gridTemplateColumns: `repeat(${columns.length}, minmax(120px, 1fr))`,
+                rows,
+                tableId: `operations-${entity}`,
+              })}
             </article>
           </div>
           {operationsStatus && <p className="status-message">{operationsStatus}</p>}
@@ -7215,27 +7903,27 @@ function App() {
       { name: "quantity", label: copy("Equipment quantity", "Ekipman miktarı"), step: "1", type: "number" },
     ];
     const machineColumns = [
-      { header: copy("Machine", "Makine"), render: (row) => row.name },
-      { header: copy("Price", "Fiyat"), render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates) },
-      { header: copy("Hourly Energy", "Saatlik Enerji"), render: (row) => `${formatNumber(row.hourly_energy_consumption_kwh, 2)} kWh` },
-      { header: copy("Capacity", "Kapasite"), render: (row) => formatNumber(row.concurrent_capacity || 1) },
-      { header: copy("Availability", "Çalışma"), render: (row) => `${formatNumber(row.availability_hours || 8, 2)} ${copy("hours", "saat")}` },
-      { header: copy("Speed", "Hız"), render: (row) => `${formatNumber(row.speed_multiplier || 1, 2)}x` },
+      { header: copy("Machine", "Makine"), key: "machine", render: (row) => row.name, value: (row) => row.name },
+      { header: copy("Price", "Fiyat"), key: "price", render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates), sortValue: (row) => toFiniteNumber(row.price), filterValue: (row) => `${row.price} ${row.price_currency || "TRY"}` },
+      { header: copy("Hourly Energy", "Saatlik Enerji"), key: "energy", render: (row) => `${formatNumber(row.hourly_energy_consumption_kwh, 2)} kWh`, sortValue: (row) => toFiniteNumber(row.hourly_energy_consumption_kwh) },
+      { header: copy("Capacity", "Kapasite"), key: "capacity", render: (row) => formatNumber(row.concurrent_capacity || 1), sortValue: (row) => toFiniteNumber(row.concurrent_capacity || 1) },
+      { header: copy("Availability", "Çalışma"), key: "availability", render: (row) => `${formatNumber(row.availability_hours || 8, 2)} ${copy("hours", "saat")}`, sortValue: (row) => toFiniteNumber(row.availability_hours || 8) },
+      { header: copy("Speed", "Hız"), key: "speed", render: (row) => `${formatNumber(row.speed_multiplier || 1, 2)}x`, sortValue: (row) => toFiniteNumber(row.speed_multiplier || 1) },
       { header: copy("Copy", "Kopyala"), render: (row) => (
         <button type="button" className="record-copy-button" onClick={() => copyOperationRecordToForm("machine", row)}>
           {copy("Copy", "Kopyala")}
         </button>
-      ) },
+      ), key: "copy", sortable: false },
     ];
     const equipmentColumns = [
-      { header: copy("Equipment", "Ekipman"), render: (row) => row.name },
-      { header: copy("Price", "Fiyat"), render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates) },
-      { header: copy("Quantity", "Miktar"), render: (row) => formatNumber(row.quantity) },
+      { header: copy("Equipment", "Ekipman"), key: "equipment", render: (row) => row.name, value: (row) => row.name },
+      { header: copy("Price", "Fiyat"), key: "price", render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates), sortValue: (row) => toFiniteNumber(row.price), filterValue: (row) => `${row.price} ${row.price_currency || "TRY"}` },
+      { header: copy("Quantity", "Miktar"), key: "quantity", render: (row) => formatNumber(row.quantity), sortValue: (row) => toFiniteNumber(row.quantity) },
       { header: copy("Copy", "Kopyala"), render: (row) => (
         <button type="button" className="record-copy-button" onClick={() => copyOperationRecordToForm("equipment", row)}>
           {copy("Copy", "Kopyala")}
         </button>
-      ) },
+      ), key: "copy", sortable: false },
     ];
     const machineInvestmentTry = operationsWorkspace.machines.reduce(
       (total, machine) => total + convertMoneyToTry(machine.price, machine.price_currency, exchangeRates),
@@ -7287,18 +7975,12 @@ function App() {
                   <h2>{copy("Machines", "Makineler")}</h2>
                   <span>{operationsWorkspace.machines.length} {copy("records", "kayıt")}</span>
                 </div>
-                <div className="operation-data-table">
-                  <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: `repeat(${machineColumns.length}, minmax(120px, 1fr))` }}>
-                    {machineColumns.map((column) => <span key={column.header}>{column.header}</span>)}
-                  </div>
-                  {(operationsWorkspace.machines.length ? operationsWorkspace.machines : [{ id: "empty" }]).map((row) => (
-                    <div className="operation-data-row" style={{ gridTemplateColumns: `repeat(${machineColumns.length}, minmax(120px, 1fr))` }} key={row.id}>
-                      {machineColumns.map((column) => (
-                        <span key={column.header}>{row.id === "empty" ? "-" : column.render(row)}</span>
-                      ))}
-                    </div>
-                  ))}
-                </div>
+                {renderSortableDataTable({
+                  columns: machineColumns,
+                  gridTemplateColumns: `repeat(${machineColumns.length}, minmax(120px, 1fr))`,
+                  rows: operationsWorkspace.machines,
+                  tableId: "machines",
+                })}
               </article>
             </div>
 
@@ -7309,18 +7991,12 @@ function App() {
                   <h2>{copy("Equipment", "Ekipman")}</h2>
                   <span>{(operationsWorkspace.equipment || []).length} {copy("records", "kayıt")}</span>
                 </div>
-                <div className="operation-data-table">
-                  <div className="operation-data-row operation-data-head" style={{ gridTemplateColumns: `repeat(${equipmentColumns.length}, minmax(120px, 1fr))` }}>
-                    {equipmentColumns.map((column) => <span key={column.header}>{column.header}</span>)}
-                  </div>
-                  {((operationsWorkspace.equipment || []).length ? operationsWorkspace.equipment : [{ id: "empty" }]).map((row) => (
-                    <div className="operation-data-row" style={{ gridTemplateColumns: `repeat(${equipmentColumns.length}, minmax(120px, 1fr))` }} key={row.id}>
-                      {equipmentColumns.map((column) => (
-                        <span key={column.header}>{row.id === "empty" ? "-" : column.render(row)}</span>
-                      ))}
-                    </div>
-                  ))}
-                </div>
+                {renderSortableDataTable({
+                  columns: equipmentColumns,
+                  gridTemplateColumns: `repeat(${equipmentColumns.length}, minmax(120px, 1fr))`,
+                  rows: operationsWorkspace.equipment || [],
+                  tableId: "equipment",
+                })}
               </article>
             </div>
           </div>
@@ -7420,6 +8096,62 @@ function App() {
   const editableAuthorizationRoles = roles.filter((role) => !isAdminRole(role));
   const moduleLabelByKey = Object.fromEntries(dashboardModules.map((module) => [module.key, module.label]));
   const getModuleLabel = (module) => moduleLabelByKey[module.module_key] || module.name;
+  const userTableColumns = [
+    { header: labels.username, key: "username", render: (row) => row.username, value: (row) => row.username },
+    { header: labels.email, key: "email", render: (row) => row.email, value: (row) => row.email },
+    { header: labels.department, key: "department", render: (row) => row.department || "-", value: (row) => row.department || "" },
+    { header: labels.accessLevel, key: "access-level", render: (row) => row.access_level, value: (row) => row.access_level },
+  ];
+  const permissionTableRows = editableAuthorizationRoles.flatMap((role) => modules.map((module) => {
+    const permission = role.permissions[module.module_key] || {};
+    return {
+      canRead: Boolean(permission.canRead),
+      canWrite: Boolean(permission.canWrite),
+      id: `${role.id}-${module.id}`,
+      module,
+      moduleLabel: getModuleLabel(module),
+      role,
+      roleName: role.name,
+    };
+  }));
+  const permissionTableColumns = [
+    { header: labels.accessLevel, key: "role", render: (row) => row.roleName, value: (row) => row.roleName },
+    { header: labels.module, key: "module", render: (row) => row.moduleLabel, value: (row) => row.moduleLabel },
+    {
+      header: labels.readPermission,
+      key: "read",
+      render: (row) => (
+        <label className="permission-check">
+          <input
+            checked={row.canRead}
+            disabled={!authorizationAccess.write || authorizationLoading}
+            type="checkbox"
+            onChange={(event) => updatePermission(row.role, row.module, "can_read", event.target.checked)}
+          />
+          <span>{labels.readPermission}</span>
+        </label>
+      ),
+      sortValue: (row) => (row.canRead ? 1 : 0),
+      filterValue: (row) => (row.canRead ? labels.readPermission : copy("No read", "Okuma yok")),
+    },
+    {
+      header: labels.writePermission,
+      key: "write",
+      render: (row) => (
+        <label className="permission-check">
+          <input
+            checked={row.canWrite}
+            disabled={!authorizationAccess.write || authorizationLoading}
+            type="checkbox"
+            onChange={(event) => updatePermission(row.role, row.module, "can_write", event.target.checked)}
+          />
+          <span>{labels.writePermission}</span>
+        </label>
+      ),
+      sortValue: (row) => (row.canWrite ? 1 : 0),
+      filterValue: (row) => (row.canWrite ? labels.writePermission : copy("No write", "Yazma yok")),
+    },
+  ];
   const operationsWorkspaceForFinance = withTryOperationWorkspace(operationsWorkspace, exchangeRates);
   const dashboardSelectedProduct = operationsWorkspace.product || operationsWorkspace.products[0] || null;
   const dashboardSelectedProductId = dashboardSelectedProduct?.id || "";
@@ -9133,22 +9865,15 @@ function App() {
                       <h2>{labels.managedUsers}</h2>
                       {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
                     </div>
-                    <div className="users-table">
-                      <div className="users-row users-row-head">
-                        <span>{labels.username}</span>
-                        <span>{labels.email}</span>
-                        <span>{labels.department}</span>
-                        <span>{labels.accessLevel}</span>
-                      </div>
-                      {profiles.map((profile) => (
-                        <div className="users-row" key={profile.id}>
-                          <strong>{profile.username}</strong>
-                          <span>{profile.email}</span>
-                          <span>{profile.department || "-"}</span>
-                          <span>{profile.access_level}</span>
-                        </div>
-                      ))}
-                    </div>
+                    {renderSimpleSortableGrid({
+                      columns: userTableColumns,
+                      gridTemplateColumns: "1fr 1.4fr 1fr 0.8fr",
+                      headClassName: "users-row-head",
+                      rowClassName: "users-row",
+                      rows: profiles,
+                      tableClassName: "users-table",
+                      tableId: "authorization-users",
+                    })}
                   </div>
                 </div>
               ) : (
@@ -9184,43 +9909,15 @@ function App() {
                       <h2>{labels.permissions}</h2>
                       {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
                     </div>
-                    <div className="permissions-table">
-                      <div className="permissions-row permissions-row-head">
-                        <span>{labels.accessLevel}</span>
-                        <span>{labels.module}</span>
-                        <span>{labels.readPermission}</span>
-                        <span>{labels.writePermission}</span>
-                      </div>
-                      {editableAuthorizationRoles.map((role) =>
-                        modules.map((module) => {
-                          const permission = role.permissions[module.module_key] || {};
-                          return (
-                            <div className="permissions-row" key={`${role.id}-${module.id}`}>
-                              <strong>{role.name}</strong>
-                              <span>{getModuleLabel(module)}</span>
-                              <label className="permission-check">
-                                <input
-                                  checked={Boolean(permission.canRead)}
-                                  disabled={!authorizationAccess.write || authorizationLoading}
-                                  type="checkbox"
-                                  onChange={(event) => updatePermission(role, module, "can_read", event.target.checked)}
-                                />
-                                <span>{labels.readPermission}</span>
-                              </label>
-                              <label className="permission-check">
-                                <input
-                                  checked={Boolean(permission.canWrite)}
-                                  disabled={!authorizationAccess.write || authorizationLoading}
-                                  type="checkbox"
-                                  onChange={(event) => updatePermission(role, module, "can_write", event.target.checked)}
-                                />
-                                <span>{labels.writePermission}</span>
-                              </label>
-                            </div>
-                          );
-                        }),
-                      )}
-                    </div>
+                    {renderSimpleSortableGrid({
+                      columns: permissionTableColumns,
+                      gridTemplateColumns: "1fr 1fr 0.8fr 0.8fr",
+                      headClassName: "permissions-row-head",
+                      rowClassName: "permissions-row",
+                      rows: permissionTableRows,
+                      tableClassName: "permissions-table",
+                      tableId: "authorization-permissions",
+                    })}
                   </div>
                 </div>
               )}

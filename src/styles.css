@@ -85,7 +85,8 @@ textarea:focus-visible {
   z-index: 4;
 }
 
-.info-tip button {
+.info-tip button,
+.info-tip .info-tip-icon {
   align-items: center;
   background: color-mix(in srgb, var(--color-teal) 14%, var(--color-surface));
   border: 1px solid color-mix(in srgb, var(--color-teal) 38%, var(--color-line));
@@ -99,6 +100,20 @@ textarea:focus-visible {
   justify-content: center;
   padding: 0;
   width: 19px;
+}
+
+.info-tip .info-tip-icon {
+  user-select: none;
+}
+
+.term-with-infobar {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
+.global-term-infobar {
+  flex: 0 0 auto;
 }
 
 .info-tip .info-tip-panel {
@@ -4323,6 +4338,112 @@ textarea:focus-visible {
   border-radius: 8px;
   min-width: 760px;
   overflow: hidden;
+}
+
+.table-control-bar {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin: 14px 0 16px;
+  padding: 0 2px;
+}
+
+.table-control-bar label {
+  align-items: center;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 82%, transparent), color-mix(in srgb, var(--color-surface-muted) 76%, transparent));
+  border: 1px solid color-mix(in srgb, var(--color-line) 72%, transparent);
+  border-radius: 999px;
+  box-shadow:
+    0 10px 24px rgba(16, 43, 50, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  display: flex;
+  gap: 8px;
+  min-height: 42px;
+  padding: 7px 14px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+  width: min(390px, 100%);
+}
+
+.table-control-bar label:focus-within {
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  border-color: color-mix(in srgb, var(--color-teal) 38%, var(--color-line));
+  box-shadow:
+    0 14px 30px rgba(16, 43, 50, 0.08),
+    0 0 0 4px color-mix(in srgb, var(--color-teal) 12%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  transform: translateY(-1px);
+}
+
+.table-control-bar label span,
+.table-control-bar strong {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.table-control-bar input {
+  background: transparent;
+  border: 0;
+  color: var(--color-heading);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+
+.sortable-table-head {
+  gap: 10px;
+}
+
+.sortable-table-head > button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  gap: 6px;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  text-transform: inherit;
+}
+
+.sortable-table-head > button:disabled {
+  cursor: default;
+}
+
+.sortable-table-head > button small {
+  background: color-mix(in srgb, var(--color-teal) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-teal) 22%, var(--color-line));
+  border-radius: 999px;
+  color: var(--color-teal-strong);
+  font-size: 0.55rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 3px 5px;
+}
+
+.sortable-table-head > button.active small {
+  background: color-mix(in srgb, var(--color-teal) 18%, #ffffff);
+  border-color: color-mix(in srgb, var(--color-teal) 36%, var(--color-line));
+}
+
+.table-empty-cell {
+  grid-column: 1 / -1;
 }
 
 .operation-data-row {
@@ -11930,7 +12051,8 @@ textarea:focus-visible {
   color: var(--app-ink);
 }
 
-.info-tip button {
+.info-tip button,
+.info-tip .info-tip-icon {
   background: rgba(163, 76, 255, 0.12);
   border-color: rgba(163, 76, 255, 0.24);
   color: var(--app-violet);
@@ -16616,10 +16738,10 @@ textarea:focus-visible {
   width: 148px;
 }
 
-.dashboard-shell .info-tip button,
-.operations-workspace .info-tip button,
-.operations-workspace.operations-modern .info-tip button,
-.info-tip button {
+.dashboard-shell .info-tip :is(button, .info-tip-icon),
+.operations-workspace .info-tip :is(button, .info-tip-icon),
+.operations-workspace.operations-modern .info-tip :is(button, .info-tip-icon),
+.info-tip :is(button, .info-tip-icon) {
   background:
     radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.28), transparent 34%),
     linear-gradient(135deg, color-mix(in srgb, var(--color-teal) 84%, #ffffff), var(--color-cyan)) !important;
@@ -16639,14 +16761,14 @@ textarea:focus-visible {
   width: 16px !important;
 }
 
-.dashboard-shell .info-tip button:hover,
-.dashboard-shell .info-tip:focus-within button,
-.operations-workspace .info-tip button:hover,
-.operations-workspace .info-tip:focus-within button,
-.operations-workspace.operations-modern .info-tip button:hover,
-.operations-workspace.operations-modern .info-tip:focus-within button,
-.info-tip button:hover,
-.info-tip:focus-within button {
+.dashboard-shell .info-tip :is(button, .info-tip-icon):hover,
+.dashboard-shell .info-tip:focus-within :is(button, .info-tip-icon),
+.operations-workspace .info-tip :is(button, .info-tip-icon):hover,
+.operations-workspace .info-tip:focus-within :is(button, .info-tip-icon),
+.operations-workspace.operations-modern .info-tip :is(button, .info-tip-icon):hover,
+.operations-workspace.operations-modern .info-tip:focus-within :is(button, .info-tip-icon),
+.info-tip :is(button, .info-tip-icon):hover,
+.info-tip:focus-within :is(button, .info-tip-icon) {
   box-shadow:
     0 7px 18px rgba(10, 109, 117, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
@@ -18255,7 +18377,7 @@ textarea:focus-visible {
   -webkit-text-fill-color: #e6efec !important;
 }
 
-.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button {
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip :is(button, .info-tip-icon) {
   background: color-mix(in srgb, var(--source-teal) 12%, #ffffff) !important;
   border: 1px solid color-mix(in srgb, var(--source-teal) 34%, rgba(16, 43, 50, 0.14)) !important;
   border-radius: 999px !important;
@@ -18273,8 +18395,8 @@ textarea:focus-visible {
   width: 19px !important;
 }
 
-.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button:hover,
-.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip:focus-within button {
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip :is(button, .info-tip-icon):hover,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip:focus-within :is(button, .info-tip-icon) {
   background: color-mix(in srgb, var(--source-teal) 18%, #ffffff) !important;
   border-color: color-mix(in srgb, var(--source-teal) 48%, rgba(16, 43, 50, 0.14)) !important;
   box-shadow: 0 0 0 3px rgba(24, 117, 101, 0.12) !important;
@@ -18612,7 +18734,7 @@ textarea:focus-visible {
   min-height: 42px !important;
 }
 
-.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button {
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip :is(button, .info-tip-icon) {
   background: color-mix(in srgb, var(--source-teal) 12%, #ffffff) !important;
   border: 1px solid color-mix(in srgb, var(--source-teal) 34%, rgba(16, 43, 50, 0.14)) !important;
   border-radius: 999px !important;
@@ -18630,8 +18752,8 @@ textarea:focus-visible {
   width: 19px !important;
 }
 
-.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button:hover,
-.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip:focus-within button {
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip :is(button, .info-tip-icon):hover,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip:focus-within :is(button, .info-tip-icon) {
   background: color-mix(in srgb, var(--source-teal) 18%, #ffffff) !important;
   box-shadow: 0 0 0 3px rgba(24, 117, 101, 0.12) !important;
 }
@@ -19642,7 +19764,7 @@ textarea:focus-visible {
   transform: translateY(-1px);
 }
 
-.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button {
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip :is(button, .info-tip-icon) {
   background:
     linear-gradient(180deg, #ffffff 0%, #e9f8f3 100%) !important;
   border: 1px solid rgba(24, 117, 101, 0.28) !important;
@@ -19662,8 +19784,8 @@ textarea:focus-visible {
   width: 19px !important;
 }
 
-.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip button:hover,
-.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip:focus-within button {
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip :is(button, .info-tip-icon):hover,
+.dashboard-shell .operations-workspace.operations-modern.operations-process-page .operation-planner .info-tip:focus-within :is(button, .info-tip-icon) {
   background:
     linear-gradient(180deg, #ffffff 0%, #ddf4ee 100%) !important;
   box-shadow: 0 0 0 3px rgba(24, 117, 101, 0.12) !important;
@@ -22273,5 +22395,76 @@ textarea:focus-visible {
 
   .dashboard-shell .reports-workspace .reports-readiness-card .schedule-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 981px) {
+  .operations-workspace.operations-modern.operations-resources-page :is(
+    .operations-material-form-card,
+    .operations-workforce-form-card
+  ) {
+    min-height: clamp(620px, 68svh, 760px) !important;
+  }
+
+  .operations-workspace.operations-modern.operations-machines-page :is(
+    .operations-machine-form-card,
+    .operations-equipment-form-card
+  ) {
+    min-height: clamp(680px, 74svh, 840px) !important;
+  }
+
+  .operations-workspace.operations-modern:is(.operations-resources-page, .operations-machines-page) .operations-record-list-card .table-control-bar {
+    margin: 18px 4px 20px;
+  }
+}
+
+/* Global polish: keep helper UI calm and lightweight across page-specific themes. */
+.info-tip :is(button, .info-tip-icon) {
+  background: color-mix(in srgb, var(--color-surface) 58%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--color-teal) 26%, transparent) !important;
+  box-shadow:
+    0 4px 12px rgba(16, 43, 50, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
+  color: color-mix(in srgb, var(--color-teal-strong) 82%, var(--color-muted)) !important;
+  opacity: 0.78;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease !important;
+}
+
+.info-tip :is(button, .info-tip-icon):hover,
+.info-tip:focus-within :is(button, .info-tip-icon) {
+  background: color-mix(in srgb, var(--color-surface) 74%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-teal) 38%, transparent) !important;
+  box-shadow:
+    0 6px 16px rgba(16, 43, 50, 0.11),
+    0 0 0 3px color-mix(in srgb, var(--color-teal) 10%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42) !important;
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.info-tip .info-tip-panel {
+  background: color-mix(in srgb, #102033 82%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(1.15);
+  border: 1px solid rgba(178, 232, 220, 0.22) !important;
+  box-shadow:
+    0 18px 44px rgba(9, 24, 34, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-weight: 720;
+}
+
+@media (max-width: 720px) {
+  .table-control-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-control-bar label {
+    width: 100%;
   }
 }
