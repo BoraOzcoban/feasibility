@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { isSupabaseConfigured, supabase } from "./lib/supabaseClient";
 import {
   createDemoFinancialLoanRows,
@@ -122,14 +123,76 @@ function useMatchedPanelHeight(dependencyKey) {
   ];
 }
 
+function positionFloatingInfoPanel(trigger, panel) {
+  if (!trigger || !panel || typeof window === "undefined") return;
+
+  const viewportPadding = 12;
+  const gap = 10;
+  const triggerRect = trigger.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  const panelWidth = Math.min(panelRect.width || 320, window.innerWidth - (viewportPadding * 2));
+  const panelHeight = panelRect.height || 80;
+  const idealLeft = triggerRect.left + (triggerRect.width / 2) - (panelWidth / 2);
+  const left = Math.min(
+    Math.max(viewportPadding, idealLeft),
+    Math.max(viewportPadding, window.innerWidth - panelWidth - viewportPadding),
+  );
+  const bottomTop = triggerRect.bottom + gap;
+  const top = bottomTop + panelHeight + viewportPadding <= window.innerHeight
+    ? bottomTop
+    : Math.max(viewportPadding, triggerRect.top - panelHeight - gap);
+
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+  panel.style.maxWidth = `${Math.max(220, window.innerWidth - (viewportPadding * 2))}px`;
+}
+
 function InfoTip({ label = "Info", text }) {
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  const updatePosition = useCallback(() => {
+    positionFloatingInfoPanel(triggerRef.current, panelRef.current);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!visible) return undefined;
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [updatePosition, visible]);
+
   if (!text) return null;
 
   return (
-    <span className="info-tip">
-      <button type="button" aria-label={label}>i</button>
-      <span className="info-tip-panel" role="tooltip">{text}</span>
-    </span>
+    <>
+      <span
+        className="info-tip"
+        onBlur={() => setVisible(false)}
+        onFocus={() => setVisible(true)}
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+      >
+        <button ref={triggerRef} type="button" aria-label={label}>i</button>
+      </span>
+      {typeof document !== "undefined" && createPortal(
+        <span
+          ref={panelRef}
+          className={`info-tip-panel floating-info-tip-panel ${visible ? "is-visible" : ""}`}
+          role="tooltip"
+        >
+          {text}
+        </span>,
+        document.body,
+      )}
+    </>
   );
 }
 
@@ -479,11 +542,37 @@ function createGlossaryInfoTip(entry, language) {
   trigger.textContent = "i";
 
   const panel = document.createElement("span");
-  panel.className = "info-tip-panel";
+  panel.className = "info-tip-panel floating-info-tip-panel global-floating-info-panel";
   panel.setAttribute("role", "tooltip");
   panel.textContent = entry.text;
+  document.body.appendChild(panel);
+  const listenerController = new AbortController();
 
-  wrapper.append(trigger, panel);
+  const showPanel = () => {
+    panel.classList.add("is-visible");
+    positionFloatingInfoPanel(trigger, panel);
+  };
+  const hidePanel = () => {
+    panel.classList.remove("is-visible");
+  };
+  const updatePanelPosition = () => {
+    if (panel.classList.contains("is-visible")) {
+      positionFloatingInfoPanel(trigger, panel);
+    }
+  };
+
+  wrapper.addEventListener("mouseenter", showPanel, { signal: listenerController.signal });
+  wrapper.addEventListener("mouseleave", hidePanel, { signal: listenerController.signal });
+  trigger.addEventListener("focus", showPanel, { signal: listenerController.signal });
+  trigger.addEventListener("blur", hidePanel, { signal: listenerController.signal });
+  window.addEventListener("resize", updatePanelPosition, { signal: listenerController.signal });
+  window.addEventListener("scroll", updatePanelPosition, { capture: true, signal: listenerController.signal });
+  wrapper.cleanupFloatingInfoPanel = () => {
+    listenerController.abort();
+    panel.remove();
+  };
+
+  wrapper.append(trigger);
   return wrapper;
 }
 
@@ -517,6 +606,8 @@ function applyGlobalTermInfobars(root, language) {
     if (
       element.dataset.termInfobarApplied
       || element.closest(".info-tip")
+      || element.closest(".info-tip-panel")
+      || element.closest(".floating-info-tip-panel")
       || element.closest(".dashboard-sidebar")
       || element.closest(".landing-nav")
       || element.closest(".dashboard-nav")
@@ -564,6 +655,124 @@ function formatCurrencyAmount(value, currency = "TRY", maximumFractionDigits = 0
 }
 
 const operationCurrencyOptions = ["TRY", "USD", "EUR"];
+
+const dashboardStorageKey = "atera-dashboard-visible-sections";
+const salesStrategyStorageKey = "atera-sales-visible-sections";
+
+const defaultDashboardVisibleSections = {
+  assumptions: ["monthlyCapacity", "averageMonthlyDemand", "unitMargin"],
+  business: ["verdict", "netResult", "cashRunway", "payback", "capacityDemand", "initialCash"],
+  details: ["monthlyRevenue", "monthlyCost", "netMargin", "breakEven", "workingCapital", "unsoldInventory", "unmetSales", "unitProductionCost"],
+};
+
+const defaultSalesVisibleSections = {
+  optional: ["expectationMultipliers", "advancedChannelParameters"],
+  readout: ["productsInChannels", "campaignBudget", "averageMultiplier", "readyRemaining"],
+};
+
+const allowedSalesVisibleSections = {
+  optional: ["expectationMultipliers", "advancedChannelParameters"],
+  readout: ["productsInChannels", "campaignBudget", "averageMultiplier", "readyRemaining", "monthlyChannelPlan", "expectedAnnualUnits", "monthlyCommission"],
+};
+
+function cloneDashboardVisibleSections(sections = defaultDashboardVisibleSections) {
+  return Object.fromEntries(
+    Object.entries(sections).map(([group, keys]) => [group, [...keys]]),
+  );
+}
+
+function cloneSalesVisibleSections(sections = defaultSalesVisibleSections) {
+  return Object.fromEntries(
+    Object.entries(sections).map(([group, keys]) => [group, [...keys]]),
+  );
+}
+
+function normalizeDashboardVisibleSections(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+
+  return Object.fromEntries(
+    Object.entries(defaultDashboardVisibleSections).map(([group, defaultKeys]) => {
+      const selectedKeys = source[group];
+
+      if (!Array.isArray(selectedKeys)) {
+        return [group, [...defaultKeys]];
+      }
+
+      return [
+        group,
+        [...new Set(selectedKeys.filter((key) => defaultKeys.includes(key)))],
+      ];
+    }),
+  );
+}
+
+function normalizeSalesVisibleSections(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+
+  return Object.fromEntries(
+    Object.entries(defaultSalesVisibleSections).map(([group, defaultKeys]) => {
+      const selectedKeys = source[group];
+      const allowedKeys = allowedSalesVisibleSections[group] || defaultKeys;
+
+      if (!Array.isArray(selectedKeys)) {
+        return [group, [...defaultKeys]];
+      }
+
+      return [
+        group,
+        [...new Set(selectedKeys.filter((key) => allowedKeys.includes(key)))],
+      ];
+    }),
+  );
+}
+
+function getStoredDashboardVisibleSections() {
+  if (typeof window === "undefined") {
+    return cloneDashboardVisibleSections();
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(dashboardStorageKey);
+    return storedValue
+      ? normalizeDashboardVisibleSections(JSON.parse(storedValue))
+      : cloneDashboardVisibleSections();
+  } catch {
+    return cloneDashboardVisibleSections();
+  }
+}
+
+function getStoredSalesVisibleSections() {
+  if (typeof window === "undefined") {
+    return cloneSalesVisibleSections();
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(salesStrategyStorageKey);
+    return storedValue
+      ? normalizeSalesVisibleSections(JSON.parse(storedValue))
+      : cloneSalesVisibleSections();
+  } catch {
+    return cloneSalesVisibleSections();
+  }
+}
+
+function createUnsavedWorkspaceSnapshot({
+  financialExtraCostForm,
+  financialSettingsForm,
+  operationForms,
+  operationPlan,
+  salesStrategy,
+  simulationVariants,
+}) {
+  return JSON.stringify({
+    financialExtraCostForm,
+    financialSettingsForm,
+    operationForms,
+    operationPlan,
+    salesStrategy,
+    simulationVariants,
+  });
+}
 
 const defaultExchangeRates = {
   error: "",
@@ -2029,6 +2238,17 @@ function App() {
   const [currentProfile, setCurrentProfile] = useState(null);
   const [dashboardSidebarOpen, setDashboardSidebarOpen] = useState(true);
   const [dashboardAssumptionMenu, setDashboardAssumptionMenu] = useState(null);
+  const [dashboardEditorOpen, setDashboardEditorOpen] = useState(false);
+  const [dashboardVisibleSections, setDashboardVisibleSections] = useState(getStoredDashboardVisibleSections);
+  const [salesEditorOpen, setSalesEditorOpen] = useState(false);
+  const [salesVisibleSections, setSalesVisibleSections] = useState(getStoredSalesVisibleSections);
+  const [savedWorkspaceSnapshot, setSavedWorkspaceSnapshot] = useState("");
+  const [unsavedPrompt, setUnsavedPrompt] = useState({
+    message: "",
+    open: false,
+    pendingNavigation: null,
+    saving: false,
+  });
   const [authorizationLoading, setAuthorizationLoading] = useState(false);
   const [authorizationStatus, setAuthorizationStatus] = useState("");
   const [authorizationTab, setAuthorizationTab] = useState("roles");
@@ -2090,10 +2310,29 @@ function App() {
   const [machineFormRef, machineListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|machine`);
   const [equipmentFormRef, equipmentListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|equipment`);
   const incomeExpenseChartRef = useRef(null);
+  const workspaceSnapshotRef = useRef("");
+  const syncSavedWorkspaceSnapshotRef = useRef(false);
   const setIncomeExpenseChartElement = useCallback((node) => {
     incomeExpenseChartRef.current = node;
     setIncomeExpenseChartNode(node);
   }, []);
+
+  const editableWorkspaceSnapshot = useMemo(() => createUnsavedWorkspaceSnapshot({
+    financialExtraCostForm,
+    financialSettingsForm,
+    operationForms,
+    operationPlan,
+    salesStrategy,
+    simulationVariants,
+  }), [
+    financialExtraCostForm,
+    financialSettingsForm,
+    operationForms,
+    operationPlan,
+    salesStrategy,
+    simulationVariants,
+  ]);
+  const hasUnsavedChanges = Boolean(session && savedWorkspaceSnapshot && editableWorkspaceSnapshot !== savedWorkspaceSnapshot);
 
   const initials = useMemo(() => {
     const source = form.username || form.email || "A";
@@ -2117,6 +2356,66 @@ function App() {
   }, [form.language]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    window.localStorage.setItem(
+      dashboardStorageKey,
+      JSON.stringify(normalizeDashboardVisibleSections(dashboardVisibleSections)),
+    );
+  }, [dashboardVisibleSections]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    window.localStorage.setItem(
+      salesStrategyStorageKey,
+      JSON.stringify(normalizeSalesVisibleSections(salesVisibleSections)),
+    );
+  }, [salesVisibleSections]);
+
+  useEffect(() => {
+    workspaceSnapshotRef.current = editableWorkspaceSnapshot;
+
+    if (syncSavedWorkspaceSnapshotRef.current) {
+      syncSavedWorkspaceSnapshotRef.current = false;
+      setSavedWorkspaceSnapshot(editableWorkspaceSnapshot);
+    }
+  }, [editableWorkspaceSnapshot]);
+
+  useEffect(() => {
+    if (!session) {
+      setSavedWorkspaceSnapshot("");
+      setUnsavedPrompt((current) => (current.open ? { message: "", open: false, pendingNavigation: null, saving: false } : current));
+      return;
+    }
+
+    if (savedWorkspaceSnapshot) return;
+    if (operationsLoading || financialLoading || salesLoading || simulationLoading) return;
+
+    setSavedWorkspaceSnapshot(editableWorkspaceSnapshot);
+  }, [
+    editableWorkspaceSnapshot,
+    financialLoading,
+    operationsLoading,
+    salesLoading,
+    savedWorkspaceSnapshot,
+    session,
+    simulationLoading,
+  ]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return undefined;
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
     const root = document.body;
     let frameId = 0;
     let observer;
@@ -2128,7 +2427,11 @@ function App() {
 
       frameId = requestAnimationFrame(() => {
         observer?.disconnect();
-        document.querySelectorAll(".global-term-infobar").forEach((node) => node.remove());
+        document.querySelectorAll(".global-term-infobar").forEach((node) => {
+          node.cleanupFloatingInfoPanel?.();
+          node.remove();
+        });
+        document.querySelectorAll(".global-floating-info-panel").forEach((node) => node.remove());
         document.querySelectorAll("[data-term-infobar-applied]").forEach((node) => {
           node.classList.remove("term-with-infobar");
           delete node.dataset.termInfobarApplied;
@@ -2154,6 +2457,11 @@ function App() {
         cancelAnimationFrame(frameId);
       }
       observer.disconnect();
+      document.querySelectorAll(".global-term-infobar").forEach((node) => {
+        node.cleanupFloatingInfoPanel?.();
+        node.remove();
+      });
+      document.querySelectorAll(".global-floating-info-panel").forEach((node) => node.remove());
     };
   }, [form.language, path]);
 
@@ -2223,6 +2531,17 @@ function App() {
         window.history.replaceState({}, "", nextPath);
       }
 
+      if (hasUnsavedChanges && nextPath !== path) {
+        window.history.pushState({}, "", path);
+        setUnsavedPrompt({
+          message: "",
+          open: true,
+          pendingNavigation: { nextMode: "login", pathname: nextPath },
+          saving: false,
+        });
+        return;
+      }
+
       setPath(nextPath);
       setStatus("");
       setMode("login");
@@ -2230,7 +2549,7 @@ function App() {
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  }, [hasUnsavedChanges, path]);
 
   useEffect(() => {
     if (!session || !supabase) {
@@ -2337,8 +2656,23 @@ function App() {
     };
   }, [currentProfile?.company_id]);
 
-  function goTo(pathname, nextMode) {
+  function markWorkspaceSnapshotClean() {
+    syncSavedWorkspaceSnapshotRef.current = true;
+    setSavedWorkspaceSnapshot(workspaceSnapshotRef.current || editableWorkspaceSnapshot);
+  }
+
+  function goTo(pathname, nextMode, options = {}) {
     const nextPath = normalizeRoutePath(pathname);
+    if (!options.force && hasUnsavedChanges && nextPath !== path) {
+      setUnsavedPrompt({
+        message: "",
+        open: true,
+        pendingNavigation: { nextMode, pathname: nextPath },
+        saving: false,
+      });
+      return;
+    }
+
     window.history.pushState({}, "", nextPath);
     setPath(nextPath);
     setMode(nextMode);
@@ -2617,7 +2951,7 @@ function App() {
     };
 
     setSimulationVariants((current) => [...current, nextVariant]);
-    goTo(nextVariant.path, "login");
+    goTo(nextVariant.path, "login", { force: true });
   }
 
   async function deleteSimulationVariant(id) {
@@ -2639,7 +2973,7 @@ function App() {
     }
 
     setSimulationVariants((current) => current.filter((variant) => variant.id !== id));
-    if (path === `/simulation/${id}`) goTo("/simulation/current-situation", "login");
+    if (path === `/simulation/${id}`) goTo("/simulation/current-situation", "login", { force: true });
   }
 
   function toggleTheme() {
@@ -3081,6 +3415,7 @@ function App() {
         }));
         setOperationPlanResult(null);
       }
+      markWorkspaceSnapshotClean();
     } catch (error) {
       setOperationsStatus(`${copy("Operations data could not be loaded:", "Operations verisi yüklenemedi:")} ${error.message}`);
     } finally {
@@ -3089,12 +3424,12 @@ function App() {
   }
 
   async function handleSaveOperationPlan(event) {
-    event.preventDefault();
+    event?.preventDefault?.();
     setOperationsStatus("");
 
     if (!supabase) {
       setOperationsStatus(labels.configure);
-      return;
+      return false;
     }
 
     const selectedProduct = operationsWorkspace.products.find((product) => product.id === operationPlan.productId);
@@ -3114,22 +3449,22 @@ function App() {
 
     if (!selectedProduct) {
       setOperationsStatus(copy("Select a saved product with a recipe before calculating feasibility.", "Fizibilite hesaplamadan önce reçetesi olan kayıtlı bir ürün seçin."));
-      return;
+      return false;
     }
 
     if (!productRecipeRows.some((row) => toFiniteNumber(row.quantity_per_unit) > 0)) {
       setOperationsStatus(copy("Add at least one material with a positive quantity to the selected product recipe before saving a process plan.", "Süreç planını kaydetmeden önce seçili ürün reçetesine pozitif miktarlı en az bir malzeme ekleyin."));
-      return;
+      return false;
     }
 
     if (!hasPositiveMachineHours && !hasSchedulableOperationRows) {
       setOperationsStatus(copy("Add at least one machine with daily hours, or define an operation step with a machine and process time.", "Günlük saati olan en az bir makine ekleyin ya da makine ve işlem süresi olan bir operasyon adımı tanımlayın."));
-      return;
+      return false;
     }
 
     if (hasSchedulableOperationRows && toFiniteNumber(operationPlan.targetQuantity) <= 0) {
       setOperationsStatus(copy("Enter a production quantity greater than zero for the operation flow.", "Operasyon akışı için sıfırdan büyük üretim miktarı girin."));
-      return;
+      return false;
     }
 
     setOperationsLoading(true);
@@ -3148,20 +3483,23 @@ function App() {
       ));
       await loadOperationsData();
       await loadFinancialData();
+      markWorkspaceSnapshotClean();
+      return true;
     } catch (error) {
       setOperationsStatus(error.message);
+      return false;
     } finally {
       setOperationsLoading(false);
     }
   }
 
   async function handleSaveOperationRecord(entity, event) {
-    event.preventDefault();
+    event?.preventDefault?.();
     setOperationsStatus("");
 
     if (!supabase) {
       setOperationsStatus(labels.configure);
-      return;
+      return false;
     }
 
     setOperationsLoading(true);
@@ -3185,8 +3523,11 @@ function App() {
       setOperationForms((current) => ({ ...current, [entity]: emptyOperationForms[entity] }));
       setOperationsStatus(copy("Operations record was saved to Supabase.", "Operations kaydı Supabase veritabanına kaydedildi."));
       await loadOperationsData();
+      markWorkspaceSnapshotClean();
+      return true;
     } catch (error) {
       setOperationsStatus(error.message);
+      return false;
     } finally {
       setOperationsLoading(false);
     }
@@ -3215,6 +3556,7 @@ function App() {
         ...nextSettings,
         loanRows: loanRowsForForm,
       });
+      markWorkspaceSnapshotClean();
     } catch (error) {
       setFinancialStatus(`${copy("Financial model could not be loaded:", "Finansal model yüklenemedi:")} ${error.message}`);
     } finally {
@@ -3223,12 +3565,12 @@ function App() {
   }
 
   async function handleSaveFinancialSettings(event) {
-    event.preventDefault();
+    event?.preventDefault?.();
     setFinancialStatus("");
 
     if (!supabase) {
       setFinancialStatus(labels.configure);
-      return;
+      return false;
     }
 
     setFinancialLoading(true);
@@ -3237,8 +3579,11 @@ function App() {
       await saveFinancialModelSettings(supabase, financialSettingsForm);
       setFinancialStatus(copy("Financial assumptions were saved to Supabase.", "Finansal varsayımlar Supabase'e kaydedildi."));
       await loadFinancialData();
+      markWorkspaceSnapshotClean();
+      return true;
     } catch (error) {
       setFinancialStatus(error.message);
+      return false;
     } finally {
       setFinancialLoading(false);
     }
@@ -3280,12 +3625,12 @@ function App() {
   }
 
   async function handleSaveFinancialExtraCost(event) {
-    event.preventDefault();
+    event?.preventDefault?.();
     setFinancialStatus("");
 
     if (!supabase) {
       setFinancialStatus(labels.configure);
-      return;
+      return false;
     }
 
     setFinancialLoading(true);
@@ -3295,8 +3640,11 @@ function App() {
       setFinancialExtraCostForm(emptyFinancialExtraCostForm);
       setFinancialStatus(copy("Extra financial cost was saved to Supabase.", "Ek finansal gider Supabase'e kaydedildi."));
       await loadFinancialData();
+      markWorkspaceSnapshotClean();
+      return true;
     } catch (error) {
       setFinancialStatus(error.message);
+      return false;
     } finally {
       setFinancialLoading(false);
     }
@@ -3318,6 +3666,7 @@ function App() {
 
       setSalesStrategy(nextSalesStrategy);
       setSimulationVariants(nextSimulationVariants);
+      markWorkspaceSnapshotClean();
     } catch (error) {
       setSalesStatus(`${copy("Planning data could not be loaded:", "Planlama verisi yüklenemedi:")} ${error.message}`);
       setSimulationStatus(`${copy("Planning data could not be loaded:", "Planlama verisi yüklenemedi:")} ${error.message}`);
@@ -3332,18 +3681,18 @@ function App() {
 
     if (!supabase) {
       setSalesStatus(labels.configure);
-      return;
+      return false;
     }
 
     if (!currentProfile?.company_id) {
       setSalesStatus(copy("Company profile is still loading.", "Şirket profili henüz yükleniyor."));
-      return;
+      return false;
     }
 
     const validationMessage = validateSalesStrategy();
     if (validationMessage) {
       setSalesStatus(validationMessage);
-      return;
+      return false;
     }
 
     setSalesLoading(true);
@@ -3352,8 +3701,11 @@ function App() {
       await saveSalesStrategy(supabase, currentProfile.company_id, salesStrategy);
       await loadPlanningData();
       setSalesStatus(copy("Sales strategy was saved to Supabase.", "Satış stratejisi Supabase'e kaydedildi."));
+      markWorkspaceSnapshotClean();
+      return true;
     } catch (error) {
       setSalesStatus(error.message);
+      return false;
     } finally {
       setSalesLoading(false);
     }
@@ -3364,12 +3716,12 @@ function App() {
 
     if (!supabase) {
       setSimulationStatus(labels.configure);
-      return;
+      return false;
     }
 
     if (!currentProfile?.company_id) {
       setSimulationStatus(copy("Company profile is still loading.", "Şirket profili henüz yükleniyor."));
-      return;
+      return false;
     }
 
     setSimulationLoading(true);
@@ -3378,8 +3730,11 @@ function App() {
       await saveSimulationVariant(supabase, currentProfile.company_id, variant);
       await loadPlanningData();
       setSimulationStatus(copy("Simulation variant was saved to Supabase.", "Simülasyon varyantı Supabase'e kaydedildi."));
+      markWorkspaceSnapshotClean();
+      return true;
     } catch (error) {
       setSimulationStatus(error.message);
+      return false;
     } finally {
       setSimulationLoading(false);
     }
@@ -3843,6 +4198,118 @@ function App() {
 
   const getTableColumnKey = (column, index) => column.key || column.header || `column-${index}`;
 
+  const getTableSortIndicator = (control, key) => {
+    if (control.sortKey !== key) return "−";
+    return control.direction === "desc" ? "↓" : "↑";
+  };
+
+  const getHiddenTableColumns = (control = {}) => Array.isArray(control.hiddenColumns) ? control.hiddenColumns : [];
+
+  const getHiddenTableRows = (control = {}) => Array.isArray(control.hiddenRows) ? control.hiddenRows : [];
+
+  const getVisibleTableColumns = (tableId, columns) => {
+    const control = tableControls[tableId] || {};
+    const hiddenColumns = new Set(getHiddenTableColumns(control));
+    return columns.filter((column, index) => !hiddenColumns.has(getTableColumnKey(column, index)));
+  };
+
+  const splitGridTemplateColumns = (gridTemplateColumns) => {
+    const template = String(gridTemplateColumns || "").trim();
+    const repeatMatch = template.match(/^repeat\((\d+),\s*(.+)\)$/);
+
+    if (repeatMatch) {
+      return Array.from({ length: Number(repeatMatch[1]) }, () => repeatMatch[2]);
+    }
+
+    const columns = [];
+    let depth = 0;
+    let current = "";
+
+    for (const character of template) {
+      if (character === "(") depth += 1;
+      if (character === ")") depth = Math.max(0, depth - 1);
+
+      if (/\s/.test(character) && depth === 0) {
+        if (current) {
+          columns.push(current);
+          current = "";
+        }
+      } else {
+        current += character;
+      }
+    }
+
+    if (current) columns.push(current);
+    return columns;
+  };
+
+  const getVisibleTableGridTemplate = (tableId, columns, gridTemplateColumns, includeRowActions = true) => {
+    const control = tableControls[tableId] || {};
+    const hiddenColumns = new Set(getHiddenTableColumns(control));
+    const templateParts = splitGridTemplateColumns(gridTemplateColumns);
+    const visibleTemplateParts = columns
+      .map((column, index) => ({
+        key: getTableColumnKey(column, index),
+        template: templateParts[index] || "minmax(120px, 1fr)",
+      }))
+      .filter((item) => !hiddenColumns.has(item.key))
+      .map((item) => item.template);
+
+    return [...visibleTemplateParts, ...(includeRowActions ? ["40px"] : [])].join(" ");
+  };
+
+  const hideTableColumn = (tableId, columns, key) => {
+    setTableControls((current) => {
+      const control = current[tableId] || {};
+      const hiddenColumns = getHiddenTableColumns(control);
+      const visibleColumnCount = columns.filter((column, index) => !hiddenColumns.includes(getTableColumnKey(column, index))).length;
+
+      if (hiddenColumns.includes(key) || visibleColumnCount <= 1) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [tableId]: {
+          ...control,
+          direction: control.sortKey === key ? undefined : control.direction,
+          hiddenColumns: [...hiddenColumns, key],
+          sortKey: control.sortKey === key ? undefined : control.sortKey,
+        },
+      };
+    });
+  };
+
+  const hideTableRow = (tableId, rowKey) => {
+    setTableControls((current) => {
+      const control = current[tableId] || {};
+      const hiddenRows = getHiddenTableRows(control);
+      if (hiddenRows.includes(rowKey)) return current;
+
+      return {
+        ...current,
+        [tableId]: {
+          ...control,
+          hiddenRows: [...hiddenRows, rowKey],
+        },
+      };
+    });
+  };
+
+  const resetTableHiding = (tableId) => {
+    setTableControls((current) => {
+      const control = current[tableId] || {};
+      return {
+        ...current,
+        [tableId]: {
+          ...control,
+          hiddenColumns: [],
+          hiddenRows: [],
+        },
+      };
+    });
+  };
+
   const getTableCellValue = (column, row) => {
     if (column.value) return column.value(row);
     if (column.sortValue) return column.sortValue(row);
@@ -3860,13 +4327,16 @@ function App() {
     return String(value);
   };
 
-  const getSortableTableRows = (tableId, rows, columns) => {
+  const getSortableTableRows = (tableId, rows, columns, getRowKey = (row) => row.id) => {
     const control = tableControls[tableId] || {};
     const query = normalizeGlossaryText(control.query || "");
+    const hiddenRows = new Set(getHiddenTableRows(control).map(String));
+    const visibleColumns = getVisibleTableColumns(tableId, columns);
     const filteredRows = rows.filter((row) => {
+      if (hiddenRows.has(String(getRowKey(row)))) return false;
       if (!query) return true;
 
-      return columns.some((column) => {
+      return visibleColumns.some((column) => {
         const rawValue = column.filterValue ? column.filterValue(row) : getTableCellValue(column, row);
         return normalizeGlossaryText(normalizeTableValue(rawValue)).includes(query);
       });
@@ -3874,7 +4344,7 @@ function App() {
 
     if (!control.sortKey) return filteredRows;
 
-    const column = columns.find((item, index) => getTableColumnKey(item, index) === control.sortKey);
+    const column = visibleColumns.find((item, index) => getTableColumnKey(item, columns.indexOf(item) >= 0 ? columns.indexOf(item) : index) === control.sortKey);
     if (!column || column.sortable === false) return filteredRows;
 
     const direction = control.direction === "desc" ? -1 : 1;
@@ -3892,6 +4362,7 @@ function App() {
 
   const renderTableToolbar = (tableId, rows, visibleRows) => {
     const control = tableControls[tableId] || {};
+    const hiddenCount = getHiddenTableColumns(control).length + getHiddenTableRows(control).length;
 
     return (
       <div className="table-control-bar">
@@ -3904,33 +4375,55 @@ function App() {
             onChange={(event) => updateTableControl(tableId, { query: event.target.value })}
           />
         </label>
-        <strong>{formatNumber(visibleRows.length)} / {formatNumber(rows.length)}</strong>
+        <div className="table-control-actions">
+          {hiddenCount > 0 && (
+            <button type="button" className="table-reset-hidden-button" onClick={() => resetTableHiding(tableId)}>
+              {copy("Show hidden", "Gizlemeleri kaldır")}
+            </button>
+          )}
+          <strong>{formatNumber(visibleRows.length)} / {formatNumber(rows.length)}</strong>
+        </div>
       </div>
     );
   };
 
   const renderSortableTableHead = (tableId, columns, gridTemplateColumns) => {
     const control = tableControls[tableId] || {};
+    const hiddenColumns = new Set(getHiddenTableColumns(control));
+    const visibleColumns = columns
+      .map((column, index) => ({ column, index, key: getTableColumnKey(column, index) }))
+      .filter((item) => !hiddenColumns.has(item.key));
+    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns);
 
     return (
-      <div className="operation-data-row operation-data-head sortable-table-head" style={{ gridTemplateColumns }}>
-        {columns.map((column, index) => {
-          const key = getTableColumnKey(column, index);
+      <div className="operation-data-row operation-data-head sortable-table-head" style={{ gridTemplateColumns: visibleGridTemplateColumns }}>
+        {visibleColumns.map(({ column, index, key }) => {
           const active = control.sortKey === key;
 
           return (
-            <button
-              type="button"
-              className={active ? "active" : ""}
-              disabled={column.sortable === false}
-              key={key}
-              onClick={() => updateTableControl(tableId, getNextTableSortPatch(control, key))}
-            >
-              <span>{column.header}</span>
-              {column.sortable !== false && <small aria-hidden="true">{active ? (control.direction === "desc" ? "DESC" : "ASC") : "SORT"}</small>}
-            </button>
+            <div className="sortable-heading-cell" key={key}>
+              <button
+                type="button"
+                className={`sort-heading-button ${active ? "active" : ""}`}
+                disabled={column.sortable === false}
+                onClick={() => updateTableControl(tableId, getNextTableSortPatch(control, key))}
+              >
+                <span>{column.header}</span>
+                {column.sortable !== false && <small className="sort-indicator" aria-hidden="true">{getTableSortIndicator(control, key)}</small>}
+              </button>
+              <button
+                type="button"
+                className="table-hide-button"
+                disabled={visibleColumns.length <= 1}
+                aria-label={`${copy("Hide column", "Kolonu gizle")}: ${normalizeTableValue(column.header)}`}
+                onClick={() => hideTableColumn(tableId, columns, key)}
+              >
+                ◉
+              </button>
+            </div>
           );
         })}
+        <span className="table-row-action-head" aria-hidden="true">−</span>
       </div>
     );
   };
@@ -3945,9 +4438,10 @@ function App() {
     tableId,
     useButtonRows = false,
   }) => {
-    const visibleRows = getSortableTableRows(tableId, rows, columns);
+    const visibleRows = getSortableTableRows(tableId, rows, columns, getRowKey);
+    const visibleColumns = getVisibleTableColumns(tableId, columns);
+    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns);
     const displayRows = visibleRows.length ? visibleRows : [{ id: "empty" }];
-    const rowElement = useButtonRows ? "button" : "div";
 
     return (
       <>
@@ -3956,24 +4450,51 @@ function App() {
           {renderSortableTableHead(tableId, columns, gridTemplateColumns)}
           {displayRows.map((row) => {
             const isEmpty = row.id === "empty";
-            const RowTag = rowElement;
+            const rowKey = isEmpty ? `${tableId}-empty` : getRowKey(row);
 
             return (
-              <RowTag
-                type={useButtonRows ? "button" : undefined}
+              <div
+                role={useButtonRows && !isEmpty ? "button" : undefined}
+                tabIndex={useButtonRows && !isEmpty ? 0 : undefined}
                 className={`operation-data-row${useButtonRows ? " operation-data-button-row" : ""}${isEmpty ? " table-empty-row" : ""}`}
-                style={{ gridTemplateColumns }}
-                key={isEmpty ? `${tableId}-empty` : getRowKey(row)}
+                style={{ gridTemplateColumns: visibleGridTemplateColumns }}
+                key={rowKey}
                 onClick={useButtonRows ? () => {
                   if (!isEmpty && onRowClick) onRowClick(row);
+                } : undefined}
+                onKeyDown={useButtonRows ? (event) => {
+                  if (!isEmpty && onRowClick && (event.key === "Enter" || event.key === " ")) {
+                    event.preventDefault();
+                    onRowClick(row);
+                  }
                 } : undefined}
               >
                 {isEmpty ? (
                   <span className="table-empty-cell">{emptyLabel || copy("No matching records", "Eşleşen kayıt yok")}</span>
-                ) : columns.map((column, index) => (
-                  <span key={getTableColumnKey(column, index)}>{column.render ? column.render(row) : normalizeTableValue(getTableCellValue(column, row))}</span>
-                ))}
-              </RowTag>
+                ) : (
+                  <>
+                    {visibleColumns.map((column) => {
+                      const originalIndex = columns.indexOf(column);
+                      return (
+                        <span key={getTableColumnKey(column, originalIndex)}>
+                          {column.render ? column.render(row) : normalizeTableValue(getTableCellValue(column, row))}
+                        </span>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className="table-hide-button row-hide-button"
+                      aria-label={copy("Hide row", "Satırı gizle")}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        hideTableRow(tableId, String(rowKey));
+                      }}
+                    >
+                      ◉
+                    </button>
+                  </>
+                )}
+              </div>
             );
           })}
         </div>
@@ -3992,41 +4513,68 @@ function App() {
     tableClassName,
     tableId,
   }) => {
-    const visibleRows = getSortableTableRows(tableId, rows, columns);
     const control = tableControls[tableId] || {};
+    const hiddenColumns = new Set(getHiddenTableColumns(control));
+    const visibleColumns = columns
+      .map((column, index) => ({ column, index, key: getTableColumnKey(column, index) }))
+      .filter((item) => !hiddenColumns.has(item.key));
+    const visibleRows = getSortableTableRows(tableId, rows, columns, getRowKey);
+    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns);
 
     return (
       <>
         {renderTableToolbar(tableId, rows, visibleRows)}
         <div className={tableClassName}>
-          <div className={`${rowClassName} ${headClassName} sortable-table-head`} style={{ gridTemplateColumns }}>
-            {columns.map((column, index) => {
-              const key = getTableColumnKey(column, index);
+          <div className={`${rowClassName} ${headClassName} sortable-table-head`} style={{ gridTemplateColumns: visibleGridTemplateColumns }}>
+            {visibleColumns.map(({ column, key }) => {
               const active = control.sortKey === key;
 
               return (
-                <button
-                  type="button"
-                  className={active ? "active" : ""}
-                  disabled={column.sortable === false}
-                  key={key}
-                  onClick={() => updateTableControl(tableId, getNextTableSortPatch(control, key))}
-                >
-                  <span>{column.header}</span>
-                  {column.sortable !== false && <small aria-hidden="true">{active ? (control.direction === "desc" ? "DESC" : "ASC") : "SORT"}</small>}
-                </button>
+                <div className="sortable-heading-cell" key={key}>
+                  <button
+                    type="button"
+                    className={`sort-heading-button ${active ? "active" : ""}`}
+                    disabled={column.sortable === false}
+                    onClick={() => updateTableControl(tableId, getNextTableSortPatch(control, key))}
+                  >
+                    <span>{column.header}</span>
+                    {column.sortable !== false && <small className="sort-indicator" aria-hidden="true">{getTableSortIndicator(control, key)}</small>}
+                  </button>
+                  <button
+                    type="button"
+                    className="table-hide-button"
+                    disabled={visibleColumns.length <= 1}
+                    aria-label={`${copy("Hide column", "Kolonu gizle")}: ${normalizeTableValue(column.header)}`}
+                    onClick={() => hideTableColumn(tableId, columns, key)}
+                  >
+                    ◉
+                  </button>
+                </div>
               );
             })}
+            <span className="table-row-action-head" aria-hidden="true">−</span>
           </div>
           {(visibleRows.length ? visibleRows : [{ id: "empty" }]).map((row) => (
-            <div className={`${rowClassName}${row.id === "empty" ? " table-empty-row" : ""}`} style={{ gridTemplateColumns }} key={row.id === "empty" ? `${tableId}-empty` : getRowKey(row)}>
+            <div className={`${rowClassName}${row.id === "empty" ? " table-empty-row" : ""}`} style={{ gridTemplateColumns: visibleGridTemplateColumns }} key={row.id === "empty" ? `${tableId}-empty` : getRowKey(row)}>
               {row.id === "empty" ? (
                 <span className="table-empty-cell">{emptyLabel || copy("No matching records", "Eşleşen kayıt yok")}</span>
-              ) : columns.map((column, index) => {
-                const content = column.render ? column.render(row) : normalizeTableValue(getTableCellValue(column, row));
-                const CellTag = index === 0 && (rowClassName.includes("users-row") || rowClassName.includes("permissions-row")) ? "strong" : "span";
-                return <CellTag key={getTableColumnKey(column, index)}>{content}</CellTag>;
-              })}
+              ) : (
+                <>
+                  {visibleColumns.map(({ column, index, key }) => {
+                    const content = column.render ? column.render(row) : normalizeTableValue(getTableCellValue(column, row));
+                    const CellTag = index === 0 && (rowClassName.includes("users-row") || rowClassName.includes("permissions-row")) ? "strong" : "span";
+                    return <CellTag key={key}>{content}</CellTag>;
+                  })}
+                  <button
+                    type="button"
+                    className="table-hide-button row-hide-button"
+                    aria-label={copy("Hide row", "Satırı gizle")}
+                    onClick={() => hideTableRow(tableId, String(getRowKey(row)))}
+                  >
+                    ◉
+                  </button>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -5250,7 +5798,7 @@ function App() {
 
     return renderDashboardLayout(
       `operations/${activeOperationsSubmodule.key}`,
-        <section className="operations-workspace operations-modern">
+        <section className="operations-workspace operations-modern operations-entry-page operations-active-processes-page">
           <div className="operations-header">
             <div>
               <span>Operations / {copy("Active Processes", "Mevcut Süreçler")}</span>
@@ -7389,13 +7937,26 @@ function App() {
     ];
     const salesReadyCount = salesReadinessItems.filter((item) => item.done).length;
     const salesReadinessPercent = Math.round((salesReadyCount / Math.max(salesReadinessItems.length, 1)) * 100);
+    const salesReadinessStatus = salesReadyCount === salesReadinessItems.length
+      ? copy("All sales data ready", "Tüm satış verileri hazır")
+      : copy("Data entry needed", "Veri girişi gerekiyor");
     const salesMonthLabels = form.language === "tr"
       ? ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
       : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const salesForecastPreview = Array.from({ length: 12 }, (_, index) => ({
-      label: salesMonthLabels[index],
-      value: getSalesForecastForMonth(salesStrategy, index),
-    }));
+    const salesForecastPreview = Array.from({ length: 12 }, (_, monthIndex) => {
+      const channels = salesStrategy.channels.map((channel, channelIndex) => ({
+        id: channel.id || `channel-${channelIndex}`,
+        name: channel.name?.trim() || `${copy("Channel", "Kanal")} ${channelIndex + 1}`,
+        units: getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy),
+      }));
+      const totalUnits = channels.reduce((total, channel) => total + channel.units, 0);
+
+      return {
+        channels,
+        label: salesMonthLabels[monthIndex],
+        value: totalUnits,
+      };
+    });
     const maxSalesForecastPreview = Math.max(1, ...salesForecastPreview.map((item) => item.value));
     const salesStrategyTone = salesReadinessPercent >= 75 ? "teal" : salesReadinessPercent >= 50 ? "amber" : "clay";
     const salesChannelTypeOptions = salesStrategy.channelTypes?.length ? salesStrategy.channelTypes : [
@@ -7456,6 +8017,78 @@ function App() {
     const seasonalityMonthLabels = form.language === "tr"
       ? ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
       : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const normalizedSalesVisibleSections = normalizeSalesVisibleSections(salesVisibleSections);
+    const isSalesOptionalSectionVisible = (sectionId) => normalizedSalesVisibleSections.optional.includes(sectionId);
+    const salesReadoutCards = [
+      {
+        detail: copy("selected from Operations products", "Operations ürünlerinden seçildi"),
+        id: "productsInChannels",
+        label: copy("Products in channels", "Kanallardaki ürün"),
+        value: formatNumber(activeProductCount),
+      },
+      {
+        detail: copy("total planned marketing spend", "toplam planlanan pazarlama bütçesi"),
+        id: "campaignBudget",
+        label: copy("Campaign budget", "Kampanya bütçesi"),
+        value: formatLira(totalCampaignBudget),
+      },
+      {
+        detail: multiplierPeriod === "quarterly" ? copy("quarterly values expanded to 12 months", "çeyrek değerleri 12 aya yayıldı") : copy("across 12 months", "12 ay genelinde"),
+        id: "averageMultiplier",
+        label: copy("Average multiplier", "Ortalama çarpan"),
+        value: `${formatNumber(averageMultiplier, 2)}x`,
+      },
+      {
+        detail: copy("after planned channel quantities", "planlanan kanal adetlerinden sonra"),
+        id: "readyRemaining",
+        label: copy("Ready remaining", "Hazır kalan"),
+        value: formatNumber(totalReadyUnits),
+      },
+      {
+        detail: copy("sum of channel quantities", "kanal adetleri toplamı"),
+        id: "monthlyChannelPlan",
+        label: copy("Monthly channel plan", "Aylık kanal planı"),
+        value: formatNumber(baseMonthlySalesUnits),
+      },
+      {
+        detail: multiplierPeriod === "quarterly" ? copy("channel plan x quarterly multipliers", "kanal planı x çeyreklik çarpanlar") : copy("channel plan x monthly multipliers", "kanal planı x aylık çarpanlar"),
+        id: "expectedAnnualUnits",
+        label: copy("12M expected units", "12A beklenen adet"),
+        value: formatNumber(expectedAnnualSalesUnits),
+      },
+      {
+        detail: copy("based on product prices", "ürün fiyatlarına göre"),
+        id: "monthlyCommission",
+        label: copy("Monthly commission", "Aylık komisyon"),
+        value: formatLira(totalMonthlyCommission),
+      },
+    ];
+    const visibleSalesReadoutCards = salesReadoutCards.filter((card) => normalizedSalesVisibleSections.readout.includes(card.id));
+    const salesEditorGroups = [
+      {
+        description: copy("These sections are optional controls on the sales page.", "Bu bölümler satış sayfasındaki opsiyonel kontrol alanlarıdır."),
+        key: "optional",
+        options: [
+          {
+            detail: copy("Monthly or quarterly expectation multipliers that scale the sales forecast.", "Satış tahminini ölçekleyen aylık veya çeyreklik beklenti çarpanları."),
+            id: "expectationMultipliers",
+            label: copy("Expectation multiplier period", "Beklenti çarpanı periyodu"),
+          },
+          {
+            detail: copy("Basket, conversion, traffic, capacity, seasonality, ramp-up and channel-specific price fields.", "Sepet, dönüşüm, trafik, kapasite, sezonsallık, ramp-up ve kanala özel fiyat alanları."),
+            id: "advancedChannelParameters",
+            label: copy("Advanced channel parameters", "Gelişmiş kanal parametreleri"),
+          },
+        ],
+        title: copy("Optional sections", "Opsiyonel kısımlar"),
+      },
+      {
+        description: copy("Choose which strategy readout cards appear at the bottom of the page.", "Sayfanın altındaki strateji okumasında hangi kartların görüneceğini seçin."),
+        key: "readout",
+        options: salesReadoutCards,
+        title: copy("Strategy readout", "Strateji okuması"),
+      },
+    ];
 
     return renderDashboardLayout(
       "sales-strategy",
@@ -7467,6 +8100,15 @@ function App() {
               <p>{copy("Plan sales channels by product, monthly sales quantity, commission, campaign duration, and monthly or quarterly expectation multipliers. Financial Modelling reads these product-linked quantities directly.", "Satış kanallarını ürün, aylık satış adedi, komisyon, kampanya süresi ve aylık ya da çeyreklik beklenti çarpanlarıyla planlayın. Finansal Modelleme bu ürün bağlantılı adetleri doğrudan kullanır.")}</p>
             </div>
             <div className="sales-header-actions">
+              <button
+                type="button"
+                className={`sales-edit-toggle ${salesEditorOpen ? "active" : ""}`}
+                onClick={() => setSalesEditorOpen((isOpen) => !isOpen)}
+                aria-controls="sales-editor-panel"
+                aria-expanded={salesEditorOpen}
+              >
+                {salesEditorOpen ? copy("Done editing", "Düzenlemeyi bitir") : copy("Edit page", "Sayfayı düzenle")}
+              </button>
               <button type="button" className="app-command-button" onClick={loadPlanningData} disabled={salesLoading}>
                 {copy("Refresh Data", "Verileri Yenile")}
               </button>
@@ -7477,6 +8119,58 @@ function App() {
           </div>
 
           {salesStatus && <p className="status-message">{salesStatus}</p>}
+
+          {salesEditorOpen && (
+            <section id="sales-editor-panel" className="sales-editor-panel" aria-label={copy("Sales page editor", "Satış sayfası düzenleyici")}>
+              <div className="sales-editor-heading">
+                <div>
+                  <span>{copy("Sales view", "Satış görünümü")}</span>
+                  <h2>{copy("Visible optional content", "Görünecek opsiyonel içerikler")}</h2>
+                  <p>{copy("Selections are saved for this browser and do not change the saved sales data.", "Seçimler bu tarayıcıda saklanır; kayıtlı satış verisini değiştirmez.")}</p>
+                </div>
+                <div className="sales-editor-actions">
+                  <button type="button" onClick={resetSalesVisibleSections}>{copy("Reset", "Sıfırla")}</button>
+                  <button type="button" className="primary" onClick={() => setSalesEditorOpen(false)}>{copy("Done", "Bitti")}</button>
+                </div>
+              </div>
+              <div className="sales-editor-grid">
+                {salesEditorGroups.map((group) => {
+                  const visibleKeys = normalizedSalesVisibleSections[group.key] || [];
+
+                  return (
+                    <article className="sales-editor-group" key={group.key}>
+                      <div className="sales-editor-group-heading">
+                        <div>
+                          <span>{group.title}</span>
+                          <p>{group.description}</p>
+                        </div>
+                        <strong>{visibleKeys.length}/{group.options.length}</strong>
+                      </div>
+                      <div className="sales-editor-options">
+                        {group.options.map((option) => {
+                          const isSelected = visibleKeys.includes(option.id);
+
+                          return (
+                            <label className={`sales-editor-option ${isSelected ? "selected" : ""}`} key={option.id}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSalesVisibleSection(group.key, option.id)}
+                              />
+                              <span>
+                                <strong>{option.label}</strong>
+                                <small>{option.detail}</small>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           <section className={`sales-command-hero ${salesStrategyTone}`} aria-label={copy("Sales strategy readiness", "Satış stratejisi hazırlığı")}>
             <div className="sales-command-copy">
@@ -7493,16 +8187,32 @@ function App() {
               </div>
             </div>
             <div className="sales-forecast-preview">
-              <div className="readiness-ring" style={{ "--readiness": `${salesReadinessPercent}%` }}>
-                <strong>{salesReadinessPercent}%</strong>
-                <span>{copy("ready", "hazır")}</span>
+              <div className="sales-readiness-status-card">
+                <span>{copy("Sales data status", "Satış veri durumu")}</span>
+                <strong>{salesReadinessStatus}</strong>
+                <small>{salesReadyCount}/{salesReadinessItems.length} {copy("source groups ready", "kaynak grup hazır")}</small>
               </div>
               <div className="sales-mini-chart" aria-label={copy("12 month sales forecast preview", "12 aylık satış tahmini önizlemesi")}>
                 {salesForecastPreview.map((item) => (
-                  <span style={{ "--bar-height": `${Math.max(6, (item.value / maxSalesForecastPreview) * 100)}%` }} key={item.label}>
+                  <button type="button" className="sales-mini-bar" style={{ "--bar-height": `${Math.max(6, (item.value / maxSalesForecastPreview) * 100)}%` }} key={item.label}>
                     <i />
                     <small>{item.label}</small>
-                  </span>
+                    <span className="sales-mini-tooltip" role="tooltip">
+                      <strong>{item.label}</strong>
+                      <b>{copy("Total sales units", "Toplam satış adedi")}: {formatNumber(item.value)}</b>
+                      {item.channels.length ? item.channels.map((channel) => (
+                        <em key={channel.id}>
+                          <span>{channel.name}</span>
+                          <small>{formatNumber(channel.units)} {copy("units", "adet")}</small>
+                        </em>
+                      )) : (
+                        <em>
+                          <span>{copy("No channel", "Kanal yok")}</span>
+                          <small>{formatNumber(0)} {copy("units", "adet")}</small>
+                        </em>
+                      )}
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -7524,6 +8234,7 @@ function App() {
           </div>
 
           <div className="sales-grid">
+            {isSalesOptionalSectionVisible("expectationMultipliers") && (
             <details className="sales-card sales-forecast-card progressive-input-box">
               <summary className="sales-card-heading progressive-section-summary">
                 <div>
@@ -7574,6 +8285,7 @@ function App() {
                 ))}
               </div>
             </details>
+            )}
 
             <details className="sales-card channels-card progressive-input-box">
               <summary className="sales-card-heading progressive-section-summary">
@@ -7667,6 +8379,7 @@ function App() {
                         />
                       </label>
                     ))}
+                    {isSalesOptionalSectionVisible("advancedChannelParameters") && (
                     <details
                       className="advanced-channel-panel wide-field"
                       open={channel.advancedOpen ?? false}
@@ -7708,6 +8421,7 @@ function App() {
                         </div>
                       </div>
                     </details>
+                    )}
                     {(() => {
                       const product = productMap.get(channel.productId) || channel.product || {};
                       const availability = getProductAvailability(channel.productId);
@@ -7770,7 +8484,7 @@ function App() {
                         onClick={() => updateTableControl("sales-campaigns", getNextTableSortPatch(control, key))}
                       >
                         <span>{column.header}</span>
-                        <small aria-hidden="true">{active ? (control.direction === "desc" ? "DESC" : "ASC") : "SORT"}</small>
+                        <small className="sort-indicator" aria-hidden="true">{getTableSortIndicator(control, key)}</small>
                       </button>
                     );
                   })}
@@ -7831,6 +8545,7 @@ function App() {
               </div>
             </details>
 
+            {Boolean(visibleSalesReadoutCards.length) && (
             <details className="sales-card sales-decision-card progressive-input-box">
               <summary className="sales-card-heading progressive-section-summary">
                 <div>
@@ -7839,12 +8554,16 @@ function App() {
                 </div>
               </summary>
               <div className="sales-signal-grid">
-                <span>{copy("Products in channels", "Kanallardaki ürün")} <strong>{formatNumber(activeProductCount)}</strong><small>{copy("selected from Operations products", "Operations ürünlerinden seçildi")}</small></span>
-                <span>{copy("Campaign budget", "Kampanya bütçesi")} <strong>{formatLira(totalCampaignBudget)}</strong><small>{copy("total planned marketing spend", "toplam planlanan pazarlama bütçesi")}</small></span>
-                <span>{copy("Average multiplier", "Ortalama çarpan")} <strong>{formatNumber(averageMultiplier, 2)}x</strong><small>{multiplierPeriod === "quarterly" ? copy("quarterly values expanded to 12 months", "çeyrek değerleri 12 aya yayıldı") : copy("across 12 months", "12 ay genelinde")}</small></span>
-                <span>{copy("Ready remaining", "Hazır kalan")} <strong>{formatNumber(totalReadyUnits)}</strong><small>{copy("after planned channel quantities", "planlanan kanal adetlerinden sonra")}</small></span>
+                {visibleSalesReadoutCards.map((card) => (
+                  <span key={card.id}>
+                    {card.label}
+                    <strong>{card.value}</strong>
+                    <small>{card.detail}</small>
+                  </span>
+                ))}
               </div>
             </details>
+            )}
           </div>
         </section>,
     );
@@ -8415,7 +9134,9 @@ function App() {
   ];
   const missingFeasibilityItem = feasibilityChecklist.find((item) => !item.done);
   const feasibilityReadyCount = feasibilityChecklist.filter((item) => item.done).length;
-  const feasibilityReadinessPercent = Math.round((feasibilityReadyCount / Math.max(feasibilityChecklist.length, 1)) * 100);
+  const feasibilityReadinessStatus = feasibilityReadyCount === feasibilityChecklist.length
+    ? copy("All data ready", "Tüm veriler hazır")
+    : copy("Data entry needed", "Veri girişi gerekiyor");
   const unmetForecastUnits = hasFinancialSourceData
     ? Math.max(0, toFiniteNumber(financialSummary.forecastSalesUnits) - toFiniteNumber(financialSummary.netSoldUnits))
     : 0;
@@ -8478,6 +9199,7 @@ function App() {
     {
       category: copy("Decision", "Karar"),
       detail: copy("from readiness and finance checks", "hazırlık ve finans kontrolünden"),
+      id: "verdict",
       label: copy("Feasibility verdict", "Fizibilite kararı"),
       tone: feasibilityVerdict.tone,
       value: feasibilityVerdict.label,
@@ -8485,6 +9207,7 @@ function App() {
     {
       category: copy("Finance", "Finans"),
       detail: copy("monthly estimate", "aylık tahmin"),
+      id: "netResult",
       label: copy("Net result", "Net sonuç"),
       tone: hasFinancialSourceData && monthlyNet > 0 ? "teal" : hasFinancialSourceData ? "clay" : "amber",
       value: moneyOrMissing(monthlyNet),
@@ -8492,6 +9215,7 @@ function App() {
     {
       category: copy("Cash", "Nakit"),
       detail: copy("before cash balance goes negative", "nakit eksiye düşmeden önce"),
+      id: "cashRunway",
       label: copy("Cash runway", "Nakit dayanma"),
       tone: hasFinancialSourceData && hasEnoughRunway ? "teal" : hasFinancialSourceData ? "amber" : "amber",
       value: hasFinancialSourceData ? `${formatNumber(financialSummary.cashRunwayMonths)} ${copy("mo", "ay")}` : noDataValue,
@@ -8499,6 +9223,7 @@ function App() {
     {
       category: copy("Return", "Geri dönüş"),
       detail: copy("investment recovery month", "yatırım geri dönüş ayı"),
+      id: "payback",
       label: copy("Payback", "Geri dönüş"),
       tone: hasFinancialSourceData && financialSummary.paybackMonth ? "teal" : hasFinancialSourceData ? "clay" : "amber",
       value: hasFinancialSourceData ? formatDashboardMonth(financialSummary.paybackMonth) : noDataValue,
@@ -8506,6 +9231,7 @@ function App() {
     {
       category: copy("Capacity", "Kapasite"),
       detail: copy("available monthly production", "mevcut aylık üretim"),
+      id: "capacityDemand",
       label: copy("Capacity vs demand", "Kapasite / talep"),
       tone: hasSalesForecast && activePlanResults.length && capacityCoveragePercent >= 100 ? "teal" : hasSalesForecast && activePlanResults.length ? "amber" : "amber",
       value: hasSalesForecast && activePlanResults.length ? `${formatNumber(capacityCoveragePercent)}%` : noDataValue,
@@ -8513,6 +9239,7 @@ function App() {
     {
       category: copy("Funding", "Finansman"),
       detail: copy("own cash after loan and grant", "kredi ve hibe sonrası öz nakit"),
+      id: "initialCash",
       label: copy("Initial cash needed", "Gerekli başlangıç nakdi"),
       tone: hasFinancialSourceData && financialSummary.initialCashRequired <= 0 ? "teal" : hasFinancialSourceData ? "amber" : "amber",
       value: hasFinancialSourceData ? formatLira(financialSummary.initialCashRequired) : noDataValue,
@@ -8580,121 +9307,400 @@ function App() {
       tone: "reports",
     },
   ];
+  const dashboardRiskPriority = {
+    high: 1,
+    medium: 2,
+    low: 3,
+    controlled: 4,
+  };
   const dashboardRiskRows = [
     !operationsWorkspace.products.length && {
       action: copy("Add product", "Ürün ekle"),
       detail: copy("Without product price and recipe, cost and revenue are not decision-grade.", "Ürün fiyatı ve reçete olmadan maliyet ve ciro karar seviyesinde değildir."),
       path: "/operations/products",
+      priority: dashboardRiskPriority.high,
       severity: copy("Blocker", "Engel"),
-      tone: "clay",
+      tone: "risk-high",
       title: copy("Product definition missing", "Ürün tanımı eksik"),
     },
     !activePlanResults.length && {
       action: copy("Save process", "Süreç kaydet"),
       detail: copy("Capacity, labor, material, and energy must come from a saved daily process plan.", "Kapasite, işçilik, malzeme ve enerji kayıtlı günlük süreç planından gelmeli."),
       path: "/operations/data-entry",
+      priority: dashboardRiskPriority.high,
       severity: copy("Blocker", "Engel"),
-      tone: "clay",
+      tone: "risk-high",
       title: copy("Production plan missing", "Üretim planı eksik"),
     },
     !hasSalesForecast && {
       action: copy("Add sales forecast", "Satış tahmini ekle"),
       detail: copy("Demand, revenue, unmet sales, and inventory risk require product-linked sales channels.", "Talep, ciro, karşılanmayan satış ve stok riski ürüne bağlı satış kanalları ister."),
       path: "/sales-strategy",
+      priority: dashboardRiskPriority.high,
       severity: copy("Blocker", "Engel"),
-      tone: "clay",
+      tone: "risk-high",
       title: copy("Sales forecast missing", "Satış tahmini eksik"),
     },
     !hasFinancialAssumptions && {
       action: copy("Complete finance", "Finansı tamamla"),
       detail: copy("Cash runway, payback, taxes, and working capital need saved financial assumptions.", "Nakit dayanma, geri dönüş, vergiler ve işletme sermayesi kayıtlı finans varsayımları ister."),
       path: "/financial-modelling/girdiler",
+      priority: dashboardRiskPriority.high,
       severity: copy("High", "Yüksek"),
-      tone: "amber",
+      tone: "risk-high",
       title: copy("Financial assumptions incomplete", "Finans varsayımları eksik"),
     },
     hasFinancialSourceData && unmetForecastUnits > 0 && {
       action: copy("Fix capacity", "Kapasiteyi düzelt"),
       detail: `${formatNumber(unmetForecastUnits)} ${copy("units of forecast demand cannot be produced.", "adet tahmini talep üretilemiyor.")}`,
       path: "/operations/data-entry",
+      priority: dashboardRiskPriority.high,
       severity: copy("High", "Yüksek"),
-      tone: "clay",
+      tone: "risk-high",
       title: copy("Capacity gap", "Kapasite açığı"),
     },
     hasFinancialSourceData && financialSummary.unsoldInventoryUnits > 0 && {
       action: copy("Balance output", "Çıktıyı dengele"),
       detail: `${formatNumber(financialSummary.unsoldInventoryUnits)} ${copy("units remain unsold in the selected horizon.", "adet seçilen ufukta satılmadan kalıyor.")}`,
       path: "/sales-strategy",
+      priority: dashboardRiskPriority.medium,
       severity: copy("Medium", "Orta"),
-      tone: "amber",
+      tone: "risk-medium",
       title: copy("Inventory risk", "Stok riski"),
     },
     hasFinancialSourceData && monthlyNet <= 0 && {
       action: copy("Repair margin", "Marjı düzelt"),
       detail: copy("Current pricing, cost, or channel assumptions do not produce positive monthly net.", "Mevcut fiyat, maliyet veya kanal varsayımları pozitif aylık net üretmiyor."),
       path: "/financial-modelling/analiz",
+      priority: dashboardRiskPriority.high,
       severity: copy("High", "Yüksek"),
-      tone: "clay",
+      tone: "risk-high",
       title: copy("Weak profitability", "Zayıf karlılık"),
     },
     hasFinancialSourceData && financialSummary.cashRunwayMonths < Math.min(financialMonthCount, 3) && {
       action: copy("Improve cash", "Nakti iyileştir"),
       detail: copy("Starting cash, financing timing, or non-critical spend should be reviewed.", "Başlangıç nakdi, finansman zamanı veya kritik olmayan harcamalar gözden geçirilmeli."),
       path: "/financial-modelling/girdiler",
+      priority: dashboardRiskPriority.high,
       severity: copy("High", "Yüksek"),
-      tone: "amber",
+      tone: "risk-high",
       title: copy("Short cash runway", "Kısa nakit dayanma"),
     },
-  ].filter(Boolean).slice(0, 5);
+  ].filter(Boolean).sort((left, right) => left.priority - right.priority).slice(0, 5);
   const dashboardAssumptionRows = [
-    [copy("Monthly capacity", "Aylık kapasite"), activePlanResults.length ? `${formatNumber(monthlyProductionCapacity, 2)} ${latestPlanResult?.productUnit || copy("units", "adet")}` : noDataValue],
-    [copy("Average monthly demand", "Ortalama aylık talep"), hasSalesForecast ? `${formatNumber(averageMonthlyDemand)} ${copy("units", "adet")}` : noDataValue],
-    [copy("Unit margin", "Birim marj"), operationUnitSalePrice ? `${formatNumber(operationProfitMargin, 1)}%` : noDataValue],
+    {
+      detail: copy("Saved process capacity multiplied by monthly working days.", "Kayıtlı süreç kapasitesinin aylık çalışma günleriyle çarpımı."),
+      id: "monthlyCapacity",
+      label: copy("Monthly capacity", "Aylık kapasite"),
+      value: activePlanResults.length ? `${formatNumber(monthlyProductionCapacity, 2)} ${latestPlanResult?.productUnit || copy("units", "adet")}` : noDataValue,
+    },
+    {
+      detail: copy("Product-linked sales forecast averaged over 12 months.", "Ürüne bağlı satış tahmininin 12 aylık ortalaması."),
+      id: "averageMonthlyDemand",
+      label: copy("Average monthly demand", "Ortalama aylık talep"),
+      value: hasSalesForecast ? `${formatNumber(averageMonthlyDemand)} ${copy("units", "adet")}` : noDataValue,
+    },
+    {
+      detail: copy("Unit sale price minus production cost, shown as a margin rate.", "Birim satış fiyatından üretim maliyeti düşülerek bulunan marj oranı."),
+      id: "unitMargin",
+      label: copy("Unit margin", "Birim marj"),
+      value: operationUnitSalePrice ? `${formatNumber(operationProfitMargin, 1)}%` : noDataValue,
+    },
   ];
+  const dashboardFinancialDetailRows = [
+    {
+      detail: copy("Expected monthly sales income from the selected product.", "Seçili üründen beklenen aylık satış geliri."),
+      id: "monthlyRevenue",
+      label: copy("Monthly revenue", "Aylık ciro"),
+      value: moneyOrMissing(monthlyRevenue),
+    },
+    {
+      detail: copy("Operating, production, finance, and recurring costs for the month.", "Aylık operasyon, üretim, finansman ve tekrar eden maliyetler."),
+      id: "monthlyCost",
+      label: copy("Monthly cost", "Aylık maliyet"),
+      value: moneyOrMissing(monthlyCost),
+    },
+    {
+      detail: copy("Net result divided by monthly revenue.", "Net sonucun aylık ciroya oranı."),
+      id: "netMargin",
+      label: copy("Net margin", "Net marj"),
+      value: hasFinancialSourceData ? `${formatNumber(netMarginPercent, 1)}%` : noDataValue,
+    },
+    {
+      detail: copy("First month where cumulative result reaches break-even.", "Kümülatif sonucun başa baş noktasına ulaştığı ilk ay."),
+      id: "breakEven",
+      label: copy("Break-even", "Başa baş"),
+      value: hasFinancialSourceData ? formatDashboardMonth(financialSummary.breakEvenMonth) : noDataValue,
+    },
+    {
+      detail: copy("Cash tied in inventory, receivables, and operating timing.", "Stok, alacaklar ve operasyon zamanlamasında bağlı kalan nakit."),
+      id: "workingCapital",
+      label: copy("Working capital", "İşletme sermayesi"),
+      value: hasFinancialSourceData ? formatLira(financialSummary.workingCapitalRequirement) : noDataValue,
+    },
+    {
+      detail: copy("Produced units that remain unsold in the selected horizon.", "Seçilen ufukta üretilip satılamayan adet."),
+      id: "unsoldInventory",
+      label: copy("Unsold inventory", "Satılmayan stok"),
+      value: hasFinancialSourceData ? `${formatNumber(financialSummary.unsoldInventoryUnits)} ${copy("units", "adet")}` : noDataValue,
+    },
+    {
+      detail: copy("Forecast demand that available capacity cannot cover.", "Mevcut kapasitenin karşılayamadığı tahmini talep."),
+      id: "unmetSales",
+      label: copy("Unmet sales", "Karşılanmayan satış"),
+      value: hasFinancialSourceData ? `${formatNumber(unmetForecastUnits)} ${copy("units", "adet")}` : noDataValue,
+    },
+    {
+      detail: copy("Average production cost per unit from the operations plan.", "Operasyon planından gelen ortalama birim üretim maliyeti."),
+      id: "unitProductionCost",
+      label: copy("Unit production cost", "Birim üretim maliyeti"),
+      value: hasFinancialSourceData ? formatLira(financialSummary.unitProductionCost, 2) : noDataValue,
+    },
+  ];
+  const normalizedDashboardVisibleSections = normalizeDashboardVisibleSections(dashboardVisibleSections);
+  const visibleDashboardAssumptionRows = dashboardAssumptionRows.filter((row) => normalizedDashboardVisibleSections.assumptions.includes(row.id));
+  const visibleDashboardExecutiveMetrics = dashboardExecutiveMetrics.filter((metric) => normalizedDashboardVisibleSections.business.includes(metric.id));
+  const visibleDashboardFinancialDetailRows = dashboardFinancialDetailRows.filter((row) => normalizedDashboardVisibleSections.details.includes(row.id));
+  const dashboardEditorGroups = [
+    {
+      description: copy("Product and projection horizon stay fixed. Choose the extra summary signals shown next to them.", "Ürün ve projeksiyon ufku sabit kalır. Yanlarında görünecek ek özet sinyalleri seçin."),
+      fixedItems: [
+        [copy("Product", "Ürün"), dashboardProductSelectLabel],
+        [copy("Projection horizon", "Projeksiyon ufku"), dashboardHorizonSelectLabel],
+      ],
+      key: "assumptions",
+      options: dashboardAssumptionRows,
+      title: copy("Assumption summary", "Varsayım özeti"),
+    },
+    {
+      description: copy("Control the headline business model metrics in the main decision grid.", "Ana karar gridindeki iş modeli metriklerini kontrol edin."),
+      key: "business",
+      options: dashboardExecutiveMetrics,
+      title: copy("Business model", "İş modeli"),
+    },
+    {
+      description: copy("Pick which finance and operations signals appear behind the verdict.", "Kararın arkasında hangi finansal ve operasyonel sinyallerin görüneceğini seçin."),
+      key: "details",
+      options: dashboardFinancialDetailRows,
+      title: copy("Financial & operating detail", "Finansal ve operasyonel detay"),
+    },
+  ];
+
+  function toggleDashboardVisibleSection(group, key) {
+    setDashboardVisibleSections((current) => {
+      const normalized = normalizeDashboardVisibleSections(current);
+      const currentKeys = normalized[group] || [];
+      const nextKeys = currentKeys.includes(key)
+        ? currentKeys.filter((item) => item !== key)
+        : [...currentKeys, key];
+
+      return {
+        ...normalized,
+        [group]: nextKeys,
+      };
+    });
+  }
+
+  function resetDashboardVisibleSections() {
+    setDashboardVisibleSections(cloneDashboardVisibleSections());
+  }
+
+  function toggleSalesVisibleSection(group, key) {
+    setSalesVisibleSections((current) => {
+      const normalized = normalizeSalesVisibleSections(current);
+      const currentKeys = normalized[group] || [];
+      const nextKeys = currentKeys.includes(key)
+        ? currentKeys.filter((item) => item !== key)
+        : [...currentKeys, key];
+
+      return {
+        ...normalized,
+        [group]: nextKeys,
+      };
+    });
+  }
+
+  function resetSalesVisibleSections() {
+    setSalesVisibleSections(cloneSalesVisibleSections());
+  }
+
+  function getDirtyOperationFormEntities() {
+    return Object.keys(emptyOperationForms).filter((entity) => (
+      JSON.stringify(operationForms[entity]) !== JSON.stringify(emptyOperationForms[entity])
+    ));
+  }
+
+  function getUnsavedManualSaveMessage() {
+    return copy(
+      "This screen has form-specific save buttons. Stay on the page and use the relevant save button, or leave without saving.",
+      "Bu ekranda form bazlı kayıt butonları var. Sayfada kalıp ilgili Kaydet butonunu kullanabilir veya kaydetmeden çıkabilirsiniz.",
+    );
+  }
+
+  async function saveCurrentWorkspaceChanges() {
+    if (routePath === "/sales-strategy") {
+      return handleSaveSalesStrategy();
+    }
+
+    if (isSimulationRoute && activeSimulationVariant) {
+      return persistSimulationVariant(activeSimulationVariant);
+    }
+
+    if (routePath === "/operations/data-entry") {
+      return handleSaveOperationPlan();
+    }
+
+    if (isOperationsRoute) {
+      const dirtyEntities = getDirtyOperationFormEntities();
+
+      if (dirtyEntities.length) {
+        for (const entity of dirtyEntities) {
+          const saved = await handleSaveOperationRecord(entity);
+          if (!saved) return false;
+        }
+        return true;
+      }
+
+      markWorkspaceSnapshotClean();
+      return true;
+    }
+
+    if (isFinancialRoute) {
+      const shouldSaveExtraCost = Boolean(
+        String(financialExtraCostForm.name || "").trim() ||
+        toFiniteNumber(financialExtraCostForm.amount) > 0,
+      );
+      const settingsSaved = await handleSaveFinancialSettings();
+
+      if (!settingsSaved) return false;
+      if (shouldSaveExtraCost) return handleSaveFinancialExtraCost();
+
+      return true;
+    }
+
+    if (routePath === "/dashboard" || routePath === "/reports") {
+      markWorkspaceSnapshotClean();
+      return true;
+    }
+
+    setUnsavedPrompt((current) => ({
+      ...current,
+      message: getUnsavedManualSaveMessage(),
+    }));
+    return false;
+  }
+
+  function closeUnsavedPrompt() {
+    setUnsavedPrompt({
+      message: "",
+      open: false,
+      pendingNavigation: null,
+      saving: false,
+    });
+  }
+
+  function continuePendingNavigation() {
+    const pendingNavigation = unsavedPrompt.pendingNavigation;
+    closeUnsavedPrompt();
+
+    if (pendingNavigation) {
+      goTo(pendingNavigation.pathname, pendingNavigation.nextMode, { force: true });
+    }
+  }
+
+  async function handleSaveUnsavedAndContinue() {
+    setUnsavedPrompt((current) => ({ ...current, message: "", saving: true }));
+    const saved = await saveCurrentWorkspaceChanges();
+
+    if (!saved) {
+      setUnsavedPrompt((current) => ({
+        ...current,
+        message: current.message || copy("Changes could not be saved yet. Please review the current page.", "Değişiklikler henüz kaydedilemedi. Lütfen mevcut sayfayı kontrol edin."),
+        saving: false,
+      }));
+      return;
+    }
+
+    markWorkspaceSnapshotClean();
+    continuePendingNavigation();
+  }
+
+  function handleLeaveWithoutSaving() {
+    setSavedWorkspaceSnapshot(editableWorkspaceSnapshot);
+    continuePendingNavigation();
+  }
+
+  function renderUnsavedChangesPrompt() {
+    if (!unsavedPrompt.open || typeof document === "undefined") return null;
+
+    return createPortal(
+      <div className="unsaved-changes-backdrop" role="presentation">
+        <section className="unsaved-changes-dialog" role="dialog" aria-modal="true" aria-labelledby="unsaved-changes-title">
+          <span>{copy("Unsaved changes", "Kaydedilmemiş değişiklik")}</span>
+          <h2 id="unsaved-changes-title">{copy("You have not saved your changes", "Değişiklikleri kaydetmediniz")}</h2>
+          <p>{copy("Do you want to save before leaving, or continue without saving?", "Çıkmadan önce kaydetmek mi, yoksa kaydetmeden devam etmek mi istersiniz?")}</p>
+          {unsavedPrompt.message && <small>{unsavedPrompt.message}</small>}
+          <div className="unsaved-changes-actions">
+            <button type="button" className="ghost" onClick={closeUnsavedPrompt} disabled={unsavedPrompt.saving}>
+              {copy("Stay on page", "Sayfada kal")}
+            </button>
+            <button type="button" className="secondary" onClick={handleLeaveWithoutSaving} disabled={unsavedPrompt.saving}>
+              {copy("Leave without saving", "Kaydetmeden çık")}
+            </button>
+            <button type="button" className="primary" onClick={handleSaveUnsavedAndContinue} disabled={unsavedPrompt.saving}>
+              {unsavedPrompt.saving ? copy("Saving...", "Kaydediliyor...") : copy("Save and continue", "Kaydet ve devam et")}
+            </button>
+          </div>
+        </section>
+      </div>,
+      document.body,
+    );
+  }
 
   function renderDashboardLayout(activePage, children) {
     return (
-      <main className={`dashboard-shell ${dashboardSidebarOpen ? "sidebar-open" : "sidebar-collapsed"}`}>
-        <aside className="dashboard-sidebar" aria-label="Dashboard navigation">
-          <div className="dashboard-brand-block">
-            <div className="dashboard-sidebar-top">
-              <button type="button" className="landing-brand dashboard-brand" onClick={() => goTo("/dashboard", "login")}>
-                <img src={logoUrl} alt="Atera logo" />
-                <strong>Atera</strong>
-              </button>
+      <>
+        <main className={`dashboard-shell ${dashboardSidebarOpen ? "sidebar-open" : "sidebar-collapsed"}`}>
+          <aside className="dashboard-sidebar" aria-label="Dashboard navigation">
+            <div className="dashboard-brand-block">
+              <div className="dashboard-sidebar-top">
+                <button type="button" className="landing-brand dashboard-brand" onClick={() => goTo("/dashboard", "login")}>
+                  <img src={logoUrl} alt="Atera logo" />
+                  <strong>Atera</strong>
+                </button>
+                <button
+                  type="button"
+                  className="dashboard-sidebar-toggle"
+                  aria-label={dashboardSidebarOpen ? copy("Close menu", "Menüyü kapat") : copy("Open menu", "Menüyü aç")}
+                  aria-expanded={dashboardSidebarOpen}
+                  onClick={() => setDashboardSidebarOpen((isOpen) => !isOpen)}
+                >
+                  <span aria-hidden="true">{dashboardSidebarOpen ? "<" : ">"}</span>
+                </button>
+              </div>
+
+              <div className="dashboard-controls">
+                <label className="language-picker">
+                  <span>{labels.language}</span>
+                  <select value={form.language} onChange={(event) => updateField("language", event.target.value)}>
+                    <option value="en">EN</option>
+                    <option value="tr">TR</option>
+                  </select>
+                </label>
+                <ThemeToggle />
+              </div>
+            </div>
+
+            <nav className="dashboard-nav">
               <button
                 type="button"
-                className="dashboard-sidebar-toggle"
-                aria-label={dashboardSidebarOpen ? copy("Close menu", "Menüyü kapat") : copy("Open menu", "Menüyü aç")}
-                aria-expanded={dashboardSidebarOpen}
-                onClick={() => setDashboardSidebarOpen((isOpen) => !isOpen)}
+                className={activePage.startsWith("dashboard") ? "active" : ""}
+                onClick={() => goTo("/dashboard", "login")}
               >
-                <span aria-hidden="true">{dashboardSidebarOpen ? "<" : ">"}</span>
+                {labels.dashboard}
               </button>
-            </div>
-
-            <div className="dashboard-controls">
-              <label className="language-picker">
-                <span>{labels.language}</span>
-                <select value={form.language} onChange={(event) => updateField("language", event.target.value)}>
-                  <option value="en">EN</option>
-                  <option value="tr">TR</option>
-                </select>
-              </label>
-              <ThemeToggle />
-            </div>
-          </div>
-
-          <nav className="dashboard-nav">
-            <button
-              type="button"
-              className={activePage.startsWith("dashboard") ? "active" : ""}
-              onClick={() => goTo("/dashboard", "login")}
-            >
-              {labels.dashboard}
-            </button>
-            {dashboardModules.map((module) => (
-              <React.Fragment key={module.key}>
+              {dashboardModules.map((module) => (
+                <React.Fragment key={module.key}>
                 <button
                   type="button"
                   className={`dashboard-nav-item ${module.tone} ${activePage === module.key || (module.key === "operations" && activePage.startsWith("operations/")) || (module.key === "product-plus" && activePage.startsWith("product-plus/")) || (module.key === "financial-modelling" && activePage.startsWith("financial-modelling/")) || (module.key === "simulation" && activePage.startsWith("simulation/")) ? "active" : ""}`}
@@ -8809,7 +9815,9 @@ function App() {
         </aside>
 
         <section className="dashboard-content">{children}</section>
-      </main>
+        </main>
+        {renderUnsavedChangesPrompt()}
+      </>
     );
   }
 
@@ -9005,8 +10013,79 @@ function App() {
               <span>{currentProfile?.username || form.username || "Atera"}</span>
               <small>{currentProfile?.access_level || "-"}</small>
             </div>
+            <button
+              type="button"
+              className={`dashboard-edit-toggle ${dashboardEditorOpen ? "active" : ""}`}
+              onClick={() => setDashboardEditorOpen((isOpen) => !isOpen)}
+              aria-controls="dashboard-editor-panel"
+              aria-expanded={dashboardEditorOpen}
+            >
+              <span>{dashboardEditorOpen ? copy("Done editing", "Düzenlemeyi bitir") : copy("Edit screen", "Ekranı düzenle")}</span>
+            </button>
             <button type="button" className="command-run-button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
           </div>
+
+          {dashboardEditorOpen && (
+            <section id="dashboard-editor-panel" className="dashboard-editor-panel" aria-label={copy("Dashboard editor", "Dashboard düzenleyici")}>
+              <div className="dashboard-editor-heading">
+                <div>
+                  <span>{copy("Dashboard view", "Dashboard görünümü")}</span>
+                  <h2>{copy("Visible data groups", "Görünür veri grupları")}</h2>
+                  <p>{copy("Selections are saved for this browser.", "Seçimler bu tarayıcı için saklanır.")}</p>
+                </div>
+                <div className="dashboard-editor-actions">
+                  <button type="button" onClick={resetDashboardVisibleSections}>{copy("Reset", "Sıfırla")}</button>
+                  <button type="button" className="primary" onClick={() => setDashboardEditorOpen(false)}>{copy("Done", "Bitti")}</button>
+                </div>
+              </div>
+              <div className="dashboard-editor-grid">
+                {dashboardEditorGroups.map((group) => {
+                  const visibleKeys = normalizedDashboardVisibleSections[group.key] || [];
+
+                  return (
+                    <article className="dashboard-editor-group" key={group.key}>
+                      <div className="dashboard-editor-group-heading">
+                        <div>
+                          <span>{group.title}</span>
+                          <p>{group.description}</p>
+                        </div>
+                        <strong>{visibleKeys.length}/{group.options.length}</strong>
+                      </div>
+                      {Boolean(group.fixedItems?.length) && (
+                        <div className="dashboard-editor-fixed-items">
+                          {group.fixedItems.map(([label, value]) => (
+                            <span key={label}>
+                              <small>{label}</small>
+                              <strong>{value}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="dashboard-editor-options">
+                        {group.options.map((option) => {
+                          const isSelected = visibleKeys.includes(option.id);
+
+                          return (
+                            <label className={`dashboard-editor-option ${isSelected ? "selected" : ""}`} key={option.id}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleDashboardVisibleSection(group.key, option.id)}
+                              />
+                              <span>
+                                <strong>{option.label}</strong>
+                                <small>{option.detail}</small>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           <section className={`dashboard-assumption-strip ${feasibilityVerdict.tone}`} aria-label={copy("Assumption snapshot", "Varsayım özeti")}>
             <div className="dashboard-assumption-strip-heading">
@@ -9095,9 +10174,16 @@ function App() {
               </div>
             </div>
             <div className="assumption-strip-list">
-              {dashboardAssumptionRows.map(([label, value]) => (
-                <span key={label}>{label}<strong>{value}</strong></span>
-              ))}
+              {visibleDashboardAssumptionRows.length
+                ? visibleDashboardAssumptionRows.map((row) => (
+                  <span key={row.id}>{row.label}<strong>{row.value}</strong></span>
+                ))
+                : (
+                  <span className="dashboard-empty-selection">
+                    {copy("No extra assumptions selected", "Ek varsayım alanı seçilmedi")}
+                    <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
+                  </span>
+                )}
             </div>
           </section>
 
@@ -9114,17 +10200,14 @@ function App() {
             </div>
             <aside className="executive-readiness-card">
               <span>{copy("Decision readiness", "Karar hazırlığı")}</span>
-              <strong>{feasibilityReadinessPercent}%</strong>
+              <strong className="executive-readiness-status">{feasibilityReadinessStatus}</strong>
               <p>{copy("Core modules ready", "Hazır ana modül")}: {feasibilityReadyCount}/{feasibilityChecklist.length}</p>
-              <div className="readiness-progress" aria-hidden="true">
-                <span style={{ width: `${feasibilityReadinessPercent}%` }} />
-              </div>
               <div className="readiness-step-list">
                 {feasibilityChecklist.map((item) => (
                   <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
                     <i>{item.done ? "OK" : "!"}</i>
                     <span>{item.label}</span>
-                    <strong>{item.done ? copy("Ready", "Hazır") : item.action}</strong>
+                    <strong>{item.done ? copy("Ready", "Hazır") : copy("Data entry needed", "Veri girişi gerekiyor")}</strong>
                   </button>
                 ))}
               </div>
@@ -9140,14 +10223,23 @@ function App() {
               <strong>{periodLabel}</strong>
             </div>
             <div className="executive-metric-grid">
-              {dashboardExecutiveMetrics.map((metric) => (
-                <article className={`command-card executive-metric-card ${metric.tone}`} key={metric.label}>
-                  <span>{metric.category}</span>
-                  <h3>{metric.label}</h3>
-                  <strong>{metric.value}</strong>
-                  <small>{metric.detail}</small>
-                </article>
-              ))}
+              {visibleDashboardExecutiveMetrics.length
+                ? visibleDashboardExecutiveMetrics.map((metric) => (
+                  <article className={`command-card executive-metric-card ${metric.tone}`} key={metric.id}>
+                    <span>{metric.category}</span>
+                    <h3>{metric.label}</h3>
+                    <strong>{metric.value}</strong>
+                    <small>{metric.detail}</small>
+                  </article>
+                ))
+                : (
+                  <article className="command-card dashboard-empty-selection-card">
+                    <span>{copy("Business case", "İş modeli")}</span>
+                    <h3>{copy("No metrics selected", "Metrik seçilmedi")}</h3>
+                    <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
+                    <small>{copy("Open the editor to show business model numbers.", "İş modeli sayılarını göstermek için düzenleyiciyi açın.")}</small>
+                  </article>
+                )}
             </div>
           </section>
 
@@ -9164,6 +10256,7 @@ function App() {
                   action: copy("Run simulation", "Simülasyon çalıştır"),
                   detail: copy("Core feasibility data is in place. Test conservative and optimistic scenarios before committing.", "Ana fizibilite verisi hazır. Karar vermeden önce temkinli ve iyimser senaryoları test edin."),
                   path: "/simulation/current-situation",
+                  priority: dashboardRiskPriority.controlled,
                   severity: copy("Controlled", "Kontrollü"),
                   tone: "teal",
                   title: copy("No blocking risk detected", "Engelleyici risk görünmüyor"),
@@ -9228,18 +10321,16 @@ function App() {
                 <button type="button" onClick={() => goTo("/financial-modelling/analiz", "login")}>{copy("Open analysis", "Analizi aç")}</button>
               </div>
               <div className="business-case-list">
-                {[
-                  [copy("Monthly revenue", "Aylık ciro"), moneyOrMissing(monthlyRevenue)],
-                  [copy("Monthly cost", "Aylık maliyet"), moneyOrMissing(monthlyCost)],
-                  [copy("Net margin", "Net marj"), hasFinancialSourceData ? `${formatNumber(netMarginPercent, 1)}%` : noDataValue],
-                  [copy("Break-even", "Başa baş"), hasFinancialSourceData ? formatDashboardMonth(financialSummary.breakEvenMonth) : noDataValue],
-                  [copy("Working capital", "İşletme sermayesi"), hasFinancialSourceData ? formatLira(financialSummary.workingCapitalRequirement) : noDataValue],
-                  [copy("Unsold inventory", "Satılmayan stok"), hasFinancialSourceData ? `${formatNumber(financialSummary.unsoldInventoryUnits)} ${copy("units", "adet")}` : noDataValue],
-                  [copy("Unmet sales", "Karşılanmayan satış"), hasFinancialSourceData ? `${formatNumber(unmetForecastUnits)} ${copy("units", "adet")}` : noDataValue],
-                  [copy("Unit production cost", "Birim üretim maliyeti"), hasFinancialSourceData ? formatLira(financialSummary.unitProductionCost, 2) : noDataValue],
-                ].map(([label, value]) => (
-                  <span key={label}>{label}<strong>{value}</strong></span>
-                ))}
+                {visibleDashboardFinancialDetailRows.length
+                  ? visibleDashboardFinancialDetailRows.map((row) => (
+                    <span key={row.id}>{row.label}<strong>{row.value}</strong></span>
+                  ))
+                  : (
+                    <span className="dashboard-empty-selection">
+                      {copy("No detail metrics selected", "Detay metriği seçilmedi")}
+                      <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
+                    </span>
+                  )}
               </div>
             </article>
           </section>
@@ -9259,12 +10350,12 @@ function App() {
   }
 
   if (session && routePath === "/dashboard/riskler-karlilik-mevcut-durum") {
-    goTo("/dashboard", "login");
+    goTo("/dashboard", "login", { force: true });
     return null;
   }
 
   if (session && routePath === "/dashboard/kisa-ozet") {
-    goTo("/dashboard", "login");
+    goTo("/dashboard", "login", { force: true });
     return null;
   }
 
@@ -9300,17 +10391,17 @@ function App() {
     }
 
     if (isOperationsRoute && !activeOperationsSubmodule) {
-      goTo(["/operations/material-definitions", "/operations/human-resources"].includes(routePath) ? "/operations/resources" : "/operations", "login");
+      goTo(["/operations/material-definitions", "/operations/human-resources"].includes(routePath) ? "/operations/resources" : "/operations", "login", { force: true });
       return null;
     }
 
     if (routePath === "/product-plus") {
-      goTo("/product-plus/product-tree", "login");
+      goTo("/product-plus/product-tree", "login", { force: true });
       return null;
     }
 
     if (isProductPlusRoute && !activeProductPlusSubmodule) {
-      goTo("/product-plus/product-tree", "login");
+      goTo("/product-plus/product-tree", "login", { force: true });
       return null;
     }
 
@@ -9561,12 +10652,12 @@ function App() {
     }
 
     if (routePath === "/financial-modelling") {
-      goTo("/financial-modelling/girdiler", "login");
+      goTo("/financial-modelling/girdiler", "login", { force: true });
       return null;
     }
 
     if (isFinancialRoute && !activeFinancialSubmodule) {
-      goTo(isLegacyFinancialDetailPath ? "/financial-modelling/analiz" : "/financial-modelling/girdiler", "login");
+      goTo(isLegacyFinancialDetailPath ? "/financial-modelling/analiz" : "/financial-modelling/girdiler", "login", { force: true });
       return null;
     }
 
@@ -9576,7 +10667,7 @@ function App() {
 
     if (isSimulationRoute) {
       if (routePath === "/simulation" || !activeSimulationVariant) {
-        goTo("/simulation/current-situation", "login");
+        goTo("/simulation/current-situation", "login", { force: true });
         return null;
       }
 
