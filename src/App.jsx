@@ -6301,7 +6301,6 @@ function App() {
                 <span>{copy("Required inputs", "Zorunlu girdiler")}</span>
                 <p>{copy("These assumptions must be present for the financial model to be saved.", "Finansal modelin kaydedilmesi için bu varsayımlar girilmelidir.")}</p>
               </div>
-              <strong>{requiredFinancialSettingFields.length}</strong>
             </summary>
             <div className="financial-input-grid">
               {requiredFinancialSettingFields.map((field) => renderFinancialField(field, true))}
@@ -6314,7 +6313,6 @@ function App() {
                 <span>{copy("General financial assumptions", "Genel finansal varsayımlar")}</span>
                 <p>{copy("Grant, tax, VAT, collection, supplier payment, stock holding and starting capacity assumptions.", "Yatırım/hibe, vergi, KDV, tahsilat, tedarikçi ödeme, stok tutma ve başlangıç kapasitesi varsayımları.")}</p>
               </div>
-              <strong>{generalFinancialAssumptionFields.length}</strong>
             </summary>
             <div className="financial-input-grid">
               {generalFinancialAssumptionFields.map((field) => renderFinancialField(field, true))}
@@ -6327,7 +6325,6 @@ function App() {
                 <span>{copy("Optional macro assumptions", "Opsiyonel makro varsayımlar")}</span>
                 <p>{copy("These percentages can inflate material, wage, energy and overhead projections month by month. Leave empty or zero to ignore.", "Bu yüzdeler malzeme, ücret, enerji ve genel gider projeksiyonlarını aylık artırabilir. Dikkate almak istemiyorsanız boş veya sıfır bırakın.")}</p>
               </div>
-              <strong>{optionalMacroFinancialSettingFields.length}</strong>
             </summary>
             <div className="financial-input-grid">
               {optionalMacroFinancialSettingFields.map((field) => renderFinancialField(field, false))}
@@ -6340,7 +6337,6 @@ function App() {
                 <span>{copy("Inflation and revaluation", "Enflasyon ve yeniden değerleme")}</span>
                 <p>{copy("Annual COGS, OpEx, price increase and asset value policies. Frequency controls how annual increases step through the projection.", "Yıllık SMM, OpEx, fiyat artışı ve varlık değer politikaları. Artış sıklığı yıllık artışların projeksiyona nasıl dağıtılacağını belirler.")}</p>
               </div>
-              <strong>{inflationRevaluationFinancialFields.length}</strong>
             </summary>
             <div className="financial-input-grid">
               {inflationRevaluationFinancialFields.map((field) => renderFinancialField(field, true))}
@@ -6731,10 +6727,13 @@ function App() {
       </article>
     );
     const statementProjectionRows = statementProjectionModel.trendRows || [];
-    const projectionPeriodMonths = financialStatementPeriod === "yearly" ? 12 : 3;
-    const projectionPeriodCountLabel = financialStatementPeriod === "yearly"
-      ? copy("4 years", "4 yıl")
-      : copy("4 quarters", "4 çeyrek");
+    const projectionPeriodMonths = financialStatementPeriod === "monthly" ? 1 : financialStatementPeriod === "yearly" ? 12 : 3;
+    const projectionPeriodCount = financialStatementPeriod === "monthly" ? 24 : 4;
+    const projectionPeriodCountLabel = financialStatementPeriod === "monthly"
+      ? copy("24 months", "24 ay")
+      : financialStatementPeriod === "yearly"
+        ? copy("4 years", "4 yıl")
+        : copy("4 quarters", "4 çeyrek");
     const formatProjectionDate = (date) => new Intl.DateTimeFormat(document.documentElement.lang === "tr" ? "tr-TR" : "en-US", {
       month: "short",
       year: "numeric",
@@ -6769,7 +6768,11 @@ function App() {
         grossMargin: salesRevenue ? (grossProfit / salesRevenue) * 100 : 0,
         grossProfit,
         incomeTax: sum("incomeTax"),
-        label: financialStatementPeriod === "yearly" ? copy(`Year ${index + 1}`, `Yıl ${index + 1}`) : copy(`Q${index + 1}`, `Ç${index + 1}`),
+        label: financialStatementPeriod === "monthly"
+          ? `${copy("Month", "Ay")} ${index + 1}`
+          : financialStatementPeriod === "yearly"
+            ? copy(`Year ${index + 1}`, `Yıl ${index + 1}`)
+            : copy(`Q${index + 1}`, `Ç${index + 1}`),
         loanInterest: sum("loanInterest"),
         materialCost,
         netIncome,
@@ -6787,8 +6790,10 @@ function App() {
         electricityCost,
       };
     };
-    const financialStatementPeriods = Array.from({ length: 4 }, (_, index) => buildProjectionPeriod(index));
-    const statementGridTemplate = `minmax(240px, 1.22fr) repeat(${financialStatementPeriods.length}, minmax(132px, 1fr))`;
+    const financialStatementPeriods = Array.from({ length: projectionPeriodCount }, (_, index) => buildProjectionPeriod(index));
+    const statementPeriodColumnWidth = financialStatementPeriod === "monthly" ? 116 : 132;
+    const statementGridTemplate = `minmax(240px, 1.22fr) repeat(${financialStatementPeriods.length}, minmax(${statementPeriodColumnWidth}px, 1fr))`;
+    const statementGridMinWidth = `${260 + (financialStatementPeriods.length * statementPeriodColumnWidth)}px`;
     const projectionRows = [
       { id: "income-section", section: copy("Income Statement", "Gelir Tablosu") },
       { detail: copy("From channel sales forecast", "Kanal satış tahmininden"), emphasis: true, format: "money", id: "salesRevenue", label: copy("Net Sales", "Net Satışlar"), tone: "income", value: (period) => period.salesRevenue },
@@ -6826,12 +6831,15 @@ function App() {
         <div className="financial-card-heading">
           <div>
             <h2>{copy("Financial Statement", "Finansal Tablo")}</h2>
-            <p>{copy("Forward projection view for the next four periods.", "Önümüzdeki dört dönem için projeksiyon görünümü.")}</p>
+            <p>{financialStatementPeriod === "monthly"
+              ? copy("Forward projection view for the next 24 months.", "Önümüzdeki 24 ay için projeksiyon görünümü.")
+              : copy("Forward projection view for the next four periods.", "Önümüzdeki dört dönem için projeksiyon görünümü.")}</p>
           </div>
           <div className="financial-statement-controls">
             <span className="financial-row-count">{projectionPeriodCountLabel}</span>
             <div className="financial-statement-toggle" role="group" aria-label={copy("Statement period", "Tablo dönemi")}>
               {[
+                ["monthly", copy("Monthly", "Aylık")],
                 ["quarterly", copy("Quarterly", "Çeyreklik")],
                 ["yearly", copy("Yearly", "Yıllık")],
               ].map(([value, label]) => (
@@ -6849,7 +6857,7 @@ function App() {
         </div>
         <div className="financial-statement financial-projection-statement">
           <div className="financial-projection-scroll">
-            <div className="financial-projection-row financial-projection-head" style={{ gridTemplateColumns: statementGridTemplate }}>
+            <div className="financial-projection-row financial-projection-head" style={{ gridTemplateColumns: statementGridTemplate, minWidth: statementGridMinWidth }}>
               <span>{copy("Line Item", "Kalem")}</span>
               {financialStatementPeriods.map((period) => (
                 <span key={period.label}>
@@ -6859,15 +6867,12 @@ function App() {
               ))}
             </div>
             {projectionRows.map((row) => row.section ? (
-              <div className="financial-projection-row financial-projection-section" style={{ gridTemplateColumns: statementGridTemplate }} key={row.id}>
+              <div className="financial-projection-row financial-projection-section" style={{ gridTemplateColumns: statementGridTemplate, minWidth: statementGridMinWidth }} key={row.id}>
                 <strong>{row.section}</strong>
-                <span />
-                <span />
-                <span />
-                <span />
+                {financialStatementPeriods.map((period) => <span key={`${row.id}-${period.label}`} />)}
               </div>
             ) : (
-              <div className={`financial-projection-row financial-projection-line ${row.emphasis ? "emphasis" : ""}`} style={{ gridTemplateColumns: statementGridTemplate }} key={row.id}>
+              <div className={`financial-projection-row financial-projection-line ${row.emphasis ? "emphasis" : ""}`} style={{ gridTemplateColumns: statementGridTemplate, minWidth: statementGridMinWidth }} key={row.id}>
                 <div>
                   <strong>{row.label}</strong>
                   <small>{row.detail}</small>
@@ -7937,12 +7942,6 @@ function App() {
     ];
     const salesReadyCount = salesReadinessItems.filter((item) => item.done).length;
     const salesReadinessPercent = Math.round((salesReadyCount / Math.max(salesReadinessItems.length, 1)) * 100);
-    const salesReadinessStatus = salesReadyCount === salesReadinessItems.length
-      ? copy("All sales data ready", "Tüm satış verileri hazır")
-      : copy("Data entry needed", "Veri girişi gerekiyor");
-    const salesMonthLabels = form.language === "tr"
-      ? ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
-      : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const salesForecastPreview = Array.from({ length: 12 }, (_, monthIndex) => {
       const channels = salesStrategy.channels.map((channel, channelIndex) => ({
         id: channel.id || `channel-${channelIndex}`,
@@ -7953,7 +7952,7 @@ function App() {
 
       return {
         channels,
-        label: salesMonthLabels[monthIndex],
+        label: `${copy("Month", "Ay")} ${monthIndex + 1}`,
         value: totalUnits,
       };
     });
@@ -8187,14 +8186,9 @@ function App() {
               </div>
             </div>
             <div className="sales-forecast-preview">
-              <div className="sales-readiness-status-card">
-                <span>{copy("Sales data status", "Satış veri durumu")}</span>
-                <strong>{salesReadinessStatus}</strong>
-                <small>{salesReadyCount}/{salesReadinessItems.length} {copy("source groups ready", "kaynak grup hazır")}</small>
-              </div>
               <div className="sales-mini-chart" aria-label={copy("12 month sales forecast preview", "12 aylık satış tahmini önizlemesi")}>
                 {salesForecastPreview.map((item) => (
-                  <button type="button" className="sales-mini-bar" style={{ "--bar-height": `${Math.max(6, (item.value / maxSalesForecastPreview) * 100)}%` }} key={item.label}>
+                  <button type="button" className="sales-mini-bar" style={{ "--bar-height": `${(item.value / maxSalesForecastPreview) * 100}%` }} key={item.label}>
                     <i />
                     <small>{item.label}</small>
                     <span className="sales-mini-tooltip" role="tooltip">
