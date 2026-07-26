@@ -467,9 +467,10 @@ create table if not exists public.operation_products (
   price_currency text not null default 'TRY' check (price_currency in ('TRY', 'USD', 'EUR')),
   cycle_time_minutes numeric(12, 4) not null default 1,
   cycle_time_unit text not null default 'minute',
-  default_flow_strategy text not null default 'flow' check (default_flow_strategy in ('batch', 'flow', 'parallel')),
+  default_flow_strategy text not null default 'pull' check (default_flow_strategy in ('push', 'pull')),
   default_batch_size numeric(14, 4) not null default 1,
   minimum_transfer_quantity numeric(14, 4) not null default 1,
+  default_safety_stock_quantity numeric(14, 4) not null default 0,
   description text,
   quality_grade text,
   weight_kg numeric(12, 3) not null default 0,
@@ -491,22 +492,31 @@ alter table public.operation_products
   add column if not exists price_currency text not null default 'TRY',
   add column if not exists cycle_time_minutes numeric(12, 4) not null default 1,
   add column if not exists cycle_time_unit text not null default 'minute',
-  add column if not exists default_flow_strategy text not null default 'flow',
+  add column if not exists default_flow_strategy text not null default 'pull',
   add column if not exists default_batch_size numeric(14, 4) not null default 1,
-  add column if not exists minimum_transfer_quantity numeric(14, 4) not null default 1;
+  add column if not exists minimum_transfer_quantity numeric(14, 4) not null default 1,
+  add column if not exists default_safety_stock_quantity numeric(14, 4) not null default 0;
 
 update public.operation_products
 set price_currency = 'TRY'
 where price_currency not in ('TRY', 'USD', 'EUR');
 
-update public.operation_products
-set default_flow_strategy = 'flow'
-where default_flow_strategy is null
-   or default_flow_strategy not in ('batch', 'flow', 'parallel');
+alter table public.operation_products
+  drop constraint if exists operation_products_default_flow_strategy_check;
 
 update public.operation_products
-set minimum_transfer_quantity = greatest(1, coalesce(minimum_transfer_quantity, 1)),
-    default_batch_size = greatest(greatest(1, coalesce(minimum_transfer_quantity, 1)), coalesce(default_batch_size, 1));
+set default_flow_strategy = case
+      when default_flow_strategy = 'batch' then 'push'
+      when default_flow_strategy in ('flow', 'parallel') then 'pull'
+      when default_flow_strategy in ('push', 'pull') then default_flow_strategy
+      else 'pull'
+    end,
+    minimum_transfer_quantity = greatest(1, coalesce(minimum_transfer_quantity, 1)),
+    default_batch_size = greatest(greatest(1, coalesce(minimum_transfer_quantity, 1)), coalesce(default_batch_size, 1)),
+    default_safety_stock_quantity = greatest(0, coalesce(default_safety_stock_quantity, 0));
+
+alter table public.operation_products
+  alter column default_flow_strategy set default 'pull';
 
 do $$
 begin
@@ -519,7 +529,7 @@ begin
   ) then
     alter table public.operation_products
       add constraint operation_products_default_flow_strategy_check
-      check (default_flow_strategy in ('batch', 'flow', 'parallel'));
+      check (default_flow_strategy in ('push', 'pull'));
   end if;
 
   if not exists (
@@ -531,7 +541,23 @@ begin
   ) then
     alter table public.operation_products
       add constraint operation_products_transfer_quantities_check
-      check (minimum_transfer_quantity >= 1 and default_batch_size >= minimum_transfer_quantity);
+      check (
+        minimum_transfer_quantity >= 1
+        and default_batch_size >= minimum_transfer_quantity
+        and default_safety_stock_quantity >= 0
+      );
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_schema = 'public'
+      and table_name = 'operation_products'
+      and constraint_name = 'operation_products_safety_stock_check'
+  ) then
+    alter table public.operation_products
+      add constraint operation_products_safety_stock_check
+      check (default_safety_stock_quantity >= 0);
   end if;
 end;
 $$;
@@ -713,6 +739,28 @@ update public.operation_workforce_resources
 set hourly_cost_currency = 'TRY'
 where hourly_cost_currency not in ('TRY', 'USD', 'EUR');
 
+create table if not exists public.operation_product_processes (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.operation_products(id) on delete cascade,
+  step_order integer not null check (step_order >= 1),
+  operation_name text not null,
+  machine_id uuid not null references public.operation_machines(id),
+  process_time_minutes numeric(14, 4) not null default 1 check (process_time_minutes > 0),
+  daily_hours numeric(10, 2) not null default 8 check (daily_hours >= 0),
+  material_id uuid references public.operation_materials(id) on delete set null,
+  material_quantity_per_unit numeric(14, 4) not null default 0 check (material_quantity_per_unit >= 0),
+  equipment_id uuid references public.operation_equipment(id) on delete set null,
+  workforce_id uuid references public.operation_workforce_resources(id) on delete set null,
+  people_assigned numeric(10, 2) not null default 0 check (people_assigned >= 0),
+  workforce_daily_hours numeric(10, 2) not null default 0 check (workforce_daily_hours >= 0),
+  capacity numeric(10, 2) not null default 1 check (capacity >= 1),
+  setup_minutes numeric(14, 4) not null default 0 check (setup_minutes >= 0),
+  speed_multiplier numeric(10, 4) not null default 1 check (speed_multiplier > 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (product_id, step_order)
+);
+
 create table if not exists public.operation_notes (
   id uuid primary key default gen_random_uuid(),
   product_id uuid not null references public.operation_products(id) on delete cascade,
@@ -753,6 +801,66 @@ update public.operation_resource_plans p
 set is_active = ranked_plans.plan_rank = 1
 from ranked_plans
 where p.id = ranked_plans.id;
+
+with latest_product_plans as (
+  select distinct on (product_id)
+    product_id,
+    input
+  from public.operation_resource_plans
+  where jsonb_typeof(input->'operationRows') = 'array'
+  order by product_id, is_active desc, created_at desc
+),
+legacy_process_rows as (
+  select
+    plan.product_id,
+    process.value,
+    process.ordinality::integer as step_order
+  from latest_product_plans plan
+  cross join lateral jsonb_array_elements(plan.input->'operationRows') with ordinality as process(value, ordinality)
+)
+insert into public.operation_product_processes (
+  product_id, step_order, operation_name, machine_id, process_time_minutes,
+  daily_hours, material_id, material_quantity_per_unit, equipment_id,
+  workforce_id, people_assigned, workforce_daily_hours, capacity,
+  setup_minutes, speed_multiplier
+)
+select
+  process.product_id,
+  process.step_order,
+  coalesce(nullif(trim(process.value->>'operationName'), ''), 'Process ' || process.step_order::text),
+  machine.id,
+  greatest(0.0001, coalesce(nullif(process.value->>'processTimeMinutes', '')::numeric, 1)),
+  greatest(0, coalesce(nullif(process.value->>'dailyHours', '')::numeric, machine.availability_hours, 8)),
+  material.id,
+  greatest(0, coalesce(nullif(process.value->>'materialQuantityPerUnit', '')::numeric, 0)),
+  equipment.id,
+  workforce.id,
+  greatest(0, coalesce(nullif(process.value->>'peopleAssigned', '')::numeric, 0)),
+  greatest(0, coalesce(nullif(process.value->>'workforceDailyHours', '')::numeric, 0)),
+  greatest(1, coalesce(nullif(process.value->>'capacity', '')::numeric, machine.concurrent_capacity, 1)),
+  greatest(0, coalesce(nullif(process.value->>'setupMinutes', '')::numeric, 0)),
+  greatest(0.0001, coalesce(nullif(process.value->>'speedMultiplier', '')::numeric, machine.speed_multiplier, 1))
+from legacy_process_rows process
+join public.operation_machines machine
+  on machine.id::text = process.value->>'machineId'
+join public.operation_products product
+  on product.id = process.product_id
+ and product.company_id = machine.company_id
+left join public.operation_materials material
+  on material.id::text = process.value->>'materialId'
+ and material.company_id = product.company_id
+left join public.operation_equipment equipment
+  on equipment.id::text = process.value->>'equipmentId'
+ and equipment.company_id = product.company_id
+left join public.operation_workforce_resources workforce
+  on workforce.id::text = process.value->>'workforceId'
+ and workforce.company_id = product.company_id
+where not exists (
+  select 1
+  from public.operation_product_processes existing
+  where existing.product_id = process.product_id
+)
+on conflict (product_id, step_order) do nothing;
 
 create table if not exists public.operation_plan_machines (
   id uuid primary key default gen_random_uuid(),
@@ -1347,6 +1455,7 @@ alter table public.operation_plan_materials
 
 alter table public.operation_products enable row level security;
 alter table public.operation_product_materials enable row level security;
+alter table public.operation_product_processes enable row level security;
 alter table public.operation_machines enable row level security;
 alter table public.operation_equipment enable row level security;
 alter table public.operation_materials enable row level security;
@@ -1371,6 +1480,8 @@ drop policy if exists "operation_products_select_company" on public.operation_pr
 drop policy if exists "operation_products_write_company" on public.operation_products;
 drop policy if exists "operation_product_materials_select_company" on public.operation_product_materials;
 drop policy if exists "operation_product_materials_write_company" on public.operation_product_materials;
+drop policy if exists "operation_product_processes_select_company" on public.operation_product_processes;
+drop policy if exists "operation_product_processes_write_company" on public.operation_product_processes;
 drop policy if exists "operation_machines_select_company" on public.operation_machines;
 drop policy if exists "operation_machines_write_company" on public.operation_machines;
 drop policy if exists "operation_equipment_select_company" on public.operation_equipment;
@@ -1455,6 +1566,73 @@ with check (
     where m.id = operation_product_materials.material_id
       and m.company_id = p.company_id
       and p.company_id = public.current_profile_company_id()
+  )
+  and public.has_module_permission('operations', 'write')
+);
+
+create policy "operation_product_processes_select_company"
+on public.operation_product_processes
+for select
+using (
+  exists (
+    select 1
+    from public.operation_products p
+    where p.id = operation_product_processes.product_id
+      and p.company_id = public.current_profile_company_id()
+  )
+  and public.has_module_permission('operations', 'read')
+);
+
+create policy "operation_product_processes_write_company"
+on public.operation_product_processes
+for all
+using (
+  exists (
+    select 1
+    from public.operation_products p
+    where p.id = operation_product_processes.product_id
+      and p.company_id = public.current_profile_company_id()
+  )
+  and public.has_module_permission('operations', 'write')
+)
+with check (
+  exists (
+    select 1
+    from public.operation_products p
+    join public.operation_machines m on m.id = operation_product_processes.machine_id
+    where p.id = operation_product_processes.product_id
+      and m.company_id = p.company_id
+      and p.company_id = public.current_profile_company_id()
+  )
+  and (
+    operation_product_processes.material_id is null
+    or exists (
+      select 1
+      from public.operation_materials material
+      join public.operation_products p on p.id = operation_product_processes.product_id
+      where material.id = operation_product_processes.material_id
+        and material.company_id = p.company_id
+    )
+  )
+  and (
+    operation_product_processes.equipment_id is null
+    or exists (
+      select 1
+      from public.operation_equipment equipment
+      join public.operation_products p on p.id = operation_product_processes.product_id
+      where equipment.id = operation_product_processes.equipment_id
+        and equipment.company_id = p.company_id
+    )
+  )
+  and (
+    operation_product_processes.workforce_id is null
+    or exists (
+      select 1
+      from public.operation_workforce_resources workforce
+      join public.operation_products p on p.id = operation_product_processes.product_id
+      where workforce.id = operation_product_processes.workforce_id
+        and workforce.company_id = p.company_id
+    )
   )
   and public.has_module_permission('operations', 'write')
 );
@@ -1832,6 +2010,11 @@ create trigger operation_product_materials_set_updated_at
 before update on public.operation_product_materials
 for each row execute function public.set_updated_at();
 
+drop trigger if exists operation_product_processes_set_updated_at on public.operation_product_processes;
+create trigger operation_product_processes_set_updated_at
+before update on public.operation_product_processes
+for each row execute function public.set_updated_at();
+
 drop trigger if exists operation_machines_set_updated_at on public.operation_machines;
 create trigger operation_machines_set_updated_at
 before update on public.operation_machines
@@ -1914,15 +2097,17 @@ declare
   v_group_index integer;
   v_machine_index integer;
   v_product_id uuid := nullif(p_input->>'productId', '')::uuid;
-  v_product_default_flow_strategy text := 'flow';
+  v_product_default_flow_strategy text := 'pull';
   v_product_default_batch_size numeric := 1;
   v_product_min_transfer_quantity numeric := 1;
+  v_product_default_safety_stock_quantity numeric := 0;
   v_target_quantity numeric := greatest(0, coalesce(nullif(p_input->>'targetQuantity', '')::numeric, 0));
   v_min_transfer_quantity numeric := 1;
   v_batch_size numeric;
   v_transfer_batch_size numeric;
   v_group_count integer;
-  v_strategy text := 'flow';
+  v_strategy text := 'pull';
+  v_minimum_safety_stock_quantity numeric := greatest(0, coalesce(nullif(p_input->>'safetyStockQuantity', '')::numeric, 0));
   v_buffer_max_quantity numeric := greatest(0, coalesce(nullif(p_input->>'bufferMaxQuantity', '')::numeric, 0));
   v_waiting_cost_per_hour numeric := greatest(0, coalesce(nullif(p_input->>'waitingCostPerHour', '')::numeric, 0));
   v_inventory_cost_per_unit_hour numeric := greatest(0, coalesce(nullif(p_input->>'inventoryCostPerUnitHour', '')::numeric, 0));
@@ -1963,11 +2148,15 @@ declare
   v_duration_minutes numeric;
   v_finish_minutes numeric;
   v_wait_minutes numeric;
+  v_stockout_wait_minutes numeric;
   v_makespan_minutes numeric := 0;
   v_total_queue_wait_minutes numeric := 0;
+  v_total_stockout_wait_minutes numeric := 0;
   v_total_processing_time_minutes numeric := 0;
   v_total_idle_hours numeric := 0;
   v_total_wip_unit_minutes numeric := 0;
+  v_total_safety_stock_quantity numeric := 0;
+  v_safety_stock_quantity numeric := 0;
   v_max_wip_quantity numeric := 0;
   v_schedule_window_minutes numeric := 0;
   v_delay_minutes numeric := 0;
@@ -1985,6 +2174,9 @@ declare
   v_from_finish_minutes numeric;
   v_to_start_minutes numeric;
   v_buffer_level numeric;
+  v_buffer_min_level numeric;
+  v_buffer_required_safety_stock numeric;
+  v_buffer_safety_stock numeric;
   v_last_event_minutes numeric;
   v_buffer_area numeric;
   v_buffer_max_wip numeric;
@@ -1996,22 +2188,33 @@ declare
 begin
   if v_product_id is not null then
     select
-      coalesce(default_flow_strategy, 'flow'),
+      coalesce(default_flow_strategy, 'pull'),
       greatest(1, coalesce(default_batch_size, 1)),
-      greatest(1, coalesce(minimum_transfer_quantity, 1))
+      greatest(1, coalesce(minimum_transfer_quantity, 1)),
+      greatest(0, coalesce(default_safety_stock_quantity, 0))
     into
       v_product_default_flow_strategy,
       v_product_default_batch_size,
-      v_product_min_transfer_quantity
+      v_product_min_transfer_quantity,
+      v_product_default_safety_stock_quantity
     from public.operation_products
     where id = v_product_id
       and company_id = p_company_id;
   end if;
 
   v_strategy := case
-    when p_input->>'flowStrategy' in ('batch', 'flow', 'parallel') then p_input->>'flowStrategy'
-    when v_product_default_flow_strategy in ('batch', 'flow', 'parallel') then v_product_default_flow_strategy
-    else 'flow'
+    when p_input->>'flowStrategy' in ('push', 'pull') then p_input->>'flowStrategy'
+    when p_input->>'flowStrategy' = 'batch' then 'push'
+    when p_input->>'flowStrategy' in ('flow', 'parallel') then 'pull'
+    when v_product_default_flow_strategy = 'push' then 'push'
+    else 'pull'
+  end;
+  v_minimum_safety_stock_quantity := case
+    when v_strategy = 'pull' then greatest(
+      0,
+      coalesce(nullif(p_input->>'safetyStockQuantity', '')::numeric, v_product_default_safety_stock_quantity, 0)
+    )
+    else 0
   end;
   v_min_transfer_quantity := greatest(
     1,
@@ -2031,8 +2234,7 @@ begin
     coalesce(nullif(p_input->>'batchSize', '')::numeric, v_product_default_batch_size, v_min_transfer_quantity)
   );
   v_transfer_batch_size := case
-    when v_strategy = 'batch' then v_target_quantity
-    when v_strategy = 'parallel' then 1
+    when v_strategy = 'push' then v_target_quantity
     else least(v_target_quantity, v_batch_size)
   end;
   v_group_count := greatest(1, ceil(v_target_quantity / greatest(v_transfer_batch_size, 1))::integer);
@@ -2098,7 +2300,14 @@ begin
 
     for v_group_index in 1..v_group_count loop
       v_group_quantity := least(v_transfer_batch_size, v_target_quantity - ((v_group_index - 1) * v_transfer_batch_size));
-      v_precedence_ready_minutes := case when v_operation_index = 1 then 0 else v_previous_finishes[v_group_index] end;
+      v_precedence_ready_minutes := case
+        when v_operation_index = 1 or v_strategy = 'pull' then 0
+        else v_previous_finishes[v_group_index]
+      end;
+      v_stockout_wait_minutes := case
+        when v_operation_index = 1 or v_strategy = 'pull' then 0
+        else greatest(0, v_precedence_ready_minutes - v_machine_available_at[v_machine_index])
+      end;
       v_start_minutes := greatest(v_machine_available_at[v_machine_index], v_precedence_ready_minutes);
       v_setup_minutes := case when v_group_index = 1 then v_operation_setup_minutes[v_operation_index] else 0 end;
       v_process_minutes := (ceil(v_group_quantity / v_operation_capacities[v_operation_index]) * v_operation_process_minutes[v_operation_index]) / v_operation_speed_multipliers[v_operation_index];
@@ -2117,6 +2326,7 @@ begin
       v_operation_finish_minutes[v_operation_index] := greatest(v_operation_finish_minutes[v_operation_index], v_finish_minutes);
       v_current_finishes[v_group_index] := v_finish_minutes;
       v_total_queue_wait_minutes := v_total_queue_wait_minutes + v_wait_minutes;
+      v_total_stockout_wait_minutes := v_total_stockout_wait_minutes + v_stockout_wait_minutes;
       v_total_processing_time_minutes := v_total_processing_time_minutes + v_duration_minutes;
       v_makespan_minutes := greatest(v_makespan_minutes, v_finish_minutes);
 
@@ -2125,8 +2335,10 @@ begin
         'batchIndex', v_group_index,
         'quantity', v_group_quantity,
         'startMinutes', v_start_minutes,
+        'processingStartMinutes', v_start_minutes + v_setup_minutes,
         'finishMinutes', v_finish_minutes,
         'durationMinutes', v_duration_minutes,
+        'stockoutWaitMinutes', v_stockout_wait_minutes,
         'waitMinutes', v_wait_minutes
       ));
 
@@ -2156,7 +2368,11 @@ begin
         and coalesce(nullif(t.value->>'batchIndex', '')::integer, 0) = v_group_index
       limit 1;
 
-      select coalesce(nullif(t.value->>'startMinutes', '')::numeric, 0)
+      select coalesce(
+        nullif(t.value->>'processingStartMinutes', '')::numeric,
+        nullif(t.value->>'startMinutes', '')::numeric,
+        0
+      )
       into v_to_start_minutes
       from jsonb_array_elements(v_operation_timing_rows) as t(value)
       where coalesce(nullif(t.value->>'operationIndex', '')::integer, 0) = v_operation_index + 1
@@ -2171,9 +2387,35 @@ begin
     end loop;
 
     v_buffer_level := 0;
+    v_buffer_min_level := 0;
+
+    for v_event in
+      select jsonb_build_object('timeMinutes', event_time_minutes, 'delta', total_delta)
+      from (
+        select
+          coalesce(nullif(e.value->>'timeMinutes', '')::numeric, 0) as event_time_minutes,
+          sum(coalesce(nullif(e.value->>'delta', '')::numeric, 0)) as total_delta
+        from jsonb_array_elements(v_buffer_events) as e(value)
+        group by event_time_minutes
+      ) grouped_buffer_events
+      order by event_time_minutes
+    loop
+      v_buffer_level := v_buffer_level + coalesce(nullif(v_event->>'delta', '')::numeric, 0);
+      v_buffer_min_level := least(v_buffer_min_level, v_buffer_level);
+    end loop;
+
+    v_buffer_required_safety_stock := case
+      when v_strategy = 'pull' then greatest(0, -v_buffer_min_level)
+      else 0
+    end;
+    v_buffer_safety_stock := case
+      when v_strategy = 'pull' then greatest(v_minimum_safety_stock_quantity, v_buffer_required_safety_stock)
+      else 0
+    end;
+    v_buffer_level := v_buffer_safety_stock;
     v_last_event_minutes := 0;
     v_buffer_area := 0;
-    v_buffer_max_wip := 0;
+    v_buffer_max_wip := v_buffer_safety_stock;
 
     for v_event in
       select jsonb_build_object('timeMinutes', event_time_minutes, 'delta', total_delta)
@@ -2191,13 +2433,18 @@ begin
       v_buffer_max_wip := greatest(v_buffer_max_wip, v_buffer_level);
       v_last_event_minutes := coalesce(nullif(v_event->>'timeMinutes', '')::numeric, 0);
     end loop;
+    v_buffer_area := v_buffer_area + (greatest(0, v_makespan_minutes - v_last_event_minutes) * v_buffer_level);
 
     v_total_wip_unit_minutes := v_total_wip_unit_minutes + v_buffer_area;
+    v_total_safety_stock_quantity := v_total_safety_stock_quantity + v_buffer_safety_stock;
+    v_safety_stock_quantity := greatest(v_safety_stock_quantity, v_buffer_safety_stock);
     v_max_wip_quantity := greatest(v_max_wip_quantity, v_buffer_max_wip);
     v_buffer_summary := v_buffer_summary || jsonb_build_array(jsonb_build_object(
       'fromOperationName', v_operation_names[v_operation_index],
       'toOperationName', v_operation_names[v_operation_index + 1],
       'maxWip', v_buffer_max_wip,
+      'requiredSafetyStockQuantity', v_buffer_required_safety_stock,
+      'safetyStockQuantity', v_buffer_safety_stock,
       'averageWip', case when v_makespan_minutes > 0 then v_buffer_area / v_makespan_minutes else 0 end,
       'waitingUnitHours', v_waiting_unit_minutes / 60,
       'bufferMaxQuantity', v_buffer_max_quantity,
@@ -2255,7 +2502,7 @@ begin
     end loop;
   end if;
 
-  v_waiting_cost := (v_total_queue_wait_minutes / 60) * v_waiting_cost_per_hour;
+  v_waiting_cost := ((v_total_queue_wait_minutes + v_total_stockout_wait_minutes) / 60) * v_waiting_cost_per_hour;
   v_inventory_cost := (v_total_wip_unit_minutes / 60) * v_inventory_cost_per_unit_hour;
   v_delay_minutes := greatest(0, v_makespan_minutes - v_schedule_window_minutes);
   v_delay_cost := (v_delay_minutes / 60) * v_delay_cost_per_hour;
@@ -2272,10 +2519,17 @@ begin
     'totalProductionTimeMinutes', v_makespan_minutes,
     'totalProcessingTimeMinutes', v_total_processing_time_minutes,
     'effectiveCycleTimeMinutes', case when v_target_quantity > 0 then v_makespan_minutes / v_target_quantity else 0 end,
-    'waitingTimeHours', v_total_queue_wait_minutes / 60,
+    'waitingTimeHours', (v_total_queue_wait_minutes + v_total_stockout_wait_minutes) / 60,
+    'queueWaitingTimeHours', v_total_queue_wait_minutes / 60,
+    'stockoutWaitTimeHours', v_total_stockout_wait_minutes / 60,
     'wipUnitHours', v_total_wip_unit_minutes / 60,
     'maxWipQuantity', v_max_wip_quantity,
-    'recommendedBufferQuantity', v_max_wip_quantity,
+    'minimumSafetyStockQuantity', v_minimum_safety_stock_quantity,
+    'safetyStockEnabled', v_strategy = 'pull',
+    'safetyStockQuantity', v_safety_stock_quantity,
+    'totalSafetyStockQuantity', v_total_safety_stock_quantity,
+    'recommendedSafetyStockQuantity', case when v_strategy = 'pull' then v_safety_stock_quantity else 0 end,
+    'recommendedBufferQuantity', case when v_strategy = 'pull' then v_safety_stock_quantity else 0 end,
     'totalIdleTimeHours', v_total_idle_hours,
     'delayMinutes', v_delay_minutes,
     'waitingCost', v_waiting_cost,
@@ -2288,13 +2542,15 @@ begin
     'machineRows', v_machine_summary,
     'bufferRows', v_buffer_summary,
     'eventSample', v_event_sample,
-    'optimization', jsonb_build_object(
-      'recommendedBatchSize', v_transfer_batch_size,
-      'totalProductionTimeMinutes', v_makespan_minutes,
-      'waitingCost', v_waiting_cost,
-      'inventoryCost', v_inventory_cost,
-      'objectiveScore', v_makespan_minutes + v_waiting_cost + v_inventory_cost + v_delay_cost + v_capacity_loss_cost
-    )
+    'optimization', case when v_strategy = 'pull' then jsonb_build_object(
+        'recommendedBatchSize', v_transfer_batch_size,
+        'totalProductionTimeMinutes', v_makespan_minutes,
+        'waitingCost', v_waiting_cost,
+        'inventoryCost', v_inventory_cost,
+        'objectiveScore', v_makespan_minutes + v_waiting_cost + v_inventory_cost + v_delay_cost + v_capacity_loss_cost
+      )
+      else null
+    end
   );
 end;
 $$;
@@ -2314,6 +2570,9 @@ declare
   v_operation_rows jsonb := case when jsonb_typeof(p_input->'operationRows') = 'array' then p_input->'operationRows' else '[]'::jsonb end;
   v_workforce_rows jsonb := case when jsonb_typeof(p_input->'workforceRows') = 'array' then p_input->'workforceRows' else '[]'::jsonb end;
   v_material_rows jsonb := case when jsonb_typeof(p_input->'materialRows') = 'array' then p_input->'materialRows' else '[]'::jsonb end;
+  v_calculation_input jsonb := p_input;
+  v_product_operation_rows jsonb := '[]'::jsonb;
+  v_product_workforce_rows jsonb := '[]'::jsonb;
   v_machine_summary jsonb := '[]'::jsonb;
   v_workforce_summary jsonb := '[]'::jsonb;
   v_material_summary jsonb := '[]'::jsonb;
@@ -2340,6 +2599,7 @@ declare
   v_produced_quantity numeric := 0;
   v_total_tracked_daily_cost numeric := 0;
   v_flow_result jsonb := null;
+  v_saved_input jsonb := p_input;
   v_result jsonb;
   v_plan_id uuid;
 begin
@@ -2370,6 +2630,48 @@ begin
   where id = v_product_id
     and company_id = v_company_id;
 
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'operationId', process.id,
+    'operationName', process.operation_name,
+    'machineId', process.machine_id,
+    'processTimeMinutes', process.process_time_minutes,
+    'dailyHours', process.daily_hours,
+    'materialId', process.material_id,
+    'materialQuantityPerUnit', process.material_quantity_per_unit,
+    'equipmentId', process.equipment_id,
+    'workforceId', process.workforce_id,
+    'peopleAssigned', process.people_assigned,
+    'workforceDailyHours', process.workforce_daily_hours,
+    'capacity', process.capacity,
+    'setupMinutes', process.setup_minutes,
+    'speedMultiplier', process.speed_multiplier
+  ) order by process.step_order), '[]'::jsonb)
+  into v_product_operation_rows
+  from public.operation_product_processes process
+  where process.product_id = v_product_id;
+
+  if jsonb_array_length(v_product_operation_rows) = 0 then
+    raise exception 'Define the product process template before saving a process plan.';
+  end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'workforceId', process.workforce_id,
+    'peopleAssigned', process.people_assigned,
+    'dailyHours', process.workforce_daily_hours
+  ) order by process.step_order), '[]'::jsonb)
+  into v_product_workforce_rows
+  from public.operation_product_processes process
+  where process.product_id = v_product_id
+    and process.workforce_id is not null
+    and process.people_assigned > 0
+    and process.workforce_daily_hours > 0;
+
+  v_workforce_rows := v_product_workforce_rows;
+  v_calculation_input := p_input || jsonb_build_object(
+    'operationRows', v_product_operation_rows,
+    'workforceRows', v_product_workforce_rows
+  );
+
   for v_entry in select value from jsonb_array_elements(v_machine_rows) loop
     select * into v_machine
     from public.operation_machines
@@ -2397,7 +2699,17 @@ begin
   end loop;
 
   v_product_cycle_time_minutes := greatest(0.0001, coalesce(v_product_cycle_time_minutes, 1));
-  v_flow_result := public.calculate_operation_flow_schedule(v_company_id, p_input, v_product_cycle_time_minutes);
+  v_flow_result := public.calculate_operation_flow_schedule(v_company_id, v_calculation_input, v_product_cycle_time_minutes);
+  if v_flow_result is not null then
+    v_saved_input := v_calculation_input || jsonb_build_object(
+      'flowStrategy', v_flow_result->>'flowStrategy',
+      'safetyStockQuantity', case
+        when v_flow_result->>'flowStrategy' = 'pull'
+          then greatest(0, coalesce(nullif(p_input->>'safetyStockQuantity', '')::numeric, 0))
+        else 0
+      end
+    );
+  end if;
 
   if v_flow_result is not null then
     v_machine_summary := coalesce(v_flow_result->'machineRows', '[]'::jsonb);
@@ -2558,7 +2870,7 @@ begin
     company_id, product_id, plan_name, is_active, target_daily_output, input, result, created_by
   )
   values (
-    v_company_id, v_product_id, v_plan_name, true, 0, p_input, v_result, auth.uid()
+    v_company_id, v_product_id, v_plan_name, true, 0, v_saved_input, v_result, auth.uid()
   )
   returning id into v_plan_id;
 
@@ -2590,7 +2902,7 @@ begin
     );
   end loop;
 
-  return jsonb_build_object('id', v_plan_id, 'input', p_input, 'result', v_result);
+  return jsonb_build_object('id', v_plan_id, 'input', v_saved_input, 'result', v_result);
 end;
 $$;
 
@@ -2606,7 +2918,12 @@ declare
   v_company_id uuid := public.current_profile_company_id();
   v_record_id uuid;
   v_entry jsonb;
+  v_equipment_id uuid;
+  v_machine_id uuid;
   v_material_id uuid;
+  v_process_count integer;
+  v_step_order integer;
+  v_workforce_id uuid;
   v_row jsonb;
 begin
   if v_company_id is null then
@@ -2689,9 +3006,12 @@ begin
           else 'minute'
         end,
         default_flow_strategy = case
-          when p_input->>'defaultFlowStrategy' in ('batch', 'flow', 'parallel') then p_input->>'defaultFlowStrategy'
+          when p_input->>'defaultFlowStrategy' in ('push', 'pull') then p_input->>'defaultFlowStrategy'
+          when p_input->>'defaultFlowStrategy' = 'batch' then 'push'
+          when p_input->>'defaultFlowStrategy' in ('flow', 'parallel') then 'pull'
           else default_flow_strategy
         end,
+        default_safety_stock_quantity = greatest(0, coalesce(nullif(p_input->>'defaultSafetyStockQuantity', '')::numeric, default_safety_stock_quantity, 0)),
         minimum_transfer_quantity = greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, minimum_transfer_quantity, 1)),
         default_batch_size = greatest(
           greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, minimum_transfer_quantity, 1)),
@@ -2706,7 +3026,7 @@ begin
     else
       insert into public.operation_products (
         company_id, product_code, name, unit, price, price_currency, cycle_time_minutes,
-        cycle_time_unit, default_flow_strategy, default_batch_size, minimum_transfer_quantity,
+        cycle_time_unit, default_flow_strategy, default_batch_size, minimum_transfer_quantity, default_safety_stock_quantity,
         product_group, revision, status, description
       )
       values (
@@ -2722,14 +3042,17 @@ begin
           else 'minute'
         end,
         case
-          when p_input->>'defaultFlowStrategy' in ('batch', 'flow', 'parallel') then p_input->>'defaultFlowStrategy'
-          else 'flow'
+          when p_input->>'defaultFlowStrategy' in ('push', 'pull') then p_input->>'defaultFlowStrategy'
+          when p_input->>'defaultFlowStrategy' = 'batch' then 'push'
+          when p_input->>'defaultFlowStrategy' in ('flow', 'parallel') then 'pull'
+          else 'pull'
         end,
         greatest(
           greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, 1)),
           coalesce(nullif(p_input->>'defaultBatchSize', '')::numeric, greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, 1)))
         ),
         greatest(1, coalesce(nullif(p_input->>'minimumTransferQuantity', '')::numeric, 1)),
+        greatest(0, coalesce(nullif(p_input->>'defaultSafetyStockQuantity', '')::numeric, 0)),
         'Basit Üretim',
         'A',
         'Aktif',
@@ -2745,6 +3068,7 @@ begin
         default_flow_strategy = excluded.default_flow_strategy,
         default_batch_size = excluded.default_batch_size,
         minimum_transfer_quantity = excluded.minimum_transfer_quantity,
+        default_safety_stock_quantity = excluded.default_safety_stock_quantity,
         product_group = excluded.product_group,
         status = excluded.status,
         description = excluded.description
@@ -2779,6 +3103,90 @@ begin
         on conflict (product_id, material_id) do update set
           quantity_per_unit = excluded.quantity_per_unit;
       end if;
+    end loop;
+
+    v_process_count := case
+      when jsonb_typeof(p_input->'processRows') = 'array' then jsonb_array_length(p_input->'processRows')
+      else 0
+    end;
+
+    if v_process_count = 0 then
+      raise exception 'Add at least one ordered process before saving the product.';
+    end if;
+
+    delete from public.operation_product_processes
+    where product_id = v_record_id;
+
+    v_step_order := 0;
+    for v_entry in
+      select value
+      from jsonb_array_elements(p_input->'processRows')
+    loop
+      v_step_order := v_step_order + 1;
+      v_machine_id := nullif(v_entry->>'machineId', '')::uuid;
+      v_material_id := nullif(v_entry->>'materialId', '')::uuid;
+      v_equipment_id := nullif(v_entry->>'equipmentId', '')::uuid;
+      v_workforce_id := nullif(v_entry->>'workforceId', '')::uuid;
+
+      if nullif(trim(v_entry->>'operationName'), '') is null then
+        raise exception 'Every product process needs a name.';
+      end if;
+
+      if v_machine_id is null or not exists (
+        select 1
+        from public.operation_machines
+        where id = v_machine_id
+          and company_id = v_company_id
+      ) then
+        raise exception 'Every product process needs a machine from your company.';
+      end if;
+
+      if v_material_id is not null and not exists (
+        select 1
+        from public.operation_product_materials
+        where product_id = v_record_id
+          and material_id = v_material_id
+      ) then
+        raise exception 'Process materials must be included in the product recipe.';
+      end if;
+
+      if v_equipment_id is not null and not exists (
+        select 1 from public.operation_equipment
+        where id = v_equipment_id and company_id = v_company_id
+      ) then
+        raise exception 'Selected process equipment was not found for your company.';
+      end if;
+
+      if v_workforce_id is not null and not exists (
+        select 1 from public.operation_workforce_resources
+        where id = v_workforce_id and company_id = v_company_id
+      ) then
+        raise exception 'Selected process workforce was not found for your company.';
+      end if;
+
+      insert into public.operation_product_processes (
+        product_id, step_order, operation_name, machine_id, process_time_minutes,
+        daily_hours, material_id, material_quantity_per_unit, equipment_id,
+        workforce_id, people_assigned, workforce_daily_hours, capacity,
+        setup_minutes, speed_multiplier
+      )
+      values (
+        v_record_id,
+        v_step_order,
+        trim(v_entry->>'operationName'),
+        v_machine_id,
+        greatest(0.0001, coalesce(nullif(v_entry->>'processTimeMinutes', '')::numeric, 1)),
+        greatest(0, coalesce(nullif(v_entry->>'dailyHours', '')::numeric, 8)),
+        v_material_id,
+        greatest(0, coalesce(nullif(v_entry->>'materialQuantityPerUnit', '')::numeric, 0)),
+        v_equipment_id,
+        v_workforce_id,
+        greatest(0, coalesce(nullif(v_entry->>'peopleAssigned', '')::numeric, 0)),
+        greatest(0, coalesce(nullif(v_entry->>'workforceDailyHours', '')::numeric, 0)),
+        greatest(1, coalesce(nullif(v_entry->>'capacity', '')::numeric, 1)),
+        greatest(0, coalesce(nullif(v_entry->>'setupMinutes', '')::numeric, 0)),
+        greatest(0.0001, coalesce(nullif(v_entry->>'speedMultiplier', '')::numeric, 1))
+      );
     end loop;
 
     select to_jsonb(p.*) into v_row from public.operation_products p where p.id = v_record_id;

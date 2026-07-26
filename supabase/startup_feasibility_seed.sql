@@ -117,14 +117,14 @@ begin
     insert into public.operation_products (
       company_id, product_code, name, product_group, revision, status, unit, price,
       price_currency, cycle_time_minutes, cycle_time_unit, default_flow_strategy,
-      default_batch_size, minimum_transfer_quantity, description, quality_grade,
+      default_batch_size, minimum_transfer_quantity, default_safety_stock_quantity, description, quality_grade,
       weight_kg, dimensions, material_name, cycle_time_seconds, labor_minutes_per_unit,
       material_kg_per_unit, scrap_rate
     )
     values (
       v_company.id, 'STARTUP-FUNCTIONAL-COLD-250', 'Fonksiyonel Soğuk Zincir İçecek 250 ml',
       'Soğuk Zincir İçecek', 'A', 'Aktif', 'adet', 75.00, 'TRY', 1.25,
-      'minute', 'flow', 24, 12, 'Startup fizibilite testi için kanal fiyatlı fonksiyonel içecek.', 'A',
+      'minute', 'pull', 24, 12, 24, 'Startup fizibilite testi için kanal fiyatlı fonksiyonel içecek.', 'A',
       0.28, '55x55x145 mm', 'Su, fonksiyonel konsantre, aroma, şişe', 75, 0.18, 0.25, 2.0
     )
     on conflict (company_id, product_code) do update set
@@ -140,6 +140,7 @@ begin
       default_flow_strategy = excluded.default_flow_strategy,
       default_batch_size = excluded.default_batch_size,
       minimum_transfer_quantity = excluded.minimum_transfer_quantity,
+      default_safety_stock_quantity = excluded.default_safety_stock_quantity,
       description = excluded.description,
       quality_grade = excluded.quality_grade,
       weight_kg = excluded.weight_kg,
@@ -253,6 +254,20 @@ begin
       hourly_cost_currency = excluded.hourly_cost_currency
     returning id into v_shipper_role_id;
 
+    delete from public.operation_product_processes
+    where product_id = v_product_id;
+
+    insert into public.operation_product_processes (
+      product_id, step_order, operation_name, machine_id, process_time_minutes,
+      daily_hours, material_id, material_quantity_per_unit, workforce_id,
+      people_assigned, workforce_daily_hours, capacity, setup_minutes, speed_multiplier
+    )
+    values
+      (v_product_id, 1, 'Karıştırma', v_mixer_id, 0.35, 2.4, v_water_id, 0.20, v_operator_id, 2, 7.5, 1, 20, 1),
+      (v_product_id, 2, 'Pastörizasyon ve soğutma', v_chiller_id, 0.52, 5.8, v_concentrate_id, 0.025, v_qc_id, 1, 4, 1, 30, 1),
+      (v_product_id, 3, 'Dolum ve kapaklama', v_filler_id, 0.65, 5.9, v_box_id, 1, v_operator_id, 2, 7.5, 1, 25, 1),
+      (v_product_id, 4, 'Soğuk paketleme', v_cold_pack_id, 0.22, 2.2, v_shipper_material_id, 0.0417, v_shipper_role_id, 1, 4, 1, 10, 1);
+
     update public.operation_resource_plans
     set is_active = false
     where company_id = v_company.id
@@ -280,9 +295,10 @@ begin
         'productId', v_product_id,
         'productName', 'Fonksiyonel Soğuk Zincir İçecek 250 ml',
         'targetQuantity', 545.455,
-        'flowStrategy', 'flow',
+        'flowStrategy', 'pull',
         'batchSize', 24,
         'minimumTransferQuantity', 12,
+        'safetyStockQuantity', 24,
         'bufferMaxQuantity', 120,
         'machineRows', jsonb_build_array(
           jsonb_build_object('machineId', v_mixer_id, 'dailyHours', 2.4),
@@ -311,7 +327,10 @@ begin
         'producedQuantity', 545.455,
         'totalProductionTimeMinutes', 430,
         'transferBatchSize', 24,
-        'flowStrategy', 'flow',
+        'flowStrategy', 'pull',
+        'safetyStockEnabled', true,
+        'safetyStockQuantity', 96,
+        'stockoutWaitTimeHours', 0,
         'cycleTimeMinutes', 1.25,
         'effectiveCycleTimeMinutes', 0.7883,
         'bottleneck', jsonb_build_object('operationName', 'Dolum ve kapaklama', 'machineId', v_filler_id, 'machineName', 'Startup Dolum ve Kapaklama Hattı', 'processingTimeMinutes', 354),

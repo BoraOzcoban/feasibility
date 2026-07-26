@@ -38,8 +38,7 @@ function getTransferBatchSize(strategy, targetQuantity, batchSize, minimumTransf
   if (safeTargetQuantity <= 0) return 0;
 
   const safeMinimumTransferQuantity = Math.max(1, Math.min(safeTargetQuantity, toFiniteNumber(minimumTransferQuantity, 1)));
-  if (strategy === "batch") return safeTargetQuantity;
-  if (strategy === "parallel") return 1;
+  if (strategy === "push") return safeTargetQuantity;
 
   return Math.max(
     safeMinimumTransferQuantity,
@@ -232,6 +231,10 @@ function scheduleGroupOnMachine(machineState, operation, group, precedenceReadyM
 
 function runOperationSchedule(operationRows, options = {}) {
   const targetQuantity = Math.max(0, toFiniteNumber(options.targetQuantity));
+  const isPull = options.flowStrategy === "pull";
+  const minimumSafetyStockQuantity = isPull
+    ? Math.max(0, toFiniteNumber(options.safetyStockQuantity))
+    : 0;
   const transferBatchSize = getTransferBatchSize(
     options.flowStrategy,
     targetQuantity,
@@ -245,6 +248,7 @@ function runOperationSchedule(operationRows, options = {}) {
   let previousFinishes = groups.map(() => 0);
   let makespanMinutes = 0;
   let totalQueueWaitMinutes = 0;
+  let totalStockoutWaitMinutes = 0;
   let totalProcessingTimeMinutes = 0;
 
   operationRows.forEach((operation, operationIndex) => {
@@ -269,7 +273,14 @@ function runOperationSchedule(operationRows, options = {}) {
     let lastFinishMinutes = 0;
 
     groups.forEach((group, groupIndex) => {
-      const precedenceReadyMinutes = operationIndex === 0 ? 0 : previousFinishes[groupIndex] || 0;
+      const precedenceReadyMinutes = operationIndex === 0 || isPull ? 0 : previousFinishes[groupIndex] || 0;
+      const machineAvailableBefore = Math.min(
+        ...(
+          machineState.slotAvailableAt.length
+            ? machineState.slotAvailableAt
+            : [0]
+        ),
+      );
       const scheduledGroup = scheduleGroupOnMachine(
         machineState,
         operation,
@@ -277,10 +288,14 @@ function runOperationSchedule(operationRows, options = {}) {
         precedenceReadyMinutes,
         groupIndex === 0,
       );
+      const stockoutWaitMinutes = operationIndex === 0 || isPull
+        ? 0
+        : Math.max(0, precedenceReadyMinutes - machineAvailableBefore);
 
       scheduledGroup.groupIntervals.forEach((interval) => operationIntervals.push(interval));
       operationWaitMinutes += scheduledGroup.waitMinutes;
       totalQueueWaitMinutes += scheduledGroup.waitMinutes;
+      totalStockoutWaitMinutes += stockoutWaitMinutes;
       makespanMinutes = Math.max(makespanMinutes, scheduledGroup.finishMinutes);
       firstStartMinutes = firstStartMinutes === null
         ? scheduledGroup.startMinutes
@@ -298,6 +313,7 @@ function runOperationSchedule(operationRows, options = {}) {
         quantity: group.quantity,
         setupMinutes: scheduledGroup.setupMinutes,
         startMinutes: scheduledGroup.startMinutes,
+        stockoutWaitMinutes,
         waitMinutes: scheduledGroup.waitMinutes,
       };
       currentTimings.push(timing);
@@ -332,13 +348,16 @@ function runOperationSchedule(operationRows, options = {}) {
       finishMinutes: lastFinishMinutes,
       idleBeforeMinutes: Math.max(0, firstStartMinutes || 0),
       startMinutes: firstStartMinutes || 0,
+      stockoutWaitMinutes: currentTimings.reduce((total, timing) => total + timing.stockoutWaitMinutes, 0),
       totalWaitMinutes: operationWaitMinutes,
     };
   });
 
   const bufferRows = [];
   let totalWipUnitMinutes = 0;
+  let totalSafetyStockQuantity = 0;
   let maxWipQuantity = 0;
+  let safetyStockQuantity = 0;
 
   for (let operationIndex = 0; operationIndex < operationTimings.length - 1; operationIndex += 1) {
     const fromTimings = operationTimings[operationIndex] || [];
@@ -358,10 +377,21 @@ function runOperationSchedule(operationRows, options = {}) {
 
     events.sort((a, b) => a.timeMinutes - b.timeMinutes || a.priority - b.priority);
 
-    let level = 0;
+    let rawLevel = 0;
+    let minimumRawLevel = 0;
+    events.forEach((event) => {
+      rawLevel += event.delta;
+      minimumRawLevel = Math.min(minimumRawLevel, rawLevel);
+    });
+
+    const requiredSafetyStockQuantity = isPull ? Math.max(0, -minimumRawLevel) : 0;
+    const bufferSafetyStockQuantity = isPull
+      ? Math.max(minimumSafetyStockQuantity, requiredSafetyStockQuantity)
+      : 0;
+    let level = bufferSafetyStockQuantity;
     let lastTimeMinutes = 0;
     let bufferArea = 0;
-    let bufferMaxWip = 0;
+    let bufferMaxWip = bufferSafetyStockQuantity;
 
     events.forEach((event) => {
       const eventTimeMinutes = event.timeMinutes;
@@ -370,8 +400,11 @@ function runOperationSchedule(operationRows, options = {}) {
       bufferMaxWip = Math.max(bufferMaxWip, level);
       lastTimeMinutes = eventTimeMinutes;
     });
+    bufferArea += Math.max(0, makespanMinutes - lastTimeMinutes) * level;
 
     totalWipUnitMinutes += bufferArea;
+    totalSafetyStockQuantity += bufferSafetyStockQuantity;
+    safetyStockQuantity = Math.max(safetyStockQuantity, bufferSafetyStockQuantity);
     maxWipQuantity = Math.max(maxWipQuantity, bufferMaxWip);
     bufferRows.push({
       averageWip: makespanMinutes ? bufferArea / makespanMinutes : 0,
@@ -381,12 +414,17 @@ function runOperationSchedule(operationRows, options = {}) {
       bufferMaxQuantity: Math.max(0, toFiniteNumber(options.bufferMaxQuantity)),
       fromOperationName: operationRows[operationIndex]?.operationName || `Operation ${operationIndex + 1}`,
       maxWip: bufferMaxWip,
+      requiredSafetyStockQuantity,
+      safetyStockQuantity: bufferSafetyStockQuantity,
       toOperationName: operationRows[operationIndex + 1]?.operationName || `Operation ${operationIndex + 2}`,
       waitingUnitHours: waitingUnitMinutes / 60,
     });
   }
 
-  const waitingCost = (totalQueueWaitMinutes / 60) * Math.max(0, toFiniteNumber(options.waitingCostPerHour));
+  const queueWaitingTimeHours = totalQueueWaitMinutes / 60;
+  const stockoutWaitTimeHours = totalStockoutWaitMinutes / 60;
+  const waitingCost = (queueWaitingTimeHours + stockoutWaitTimeHours)
+    * Math.max(0, toFiniteNumber(options.waitingCostPerHour));
   const inventoryCost = (totalWipUnitMinutes / 60) * Math.max(0, toFiniteNumber(options.inventoryCostPerUnitHour));
   const scheduleWindowMinutes = Math.max(...operationRows.map((row) => Math.max(0, toFiniteNumber(row.dailyHours)) * 60), 0);
   const delayMinutes = Math.max(0, makespanMinutes - scheduleWindowMinutes);
@@ -433,16 +471,23 @@ function runOperationSchedule(operationRows, options = {}) {
     inventoryCost,
     machineRows,
     maxWipQuantity,
+    minimumSafetyStockQuantity,
     objectiveScore,
     operationRows,
     producedQuantity: targetQuantity,
-    recommendedBufferQuantity: maxWipQuantity,
+    queueWaitingTimeHours,
+    recommendedBufferQuantity: isPull ? safetyStockQuantity : 0,
+    recommendedSafetyStockQuantity: isPull ? safetyStockQuantity : 0,
+    safetyStockEnabled: isPull,
+    safetyStockQuantity,
+    stockoutWaitTimeHours,
     totalIdleTimeHours,
+    totalSafetyStockQuantity,
     totalProcessingTimeMinutes,
     totalProductionTimeMinutes: makespanMinutes,
     transferBatchSize,
     waitingCost,
-    waitingTimeHours: totalQueueWaitMinutes / 60,
+    waitingTimeHours: queueWaitingTimeHours + stockoutWaitTimeHours,
     wipUnitHours: totalWipUnitMinutes / 60,
     bottleneck: bottleneckOperation
       ? {
@@ -456,7 +501,9 @@ function runOperationSchedule(operationRows, options = {}) {
 }
 
 function normalizeFlowStrategy(value) {
-  return ["batch", "flow", "parallel"].includes(value) ? value : "flow";
+  if (value === "push" || value === "batch") return "push";
+  if (value === "pull" || value === "flow" || value === "parallel") return "pull";
+  return "pull";
 }
 
 function simulateOperationFlow(operationRows, plan, workspace, machineRows, productCycleTimeMinutes, product = {}, options = {}) {
@@ -476,6 +523,19 @@ function simulateOperationFlow(operationRows, plan, workspace, machineRows, prod
     minimumTransferQuantity,
     toFiniteNumber(getPlanValue(plan, "batchSize", productBatchSize), productBatchSize),
   );
+  const productSafetyStockQuantity = Math.max(
+    0,
+    toFiniteNumber(product.default_safety_stock_quantity ?? product.defaultSafetyStockQuantity, 0),
+  );
+  const safetyStockQuantity = flowStrategy === "pull"
+    ? Math.max(
+        0,
+        toFiniteNumber(
+          getPlanValue(plan, "safetyStockQuantity", productSafetyStockQuantity),
+          productSafetyStockQuantity,
+        ),
+      )
+    : 0;
   const normalizedRows = normalizeOperationRows(operationRows, workspace.machines || [], machineRows, productCycleTimeMinutes);
 
   if (!normalizedRows.length || targetQuantity <= 0) return null;
@@ -489,17 +549,18 @@ function simulateOperationFlow(operationRows, plan, workspace, machineRows, prod
     inventoryCostPerUnitHour: Math.max(0, toFiniteNumber(getPlanValue(plan, "inventoryCostPerUnitHour", 0))),
     machines: workspace.machines || [],
     minimumTransferQuantity,
+    safetyStockQuantity,
     targetQuantity,
     waitingCostPerHour: Math.max(0, toFiniteNumber(getPlanValue(plan, "waitingCostPerHour", 0))),
   };
   const schedule = runOperationSchedule(normalizedRows.map((row) => ({ ...row })), scheduleOptions);
-  const shouldOptimize = options.optimize !== false;
+  const shouldOptimize = options.optimize !== false && flowStrategy === "pull";
   const candidates = shouldOptimize ? buildBatchCandidates(targetQuantity, minimumTransferQuantity, batchSize) : [];
   const optimal = shouldOptimize
     ? candidates
         .map((candidateBatchSize) => runOperationSchedule(
           normalizedRows.map((row) => ({ ...row })),
-          { ...scheduleOptions, batchSize: candidateBatchSize, flowStrategy: "flow" },
+          { ...scheduleOptions, batchSize: candidateBatchSize, flowStrategy: "pull" },
         ))
         .reduce((best, candidate) => (
           !best || candidate.objectiveScore < best.objectiveScore ? candidate : best
@@ -512,16 +573,19 @@ function simulateOperationFlow(operationRows, plan, workspace, machineRows, prod
     batchSize,
     flowStrategy,
     minimumTransferQuantity,
-    optimization: optimal
-      ? {
-          objectiveScore: optimal.objectiveScore,
-          recommendedBatchSize: optimal.transferBatchSize,
-          testedBatchSizes: candidates,
-          totalProductionTimeMinutes: optimal.totalProductionTimeMinutes,
-          waitingCost: optimal.waitingCost,
-          inventoryCost: optimal.inventoryCost,
-        }
-      : savedOptimization,
+    safetyStockQuantity: schedule.safetyStockQuantity,
+    optimization: flowStrategy === "pull"
+      ? (optimal
+          ? {
+              objectiveScore: optimal.objectiveScore,
+              recommendedBatchSize: optimal.transferBatchSize,
+              testedBatchSizes: candidates,
+              totalProductionTimeMinutes: optimal.totalProductionTimeMinutes,
+              waitingCost: optimal.waitingCost,
+              inventoryCost: optimal.inventoryCost,
+            }
+          : savedOptimization)
+      : null,
     targetQuantity,
   };
 }

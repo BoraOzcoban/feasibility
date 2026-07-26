@@ -105,14 +105,14 @@ begin
     insert into public.operation_products (
       company_id, product_code, name, product_group, revision, status, unit, price,
       price_currency, cycle_time_minutes, cycle_time_unit, default_flow_strategy,
-      default_batch_size, minimum_transfer_quantity, description, quality_grade,
+      default_batch_size, minimum_transfer_quantity, default_safety_stock_quantity, description, quality_grade,
       weight_kg, dimensions, material_name, cycle_time_seconds, labor_minutes_per_unit,
       material_kg_per_unit, scrap_rate
     )
     values (
       v_company.id, 'DEMO-STRAWBERRY-MILK', 'Demo Çilekli Süt 250 ml',
       'Soğuk Zincir İçecek', 'A', 'Aktif', 'adet', 100.00, 'TRY', 2.00,
-      'minute', 'flow', 5, 5, 'Demo seed ile eklenen tam reçeteli ürün.', 'A+', 0.28,
+      'minute', 'pull', 5, 5, 5, 'Demo seed ile eklenen tam reçeteli ürün.', 'A+', 0.28,
       '55x55x145 mm', 'Süt, çilek püresi, şişe', 120, 0.45, 0.25, 1.8
     )
     on conflict (company_id, product_code) do update set
@@ -128,6 +128,7 @@ begin
       default_flow_strategy = excluded.default_flow_strategy,
       default_batch_size = excluded.default_batch_size,
       minimum_transfer_quantity = excluded.minimum_transfer_quantity,
+      default_safety_stock_quantity = excluded.default_safety_stock_quantity,
       description = excluded.description,
       quality_grade = excluded.quality_grade,
       weight_kg = excluded.weight_kg,
@@ -142,14 +143,14 @@ begin
     insert into public.operation_products (
       company_id, product_code, name, product_group, revision, status, unit, price,
       price_currency, cycle_time_minutes, cycle_time_unit, default_flow_strategy,
-      default_batch_size, minimum_transfer_quantity, description, quality_grade,
+      default_batch_size, minimum_transfer_quantity, default_safety_stock_quantity, description, quality_grade,
       weight_kg, dimensions, material_name, cycle_time_seconds, labor_minutes_per_unit,
       material_kg_per_unit, scrap_rate
     )
     values (
       v_company.id, 'DEMO-MANGO-PUREE', 'Demo Mango Püresi 500 g',
       'Meyve Püresi', 'B', 'Aktif', 'adet', 145.00, 'TRY', 2.75,
-      'minute', 'flow', 5, 5, 'İkinci demo ürün; ürün listesi ve satış seçimi dolu görünsün diye eklenir.', 'A', 0.54,
+      'minute', 'pull', 5, 5, 5, 'İkinci demo ürün; ürün listesi ve satış seçimi dolu görünsün diye eklenir.', 'A', 0.54,
       '90x65x165 mm', 'Mango, ambalaj', 165, 0.55, 0.50, 2.2
     )
     on conflict (company_id, product_code) do update set
@@ -162,6 +163,7 @@ begin
       default_flow_strategy = excluded.default_flow_strategy,
       default_batch_size = excluded.default_batch_size,
       minimum_transfer_quantity = excluded.minimum_transfer_quantity,
+      default_safety_stock_quantity = excluded.default_safety_stock_quantity,
       description = excluded.description
     returning id into v_secondary_product_id;
 
@@ -267,27 +269,49 @@ begin
     on conflict (company_id, role_name) do update set hourly_cost = excluded.hourly_cost, hourly_cost_currency = excluded.hourly_cost_currency
     returning id into v_qc_id;
 
+    delete from public.operation_product_processes
+    where product_id in (v_product_id, v_secondary_product_id);
+
+    insert into public.operation_product_processes (
+      product_id, step_order, operation_name, machine_id, process_time_minutes,
+      daily_hours, material_id, material_quantity_per_unit, workforce_id,
+      people_assigned, workforce_daily_hours, capacity, setup_minutes, speed_multiplier
+    )
+    values
+      (v_product_id, 1, 'Pastörizasyon', v_pasteurizer_id, 1.20, 8, v_milk_id, 0.22, v_operator_id, 2, 7.5, 10, 18, 1.10),
+      (v_product_id, 2, 'Homojenizasyon', v_homogenizer_id, 0.95, 8, v_strawberry_id, 0.045, v_operator_id, 2, 7.5, 8, 12, 1.05),
+      (v_product_id, 3, 'Dolum ve Kapaklama', v_filler_id, 1.85, 8, v_bottle_id, 1, v_qc_id, 1, 4, 5, 22, 1),
+      (v_product_id, 4, 'Koli Paketleme', v_packer_id, 0.70, 8, v_box_id, 0.0417, v_packer_role_id, 2, 6, 12, 10, 1.20),
+      (v_secondary_product_id, 1, 'Püre Hazırlama', v_homogenizer_id, 1.10, 8, v_strawberry_id, 0.28, v_operator_id, 2, 7.5, 8, 12, 1),
+      (v_secondary_product_id, 2, 'Dolum ve Paketleme', v_filler_id, 1.65, 8, v_bottle_id, 1, v_packer_role_id, 2, 6, 5, 18, 1);
+
     delete from public.operation_notes
     where product_id in (v_product_id, v_secondary_product_id)
       and note like 'Demo:%';
 
     insert into public.operation_notes (product_id, note)
     values
-      (v_product_id, 'Demo: Flow senaryosu 5 adet transfer batch ile dolum hattı darboğazını gösterir.'),
+      (v_product_id, 'Demo: Çekme senaryosu 5 adet ikmal lotu ve otomatik güvenli stokla dolum hattı darboğazını gösterir.'),
       (v_product_id, 'Demo: Buffer/WIP ve bekleme maliyeti görsellerini test etmek için hazırlanmıştır.');
 
     delete from public.operation_resource_plans
     where company_id = v_company.id
-      and plan_name in ('Demo Flow - Çilekli Süt 1000 adet', 'Demo Batch - Çilekli Süt 1000 adet');
+      and plan_name in (
+        'Demo Flow - Çilekli Süt 1000 adet',
+        'Demo Batch - Çilekli Süt 1000 adet',
+        'Demo Pull - Çilekli Süt 1000 adet',
+        'Demo Push - Çilekli Süt 1000 adet'
+      );
 
     v_flow_input := jsonb_build_object(
-      'planName', 'Demo Flow - Çilekli Süt 1000 adet',
+      'planName', 'Demo Pull - Çilekli Süt 1000 adet',
       'productId', v_product_id,
       'productName', 'Demo Çilekli Süt 250 ml',
       'targetQuantity', 1000,
-      'flowStrategy', 'flow',
+      'flowStrategy', 'pull',
       'batchSize', 5,
       'minimumTransferQuantity', 5,
+      'safetyStockQuantity', 5,
       'bufferMaxQuantity', 40,
       'waitingCostPerHour', 350,
       'inventoryCostPerUnitHour', 0.12,
@@ -313,7 +337,7 @@ begin
     );
 
     v_flow_result := jsonb_build_object(
-      'planName', 'Demo Flow - Çilekli Süt 1000 adet',
+      'planName', 'Demo Pull - Çilekli Süt 1000 adet',
       'productName', 'Demo Çilekli Süt 250 ml',
       'productPrice', 100.00,
       'productPriceCurrency', 'TRY',
@@ -321,7 +345,10 @@ begin
       'producedQuantity', 1000,
       'totalProductionTimeMinutes', 426,
       'transferBatchSize', 5,
-      'flowStrategy', 'flow',
+      'flowStrategy', 'pull',
+      'safetyStockEnabled', true,
+      'safetyStockQuantity', 35,
+      'stockoutWaitTimeHours', 0,
       'cycleTimeMinutes', 2,
       'effectiveCycleTimeMinutes', 0.426,
       'bottleneck', jsonb_build_object('operationName', 'Dolum ve Kapaklama', 'machineId', v_filler_id, 'machineName', 'Demo Dolum Hattı', 'processingTimeMinutes', 392),
@@ -347,9 +374,9 @@ begin
         jsonb_build_object('operationId', 'op-pack', 'operationName', 'Koli Paketleme', 'machineId', v_packer_id, 'machineName', 'Demo Paketleme Robotu', 'busyMinutes', 84, 'utilizationPercent', 19.7)
       ),
       'bufferRows', jsonb_build_array(
-        jsonb_build_object('fromOperationName', 'Pastörizasyon', 'toOperationName', 'Homojenizasyon', 'maxWip', 15, 'averageWip', 6.8),
-        jsonb_build_object('fromOperationName', 'Homojenizasyon', 'toOperationName', 'Dolum ve Kapaklama', 'maxWip', 35, 'averageWip', 18.2),
-        jsonb_build_object('fromOperationName', 'Dolum ve Kapaklama', 'toOperationName', 'Koli Paketleme', 'maxWip', 10, 'averageWip', 3.1)
+        jsonb_build_object('fromOperationName', 'Pastörizasyon', 'toOperationName', 'Homojenizasyon', 'maxWip', 15, 'averageWip', 6.8, 'safetyStockQuantity', 15),
+        jsonb_build_object('fromOperationName', 'Homojenizasyon', 'toOperationName', 'Dolum ve Kapaklama', 'maxWip', 35, 'averageWip', 18.2, 'safetyStockQuantity', 35),
+        jsonb_build_object('fromOperationName', 'Dolum ve Kapaklama', 'toOperationName', 'Koli Paketleme', 'maxWip', 10, 'averageWip', 3.1, 'safetyStockQuantity', 10)
       ),
       'machineRows', jsonb_build_array(
         jsonb_build_object('machineId', v_pasteurizer_id, 'name', 'Demo Pastörizasyon Kazanı', 'dailyHours', 2.13, 'energyConsumptionKwh', 39.4, 'utilizationPercent', 30.0),
@@ -372,18 +399,20 @@ begin
     );
 
     v_batch_input := v_flow_input || jsonb_build_object(
-      'planName', 'Demo Batch - Çilekli Süt 1000 adet',
-      'flowStrategy', 'batch',
+      'planName', 'Demo Push - Çilekli Süt 1000 adet',
+      'flowStrategy', 'push',
       'batchSize', 1000,
       'minimumTransferQuantity', 1000,
       'bufferMaxQuantity', 0
     );
 
     v_batch_result := v_flow_result || jsonb_build_object(
-      'planName', 'Demo Batch - Çilekli Süt 1000 adet',
+      'planName', 'Demo Push - Çilekli Süt 1000 adet',
       'totalProductionTimeMinutes', 734,
       'transferBatchSize', 1000,
-      'flowStrategy', 'batch',
+      'flowStrategy', 'push',
+      'safetyStockEnabled', false,
+      'safetyStockQuantity', 0,
       'effectiveCycleTimeMinutes', 0.734,
       'maxWipQuantity', 1000,
       'energyConsumptionKwh', 491.2,
@@ -396,9 +425,9 @@ begin
       'totalTrackedDailyCost', 32656,
       'optimization', jsonb_build_object('recommendedBatchSize', 5, 'objectiveScore', 12140, 'testedBatchSizes', jsonb_build_array(1, 5, 10, 25, 50, 100, 1000)),
       'bufferRows', jsonb_build_array(
-        jsonb_build_object('fromOperationName', 'Pastörizasyon', 'toOperationName', 'Homojenizasyon', 'maxWip', 1000, 'averageWip', 500),
-        jsonb_build_object('fromOperationName', 'Homojenizasyon', 'toOperationName', 'Dolum ve Kapaklama', 'maxWip', 1000, 'averageWip', 500),
-        jsonb_build_object('fromOperationName', 'Dolum ve Kapaklama', 'toOperationName', 'Koli Paketleme', 'maxWip', 1000, 'averageWip', 500)
+        jsonb_build_object('fromOperationName', 'Pastörizasyon', 'toOperationName', 'Homojenizasyon', 'maxWip', 1000, 'averageWip', 500, 'safetyStockQuantity', 0),
+        jsonb_build_object('fromOperationName', 'Homojenizasyon', 'toOperationName', 'Dolum ve Kapaklama', 'maxWip', 1000, 'averageWip', 500, 'safetyStockQuantity', 0),
+        jsonb_build_object('fromOperationName', 'Dolum ve Kapaklama', 'toOperationName', 'Koli Paketleme', 'maxWip', 1000, 'averageWip', 500, 'safetyStockQuantity', 0)
       )
     );
 
@@ -406,7 +435,7 @@ begin
       company_id, product_id, plan_name, is_active, target_daily_output, input, result, created_at
     )
     values (
-      v_company.id, v_product_id, 'Demo Batch - Çilekli Süt 1000 adet', true, 1000,
+      v_company.id, v_product_id, 'Demo Push - Çilekli Süt 1000 adet', true, 1000,
       v_batch_input, v_batch_result, now() - interval '1 day'
     )
     returning id into v_plan_batch_id;
@@ -415,7 +444,7 @@ begin
       company_id, product_id, plan_name, is_active, target_daily_output, input, result, created_at
     )
     values (
-      v_company.id, v_product_id, 'Demo Flow - Çilekli Süt 1000 adet', true, 1000,
+      v_company.id, v_product_id, 'Demo Pull - Çilekli Süt 1000 adet', true, 1000,
       v_flow_input, v_flow_result, now()
     )
     returning id into v_plan_flow_id;

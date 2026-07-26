@@ -143,11 +143,12 @@ test("ignores malformed nested plan rows", () => {
   assert.equal(result.workforceRows.length, 1);
 });
 
-test("simulates operation precedence with flow batches", () => {
+test("pull starts from downstream demand and creates enough safety stock to eliminate material starvation", () => {
   const result = calculateCurrentPlanResult({
     input: {
       batchSize: 5,
-      flowStrategy: "flow",
+      flowStrategy: "pull",
+      inventoryCostPerUnitHour: 2,
       minimumTransferQuantity: 1,
       operationRows: [
         { capacity: 1, dailyHours: 8, machineId: "machine-1", operationName: "Puree", processTimeMinutes: 2, setupMinutes: 0, speedMultiplier: 1 },
@@ -166,21 +167,30 @@ test("simulates operation precedence with flow batches", () => {
   });
 
   assert.equal(result.producedQuantity, 10);
+  assert.equal(result.flowStrategy, "pull");
   assert.equal(result.transferBatchSize, 5);
-  assert.equal(result.totalProductionTimeMinutes, 25);
+  assert.equal(result.totalProductionTimeMinutes, 20);
   assert.equal(result.bottleneck.operationName, "Puree");
-  assert.equal(result.maxWipQuantity, 5);
-  assert.equal(result.optimization.recommendedBatchSize, 1);
+  assert.equal(result.safetyStockEnabled, true);
+  assert.equal(result.safetyStockQuantity, 10);
+  assert.equal(result.totalSafetyStockQuantity, 10);
+  assert.equal(result.stockoutWaitTimeHours, 0);
+  assert.equal(result.maxWipQuantity, 10);
+  assert.equal(result.bufferRows[0].requiredSafetyStockQuantity, 10);
+  assert.equal(result.inventoryCost, 2.5);
+  assert.equal(result.optimization.recommendedBatchSize, 10);
   assert.equal(result.materialCost, 450);
   assert.equal(result.machineRows.length, 2);
 });
 
-test("batch strategy waits for the full quantity before the next operation starts", () => {
+test("push sends the planned quantity forward without safety stock and can wait for inventory", () => {
   const result = calculateCurrentPlanResult({
     input: {
       batchSize: 2,
-      flowStrategy: "batch",
+      flowStrategy: "push",
       minimumTransferQuantity: 1,
+      safetyStockQuantity: 99,
+      waitingCostPerHour: 60,
       operationRows: [
         { capacity: 2, dailyHours: 8, machineId: "machine-1", operationName: "Puree", processTimeMinutes: 2, setupMinutes: 0, speedMultiplier: 1 },
         { capacity: 1, dailyHours: 8, machineId: "machine-2", operationName: "Pack", processTimeMinutes: 1, setupMinutes: 0, speedMultiplier: 1 },
@@ -199,13 +209,21 @@ test("batch strategy waits for the full quantity before the next operation start
 
   assert.equal(result.transferBatchSize, 4);
   assert.equal(result.batchCount, 1);
+  assert.equal(result.flowStrategy, "push");
   assert.equal(result.operationRows[0].finishMinutes, 4);
   assert.equal(result.operationRows[1].startMinutes, 4);
   assert.equal(result.totalProductionTimeMinutes, 8);
+  assert.equal(result.safetyStockEnabled, false);
+  assert.equal(result.safetyStockQuantity, 0);
+  assert.equal(result.totalSafetyStockQuantity, 0);
+  assert.equal(result.stockoutWaitTimeHours, 4 / 60);
+  assert.equal(result.waitingCost, 4);
+  assert.equal(result.inventoryCost, 0);
+  assert.equal(result.optimization, null);
   assert.equal(result.maxWipQuantity, 4);
 });
 
-test("parallel simulation uses product-level events and honors machine capacity", () => {
+test("legacy parallel plans migrate to pull semantics", () => {
   const result = calculateCurrentPlanResult({
     input: {
       batchSize: 4,
@@ -227,14 +245,16 @@ test("parallel simulation uses product-level events and honors machine capacity"
     ],
   });
 
-  assert.equal(result.transferBatchSize, 1);
-  assert.equal(result.batchCount, 4);
+  assert.equal(result.flowStrategy, "pull");
+  assert.equal(result.transferBatchSize, 4);
+  assert.equal(result.batchCount, 1);
   assert.equal(result.operationRows[0].finishMinutes, 4);
-  assert.equal(result.totalProductionTimeMinutes, 6);
-  assert.equal(result.maxWipQuantity, 2);
+  assert.equal(result.totalProductionTimeMinutes, 4);
+  assert.equal(result.safetyStockQuantity, 4);
+  assert.equal(result.stockoutWaitTimeHours, 0);
 });
 
-test("uses product transfer defaults when a plan omits flow settings", () => {
+test("uses product Pull and safety stock defaults when a plan omits flow settings", () => {
   const result = calculateCurrentPlanResult({
     input: {
       operationRows: [
@@ -255,14 +275,43 @@ test("uses product transfer defaults when a plan omits flow settings", () => {
       {
         ...workspace.products[0],
         default_batch_size: 3,
-        default_flow_strategy: "flow",
+        default_flow_strategy: "pull",
+        default_safety_stock_quantity: 8,
         minimum_transfer_quantity: 3,
       },
     ],
   });
 
-  assert.equal(result.flowStrategy, "flow");
+  assert.equal(result.flowStrategy, "pull");
   assert.equal(result.minimumTransferQuantity, 3);
   assert.equal(result.transferBatchSize, 3);
   assert.equal(result.batchCount, 2);
+  assert.equal(result.minimumSafetyStockQuantity, 8);
+  assert.equal(result.safetyStockQuantity, 8);
+});
+
+test("legacy batch plans migrate to Push and ignore configured safety stock", () => {
+  const result = calculateCurrentPlanResult({
+    input: {
+      flowStrategy: "batch",
+      operationRows: [
+        { capacity: 1, dailyHours: 8, machineId: "machine-1", operationName: "Puree", processTimeMinutes: 1 },
+        { capacity: 1, dailyHours: 8, machineId: "machine-2", operationName: "Pack", processTimeMinutes: 1 },
+      ],
+      productId: "product-1",
+      safetyStockQuantity: 50,
+      targetQuantity: 5,
+    },
+    product_id: "product-1",
+  }, {
+    ...workspace,
+    machines: [
+      ...workspace.machines,
+      { availability_hours: 8, concurrent_capacity: 1, hourly_energy_consumption_kwh: 1, id: "machine-2", name: "Packer", price: 50000, speed_multiplier: 1 },
+    ],
+  });
+
+  assert.equal(result.flowStrategy, "push");
+  assert.equal(result.safetyStockQuantity, 0);
+  assert.equal(result.operationRows[1].startMinutes, 5);
 });

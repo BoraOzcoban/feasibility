@@ -23648,3 +23648,20 @@ body > .floating-info-tip-panel,
     justify-content: space-between;
   }
 }
+.process-step-list-locked {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.process-step-list-locked :is(input, select) {
+  cursor: not-allowed;
+}
+
+.resource-row-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+  margin-left: auto;
+}

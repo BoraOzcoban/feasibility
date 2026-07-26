@@ -3,7 +3,7 @@ export const emptyOperationPlan = {
   bufferMaxQuantity: 0,
   capacityLossCostPerHour: 0,
   delayCostPerHour: 0,
-  flowStrategy: "flow",
+  flowStrategy: "pull",
   inventoryCostPerUnitHour: 0,
   machineRows: [],
   materialRows: [],
@@ -12,6 +12,7 @@ export const emptyOperationPlan = {
   planName: "",
   productId: "",
   productName: "",
+  safetyStockQuantity: 0,
   targetQuantity: 1000,
   waitingCostPerHour: 0,
   workforceRows: [],
@@ -63,9 +64,11 @@ export const emptyOperationForms = {
     cycleTimeUnit: "minute",
     cycleTimeValue: 1,
     defaultBatchSize: 5,
-    defaultFlowStrategy: "flow",
+    defaultFlowStrategy: "pull",
+    defaultSafetyStockQuantity: 0,
     id: "",
     materialRows: [],
+    processRows: [],
     minimumTransferQuantity: 1,
     name: "",
     price: 0,
@@ -98,7 +101,7 @@ export async function loadOperationsWorkspace(supabase) {
       supabase.from("operation_equipment").select("*").order("name", { ascending: true }),
       supabase
         .from("operation_products")
-        .select("*, material_rows:operation_product_materials(*, material:operation_materials(*))")
+        .select("*, material_rows:operation_product_materials(*, material:operation_materials(*)), process_rows:operation_product_processes(*)")
         .order("name", { ascending: true }),
       supabase.from("operation_machines").select("*").order("name", { ascending: true }),
       supabase.from("operation_materials").select("*").order("name", { ascending: true }),
