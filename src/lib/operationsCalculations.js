@@ -66,7 +66,7 @@ function normalizeOperationRows(operationRows, machines, machineRows, productCyc
       );
       const speedMultiplier = Math.max(
         0.0001,
-        toFiniteNumber(row.speedMultiplier ?? row.speed_multiplier ?? machine?.speed_multiplier, 1),
+        toFiniteNumber(row.speedMultiplier ?? row.speed_multiplier, 1),
       );
       const availabilityHours = Math.max(
         0,
@@ -669,7 +669,6 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = 
   }
 
   const producedQuantity = flowSimulation?.producedQuantity ?? ((primaryMachineDailyHours * 60) / productCycleTimeMinutes);
-  let materialCost = 0;
   const recipeRows = asObjectArray(product.material_rows);
   const materialSummary = (recipeRows.length ? recipeRows : manualMaterialRows)
     .map((row) => {
@@ -681,17 +680,11 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = 
       const dailyQuantity = recipeRows.length
         ? producedQuantity * Math.max(0, quantityPerUnit)
         : Math.max(0, toFiniteNumber(row.dailyQuantity));
-      const pricePerUnit = Math.max(0, toFiniteNumber(material.price_per_unit));
-      const cost = dailyQuantity * pricePerUnit;
-      materialCost += cost;
-
       return {
-        cost,
         dailyQuantity,
         materialId: material.id,
+        materialGroup: material.material_group || material.materialGroup || "Genel",
         name: material.name,
-        priceCurrency: material.price_currency || "TRY",
-        pricePerUnit,
         producedQuantity,
         quantityPerUnit: recipeRows.length ? quantityPerUnit : undefined,
         unit: material.unit,
@@ -699,7 +692,6 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = 
     })
     .filter(Boolean);
 
-  let workforceCost = 0;
   let workforceHoursUsed = 0;
   const workforceSummary = workforceRows
     .map((row) => {
@@ -709,16 +701,10 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = 
       const peopleAssigned = Math.max(0, toFiniteNumber(row.peopleAssigned));
       const dailyHours = Math.max(0, toFiniteNumber(row.dailyHours));
       const hoursUsed = peopleAssigned * dailyHours;
-      const hourlyCost = Math.max(0, toFiniteNumber(resource.hourly_cost));
-      const cost = hoursUsed * hourlyCost;
-      workforceCost += cost;
       workforceHoursUsed += hoursUsed;
 
       return {
-        cost,
         dailyHours,
-        hourlyCost,
-        hourlyCostCurrency: resource.hourly_cost_currency || "TRY",
         hoursUsed,
         peopleAssigned,
         roleName: resource.role_name,
@@ -727,21 +713,23 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = 
     })
     .filter(Boolean);
 
-  const flowCost = flowSimulation
-    ? toFiniteNumber(flowSimulation.waitingCost) +
-      toFiniteNumber(flowSimulation.inventoryCost) +
-      toFiniteNumber(flowSimulation.delayCost) +
-      toFiniteNumber(flowSimulation.capacityLossCost)
-    : 0;
+  const {
+    materialCost: ignoredMaterialCost,
+    totalTrackedDailyCost: ignoredTrackedCost,
+    workforceCost: ignoredWorkforceCost,
+    ...savedResult
+  } = plan.result || {};
+  void ignoredMaterialCost;
+  void ignoredTrackedCost;
+  void ignoredWorkforceCost;
 
   return {
-    ...(plan.result || {}),
+    ...savedResult,
     ...(flowSimulation || {}),
     cycleTimeMinutes: productCycleTimeMinutes,
     energyConsumptionKwh,
     machineHoursUsed,
     machineRows: machineSummary,
-    materialCost,
     materialRows: materialSummary,
     primaryMachineDailyHours,
     producedQuantity,
@@ -750,8 +738,6 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = 
     productPriceCurrency: product.price_currency || "TRY",
     productUnit: product.unit || plan.result?.productUnit || "adet",
     selectedMachineValue,
-    totalTrackedDailyCost: materialCost + workforceCost + flowCost,
-    workforceCost,
     workforceHoursUsed,
     workforceRows: workforceSummary,
   };

@@ -14,6 +14,7 @@ alter table public.operation_machines
   add column if not exists failure_probability_percent numeric(5, 2) not null default 0;
 
 alter table public.operation_materials
+  add column if not exists material_group text not null default 'Genel',
   add column if not exists price_currency text not null default 'TRY';
 
 alter table public.operation_workforce_resources
@@ -198,7 +199,7 @@ select
   greatest(0, coalesce(nullif(process.value->>'workforceDailyHours', '')::numeric, 0)),
   greatest(1, coalesce(nullif(process.value->>'capacity', '')::numeric, machine.concurrent_capacity, 1)),
   greatest(0, coalesce(nullif(process.value->>'setupMinutes', '')::numeric, 0)),
-  greatest(0.0001, coalesce(nullif(process.value->>'speedMultiplier', '')::numeric, machine.speed_multiplier, 1))
+  greatest(0.0001, coalesce(nullif(process.value->>'speedMultiplier', '')::numeric, 1))
 from legacy_process_rows process
 join public.operation_machines machine
   on machine.id::text = process.value->>'machineId'
@@ -583,16 +584,18 @@ begin
 
   if p_entity = 'material' then
     insert into public.operation_materials (
-      company_id, name, unit, price_per_unit, price_currency
+      company_id, name, material_group, unit, price_per_unit, price_currency
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'name'), ''),
+      coalesce(nullif(trim(p_input->>'materialGroup'), ''), 'Genel'),
       coalesce(nullif(trim(p_input->>'unit'), ''), 'kg'),
       greatest(0, coalesce(nullif(p_input->>'pricePerUnit', '')::numeric, 0)),
       case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end
     )
     on conflict (company_id, name) do update set
+      material_group = excluded.material_group,
       unit = excluded.unit,
       price_per_unit = excluded.price_per_unit,
       price_currency = excluded.price_currency

@@ -340,6 +340,7 @@ export const emptyFinancialModel = {
     materialCost: 0,
     netIncome: 0,
     netSoldUnits: 0,
+    otherProductionCost: 0,
     paybackMonth: null,
     planCount: 0,
     requiredMonthlySalesVolume: 0,

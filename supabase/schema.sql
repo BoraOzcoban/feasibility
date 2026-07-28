@@ -653,6 +653,7 @@ create table if not exists public.operation_materials (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
   name text not null,
+  material_group text not null default 'Genel',
   unit text not null default 'kg',
   price_per_unit numeric(14, 4) not null default 0,
   price_currency text not null default 'TRY' check (price_currency in ('TRY', 'USD', 'EUR')),
@@ -662,6 +663,7 @@ create table if not exists public.operation_materials (
 );
 
 alter table public.operation_materials
+  add column if not exists material_group text not null default 'Genel',
   add column if not exists price_per_unit numeric(14, 4) not null default 0,
   add column if not exists price_currency text not null default 'TRY';
 
@@ -839,7 +841,7 @@ select
   greatest(0, coalesce(nullif(process.value->>'workforceDailyHours', '')::numeric, 0)),
   greatest(1, coalesce(nullif(process.value->>'capacity', '')::numeric, machine.concurrent_capacity, 1)),
   greatest(0, coalesce(nullif(process.value->>'setupMinutes', '')::numeric, 0)),
-  greatest(0.0001, coalesce(nullif(process.value->>'speedMultiplier', '')::numeric, machine.speed_multiplier, 1))
+  greatest(0.0001, coalesce(nullif(process.value->>'speedMultiplier', '')::numeric, 1))
 from legacy_process_rows process
 join public.operation_machines machine
   on machine.id::text = process.value->>'machineId'
@@ -2280,7 +2282,7 @@ begin
     v_operation_process_minutes := array_append(v_operation_process_minutes, greatest(0.0001, coalesce(nullif(v_entry->>'processTimeMinutes', '')::numeric, p_product_cycle_time_minutes, 1)));
     v_operation_capacities := array_append(v_operation_capacities, greatest(1, coalesce(nullif(v_entry->>'capacity', '')::numeric, v_machine.concurrent_capacity, 1)));
     v_operation_setup_minutes := array_append(v_operation_setup_minutes, greatest(0, coalesce(nullif(v_entry->>'setupMinutes', '')::numeric, 0)));
-    v_operation_speed_multipliers := array_append(v_operation_speed_multipliers, greatest(0.0001, coalesce(nullif(v_entry->>'speedMultiplier', '')::numeric, v_machine.speed_multiplier, 1)));
+    v_operation_speed_multipliers := array_append(v_operation_speed_multipliers, greatest(0.0001, coalesce(nullif(v_entry->>'speedMultiplier', '')::numeric, 1)));
     v_operation_availability_hours := array_append(v_operation_availability_hours, greatest(0, coalesce(nullif(v_entry->>'dailyHours', '')::numeric, v_machine.availability_hours, 8)));
     v_operation_busy_minutes := array_append(v_operation_busy_minutes, 0);
     v_operation_wait_minutes := array_append(v_operation_wait_minutes, 0);
@@ -2587,9 +2589,6 @@ declare
   v_workforce_hours_used numeric := 0;
   v_energy_consumption_kwh numeric := 0;
   v_selected_machine_value numeric := 0;
-  v_workforce_cost numeric := 0;
-  v_material_cost numeric := 0;
-  v_flow_cost numeric := 0;
   v_product_unit text := 'adet';
   v_product_price numeric := 0;
   v_product_price_currency text := 'TRY';
@@ -2597,7 +2596,6 @@ declare
   v_product_material_count integer := 0;
   v_primary_machine_daily_hours numeric := 0;
   v_produced_quantity numeric := 0;
-  v_total_tracked_daily_cost numeric := 0;
   v_flow_result jsonb := null;
   v_saved_input jsonb := p_input;
   v_result jsonb;
@@ -2748,16 +2746,12 @@ begin
     v_people := greatest(0, coalesce(nullif(v_entry->>'peopleAssigned', '')::numeric, 0));
     v_daily_hours := greatest(0, coalesce(nullif(v_entry->>'dailyHours', '')::numeric, 0));
     v_workforce_hours_used := v_workforce_hours_used + (v_people * v_daily_hours);
-    v_workforce_cost := v_workforce_cost + (v_people * v_daily_hours * greatest(v_workforce.hourly_cost, 0));
     v_workforce_summary := v_workforce_summary || jsonb_build_array(jsonb_build_object(
       'workforceId', v_workforce.id,
       'roleName', v_workforce.role_name,
       'peopleAssigned', v_people,
       'dailyHours', v_daily_hours,
-      'hoursUsed', v_people * v_daily_hours,
-      'hourlyCost', v_workforce.hourly_cost,
-      'hourlyCostCurrency', coalesce(v_workforce.hourly_cost_currency, 'TRY'),
-      'cost', v_people * v_daily_hours * greatest(v_workforce.hourly_cost, 0)
+      'hoursUsed', v_people * v_daily_hours
     ));
   end loop;
 
@@ -2774,9 +2768,8 @@ begin
       select
         m.id,
         m.name,
+        m.material_group,
         m.unit,
-        m.price_per_unit,
-        m.price_currency,
         pm.quantity_per_unit
       from public.operation_product_materials pm
       join public.operation_materials m on m.id = pm.material_id
@@ -2784,17 +2777,14 @@ begin
         and m.company_id = v_company_id
     loop
       v_daily_quantity := v_produced_quantity * greatest(v_material.quantity_per_unit, 0);
-      v_material_cost := v_material_cost + (v_daily_quantity * greatest(v_material.price_per_unit, 0));
       v_material_summary := v_material_summary || jsonb_build_array(jsonb_build_object(
         'materialId', v_material.id,
+        'materialGroup', v_material.material_group,
         'name', v_material.name,
         'unit', v_material.unit,
         'quantityPerUnit', v_material.quantity_per_unit,
         'producedQuantity', v_produced_quantity,
-        'dailyQuantity', v_daily_quantity,
-        'pricePerUnit', v_material.price_per_unit,
-        'priceCurrency', coalesce(v_material.price_currency, 'TRY'),
-        'cost', v_daily_quantity * greatest(v_material.price_per_unit, 0)
+        'dailyQuantity', v_daily_quantity
       ));
     end loop;
   else
@@ -2809,15 +2799,12 @@ begin
       end if;
 
       v_daily_quantity := greatest(0, coalesce(nullif(v_entry->>'dailyQuantity', '')::numeric, 0));
-      v_material_cost := v_material_cost + (v_daily_quantity * greatest(v_material.price_per_unit, 0));
       v_material_summary := v_material_summary || jsonb_build_array(jsonb_build_object(
         'materialId', v_material.id,
+        'materialGroup', v_material.material_group,
         'name', v_material.name,
         'unit', v_material.unit,
-        'dailyQuantity', v_daily_quantity,
-        'pricePerUnit', v_material.price_per_unit,
-        'priceCurrency', coalesce(v_material.price_currency, 'TRY'),
-        'cost', v_daily_quantity * greatest(v_material.price_per_unit, 0)
+        'dailyQuantity', v_daily_quantity
       ));
     end loop;
   end if;
@@ -2829,16 +2816,6 @@ begin
   ) then
     raise exception 'The selected product needs at least one positive material recipe quantity before feasibility can be calculated.';
   end if;
-
-  if v_flow_result is not null then
-    v_flow_cost :=
-      greatest(0, coalesce(nullif(v_flow_result->>'waitingCost', '')::numeric, 0)) +
-      greatest(0, coalesce(nullif(v_flow_result->>'inventoryCost', '')::numeric, 0)) +
-      greatest(0, coalesce(nullif(v_flow_result->>'delayCost', '')::numeric, 0)) +
-      greatest(0, coalesce(nullif(v_flow_result->>'capacityLossCost', '')::numeric, 0));
-  end if;
-
-  v_total_tracked_daily_cost := v_material_cost + v_workforce_cost + v_flow_cost;
 
   v_result := jsonb_build_object(
     'productName', v_product_name,
@@ -2852,9 +2829,6 @@ begin
     'workforceHoursUsed', v_workforce_hours_used,
     'energyConsumptionKwh', v_energy_consumption_kwh,
     'selectedMachineValue', v_selected_machine_value,
-    'materialCost', v_material_cost,
-    'workforceCost', v_workforce_cost,
-    'totalTrackedDailyCost', v_total_tracked_daily_cost,
     'machineRows', v_machine_summary,
     'workforceRows', v_workforce_summary,
     'materialRows', v_material_summary
@@ -3195,16 +3169,18 @@ begin
 
   if p_entity = 'material' then
     insert into public.operation_materials (
-      company_id, name, unit, price_per_unit, price_currency
+      company_id, name, material_group, unit, price_per_unit, price_currency
     )
     values (
       v_company_id,
       nullif(trim(p_input->>'name'), ''),
+      coalesce(nullif(trim(p_input->>'materialGroup'), ''), 'Genel'),
       coalesce(nullif(trim(p_input->>'unit'), ''), 'kg'),
       greatest(0, coalesce(nullif(p_input->>'pricePerUnit', '')::numeric, 0)),
       case when upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) in ('TRY', 'USD', 'EUR') then upper(coalesce(nullif(trim(p_input->>'priceCurrency'), ''), 'TRY')) else 'TRY' end
     )
     on conflict (company_id, name) do update set
+      material_group = excluded.material_group,
       unit = excluded.unit,
       price_per_unit = excluded.price_per_unit,
       price_currency = excluded.price_currency

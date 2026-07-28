@@ -7,14 +7,14 @@ const workspace = {
     { hourly_energy_consumption_kwh: 2, id: "machine-1", name: "Press", price: 100000 },
   ],
   materials: [
-    { id: "material-1", name: "Steel", price_per_unit: 15, unit: "kg" },
+    { id: "material-1", material_group: "Metal", name: "Steel", price_per_unit: 15, unit: "kg" },
   ],
   products: [
     {
       cycle_time_minutes: 2,
       id: "product-1",
       material_rows: [
-        { material: { id: "material-1", name: "Steel", price_per_unit: 15, unit: "kg" }, material_id: "material-1", quantity_per_unit: 3 },
+        { material: { id: "material-1", material_group: "Metal", name: "Steel", price_per_unit: 15, unit: "kg" }, material_id: "material-1", quantity_per_unit: 3 },
       ],
       name: "Bracket",
       price: 120,
@@ -41,9 +41,10 @@ test("recalculates an active plan from current operation records", () => {
   }, workspace);
 
   assert.equal(result.producedQuantity, 240);
-  assert.equal(result.materialCost, 10800);
-  assert.equal(result.workforceCost, 1600);
-  assert.equal(result.totalTrackedDailyCost, 12400);
+  assert.equal(result.materialRows[0].materialGroup, "Metal");
+  assert.equal("materialCost" in result, false);
+  assert.equal("workforceCost" in result, false);
+  assert.equal("totalTrackedDailyCost" in result, false);
   assert.equal(hasViablePlanResult(result), true);
 });
 
@@ -179,8 +180,32 @@ test("pull starts from downstream demand and creates enough safety stock to elim
   assert.equal(result.bufferRows[0].requiredSafetyStockQuantity, 10);
   assert.equal(result.inventoryCost, 2.5);
   assert.equal(result.optimization.recommendedBatchSize, 10);
-  assert.equal(result.materialCost, 450);
   assert.equal(result.machineRows.length, 2);
+});
+
+test("uses product-process speed instead of a machine-wide speed", () => {
+  const result = calculateCurrentPlanResult({
+    input: {
+      batchSize: 10,
+      flowStrategy: "pull",
+      operationRows: [
+        { capacity: 1, dailyHours: 8, machineId: "machine-1", operationName: "Slow product", processTimeMinutes: 2, setupMinutes: 0 },
+        { capacity: 1, dailyHours: 8, machineId: "machine-2", operationName: "Fast product", processTimeMinutes: 2, setupMinutes: 0, speedMultiplier: 2 },
+      ],
+      productId: "product-1",
+      targetQuantity: 10,
+    },
+    product_id: "product-1",
+  }, {
+    ...workspace,
+    machines: [
+      { ...workspace.machines[0], speed_multiplier: 10 },
+      { availability_hours: 8, concurrent_capacity: 1, id: "machine-2", name: "Packer", speed_multiplier: 10 },
+    ],
+  }, { optimize: false });
+
+  assert.equal(result.operationRows[0].busyMinutes, 20);
+  assert.equal(result.operationRows[1].busyMinutes, 10);
 });
 
 test("push sends the planned quantity forward without safety stock and can wait for inventory", () => {

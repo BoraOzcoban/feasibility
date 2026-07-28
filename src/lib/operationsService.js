@@ -58,7 +58,6 @@ export const emptyOperationForms = {
     name: "",
     price: 0,
     priceCurrency: "TRY",
-    speedMultiplier: 1,
   },
   product: {
     cycleTimeUnit: "minute",
@@ -76,6 +75,7 @@ export const emptyOperationForms = {
     unit: "adet",
   },
   material: {
+    materialGroup: "",
     name: "",
     pricePerUnit: 0,
     priceCurrency: "TRY",

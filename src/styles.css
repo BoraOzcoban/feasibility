@@ -23665,3 +23665,128 @@ body > .floating-info-tip-panel,
   gap: 0.45rem;
   margin-left: auto;
 }
+.operation-cost-workspace {
+  display: grid;
+  gap: 22px;
+}
+
+.operation-cost-totals {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.operation-cost-summary-card,
+.operation-cost-detail-card,
+.operation-cost-assumptions {
+  min-width: 0;
+}
+
+.operation-cost-table {
+  display: grid;
+  overflow-x: auto;
+}
+
+.operation-cost-row {
+  align-items: center;
+  border-top: 1px solid var(--color-line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(170px, 1.3fr) repeat(4, minmax(130px, 1fr));
+  min-width: 760px;
+  padding: 13px 4px;
+}
+
+.operation-cost-head {
+  border-top: 0;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.operation-cost-detail-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.operation-cost-detail-card > summary,
+.operation-cost-assumptions > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+}
+
+.operation-cost-detail-card > summary::-webkit-details-marker,
+.operation-cost-assumptions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.operation-cost-detail-section {
+  border-top: 1px solid var(--color-line);
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.operation-cost-detail-section h3 {
+  font-size: 0.82rem;
+  margin: 0 0 8px;
+}
+
+.operation-cost-value-row {
+  align-items: baseline;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.operation-cost-value-row span {
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.operation-cost-value-row strong {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.operation-cost-assumptions .operation-cost-value-row input[type="number"],
+.operation-cost-assumptions .operation-cost-value-row select {
+  max-width: 180px;
+  min-width: 120px;
+  text-align: right;
+}
+
+.operation-cost-assumptions .operation-cost-value-row input[type="checkbox"] {
+  height: 18px;
+  width: 18px;
+}
+
+.operation-cost-assumption-grid {
+  border-top: 1px solid var(--color-line);
+  display: grid;
+  gap: 0 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+  padding-top: 12px;
+}
+
+@media (max-width: 1100px) {
+  .operation-cost-totals,
+  .operation-cost-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .operation-cost-totals,
+  .operation-cost-detail-grid,
+  .operation-cost-assumption-grid {
+    grid-template-columns: 1fr;
+  }
+}
