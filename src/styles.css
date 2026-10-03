@@ -18180,8 +18180,14 @@ body > .floating-info-tip-panel,
   border: 0;
   border-radius: 0;
   box-shadow: none;
+  flex-wrap: wrap;
   overflow: visible;
   padding: clamp(8px, 1.4vw, 16px) 0 2px;
+}
+
+.feasibility-dashboard .dashboard-section-heading > div {
+  flex: 1 1 300px;
+  min-width: 0;
 }
 
 .feasibility-dashboard .dashboard-section-heading::after {
@@ -18216,7 +18222,9 @@ body > .floating-info-tip-panel,
   border: 1px solid var(--overview-line);
   border-radius: 999px;
   color: rgba(255, 255, 255, 0.82);
+  flex: 0 0 auto;
   padding: 9px 12px;
+  white-space: nowrap;
 }
 
 .feasibility-dashboard .executive-metric-grid {
