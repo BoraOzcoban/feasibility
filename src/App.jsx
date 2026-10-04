@@ -102,6 +102,14 @@ function formatNumber(value, maximumFractionDigits = 0) {
   return new Intl.NumberFormat(locale, { maximumFractionDigits }).format(withoutNegativeZero(value, maximumFractionDigits));
 }
 
+const countableUnits = new Set(["", "adet", "ad", "pcs", "pc", "piece", "pieces", "unit", "units"]);
+
+// Pieces are shown as whole numbers ("545 adet", not "545,46 adet");
+// measured units such as kg or litre keep two decimals.
+function formatQuantity(value, unit = "") {
+  return formatNumber(value, countableUnits.has(String(unit || "").trim().toLowerCase()) ? 0 : 2);
+}
+
 function formatLira(value, maximumFractionDigits = 0) {
   const locale = document.documentElement.lang === "tr" ? "tr-TR" : "en-US";
   return new Intl.NumberFormat(locale, {
@@ -904,7 +912,7 @@ function mapExchangeRateRowsToState(rows = []) {
     ...defaultExchangeRates,
     EUR: eur,
     source: latestRow?.source || "TCMB",
-    sourceDetail: "Supabase latest",
+    sourceDetail: "",
     status: "ready",
     TRY: 1,
     USD: usd,
@@ -1338,10 +1346,10 @@ const text = {
     authorizationLockedCopy: "Your company role does not have read or write permission for this module yet.",
     roleDefinition: "Role definition",
     userDefinition: "User definition",
-    userDefinitionCopy: "Create company users and save their profile records through Supabase.",
+    userDefinitionCopy: "Create company users and assign their roles.",
     managedUsers: "Defined users",
     createManagedUser: "Create user",
-    userCreated: "User was created and saved to profiles.",
+    userCreated: "User was created.",
     newRole: "New role",
     roleName: "Role name",
     roleDescription: "Role description",
@@ -1363,7 +1371,7 @@ const text = {
     passwordTooShort: "Password must be at least 6 characters.",
     passwordUpdated: "Password updated. You can log in now.",
     usernameNotFound: "Username was not found.",
-    missingUser: "Supabase did not return a user.",
+    missingUser: "The user could not be read. Please sign in again.",
   },
   tr: {
     language: "Dil",
@@ -1431,10 +1439,10 @@ const text = {
     authorizationLockedCopy: "Şirketinizdeki yetkinizin bu modül için okuma veya yazma izni yok.",
     roleDefinition: "Yetki tanımlama",
     userDefinition: "Kullanıcı tanımlama",
-    userDefinitionCopy: "Şirket kullanıcıları oluşturun ve profil kayıtlarını Supabase'e kaydedin.",
+    userDefinitionCopy: "Şirket kullanıcılarını oluşturun ve rollerini atayın.",
     managedUsers: "Tanımlı kullanıcılar",
     createManagedUser: "Kullanıcı oluştur",
-    userCreated: "Kullanıcı oluşturuldu ve profiles tablosuna kaydedildi.",
+    userCreated: "Kullanıcı oluşturuldu.",
     newRole: "Yeni yetki",
     roleName: "Yetki adı",
     roleDescription: "Yetki açıklaması",
@@ -1456,7 +1464,7 @@ const text = {
     passwordTooShort: "Şifre en az 6 karakter olmalı.",
     passwordUpdated: "Şifre güncellendi. Artık giriş yapabilirsiniz.",
     usernameNotFound: "Kullanıcı adı bulunamadı.",
-    missingUser: "Supabase kullanıcı bilgisi döndürmedi.",
+    missingUser: "Kullanıcı bilgisi alınamadı. Lütfen tekrar giriş yapın.",
   },
 };
 
@@ -1524,6 +1532,12 @@ function normalizeRoutePath(pathname) {
   return routeAliasMap[normalized] || normalized;
 }
 
+const signedInRoutePrefixes = ["/dashboard", "/operations", "/sales-strategy", "/financial-modelling", "/simulation", "/reports", "/authorization"];
+
+function isSignedInRoute(routePath) {
+  return signedInRoutePrefixes.some((prefix) => routePath === prefix || routePath.startsWith(`${prefix}/`));
+}
+
 function App() {
   const [mode, setMode] = useState("login");
   const [path, setPath] = useState(() => normalizeRoutePath(window.location.pathname));
@@ -1575,7 +1589,6 @@ function App() {
   const [reportsFilterOpen, setReportsFilterOpen] = useState(false);
   const [reportsSearch, setReportsSearch] = useState("");
   const [reportsTab, setReportsTab] = useState("all");
-  const [productPlusTab, setProductPlusTab] = useState("general");
   const [operationForms, setOperationForms] = useState(emptyOperationForms);
   const [operationPlan, setOperationPlan] = useState(emptyOperationPlan);
   const [operationPlanResult, setOperationPlanResult] = useState(null);
@@ -1866,8 +1879,10 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    if (session && path === "/login" && mode !== "reset") {
-      goTo("/dashboard", "login");
+    // Signed-in users on /login or on a URL no page handles (such as the
+    // removed /product-plus pages) go to the dashboard instead of the login form.
+    if (session && path !== "/" && mode !== "reset") {
+      if (path === "/login" || !isSignedInRoute(normalizeRoutePath(path))) goTo("/dashboard", "login");
     }
   }, [session, path, mode]);
 
@@ -1927,12 +1942,11 @@ function App() {
 
         if (!isCurrent) return;
 
-        let sourceDetail = "Auto fetched";
+        let sourceDetail = "";
         try {
           await saveExchangeRatesToSupabase(supabase, currentProfile.company_id, nextRates);
-          sourceDetail = "Saved to Supabase";
         } catch (saveError) {
-          sourceDetail = isMissingExchangeRatesTableError(saveError) ? "Auto fetched" : `Auto fetched, save failed: ${saveError.message}`;
+          sourceDetail = isMissingExchangeRatesTableError(saveError) ? "" : `${nextRates.source}, ${copy("could not be saved", "kaydedilemedi")}: ${saveError.message}`;
         }
 
         setExchangeRates({
@@ -2265,7 +2279,7 @@ function App() {
 
       try {
         await deleteSimulationVariantRecord(supabase, currentProfile.company_id, id);
-        setSimulationStatus(copy("Simulation variant was deleted from Supabase.", "Simülasyon varyantı Supabase'ten silindi."));
+        setSimulationStatus(copy("Simulation variant was deleted.", "Simülasyon varyantı silindi."));
       } catch (error) {
         setSimulationStatus(error.message);
       } finally {
@@ -2349,9 +2363,8 @@ function App() {
       if (supabase && currentProfile?.company_id) {
         try {
           await saveExchangeRatesToSupabase(supabase, currentProfile.company_id, nextRates);
-          sourceDetail = "Saved to Supabase";
         } catch (saveError) {
-          sourceDetail = isMissingExchangeRatesTableError(saveError) ? "" : `Save failed: ${saveError.message}`;
+          sourceDetail = isMissingExchangeRatesTableError(saveError) ? "" : `${nextRates.source}, ${copy("could not be saved", "kaydedilemedi")}: ${saveError.message}`;
         }
       }
       setExchangeRates({
@@ -2743,7 +2756,7 @@ function App() {
       }
       markWorkspaceSnapshotClean();
     } catch (error) {
-      setOperationsStatus(`${copy("Operations data could not be loaded:", "Operations verisi yüklenemedi:")} ${error.message}`);
+      setOperationsStatus(`${copy("Operations data could not be loaded:", "Operasyon verisi yüklenemedi:")} ${error.message}`);
     } finally {
       setOperationsLoading(false);
     }
@@ -2822,8 +2835,8 @@ function App() {
       });
       setOperationPlanResult(savedPlan.result);
       setOperationsStatus(copy(
-        "Resource plan was saved to Supabase and calculated by the backend function.",
-        "Kaynak planı Supabase veritabanına kaydedildi ve backend fonksiyonunda hesaplandı.",
+        "Resource plan was saved and calculated.",
+        "Kaynak planı kaydedildi ve hesaplandı.",
       ));
       await loadOperationsData();
       await loadFinancialData();
@@ -2893,7 +2906,7 @@ function App() {
       });
 
       setOperationForms((current) => ({ ...current, [entity]: emptyOperationForms[entity] }));
-      setOperationsStatus(copy("Operations record was saved to Supabase.", "Operations kaydı Supabase veritabanına kaydedildi."));
+      setOperationsStatus(copy("Operations record was saved.", "Operasyon kaydı kaydedildi."));
       await loadOperationsData();
       markWorkspaceSnapshotClean();
       return true;
@@ -2949,7 +2962,7 @@ function App() {
 
     try {
       await saveFinancialModelSettings(supabase, financialSettingsForm);
-      setFinancialStatus(copy("Financial assumptions were saved to Supabase.", "Finansal varsayımlar Supabase'e kaydedildi."));
+      setFinancialStatus(copy("Financial assumptions were saved.", "Finansal varsayımlar kaydedildi."));
       await loadFinancialData();
       markWorkspaceSnapshotClean();
       return true;
@@ -3010,7 +3023,7 @@ function App() {
     try {
       await saveFinancialExtraCost(supabase, financialExtraCostForm);
       setFinancialExtraCostForm(emptyFinancialExtraCostForm);
-      setFinancialStatus(copy("Extra financial cost was saved to Supabase.", "Ek finansal gider Supabase'e kaydedildi."));
+      setFinancialStatus(copy("Extra financial cost was saved.", "Ek finansal gider kaydedildi."));
       await loadFinancialData();
       markWorkspaceSnapshotClean();
       return true;
@@ -3072,7 +3085,7 @@ function App() {
     try {
       await saveSalesStrategy(supabase, currentProfile.company_id, salesStrategy);
       await loadPlanningData();
-      setSalesStatus(copy("Sales strategy was saved to Supabase.", "Satış stratejisi Supabase'e kaydedildi."));
+      setSalesStatus(copy("Sales strategy was saved.", "Satış stratejisi kaydedildi."));
       markWorkspaceSnapshotClean();
       return true;
     } catch (error) {
@@ -3101,7 +3114,7 @@ function App() {
     try {
       await saveSimulationVariant(supabase, currentProfile.company_id, variant);
       await loadPlanningData();
-      setSimulationStatus(copy("Simulation variant was saved to Supabase.", "Simülasyon varyantı Supabase'e kaydedildi."));
+      setSimulationStatus(copy("Simulation variant was saved.", "Simülasyon varyantı kaydedildi."));
       markWorkspaceSnapshotClean();
       return true;
     } catch (error) {
@@ -3995,7 +4008,7 @@ function App() {
         id: "quantity",
         group: copy("Plan", "Plan"),
         label: copy("Quantity to Produce", "Üretilecek Miktar"),
-        value: `${formatNumber(result.producedQuantity, 2)} ${result.productUnit || copy("pcs", "adet")}`,
+        value: `${formatQuantity(result.producedQuantity, result.productUnit)} ${result.productUnit || copy("pcs", "adet")}`,
       },
       {
         id: "strategy",
@@ -4008,14 +4021,14 @@ function App() {
         id: "transfer-batch",
         group: copy("Plan", "Plan"),
         label: copy("Transfer Batch", "Transfer batch"),
-        value: result.transferBatchSize ? formatNumber(result.transferBatchSize, 2) : "-",
+        value: result.transferBatchSize ? formatQuantity(result.transferBatchSize, result.productUnit) : "-",
         info: copy("In Pull, this is the replenishment lot moved by downstream demand. In Push, the planned production quantity is sent forward as one lot.", "Çekme sisteminde sonraki proses talebiyle ikmal edilen transfer lotudur. İtme sisteminde planlanan üretim miktarı tek lot olarak ileri gönderilir."),
       },
       {
         id: "recommended-batch",
         group: copy("Plan", "Plan"),
         label: copy("Best batch size", "En iyi batch"),
-        value: result.optimization?.recommendedBatchSize ? formatNumber(result.optimization.recommendedBatchSize, 2) : "-",
+        value: result.optimization?.recommendedBatchSize ? formatQuantity(result.optimization.recommendedBatchSize, result.productUnit) : "-",
         info: copy("Recommended transfer batch size from the optimizer, based on total time plus waiting, inventory, delay, and capacity-loss costs.", "Toplam süre, bekleme, stok, gecikme ve kapasite kaybı maliyetlerine göre optimizasyonun önerdiği transfer batch boyutudur."),
       },
       {
@@ -4023,7 +4036,7 @@ function App() {
         group: copy("Production system", "Üretim sistemi"),
         label: copy("Safety Stock", "Güvenli stok"),
         value: result.safetyStockEnabled
-          ? `${formatNumber(result.safetyStockQuantity, 2)} ${copy("max / buffer", "maks / buffer")} · ${formatNumber(result.totalSafetyStockQuantity, 2)} ${copy("total", "toplam")} ${result.productUnit || copy("pcs", "adet")}`
+          ? `${formatQuantity(result.safetyStockQuantity, result.productUnit)} ${copy("max / buffer", "maks / buffer")} · ${formatQuantity(result.totalSafetyStockQuantity, result.productUnit)} ${copy("total", "toplam")} ${result.productUnit || copy("pcs", "adet")}`
           : copy("Not used", "Kullanılmaz"),
         info: copy("Pull automatically calculates at least enough intermediate safety stock to prevent downstream material starvation. Push always keeps this at zero.", "Çekme sistemi sonraki prosesin malzemesiz kalmasını önleyecek en düşük ara güvenli stoku otomatik hesaplar. İtme sisteminde bu değer her zaman sıfırdır."),
       },
@@ -4065,7 +4078,7 @@ function App() {
         id: "max-wip",
         group: copy("Production system", "Üretim sistemi"),
         label: copy("Max WIP", "Maks WIP"),
-        value: formatNumber(result.maxWipQuantity, 2),
+        value: formatQuantity(result.maxWipQuantity, result.productUnit),
         info: copy("Maximum intermediate inventory in a process buffer, including Pull safety stock. Push has no starting safety stock.", "Proses tamponundaki, Çekme güvenli stoku dahil maksimum ara stoktur. İtme sisteminde başlangıç güvenli stoku yoktur."),
       },
       {
@@ -4642,7 +4655,7 @@ function App() {
           ))}
         </div>
         <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
-          {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save to Supabase", "Supabase'e Kaydet")}
+          {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save", "Kaydet")}
         </button>
       </form>
     );
@@ -4869,8 +4882,8 @@ function App() {
               </div>
               <p className="planner-empty-state">
                 {copy(
-                  "Service costs affect feasibility through optional financial expenses. Use initial or recurring expense rows so they are saved in Supabase and included in the model.",
-                  "Hizmet maliyetleri fizibiliteyi opsiyonel finans giderleri üzerinden etkiler. Supabase'e kaydedilip modele dahil olması için başlangıç veya tekrarlayan gider satırlarını kullanın.",
+                  "Service costs affect feasibility through optional financial expenses. Add them as initial or recurring expense rows so they are included in the model.",
+                  "Hizmet maliyetleri fizibiliteyi opsiyonel finans giderleri üzerinden etkiler. Modele dahil olması için başlangıç veya tekrarlayan gider satırı olarak ekleyin.",
                 )}
               </p>
             </article>
@@ -5314,7 +5327,7 @@ function App() {
               </div>
 
               <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
-                {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save to Supabase", "Supabase'e Kaydet")}
+                {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save", "Kaydet")}
               </button>
             </form>
 
@@ -5355,7 +5368,7 @@ function App() {
             <div>
               <span>Operations / {copy("Active Processes", "Mevcut Süreçler")}</span>
               <h1>{copy("Active Processes", "Mevcut Süreçler")}</h1>
-              <p>{copy("Track production plans saved to Supabase and their calculated production/cost results.", "Supabase'e kaydedilen üretim planlarını ve hesaplanan üretim/maliyet sonuçlarını takip edin.")}</p>
+              <p>{copy("Track saved production plans and their calculated production and cost results.", "Kaydedilen üretim planlarını ve hesaplanan üretim/maliyet sonuçlarını takip edin.")}</p>
             </div>
             <div className="operations-actions">
               <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
@@ -5405,14 +5418,14 @@ function App() {
 
                   <div className="process-metrics">
                     <span>{copy("Product", "Ürün")} <strong>{productName}</strong></span>
-                    <span>{copy("Quantity to Produce", "Üretilecek Miktar")} <strong>{formatNumber(result.producedQuantity, 2)} {productUnit}</strong></span>
+                    <span>{copy("Quantity to Produce", "Üretilecek Miktar")} <strong>{formatQuantity(result.producedQuantity, productUnit)} {productUnit}</strong></span>
                     <span>{copy("Cycle", "Çevrim")} <strong>{formatCycleTime(result.cycleTimeMinutes, plan.product?.cycle_time_unit || "minute")}</strong></span>
                     <span>{copy("Production Time", "Toplam süre")} <strong>{result.totalProductionTimeMinutes ? formatMinutesDuration(result.totalProductionTimeMinutes) : "-"}</strong></span>
                     <span>{copy("Strategy", "Strateji")} <strong>{processStrategyLabels[result.flowStrategy] || result.flowStrategy || "-"}</strong></span>
-                    <span>{copy("Batch / Transfer", "Batch / Transfer")} <strong>{result.transferBatchSize ? formatNumber(result.transferBatchSize, 2) : "-"}</strong></span>
-                    <span>{copy("Safety Stock", "Güvenli stok")} <strong>{result.safetyStockEnabled || normalizeFlowStrategy(result.flowStrategy) === "pull" ? `${formatNumber(result.safetyStockQuantity, 2)} ${copy("max / buffer", "maks / buffer")}` : copy("Not used", "Kullanılmaz")}</strong></span>
+                    <span>{copy("Batch / Transfer", "Batch / Transfer")} <strong>{result.transferBatchSize ? formatQuantity(result.transferBatchSize, productUnit) : "-"}</strong></span>
+                    <span>{copy("Safety Stock", "Güvenli stok")} <strong>{result.safetyStockEnabled || normalizeFlowStrategy(result.flowStrategy) === "pull" ? `${formatQuantity(result.safetyStockQuantity, productUnit)} ${copy("max / buffer", "maks / buffer")}` : copy("Not used", "Kullanılmaz")}</strong></span>
                     <span>{copy("Stock Wait", "Stok bekleme")} <strong>{formatNumber(result.stockoutWaitTimeHours, 2)} {copy("hours", "saat")}</strong></span>
-                    <span>{copy("Max WIP", "Maks WIP")} <strong>{formatNumber(result.maxWipQuantity, 2)}</strong></span>
+                    <span>{copy("Max WIP", "Maks WIP")} <strong>{formatQuantity(result.maxWipQuantity, productUnit)}</strong></span>
                     <span>{copy("Bottleneck", "Darboğaz")} <strong>{result.bottleneck?.operationName || "-"}</strong></span>
                     <span>{copy("Main Machine Hours", "Ana Makine Saati")} <strong>{formatNumber(result.primaryMachineDailyHours, 2)} {copy("hours", "saat")}</strong></span>
                     <span>{copy("Energy", "Enerji")} <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
@@ -5432,7 +5445,7 @@ function App() {
                       <h3>{copy("Buffers", "Buffer")}</h3>
                       {(bufferRows.length ? bufferRows : [{ fromOperationName: "-", toOperationName: "-", maxWip: 0 }]).map((row, index) => (
                         <span key={`${row.fromOperationName}-${row.toOperationName}-${index}`}>
-                          {row.fromOperationName} -&gt; {row.toOperationName} <strong>{formatNumber(row.maxWip, 2)} WIP / {formatNumber(row.safetyStockQuantity, 2)} {copy("safety", "güvenli")}</strong>
+                          {row.fromOperationName} -&gt; {row.toOperationName} <strong>{formatQuantity(row.maxWip, productUnit)} WIP / {formatQuantity(row.safetyStockQuantity, productUnit)} {copy("safety", "güvenli")}</strong>
                         </span>
                       ))}
                     </div>
@@ -5457,7 +5470,7 @@ function App() {
               );
             }) : (
               <article className="operation-card process-card">
-                <p className="planner-empty-state">{copy("No production plans saved to Supabase yet. Save a plan from the process definition screen and it will appear here.", "Henüz Supabase'e kaydedilmiş üretim planı yok. Süreç tanımlama ekranından plan kaydedince burada görünecek.")}</p>
+                <p className="planner-empty-state">{copy("No production plans saved yet. Save a plan from the process definition screen and it will appear here.", "Henüz kaydedilmiş üretim planı yok. Süreç tanımlama ekranından plan kaydedince burada görünecek.")}</p>
               </article>
             )}
           </div>
@@ -5476,7 +5489,6 @@ function App() {
     const incomeExpenseTrendChart = buildIncomeExpenseTrendChart(model.trendRows || []);
     const currentFinancialPage = activeFinancialSubmodule || financialSubmodules[0];
     const investmentTotal = (summary.machinePurchaseCost || 0) + (summary.equipmentPurchaseCost || 0) + (summary.extraInitialCost || 0) + (summary.workingCapitalRequirement || 0);
-    const returnOnInvestment = investmentTotal ? `${formatNumber(((summary.netIncome || 0) / investmentTotal) * 100, 1)}%` : "-";
     const formatMonth = (month) => (month ? `${month}. ${copy("month", "ay")}` : "-");
     const financialRowLabels = {
       electricityCost: copy("Electricity", "Elektrik"),
@@ -5637,7 +5649,7 @@ function App() {
     const financialPageMeta = {
       inputs: {
         description: copy("Enter financial assumptions and extra costs used by the feasibility model.", "Fizibilite modelinde kullanılacak finansal varsayımları ve ek giderleri girin."),
-        title: "Girdiler",
+        title: copy("Inputs", "Girdiler"),
       },
       overview: {
         description: copy("Review all financial rows and the income-expense projection. Add only the widgets you want to keep on your saved screen.", "Tüm finansal satırları ve gelir-gider projeksiyonunu inceleyin. Kayıtlı ekranınızda tutmak istediğiniz widgetları ayrıca ekleyin."),
@@ -5647,51 +5659,7 @@ function App() {
         description: copy("Add financing loans separately from optional expenses. Each loan needs its own amount, annual interest, and term.", "Finansman kredilerini opsiyonel giderlerden ayrı girin. Her kredinin tutarı, yıllık faizi ve vadesi ayrı olmalıdır."),
         title: copy("Loans", "Krediler"),
       },
-      "product-cost": {
-        description: copy("Product cost is calculated operation by operation in EUR with the Excel-compatible CostEngine.", "Ürün maliyeti Excel uyumlu CostEngine ile operasyon operasyon EUR bazında hesaplanır."),
-        title: "Ürün Maliyeti",
-      },
-      "investment-cost": {
-        description: copy("Investment cost combines machine purchase cost and initial extra costs coming from the financial model.", "Yatırım maliyeti; finansal modelden gelen makine satın alma maliyeti ve başlangıç ek giderlerini birleştirir."),
-        title: "Yatırım Maliyeti",
-      },
-      "product-return": {
-        description: copy("Product return compares operation-based sales revenue with tracked production expenses and net income.", "Ürün getirisi; operasyon bazlı satış kazançlarını takip edilen üretim giderleri ve net kazançla karşılaştırır."),
-        title: "Ürün Getirisi",
-      },
-      "investment-return": {
-        description: copy("Investment return compares net income with the current machine and initial-cost investment base.", "Yatırım getirisi; net kazancı mevcut makine ve başlangıç maliyeti yatırım tabanıyla karşılaştırır."),
-        title: "Yatırım Getirisi",
-      },
     }[currentFinancialPage.key];
-    const metricRowsByPage = {
-      "product-cost": [
-        [copy("Active Process", "Mevcut Süreç"), summary.planCount],
-        [copy("Working Days", "Çalışma Günü"), formatNumber(summary.workingDaysPerMonth, 1)],
-        [copy("Material Cost", "Malzeme Maliyeti"), formatLira(summary.materialCost)],
-        [copy("Total Expense", "Toplam Gider"), formatLira(summary.totalCost)],
-      ],
-      "investment-cost": [
-        [copy("Initial Cash Needed", "Gerekli Başlangıç Nakit"), formatLira(summary.initialCashRequired)],
-        [copy("Working Capital", "İşletme Sermayesi"), formatLira(summary.workingCapitalRequirement)],
-        [copy("Loan Amount", "Kredi Tutarı"), formatLira(summary.loanAmount)],
-        [copy("Total Investment", "Toplam Yatırım"), formatLira(investmentTotal)],
-      ],
-      "product-return": [
-        [copy("Sales Revenue", "Satış Kazançları"), formatLira(summary.salesRevenue)],
-        [copy("Net Sold", "Net Satılan"), formatNumber(summary.netSoldUnits)],
-        [copy("Net Income", "Net Kazanç"), formatLira(summary.netIncome)],
-        [copy("Required Monthly Sales", "Gerekli Aylık Satış"), formatNumber(summary.requiredMonthlySalesVolume)],
-      ],
-      "investment-return": [
-        [copy("Net Income", "Net Kazanç"), formatLira(summary.netIncome)],
-        [copy("Cash Runway", "Nakit Dayanma Süresi"), `${formatNumber(summary.cashRunwayMonths)} ${copy("mo", "ay")}`],
-        [copy("Payback", "Geri Ödeme"), formatMonth(summary.paybackMonth)],
-        [copy("ROI", "Yatırım Getirisi"), returnOnInvestment],
-      ],
-    };
-    const isCostPage = currentFinancialPage.key.includes("cost");
-    const isInvestmentPage = currentFinancialPage.key.includes("investment");
     const costBreakdownRows = (model.costStructure || []).filter((item) => toFiniteNumber(item.amount) > 0);
     const investmentBreakdownRows = [
       { amount: summary.machinePurchaseCost, id: "machinePurchase", label: copy("Machine investment", "Makine yatırımı") },
@@ -5817,8 +5785,8 @@ function App() {
                 : exchangeRates.error
                   ? `${copy("Rates could not be refreshed:", "Kurlar yenilenemedi:")} ${exchangeRates.error}`
                 : exchangeRates.status === "ready"
-                    ? `${copy("Rates loaded from", "Kurlar şu kaynaktan alındı")}: ${exchangeRates.sourceDetail || exchangeRates.source}. ${copy("Operations prices entered in USD/EUR are converted to TRY in financial analysis.", "Operations tarafında USD/EUR girilen fiyatlar finansal analizde TL'ye çevrilir.")}`
-                    : copy("Latest Supabase rates appear here first. Click fetch prices to refresh USD/TRY and EUR/TRY from TCMB and save them.", "Önce Supabase'deki son kurlar burada görünür. USD/TRY ve EUR/TRY değerlerini TCMB'den yenileyip kaydetmek için fiyatları çek butonuna basın.")}
+                    ? `${copy("Rates loaded from", "Kurlar şu kaynaktan alındı")}: ${exchangeRates.sourceDetail || exchangeRates.source}. ${copy("Operations prices entered in USD/EUR are converted to TRY in financial analysis.", "Operasyon tarafında USD/EUR girilen fiyatlar finansal analizde TL'ye çevrilir.")}`
+                    : copy("The last saved rates appear here first. Click fetch prices to refresh USD/TRY and EUR/TRY from TCMB and save them.", "Önce son kaydedilen kurlar burada görünür. USD/TRY ve EUR/TRY değerlerini TCMB'den yenileyip kaydetmek için fiyatları çek butonuna basın.")}
             </p>
           </div>
           <div className="exchange-rate-actions">
@@ -6632,12 +6600,6 @@ function App() {
         </div>
       </article>
     );
-    const visibleIncomeRows = (model.incomeRows || []).filter((row) => {
-      if (currentFinancialPage.key === "product-cost") return row.kind !== "income" && row.costType !== "initial";
-      if (currentFinancialPage.key === "investment-cost") return row.costType === "initial" || row.id === "workingCapital";
-      if (currentFinancialPage.key === "product-return") return row.costType !== "initial";
-      return true;
-    });
     const overviewMonthCount = Math.max(1, getProjectionMonthCount(financialHorizon));
     const overviewHasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
     const overviewIsDecisionReady = Boolean(summary.planCount && overviewHasSalesForecast && financialModel.settingsSaved);
@@ -6799,107 +6761,13 @@ function App() {
       );
     }
 
-    if (currentFinancialPage.key === "overview") {
-      return renderDashboardLayout(
-        `financial-modelling/${currentFinancialPage.key}`,
-          <section className="financial-workspace">
-            <div className="financial-header">
-              <div>
-                <span>{currentFinancialPage.group} / {copy("Model connected to Operations data", "Operations verisine bağlı model")}</span>
-                <h1>{financialPageMeta.title}</h1>
-                <p>{financialPageMeta.description}</p>
-              </div>
-              <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
-                {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
-              </button>
-            </div>
-
-            {financialStatus && <p className="status-message">{financialStatus}</p>}
-
-            <div className="financial-overview-grid financial-overview-primary">
-              {renderOverviewFinancialRows()}
-              {renderFinancialTrendCard()}
-            </div>
-
-            <div className="financial-decision-metrics">
-              {overviewDecisionMetrics.map((metric) => (
-                <article className={`financial-decision-card ${metric.tone}`} key={metric.label}>
-                  <span>{metric.label}</span>
-                  <strong>{metric.value}</strong>
-                  <small>{metric.detail}</small>
-                </article>
-              ))}
-            </div>
-
-            <div className="financial-overview-layout financial-overview-two-up">
-              <article className="financial-panel financial-flow-panel">
-                <div className="financial-panel-heading">
-                  <div>
-                    <span>{copy("Money flow", "Para akışı")}</span>
-                    <h2>{copy("From sales to net return", "Satıştan net getiriye")}</h2>
-                  </div>
-                  <strong>{overviewIsDecisionReady ? `${formatNumber(overviewMarginPercent, 1)}%` : "-"}</strong>
-                </div>
-                <div className="financial-flow-grid">
-                  {overviewMoneyFlowRows.map((row) => (
-                    <div className={`financial-flow-card ${row.tone}`} key={row.label}>
-                      <span>{row.label}</span>
-                      <strong>{overviewIsDecisionReady ? formatLira(row.amount) : "-"}</strong>
-                      <small>{row.detail}</small>
-                    </div>
-                  ))}
-                </div>
-              </article>
-
-              <article className="financial-panel financial-breakdown-panel">
-                <div className="financial-panel-heading">
-                  <div>
-                    <span>{copy("Cost pressure", "Maliyet baskısı")}</span>
-                    <h2>{copy("Largest cash needs", "En büyük nakit ihtiyaçları")}</h2>
-                  </div>
-                  <strong>{overviewIsDecisionReady ? formatLira(overviewMonthlyCost) : "-"}</strong>
-                </div>
-                {renderBreakdownBars(
-                  overviewCostBreakdownRows,
-                  overviewMaxCostBreakdownAmount,
-                  copy("No cost data yet", "Henüz maliyet verisi yok"),
-                  "cost",
-                )}
-              </article>
-            </div>
-
-            <div className="financial-quick-grid">
-              {[
-                [copy("Produced / Sold", "Üretilen / Satılan"), overviewIsDecisionReady ? `${formatNumber(summary.totalProduced)} / ${formatNumber(summary.netSoldUnits)}` : "-", copy("selected horizon units", "seçili ufuk adedi")],
-                [copy("Unsold Inventory", "Satılmayan Stok"), overviewIsDecisionReady ? `${formatNumber(summary.unsoldInventoryUnits)} ${copy("units", "adet")}` : "-", copy("production above sales", "satışı aşan üretim")],
-                [copy("Required Cash", "Gerekli Nakit"), overviewIsDecisionReady ? formatLira(summary.initialCashRequired) : "-", copy("after initial loan and grant", "başlangıç kredi ve hibe sonrası")],
-                [copy("Payback", "Geri Dönüş"), overviewIsDecisionReady ? formatMonth(summary.paybackMonth) : "-", copy("investment recovery month", "yatırımın geri dönüş ayı")],
-              ].map(([label, value, detail]) => (
-                <article className="financial-quick-card" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                  <small>{detail}</small>
-                </article>
-              ))}
-            </div>
-
-            {selectedFinancialWidgets.length > 0 && (
-              <div className="financial-widget-grid">
-                {selectedFinancialWidgets.map(renderOverviewWidget)}
-              </div>
-            )}
-
-            {renderWidgetSelector()}
-          </section>,
-      );
-    }
-
+    // Overview is the last financial page; legacy detail URLs redirect here.
     return renderDashboardLayout(
       `financial-modelling/${currentFinancialPage.key}`,
         <section className="financial-workspace">
           <div className="financial-header">
             <div>
-              <span>{currentFinancialPage.group} / {copy("Model connected to Operations data", "Operations verisine bağlı model")}</span>
+              <span>{currentFinancialPage.group} / {copy("Model connected to Operations data", "Operasyon verisine bağlı model")}</span>
               <h1>{financialPageMeta.title}</h1>
               <p>{financialPageMeta.description}</p>
             </div>
@@ -6910,32 +6778,66 @@ function App() {
 
           {financialStatus && <p className="status-message">{financialStatus}</p>}
 
-          <div className="finance-metric-grid">
-            {metricRowsByPage[currentFinancialPage.key].map(([label, value]) => (
-              <article className="finance-metric-card" key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-                <small>{copy("Feasibility model result", "Fizibilite model sonucu")}</small>
+          <div className="financial-overview-grid financial-overview-primary">
+            {renderOverviewFinancialRows()}
+            {renderFinancialTrendCard()}
+          </div>
+
+          <div className="financial-decision-metrics">
+            {overviewDecisionMetrics.map((metric) => (
+              <article className={`financial-decision-card ${metric.tone}`} key={metric.label}>
+                <span>{metric.label}</span>
+                <strong>{metric.value}</strong>
+                <small>{metric.detail}</small>
               </article>
             ))}
           </div>
 
-          <div className="financial-feasibility-grid">
+          <div className="financial-overview-layout financial-overview-two-up">
+            <article className="financial-panel financial-flow-panel">
+              <div className="financial-panel-heading">
+                <div>
+                  <span>{copy("Money flow", "Para akışı")}</span>
+                  <h2>{copy("From sales to net return", "Satıştan net getiriye")}</h2>
+                </div>
+                <strong>{overviewIsDecisionReady ? `${formatNumber(overviewMarginPercent, 1)}%` : "-"}</strong>
+              </div>
+              <div className="financial-flow-grid">
+                {overviewMoneyFlowRows.map((row) => (
+                  <div className={`financial-flow-card ${row.tone}`} key={row.label}>
+                    <span>{row.label}</span>
+                    <strong>{overviewIsDecisionReady ? formatLira(row.amount) : "-"}</strong>
+                    <small>{row.detail}</small>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="financial-panel financial-breakdown-panel">
+              <div className="financial-panel-heading">
+                <div>
+                  <span>{copy("Cost pressure", "Maliyet baskısı")}</span>
+                  <h2>{copy("Largest cash needs", "En büyük nakit ihtiyaçları")}</h2>
+                </div>
+                <strong>{overviewIsDecisionReady ? formatLira(overviewMonthlyCost) : "-"}</strong>
+              </div>
+              {renderBreakdownBars(
+                overviewCostBreakdownRows,
+                overviewMaxCostBreakdownAmount,
+                copy("No cost data yet", "Henüz maliyet verisi yok"),
+                "cost",
+              )}
+            </article>
+          </div>
+
+          <div className="financial-quick-grid">
             {[
-              [copy("Forecast Sales", "Tahmini Satış"), formatNumber(summary.forecastSalesUnits), copy("from Sales Strategy monthly inputs", "Satış Stratejisi aylık girdilerinden")],
-              [copy("Unsold Inventory", "Satılmayan Stok"), formatNumber(summary.unsoldInventoryUnits), copy("production above channel sales plan", "kanal satış planını aşan üretim")],
-              [copy("Write-off Value", "Fire / İade Değeri"), formatLira(summary.expiredWriteOffCost), copy("spoilage, returns and expired products", "bozulma, iade ve SKT ürünler")],
-              [copy("Cash Runway", "Nakit Dayanma"), `${formatNumber(summary.cashRunwayMonths)} ${copy("months", "ay")}`, copy("with entered initial cash", "girilen başlangıç nakdiyle")],
-              [copy("Break-even", "Başa Baş"), formatMonth(summary.breakEvenMonth), copy("first profitable operating month", "ilk kârlı operasyon ayı")],
-              [copy("Payback", "Geri Dönüş"), formatMonth(summary.paybackMonth), copy("investment plus working capital", "yatırım ve işletme sermayesi")],
-              [copy("Initial Cash Needed", "Gerekli Başlangıç Nakdi"), formatLira(summary.initialCashRequired), copy("own cash after loan", "kredi sonrası öz nakit")],
-              [copy("Monthly Loan Payment", "Aylık Kredi Ödemesi"), formatLira(summary.loanPayment), copy("principal and interest", "anapara ve faiz")],
-              [copy("Required Monthly Sales", "Gerekli Aylık Satış"), formatNumber(summary.requiredMonthlySalesVolume), copy("break-even volume estimate", "başa baş hacim tahmini")],
-              [copy("Channel Commission", "Kanal Komisyonu"), formatLira(summary.retailerMarginCost), copy("commission deducted from channel sales", "kanal satışlarından düşülen komisyon")],
-              [copy("Payment Delay", "Ödeme Vadesi"), `${formatNumber(summary.weightedPaymentDelayDays, 1)} ${copy("days", "gün")}`, copy("weighted channel delay", "ağırlıklı kanal vadesi")],
-              [copy("VAT + Tax", "KDV + Vergi"), formatLira(summary.vatPayable + summary.incomeTax), copy("basic tax handling", "temel vergi hesabı")],
+              [copy("Produced / Sold", "Üretilen / Satılan"), overviewIsDecisionReady ? `${formatNumber(summary.totalProduced)} / ${formatNumber(summary.netSoldUnits)}` : "-", copy("selected horizon units", "seçili ufuk adedi")],
+              [copy("Unsold Inventory", "Satılmayan Stok"), overviewIsDecisionReady ? `${formatNumber(summary.unsoldInventoryUnits)} ${copy("units", "adet")}` : "-", copy("production above sales", "satışı aşan üretim")],
+              [copy("Required Cash", "Gerekli Nakit"), overviewIsDecisionReady ? formatLira(summary.initialCashRequired) : "-", copy("after initial loan and grant", "başlangıç kredi ve hibe sonrası")],
+              [copy("Payback", "Geri Dönüş"), overviewIsDecisionReady ? formatMonth(summary.paybackMonth) : "-", copy("investment recovery month", "yatırımın geri dönüş ayı")],
             ].map(([label, value, detail]) => (
-              <article className="financial-feasibility-card" key={label}>
+              <article className="financial-quick-card" key={label}>
                 <span>{label}</span>
                 <strong>{value}</strong>
                 <small>{detail}</small>
@@ -6943,97 +6845,13 @@ function App() {
             ))}
           </div>
 
-          <div className="financial-grid">
-            <article className="financial-card income-card">
-              <div className="financial-card-heading"><h2>{isCostPage ? copy("Cost Calculation Rows", "Maliyet Hesap Satırları") : copy("Return Calculation Rows", "Getiri Hesap Satırları")}</h2></div>
-              <div className="income-table simplified-income-table">
-                <div className="income-row income-head"><span>{copy("Item", "Kalem")}</span><span>{copy("Type", "Tip")}</span><span>{copy("Amount", "Tutar")}</span></div>
-                {visibleIncomeRows.map((row, index) => (
-                  <div className="income-row" key={`${row.label}-${index}`}>
-                    <strong>{getFinancialRowLabel(row)}</strong>
-                    <span>{row.kind === "income" ? copy("Income", "Gelir") : row.costType === "initial" ? copy("Initial expense", "Başlangıç gideri") : copy("Expense", "Gider")}</span>
-                    <span>{formatLira(row.amount)}</span>
-                  </div>
-                ))}
-                <div className="income-row income-total">
-                  <strong>{isCostPage ? copy("Selected cost total", "Seçili maliyet toplamı") : copy("Net income", "Net kazanç")}</strong>
-                  <span>{isCostPage ? currentFinancialPage.group : copy("Income - expense", "Gelir - gider")}</span>
-                  <span>{isCostPage ? formatLira(isInvestmentPage ? investmentTotal : summary.totalCost) : formatLira(summary.netIncome)}</span>
-                </div>
-              </div>
-            </article>
-
-            <article className="financial-card trend-card">
-            <div className="financial-card-heading">
-              <h2>{copy("Financial Trends", "Finansal Trendler")}</h2>
-              <div className="mini-tabs">
-                {[
-                  ["6m", copy("6 Months", "6 Ay")],
-                  ["1y", copy("1 Year", "1 Yıl")],
-                  ["5y", copy("5 Years", "5 Yıl")],
-                ].map(([value, label]) => (
-                  <button
-                    type="button"
-                    className={financialHorizon === value ? "active" : ""}
-                    onClick={() => {
-                      setFinancialHorizon(value);
-                      loadFinancialData(value);
-                    }}
-                    key={value}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+          {selectedFinancialWidgets.length > 0 && (
+            <div className="financial-widget-grid">
+              {selectedFinancialWidgets.map(renderOverviewWidget)}
             </div>
-            <div className="chart-legend" aria-label={copy("Chart color legend", "Grafik renk açıklaması")}>
-              <span className="legend-sales">{copy("Sales revenue", "Satış kazançları")}</span>
-              <span className="legend-costs">{copy("Expenses", "Giderler")}</span>
-            </div>
-            {renderIncomeExpenseTrendSvg(copy("Sales revenue and expenses projection chart", "Satış kazançları ve giderler projeksiyon grafiği"))}
-            </article>
+          )}
 
-            <article className="financial-card cost-card">
-              <h2>{isInvestmentPage ? copy("Investment Structure", "Yatırım Yapısı") : copy("Cost Structure", "Maliyet Yapısı")}</h2>
-              <div className="cost-body">
-                <div className="donut-chart cost-donut" aria-hidden="true"><span>{formatLira(isInvestmentPage ? investmentTotal : summary.totalCost)}</span></div>
-                <div className="cost-list">
-                  {(isInvestmentPage
-                    ? [
-                        { amount: summary.machinePurchaseCost, label: copy("Machine investment", "Makine yatırımı") },
-                        { amount: summary.extraInitialCost, label: copy("Initial extra costs", "Başlangıç ek giderleri") },
-                      ]
-                    : (model.costStructure || [])
-                  ).map((item) => (
-                    <span key={item.id || item.label}>{getFinancialRowLabel(item)}<strong>{formatLira(item.amount)}</strong></span>
-                  ))}
-                </div>
-              </div>
-            </article>
-
-            <article className="financial-card scenario-card">
-              <div className="financial-card-heading"><h2>{isCostPage ? copy("Extra Costs", "Ek Giderler") : copy("Return Notes", "Getiri Notları")}</h2></div>
-              <div className="scenario-list">
-                {(isCostPage
-                  ? (model.extraCosts?.length ? model.extraCosts : [{ id: "empty", name: copy("No extra cost yet", "Henüz ek gider yok"), costType: "-", amount: 0 }])
-                  : [
-                      { amount: summary.salesRevenue, costType: "income", id: "sales", name: copy("Sales revenue from monthly forecast", "Aylık tahminden satış geliri") },
-                      { amount: summary.netIncome, costType: "income", id: "net", name: copy("Net return after tracked costs", "Takip edilen maliyetlerden sonra net getiri") },
-                      { amount: summary.expiredWriteOffCost, costType: "income", id: "writeoff-note", name: copy("Spoilage and return write-off", "Bozulma ve iade fire maliyeti") },
-                      { amount: summary.vatPayable + summary.incomeTax, costType: "income", id: "tax-note", name: copy("VAT and income tax", "KDV ve gelir vergisi") },
-                    ]
-                ).map((cost) => (
-                  <div className="scenario-row" key={cost.id}>
-                    <div>
-                      <strong>{cost.name}</strong>
-                      <span>{cost.costType === "initial" ? copy("Initial expense", "Başlangıç gideri") : cost.costType === "recurring" ? copy("Recurring expense", "Tekrarlayan gider") : cost.costType === "income" ? copy("Calculated return", "Hesaplanan getiri") : "-"}</span>
-                    </div>
-                    <strong>{cost.id === "empty" ? "-" : formatLira(cost.amount)}</strong>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </div>
+          {renderWidgetSelector()}
         </section>,
     );
   }
@@ -7188,7 +7006,7 @@ function App() {
     const positiveOutcomeCount = outcomes.filter((outcome) => outcome.net > 0).length;
     const simulationConfidencePercent = Math.round((positiveOutcomeCount / outcomes.length) * 100);
     const simulationReadinessItems = [
-      { done: toFiniteNumber(linkedSummary.planCount) > 0, label: copy("Operations", "Operations"), path: "/operations/data-entry" },
+      { done: toFiniteNumber(linkedSummary.planCount) > 0, label: copy("Operations", "Operasyon"), path: "/operations/data-entry" },
       { done: simulationHasSalesForecast, label: copy("Sales", "Satış"), path: "/sales-strategy" },
       { done: financialModel.settingsSaved, label: copy("Finance", "Finans"), path: "/financial-modelling/analiz" },
       { done: scenarioSalesUnits > 0 && scenarioUnitSalesPrice > 0, label: copy("Variant", "Varyant"), path: variant.path || `/simulation/${variant.id}` },
@@ -7629,7 +7447,7 @@ function App() {
     const isSalesOptionalSectionVisible = (sectionId) => normalizedSalesVisibleSections.optional.includes(sectionId);
     const salesReadoutCards = [
       {
-        detail: copy("selected from Operations products", "Operations ürünlerinden seçildi"),
+        detail: copy("selected from Operations products", "Operasyon ürünlerinden seçildi"),
         id: "productsInChannels",
         label: copy("Products in channels", "Kanallardaki ürün"),
         value: formatNumber(activeProductCount),
@@ -8032,8 +7850,8 @@ function App() {
 
                       return (
                         <div className="sales-channel-capacity wide-field">
-                          <span>{copy("Monthly produced", "Aylık üretilen")}<strong>{formatNumber(availability.monthlyProduced, 2)} {unit}</strong></span>
-                          <span>{copy("Planned in channels", "Kanallarda planlanan")}<strong>{formatNumber(availability.plannedSales, 2)} {unit}</strong></span>
+                          <span>{copy("Monthly produced", "Aylık üretilen")}<strong>{formatQuantity(availability.monthlyProduced, unit)} {unit}</strong></span>
+                          <span>{copy("Planned in channels", "Kanallarda planlanan")}<strong>{formatQuantity(availability.plannedSales, unit)} {unit}</strong></span>
                           <span>{copy("Ready to sell remaining", "Satmaya hazır kalan")}<strong>{formatNumber(Math.max(0, availability.remaining), 2)} {unit}</strong></span>
                         </div>
                       );
@@ -8375,7 +8193,7 @@ function App() {
   );
 
   const dashboardModules = [
-    { key: "operations", path: "/operations", label: "Operations", category: copy("Production", "Üretim"), tone: "operations" },
+    { key: "operations", path: "/operations", label: copy("Operations", "Operasyon"), category: copy("Production", "Üretim"), tone: "operations" },
     { key: "sales-strategy", path: "/sales-strategy", label: copy("Sales Strategy", "Satış Stratejisi"), category: copy("Market", "Pazar"), tone: "sales" },
     { key: "financial-modelling", path: "/financial-modelling", label: copy("Financial Modelling", "Finansal Modelleme"), category: copy("Finance", "Finans"), tone: "finance" },
     { key: "simulation", path: "/simulation", label: copy("Simulation", "Simülasyon"), category: copy("Decision", "Karar"), tone: "decision" },
@@ -8388,19 +8206,15 @@ function App() {
     { key: "data-entry", path: "/operations/data-entry", label: copy("Process Definition", "Süreç Tanımlama") },
     { key: "active-processes", path: "/operations/active-processes", label: copy("Active Processes", "Mevcut Süreçler") },
   ];
-  const productPlusSubmodules = [
-    { key: "product-tree", path: "/product-plus/product-tree", label: copy("Product Tree", "Ürün Ağacı") },
-  ];
   const financialSubmodules = [
-    { group: "Girdiler", key: "inputs", path: "/financial-modelling/girdiler", label: "Girdiler" },
-    { group: "Krediler", key: "loans", path: "/financial-modelling/krediler", label: "Krediler" },
-    { group: "Analiz", key: "overview", path: "/financial-modelling/analiz", label: "Maliyet & Getiri" },
+    { group: copy("Inputs", "Girdiler"), key: "inputs", path: "/financial-modelling/girdiler", label: copy("Inputs", "Girdiler") },
+    { group: copy("Loans", "Krediler"), key: "loans", path: "/financial-modelling/krediler", label: copy("Loans", "Krediler") },
+    { group: copy("Analysis", "Analiz"), key: "overview", path: "/financial-modelling/analiz", label: copy("Cost & Return", "Maliyet & Getiri") },
   ];
 
   const routePath = normalizeRoutePath(path);
   const activeModule = dashboardModules.find((module) => module.path === routePath);
   const activeOperationsSubmodule = operationsSubmodules.find((module) => module.path === routePath);
-  const activeProductPlusSubmodule = productPlusSubmodules.find((module) => module.path === routePath);
   const activeFinancialSubmodule = financialSubmodules.find((module) => module.path === routePath);
   const isLegacyFinancialDetailPath = [
     "/financial-modelling/maliyet-hesaplama/urun-maliyeti",
@@ -8410,7 +8224,6 @@ function App() {
   ].includes(routePath);
   const activeSimulationVariant = simulationVariants.find((variant) => variant.path === routePath);
   const isOperationsRoute = routePath === "/operations" || routePath.startsWith("/operations/");
-  const isProductPlusRoute = routePath === "/product-plus" || routePath.startsWith("/product-plus/");
   const isFinancialRoute = routePath === "/financial-modelling" || routePath.startsWith("/financial-modelling/");
   const isSimulationRoute = routePath === "/simulation" || routePath.startsWith("/simulation/");
   const editableAuthorizationRoles = roles.filter((role) => !isAdminRole(role));
@@ -8531,8 +8344,8 @@ function App() {
   const monthlyCost = financialMonthCount ? toFiniteNumber(financialSummary.totalCost) / financialMonthCount : 0;
   const monthlyNet = financialMonthCount ? toFiniteNumber(financialSummary.netIncome) / financialMonthCount : 0;
   const dashboardStats = [
-    { category: copy("Production", "Üretim"), label: copy("Daily Production", "Günlük Üretim"), value: activePlanResults.length ? `${formatNumber(totalDailyProduction, 2)} ${latestPlanResult?.productUnit || operationsWorkspace.product?.unit || copy("units", "adet")}` : noDataValue, delta: copy("Supabase", "Supabase"), detail: copy("active process result", "aktif süreç sonucu"), tone: "operations" },
-    { category: copy("Production", "Üretim"), label: copy("Active Plans", "Aktif Plan"), value: formatNumber(operationsWorkspace.activePlans.length), delta: copy("Supabase", "Supabase"), detail: copy("saved process plans", "kayıtlı süreç planları"), tone: "operations" },
+    { category: copy("Production", "Üretim"), label: copy("Daily Production", "Günlük Üretim"), value: activePlanResults.length ? `${formatQuantity(totalDailyProduction, latestPlanResult?.productUnit || operationsWorkspace.product?.unit)} ${latestPlanResult?.productUnit || operationsWorkspace.product?.unit || copy("units", "adet")}` : noDataValue, delta: copy("Saved plans", "Kayıtlı plan"), detail: copy("active process result", "aktif süreç sonucu"), tone: "operations" },
+    { category: copy("Production", "Üretim"), label: copy("Active Plans", "Aktif Plan"), value: formatNumber(operationsWorkspace.activePlans.length), delta: copy("Saved plans", "Kayıtlı plan"), detail: copy("saved process plans", "kayıtlı süreç planları"), tone: "operations" },
     { category: copy("Finance", "Finans"), label: copy("Monthly Revenue", "Aylık Ciro"), value: moneyOrMissing(monthlyRevenue), delta: copy("calculated", "hesaplandı"), detail: copy("from channel sales plan", "kanal satış planından"), tone: "finance" },
     { category: copy("Finance", "Finans"), label: copy("Cash Runway", "Nakit Dayanma"), value: hasFinancialSourceData ? `${formatNumber(financialSummary.cashRunwayMonths)} ${copy("mo", "ay")}` : noDataValue, delta: copy("calculated", "hesaplandı"), detail: copy("from current cash", "mevcut nakitten"), tone: "finance" },
   ];
@@ -8593,16 +8406,16 @@ function App() {
     ...(latestPlanResult?.materialRows || []).map((row) => ({
       id: `material-${row.materialId}`,
       name: row.name,
-      station: `${formatNumber(row.dailyQuantity, 2)} ${row.unit || ""}`,
+      station: `${formatQuantity(row.dailyQuantity, row.unit)} ${row.unit || ""}`,
     })),
   ];
   const dashboardInsights = [
     dashboardSelectedProduct
       ? { title: copy("Product data loaded", "Ürün verisi yüklendi"), copy: `${dashboardSelectedProduct.product_code || "-"} / ${dashboardSelectedProduct.name || "-"}`, tone: "teal" }
-      : { title: copy("Product input needed", "Ürün girdisi gerekli"), copy: copy("Add a product in Operations so feasibility can use a real item.", "Fizibilitenin gerçek ürün kullanması için Operations'a ürün ekleyin."), tone: "amber" },
+      : { title: copy("Product input needed", "Ürün girdisi gerekli"), copy: copy("Add a product in Operations so feasibility can use a real item.", "Fizibilitenin gerçek ürün kullanması için Operasyon'a ürün ekleyin."), tone: "amber" },
     activePlanResults.length
-      ? { title: copy("Process result loaded", "Süreç sonucu yüklendi"), copy: `${formatNumber(totalDailyProduction, 2)} ${latestPlanResult?.productUnit || copy("units", "adet")} / ${formatLira(totalDailyTrackedCost)}`, tone: "cyan" }
-      : { title: copy("Process result needed", "Süreç sonucu gerekli"), copy: copy("Save a process plan so production and cost numbers are calculated from Supabase.", "Üretim ve maliyet sayıları Supabase'ten hesaplansın diye süreç planı kaydedin."), tone: "amber" },
+      ? { title: copy("Process result loaded", "Süreç sonucu yüklendi"), copy: `${formatQuantity(totalDailyProduction, latestPlanResult?.productUnit)} ${latestPlanResult?.productUnit || copy("units", "adet")} / ${formatLira(totalDailyTrackedCost)}`, tone: "cyan" }
+      : { title: copy("Process result needed", "Süreç sonucu gerekli"), copy: copy("Save a process plan so production and cost numbers can be calculated.", "Üretim ve maliyet sayılarının hesaplanması için bir süreç planı kaydedin."), tone: "amber" },
     hasSalesForecast
       ? { title: copy("Sales plan loaded", "Satış planı yüklendi"), copy: `${formatNumber(dashboardExpectedSalesUnits)} ${copy("expected units across 12 months", "12 ay beklenen adet")}`, tone: "teal" }
       : { title: copy("Sales plan needed", "Satış planı gerekli"), copy: copy("Add product-linked channel quantities in Sales Strategy to unlock revenue, inventory, and runway calculations.", "Ciro, stok ve nakit hesapları için Satış Stratejisi'nde ürüne bağlı kanal adetleri girin."), tone: "amber" },
@@ -8867,7 +8680,7 @@ function App() {
     {
       action: activePlanResults.length ? copy("Review process", "Süreci incele") : copy("Save process", "Süreç kaydet"),
       detail: activePlanResults.length
-        ? `${formatNumber(totalDailyProduction, 2)} ${latestPlanResult?.productUnit || copy("units", "adet")} ${copy("per day", "günlük")}`
+        ? `${formatQuantity(totalDailyProduction, latestPlanResult?.productUnit)} ${latestPlanResult?.productUnit || copy("units", "adet")} ${copy("per day", "günlük")}`
         : copy("A saved process plan unlocks capacity and cost.", "Kayıtlı süreç planı kapasite ve maliyeti açar."),
       done: activePlanResults.length > 0,
       label: copy("Production capacity", "Üretim kapasitesi"),
@@ -9020,7 +8833,7 @@ function App() {
       detail: copy("Saved process capacity multiplied by monthly working days.", "Kayıtlı süreç kapasitesinin aylık çalışma günleriyle çarpımı."),
       id: "monthlyCapacity",
       label: copy("Monthly capacity", "Aylık kapasite"),
-      value: activePlanResults.length ? `${formatNumber(monthlyProductionCapacity, 2)} ${latestPlanResult?.productUnit || copy("units", "adet")}` : noDataValue,
+      value: activePlanResults.length ? `${formatQuantity(monthlyProductionCapacity, latestPlanResult?.productUnit)} ${latestPlanResult?.productUnit || copy("units", "adet")}` : noDataValue,
     },
     {
       detail: copy("Product-linked sales forecast averaged over 12 months.", "Ürüne bağlı satış tahmininin 12 aylık ortalaması."),
@@ -9528,8 +9341,8 @@ function App() {
                 <React.Fragment key={module.key}>
                 <button
                   type="button"
-                  className={`dashboard-nav-item ${module.tone} ${activePage === module.key || (module.key === "operations" && activePage.startsWith("operations/")) || (module.key === "product-plus" && activePage.startsWith("product-plus/")) || (module.key === "financial-modelling" && activePage.startsWith("financial-modelling/")) || (module.key === "simulation" && activePage.startsWith("simulation/")) ? "active" : ""}`}
-                  onClick={() => goTo(module.key === "product-plus" ? "/product-plus/product-tree" : module.key === "financial-modelling" ? "/financial-modelling/girdiler" : module.key === "simulation" ? "/simulation/current-situation" : module.path, "login")}
+                  className={`dashboard-nav-item ${module.tone} ${activePage === module.key || (module.key === "operations" && activePage.startsWith("operations/")) || (module.key === "financial-modelling" && activePage.startsWith("financial-modelling/")) || (module.key === "simulation" && activePage.startsWith("simulation/")) ? "active" : ""}`}
+                  onClick={() => goTo(module.key === "financial-modelling" ? "/financial-modelling/girdiler" : module.key === "simulation" ? "/simulation/current-situation" : module.path, "login")}
                 >
                   <span className="dashboard-nav-category">{module.category}</span>
                   <strong>{module.label}</strong>
@@ -9540,20 +9353,6 @@ function App() {
                       <button
                         type="button"
                         className={activePage === `operations/${submodule.key}` ? "active" : ""}
-                        onClick={() => goTo(submodule.path, "login")}
-                        key={submodule.key}
-                      >
-                        {submodule.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {module.key === "product-plus" && (activePage === "product-plus" || activePage.startsWith("product-plus/")) && (
-                  <div className="dashboard-subnav" aria-label="Ürün + submodules">
-                    {productPlusSubmodules.map((submodule) => (
-                      <button
-                        type="button"
-                        className={activePage === `product-plus/${submodule.key}` ? "active" : ""}
                         onClick={() => goTo(submodule.path, "login")}
                         key={submodule.key}
                       >
@@ -10188,14 +9987,14 @@ function App() {
     return null;
   }
 
-  if (session && (activeModule || isOperationsRoute || isProductPlusRoute || isFinancialRoute || isSimulationRoute)) {
+  if (session && (activeModule || isOperationsRoute || isFinancialRoute || isSimulationRoute)) {
     if (routePath === "/operations") {
       return renderDashboardLayout(
         "operations",
           <section className="module-placeholder operations-overview">
             <div>
               <span>Operations</span>
-              <h1>{copy("Operations", "Operations")}</h1>
+              <h1>{copy("Operations", "Operasyon")}</h1>
               <p>{copy("Choose the operational workspace you want to work on: resources, products, machines, process definition, or active processes.", "Çalışmak istediğiniz operasyon alanını seçin: kaynaklar, ürünler, makineler, süreç tanımı veya mevcut süreçler.")}</p>
             </div>
             <div className="placeholder-grid">
@@ -10221,16 +10020,6 @@ function App() {
 
     if (isOperationsRoute && !activeOperationsSubmodule) {
       goTo(["/operations/material-definitions", "/operations/human-resources"].includes(routePath) ? "/operations/resources" : "/operations", "login", { force: true });
-      return null;
-    }
-
-    if (routePath === "/product-plus") {
-      goTo("/product-plus/product-tree", "login", { force: true });
-      return null;
-    }
-
-    if (isProductPlusRoute && !activeProductPlusSubmodule) {
-      goTo("/product-plus/product-tree", "login", { force: true });
       return null;
     }
 
@@ -10311,160 +10100,14 @@ function App() {
       return renderProductDataPage();
     }
 
-    if (activeProductPlusSubmodule?.key === "product-tree") {
-      return renderDashboardLayout(
-        `product-plus/${activeProductPlusSubmodule.key}`,
-          <section className="operations-workspace">
-            <div className="operations-header">
-              <div>
-                <span>{copy("Product Tree / Product Detail", "Ürün Ağacı / Ürün Detayı")}</span>
-                <h1>{operationsWorkspace.product?.name || copy("Operational Definition", "Operasyonel Tanımlama")}</h1>
-              </div>
-              <div className="operations-actions">
-                <button type="button" onClick={() => goTo("/dashboard", "login")}>{copy("Back", "Geri")}</button>
-                <button type="button" className="primary" onClick={() => goTo("/operations/products", "login")}>{copy("Edit Product", "Ürünü Düzenle")}</button>
-              </div>
-            </div>
-
-            <div className="operations-tabs" role="tablist" aria-label={copy("Operation detail tabs", "Operasyon detay sekmeleri")}>
-              {[
-                ["general", copy("General Information", "Genel Bilgiler")],
-                ["technical", copy("Technical Specs", "Teknik Özellikler")],
-                ["materials", copy("Materials & Components", "Malzeme & Bileşenler")],
-                ["flow", copy("Process Flow", "Süreç Akışı")],
-                ["notes", copy("Notes", "Notlar")],
-              ].map(([key, tab]) => (
-                <button type="button" className={productPlusTab === key ? "active" : ""} onClick={() => setProductPlusTab(key)} key={key}>{tab}</button>
-              ))}
-            </div>
-
-            <div className="operations-grid">
-              <article className="operation-card part-visual-card">
-                <div className="part-blueprint" aria-label={copy("Gasket technical visual", "Conta teknik görseli")}>
-                  <div className="gasket-shape">
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                </div>
-                <div className="part-status-row">
-                  <span>{copy("Weight", "Ağırlık")} <strong>{operationsWorkspace.product?.weight_kg || "-"}kg</strong></span>
-                  <span>{copy("Size", "Boyut")} <strong>{operationsWorkspace.product?.dimensions || "-"}</strong></span>
-                  <span>{copy("Material", "Malzeme")} <strong>{operationsWorkspace.product?.material_name || "-"}</strong></span>
-                  <span>{copy("Quality", "Kalite")} <strong>{operationsWorkspace.product?.quality_grade || "-"}</strong></span>
-                  <span>{copy("Cycle", "Çevrim")} <strong>{operationsWorkspace.product?.cycle_time_seconds || "-"} {copy("sec", "sn")}</strong></span>
-                </div>
-              </article>
-
-              <article className="operation-card part-info-card">
-                <div className="part-title">
-                  <span>{operationsWorkspace.product?.status || noDataValue}</span>
-                  <h2>{operationsWorkspace.product?.product_code || noDataValue}</h2>
-                </div>
-                <dl>
-                  <div><dt>{copy("Product Code", "Ürün Kodu")}</dt><dd>{operationsWorkspace.product?.product_code || "-"}</dd></div>
-                  <div><dt>{copy("Product Name", "Ürün Adı")}</dt><dd>{operationsWorkspace.product?.name || "-"}</dd></div>
-                  <div><dt>{copy("Product Group", "Ürün Grubu")}</dt><dd>{operationsWorkspace.product?.product_group || "-"}</dd></div>
-                  <div><dt>{copy("Revision", "Revizyon")}</dt><dd>{operationsWorkspace.product?.revision || "-"}</dd></div>
-                  <div><dt>{copy("Status", "Durum")}</dt><dd>{operationsWorkspace.product?.status || "-"}</dd></div>
-                  <div><dt>{copy("Created Date", "Oluşturma Tarihi")}</dt><dd>{operationsWorkspace.product?.created_at ? new Date(operationsWorkspace.product.created_at).toLocaleDateString(locale) : "-"}</dd></div>
-                  <div><dt>{copy("Last Update", "Son Güncelleme")}</dt><dd>{operationsWorkspace.product?.updated_at ? new Date(operationsWorkspace.product.updated_at).toLocaleString(locale) : "-"}</dd></div>
-                  <div><dt>{copy("Description", "Açıklama")}</dt><dd>{operationsWorkspace.product?.description || "-"}</dd></div>
-                </dl>
-              </article>
-
-              <article className="operation-card machine-card">
-                <div className="operation-card-heading">
-                  <h2>{copy("Machine Pool", "Makine Havuzu")}</h2>
-                  <span>{copy("Machine pool", "Makine havuzu")}</span>
-                </div>
-                <div className="machine-table">
-                  <div className="machine-row machine-head"><span>{copy("Machine", "Makine")}</span><span>{copy("Price", "Fiyat")}</span><span>{copy("Energy", "Enerji")}</span><span>{copy("Status", "Durum")}</span></div>
-                  {operationsWorkspace.machines.map((machine) => (
-                    <div className="machine-row" key={machine.id}>
-                      <strong>{machine.name}</strong>
-                      <span>{formatOperationMoney(machine.price, machine.price_currency, exchangeRates)}</span>
-                      <span>{formatNumber(machine.hourly_energy_consumption_kwh, 2)} {copy("kWh/hour", "kWh/saat")}</span>
-                      <mark className="ok">{copy("Defined", "Tanımlı")}</mark>
-                    </div>
-                  ))}
-                </div>
-              </article>
-
-              <article className="operation-card technical-card">
-                <h2>{copy("Technical Specs", "Teknik Özellikler")}</h2>
-                <div className="technical-grid">
-                  {technicalSpecs.map(([label, value]) => (
-                    <div key={label}><span>{label}</span><strong>{value}</strong></div>
-                  ))}
-                </div>
-              </article>
-
-              <article className="operation-card finance-impact-card">
-                <div className="operation-card-heading">
-                  <h2>{copy("Financial Impact", "Finansal Etki")}</h2>
-                  <select value={financialHorizon} onChange={(event) => loadFinancialData(event.target.value)}>
-                    <option value="6m">{copy("Next 6 months", "Gelecek 6 ay")}</option>
-                    <option value="1y">{copy("Next 12 months", "Gelecek 12 ay")}</option>
-                    <option value="5y">{copy("Next 60 months", "Gelecek 60 ay")}</option>
-                  </select>
-                </div>
-                <div className="impact-kpis">
-                  <span>{copy("Unit Sale Price", "Birim Satış Fiyatı")} <strong>{operationUnitSalePrice ? formatLira(operationUnitSalePrice, 2) : noDataValue}</strong></span>
-                  <span>{copy("Daily Cost", "Günlük Maliyet")} <strong>{latestPlanResult ? formatLira(operationUnitCost * toFiniteNumber(latestPlanResult.producedQuantity)) : noDataValue}</strong></span>
-                  <span>{copy("Unit Profit", "Birim Kâr")} <strong>{operationUnitSalePrice && operationUnitCost ? formatLira(operationUnitProfit, 2) : noDataValue}</strong></span>
-                  <span>{copy("Profit Margin", "Kâr Marjı")} <strong>{operationUnitSalePrice && operationUnitCost ? `${formatNumber(operationProfitMargin, 1)}%` : noDataValue}</strong></span>
-                </div>
-                <div className="impact-body">
-                  <div className="donut-chart" aria-hidden="true"><span>{latestPlanResult ? formatLira(operationUnitCost * toFiniteNumber(latestPlanResult.producedQuantity)) : noDataValue}</span></div>
-                  <div className="monthly-impact">
-                    <span>{copy("Product", "Ürün")} <strong>{latestPlanResult?.productName || operationsWorkspace.product?.name || noDataValue}</strong></span>
-                    <span>{copy("Estimated Revenue", "Tahmini Ciro")} <strong>{moneyOrMissing(monthlyRevenue)}</strong></span>
-                    <span>{copy("Estimated Cost", "Tahmini Maliyet")} <strong>{moneyOrMissing(monthlyCost)}</strong></span>
-                    <span>{copy("Net Profit Margin", "Net Kâr Marjı")} <strong>{hasFinancialSourceData && monthlyRevenue ? `${formatNumber((monthlyNet / monthlyRevenue) * 100, 1)}%` : noDataValue}</strong></span>
-                  </div>
-                </div>
-              </article>
-
-              <article className="operation-card notes-card">
-                <div className="operation-card-heading">
-                  <h2>{copy("Notes", "Notlar")}</h2>
-                  <button type="button" onClick={handleCreateOperationNote} disabled={operationsLoading}>{copy("New Note", "Yeni Not")}</button>
-                </div>
-                {(operationsWorkspace.notes.length ? operationsWorkspace.notes : [{ id: "empty", note: copy("No product note yet.", "Henüz ürün notu yok."), created_at: new Date().toISOString() }]).map((note) => (
-                  <p key={note.id}>{new Date(note.created_at).toLocaleDateString(locale)}: {note.note}</p>
-                ))}
-              </article>
-            </div>
-
-            <article className="operation-card operation-flow">
-              <div className="operation-card-heading">
-                <h2>{copy("Operation Flow", "Operasyon Akışı")}</h2>
-                <button type="button" onClick={focusOperationFlow}>{copy("View Flow Diagram", "Akış Diyagramını Gör")}</button>
-              </div>
-              <div className="flow-steps">
-                {(operationFlowSteps.length ? operationFlowSteps : [{ id: "empty", name: copy("Save a process plan", "Süreç planı kaydedin"), station: copy("Backend result needed", "Backend sonucu gerekli") }]).map((step, index) => ({ ...step, step_order: index + 1 })).map((step) => (
-                  <div className="flow-step" key={step.id}>
-                    <span>{step.step_order}</span>
-                    <strong>{step.name}</strong>
-                    <small>{step.station}</small>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>,
-      );
-    }
-
     if (activeOperationsSubmodule) {
       return renderDashboardLayout(
         `operations/${activeOperationsSubmodule.key}`,
           <section className="module-placeholder">
             <div>
-              <span>{copy("Operations placeholder", "Operations boş durum")}</span>
+              <span>{copy("Operations placeholder", "Operasyon boş durum")}</span>
               <h1>{activeOperationsSubmodule.label}</h1>
-              <p>{copy("This subpage is prepared under the Operations module. Content and business logic will be added later.", "Bu alt sayfa Operations modülü altında hazırlandı. İçerik ve iş mantığı daha sonra eklenecek.")}</p>
+              <p>{copy("This subpage is not available yet.", "Bu alt sayfa henüz hazır değil.")}</p>
             </div>
             <div className="placeholder-grid">
               <article>
@@ -10598,7 +10241,7 @@ function App() {
                   </div>
                   {[
                     [copy("Product record", "Ürün kaydı"), operationsWorkspace.product ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
-                    [copy("Process backend result", "Süreç backend sonucu"), activePlanResults.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
+                    [copy("Process result", "Süreç sonucu"), activePlanResults.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                     [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                     [copy("Financial assumptions", "Finansal varsayımlar"), hasFinancialAssumptions ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
                   ].map(([item, state]) => (
@@ -10653,7 +10296,7 @@ function App() {
             </article>
             <article>
               <strong>{copy("Status", "Durum")}</strong>
-              <p>{copy("This module will stay empty until its Supabase-backed workflow is added.", "Bu modül Supabase bağlantılı iş akışı eklenene kadar boş kalır.")}</p>
+              <p>{copy("This module is not available yet.", "Bu modül henüz hazır değil.")}</p>
             </article>
           </div>
         </section>,
@@ -10857,7 +10500,7 @@ function App() {
             <img src={logoUrl} alt="Atera logo" />
             <div>
               <strong>Atera</strong>
-              <span>{copy("Commodity Workspace", "Emtia Çalışma Alanı")}</span>
+              <span>{copy("Production feasibility", "Üretim fizibilitesi")}</span>
             </div>
           </div>
 
