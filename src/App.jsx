@@ -1552,7 +1552,7 @@ function App() {
   const [roleForm, setRoleForm] = useState(emptyRoleForm);
   const [managedUserForm, setManagedUserForm] = useState(emptyManagedUserForm);
   const [financialExtraCostForm, setFinancialExtraCostForm] = useState(emptyFinancialExtraCostForm);
-  const [financialHorizon, setFinancialHorizon] = useState("6m");
+  const [financialHorizon, setFinancialHorizon] = useState("5y");
   const [financialStatementPeriod, setFinancialStatementPeriod] = useState("quarterly");
   const [financialModel, setFinancialModel] = useState(emptyFinancialModel);
   const [financialSettingsForm, setFinancialSettingsForm] = useState(defaultFinancialSettings);
@@ -6292,11 +6292,11 @@ function App() {
     );
     const statementProjectionRows = statementProjectionModel.trendRows || [];
     const projectionPeriodMonths = financialStatementPeriod === "monthly" ? 1 : financialStatementPeriod === "yearly" ? 12 : 3;
-    const projectionPeriodCount = financialStatementPeriod === "monthly" ? 24 : 4;
+    const projectionPeriodCount = financialStatementPeriod === "monthly" ? 24 : financialStatementPeriod === "yearly" ? 5 : 4;
     const projectionPeriodCountLabel = financialStatementPeriod === "monthly"
       ? copy("24 months", "24 ay")
       : financialStatementPeriod === "yearly"
-        ? copy("4 years", "4 yıl")
+        ? copy("5 years", "5 yıl")
         : copy("4 quarters", "4 çeyrek");
     const formatProjectionDate = (date) => new Intl.DateTimeFormat(document.documentElement.lang === "tr" ? "tr-TR" : "en-US", {
       month: "short",
@@ -6332,9 +6332,22 @@ function App() {
         otherProductionCost -
         writeOffCost;
       const netIncome = sum("netIncome");
+      const sellingCost = sum("sellingCost");
+      const overheadCost = sum("overheadCost");
 
       return {
         cashFlow: sum("cashFlow"),
+        equity: toFiniteNumber(lastRow.equity),
+        fixedAssets: toFiniteNumber(lastRow.fixedAssets),
+        inventoryValue: toFiniteNumber(lastRow.inventoryValue),
+        loanBalance: toFiniteNumber(lastRow.loanBalance),
+        operatingProfit: grossProfit - sellingCost - overheadCost,
+        otherLiabilities: toFiniteNumber(lastRow.payables) + toFiniteNumber(lastRow.vatDue) + toFiniteNumber(lastRow.taxPayable),
+        otherAssets: toFiniteNumber(lastRow.receivables) + toFiniteNumber(lastRow.vatCredit),
+        overheadCost,
+        sellingCost,
+        totalAssets: toFiniteNumber(lastRow.totalAssets),
+        totalLiabilitiesAndEquity: toFiniteNumber(lastRow.totalLiabilitiesAndEquity),
         endingCash: toFiniteNumber(lastRow.cashBalance),
         grossMargin: salesRevenue ? (grossProfit / salesRevenue) * 100 : 0,
         grossProfit,
@@ -6351,6 +6364,7 @@ function App() {
         netMargin: salesRevenue ? (netIncome / salesRevenue) * 100 : 0,
         netSoldUnits: sum("netSoldUnits"),
         periodRows,
+        inventoryUnits: toFiniteNumber(lastRow.inventoryUnits),
         producedUnits: sum("producedUnits"),
         rangeLabel: getProjectionRangeLabel(startIndex, projectionPeriodMonths),
         salesRevenue,
@@ -6372,11 +6386,14 @@ function App() {
       { detail: copy("Material input cost", "Malzeme girdi maliyeti"), format: "money", id: "materialCost", label: copy("Materials", "Malzemeler"), tone: "cost", value: (period) => period.materialCost },
       { detail: copy("Labor and salary cost", "İşçilik ve maaş maliyeti"), format: "money", id: "workforceCost", label: copy("Labor", "İşçilik"), tone: "cost", value: (period) => period.workforceCost },
       { detail: copy("Energy cost from operations", "Operasyonlardan gelen enerji maliyeti"), format: "money", id: "electricityCost", label: copy("Energy", "Enerji"), tone: "cost", value: (period) => period.electricityCost },
-      { detail: copy("Depreciation, maintenance and mold", "Amortisman, bakım ve kalıp"), format: "money", id: "otherProductionCost", label: copy("Other Production", "Diğer Üretim"), tone: "cost", value: (period) => period.otherProductionCost },
-      { detail: copy("Returns, spoilage and expired stock", "İade, fire ve SKT kaynaklı stok"), format: "money", id: "writeOffCost", label: copy("Write-off Cost", "Fire / İade Maliyeti"), tone: "cost", value: (period) => period.writeOffCost },
-      { detail: copy("Revenue after direct production costs", "Direkt üretim maliyetleri sonrası gelir"), emphasis: true, format: "money", id: "grossProfit", label: copy("Gross Profit", "Brüt Kâr"), signed: true, value: (period) => period.grossProfit },
+      { detail: copy("Machines and equipment, straight-line, non-cash", "Makine ve ekipman, doğrusal, nakit dışı"), format: "money", id: "otherProductionCost", label: copy("Depreciation", "Amortisman"), tone: "cost", value: (period) => period.otherProductionCost },
+      { detail: copy("Cost of returned units", "İade edilen ürünlerin maliyeti"), format: "money", id: "writeOffCost", label: copy("Returns Write-off", "İade Maliyeti"), tone: "cost", value: (period) => period.writeOffCost },
+      { detail: copy("Net sales minus cost of units sold", "Net satışlardan satılan ürünlerin maliyeti düşülmüş hali"), emphasis: true, format: "money", id: "grossProfit", label: copy("Gross Profit", "Brüt Kâr"), signed: true, value: (period) => period.grossProfit },
+      { detail: copy("Channel commission, acquisition cost and campaigns", "Kanal komisyonu, müşteri edinme ve kampanyalar"), format: "money", id: "sellingCost", label: copy("Selling Expenses", "Satış ve Pazarlama Giderleri"), tone: "cost", value: (period) => period.sellingCost },
+      { detail: copy("Recurring overhead and one-off start-up costs", "Tekrarlayan genel giderler ve tek seferlik başlangıç giderleri"), format: "money", id: "overheadCost", label: copy("Overhead", "Genel Giderler"), tone: "cost", value: (period) => period.overheadCost },
+      { detail: copy("Before interest and tax", "Faiz ve vergi öncesi"), emphasis: true, format: "money", id: "operatingProfit", label: copy("Operating Profit", "Faaliyet Kârı"), signed: true, value: (period) => period.operatingProfit },
       { detail: copy("Interest accrued from active loans", "Aktif kredilerden işleyen faiz"), format: "money", id: "loanInterest", label: copy("Loan Interest", "Kredi Faizi"), tone: "cost", value: (period) => period.loanInterest },
-      { detail: copy("Income tax calculated from profit", "Kârdan hesaplanan gelir vergisi"), format: "money", id: "incomeTax", label: copy("Income Tax", "Gelir Vergisi"), tone: "tax", value: (period) => period.incomeTax },
+      { detail: copy("Annual profit after losses carried forward", "Devreden zararlar mahsup edilmiş yıllık kâr üzerinden"), format: "money", id: "incomeTax", label: copy("Income Tax", "Gelir Vergisi"), tone: "tax", value: (period) => period.incomeTax },
       { detail: copy("All cost lines carried by the model", "Modelin taşıdığı tüm maliyet satırları"), emphasis: true, format: "money", id: "totalCost", label: copy("Total Expenses", "Toplam Giderler"), tone: "cost", value: (period) => period.totalCost },
       { detail: copy("After all operating, financing and tax costs", "Tüm operasyon, finansman ve vergi maliyetlerinden sonra"), emphasis: true, format: "money", id: "netIncome", label: copy("Net Profit", "Net Kâr"), signed: true, value: (period) => period.netIncome },
       { detail: copy("Net profit divided by net sales", "Net kârın net satışlara oranı"), format: "percent", id: "netMargin", label: copy("Net Profit Margin", "Net Kâr Marjı"), signed: true, value: (period) => period.netMargin },
@@ -6384,10 +6401,20 @@ function App() {
       { detail: copy("Cash at the start of the period", "Dönem başındaki nakit"), format: "money", id: "startingCash", label: copy("Starting Cash", "Dönem Başı Nakit"), signed: true, value: (period) => period.startingCash },
       { detail: copy("Net movement inside the period", "Dönem içi net hareket"), emphasis: true, format: "money", id: "cashFlow", label: copy("Net Cash Flow", "Net Nakit Akışı"), signed: true, value: (period) => period.cashFlow },
       { detail: copy("Cash left after the period closes", "Dönem kapandıktan sonra kalan nakit"), emphasis: true, format: "money", id: "endingCash", label: copy("Ending Cash", "Dönem Sonu Nakit"), signed: true, value: (period) => period.endingCash },
-      { detail: copy("Sales VAT position in the model", "Modeldeki satış KDV pozisyonu"), format: "money", id: "vatPayable", label: copy("VAT Payable", "Ödenecek KDV"), tone: "tax", value: (period) => period.vatPayable },
+      { detail: copy("Output VAT minus input VAT, paid the following month", "Hesaplanan KDV eksi indirilecek KDV, ertesi ay ödenir"), format: "money", id: "vatPayable", label: copy("VAT Payable", "Ödenecek KDV"), tone: "tax", value: (period) => period.vatPayable },
+      { id: "balance-section", section: copy("Balance Sheet (period end)", "Bilanço (dönem sonu)") },
+      { detail: copy("Customer receivables and VAT credit", "Müşteri alacakları ve devreden KDV"), format: "money", id: "otherAssets", label: copy("Receivables", "Alacaklar"), value: (period) => period.otherAssets },
+      { detail: copy("Finished goods and raw material stock at cost", "Mamul ve hammadde stoku, maliyet bedeliyle"), format: "money", id: "inventoryValue", label: copy("Inventory", "Stoklar"), value: (period) => period.inventoryValue },
+      { detail: copy("Machines and equipment after depreciation", "Amortisman sonrası makine ve ekipman"), format: "money", id: "fixedAssets", label: copy("Fixed Assets", "Duran Varlıklar"), value: (period) => period.fixedAssets },
+      { detail: copy("Cash, receivables, inventory and fixed assets", "Nakit, alacak, stok ve duran varlıklar"), emphasis: true, format: "money", id: "totalAssets", label: copy("Total Assets", "Toplam Aktif"), value: (period) => period.totalAssets },
+      { detail: copy("Supplier, VAT and income tax payables", "Tedarikçi, KDV ve gelir vergisi borçları"), format: "money", id: "otherLiabilities", label: copy("Payables", "Kısa Vadeli Borçlar"), value: (period) => period.otherLiabilities },
+      { detail: copy("Outstanding loan principal", "Kalan kredi anaparası"), format: "money", id: "loanBalance", label: copy("Loans", "Krediler"), value: (period) => period.loanBalance },
+      { detail: copy("Paid-in capital, grants and retained earnings", "Sermaye, hibe ve birikmiş kâr"), format: "money", id: "equity", label: copy("Equity", "Özkaynak"), signed: true, value: (period) => period.equity },
+      { detail: copy("Must equal total assets", "Toplam aktife eşit olmalı"), emphasis: true, format: "money", id: "totalLiabilitiesAndEquity", label: copy("Total Liabilities and Equity", "Toplam Pasif"), value: (period) => period.totalLiabilitiesAndEquity },
       { id: "operations-section", section: copy("Operating Volume", "Operasyon Hacmi") },
       { detail: copy("Units produced by active process plans", "Aktif süreç planlarıyla üretilen adet"), format: "number", id: "producedUnits", label: copy("Produced Units", "Üretilen Adet"), value: (period) => period.producedUnits },
       { detail: copy("Units sold after returns", "İadeler sonrası satılan adet"), format: "number", id: "netSoldUnits", label: copy("Net Sold Units", "Net Satılan Adet"), value: (period) => period.netSoldUnits },
+      { detail: copy("Finished goods left at period end", "Dönem sonunda kalan mamul"), format: "number", id: "inventoryUnits", label: copy("Units in Stock", "Stoktaki Adet"), value: (period) => period.inventoryUnits },
     ];
     const formatProjectionValue = (row, period) => {
       const value = toFiniteNumber(row.value(period));
@@ -6406,7 +6433,9 @@ function App() {
             <h2>{copy("Financial Statement", "Finansal Tablo")}</h2>
             <p>{financialStatementPeriod === "monthly"
               ? copy("Forward projection view for the next 24 months.", "Önümüzdeki 24 ay için projeksiyon görünümü.")
-              : copy("Forward projection view for the next four periods.", "Önümüzdeki dört dönem için projeksiyon görünümü.")}</p>
+              : financialStatementPeriod === "yearly"
+                ? copy("Five-year income statement, cash flow and balance sheet.", "5 yıllık gelir tablosu, nakit akışı ve bilanço.")
+                : copy("Forward projection view for the next four quarters.", "Önümüzdeki dört çeyrek için projeksiyon görünümü.")}</p>
           </div>
           <div className="financial-statement-controls">
             <span className="financial-row-count">{projectionPeriodCountLabel}</span>
@@ -8482,7 +8511,7 @@ function App() {
   const latestPlanResult = latestPlan?.result || (operationPlanResult
     ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, dashboardOperationsWorkspace, { optimize: false })
     : null);
-  const totalDailyProduction = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.producedQuantity), 0);
+  const totalDailyProduction = toFiniteNumber(financialSummary.dailyProduction, activePlanResults.reduce((total, result) => total + toFiniteNumber(result.producedQuantity), 0));
   const totalDailyTrackedCost =
     totalDailyProduction * toFiniteNumber(financialSummary.unitProductionCost);
   const totalDailyEnergy = activePlanResults.reduce((total, result) => total + toFiniteNumber(result.energyConsumptionKwh), 0);
@@ -8936,6 +8965,17 @@ function App() {
       severity: copy("High", "Yüksek"),
       tone: "risk-high",
       title: copy("Cost data missing", "Maliyet verisi eksik"),
+    },
+    (financialCostWarnings.capacityLimitedPlans || []).length > 0 && {
+      action: copy("Review process plan", "Süreç planını gözden geçir"),
+      detail: (financialCostWarnings.capacityLimitedPlans || [])
+        .map((plan) => `${plan.planName}: ${formatNumber(plan.output)} / ${formatNumber(plan.target)} ${copy("units per day fit machine hours", "adet/gün makine süresine sığıyor")}`)
+        .join(" · "),
+      path: "/operations/active-processes",
+      priority: dashboardRiskPriority.high,
+      severity: copy("High", "Yüksek"),
+      tone: "risk-high",
+      title: copy("Plan exceeds machine time", "Plan makine süresini aşıyor"),
     },
     hasFinancialSourceData && unmetForecastUnits > 0 && {
       action: copy("Fix capacity", "Kapasiteyi düzelt"),

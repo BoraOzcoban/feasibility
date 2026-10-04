@@ -414,12 +414,16 @@ export function calculatePlanDailyCost(result = {}, operationsWorkspace = {}, se
   const electricityPrice = Math.max(0, toFiniteNumber(settings.electricityPricePerKwh));
   const missingMaterialPrices = [];
   const missingWorkforceRates = [];
+  let foreignCurrencyMaterial = 0;
 
   const material = asObjectArray(result?.materialRows).reduce((total, row) => {
     const record = materials.get(row.materialId) || row.material || null;
     const price = Math.max(0, toFiniteNumber(record?.price_per_unit));
     const quantity = Math.max(0, toFiniteNumber(row.dailyQuantity));
     if (quantity > 0 && price <= 0) missingMaterialPrices.push(record?.name || row.name || row.materialId);
+    if (normalizeCurrencyCode(record?.price_currency_original || record?.price_currency) !== "TRY") {
+      foreignCurrencyMaterial += quantity * price;
+    }
     return total + (quantity * price);
   }, 0);
 
@@ -444,6 +448,7 @@ export function calculatePlanDailyCost(result = {}, operationsWorkspace = {}, se
   return {
     daily: { energy, labor, material, total: material + labor + energy },
     energyKwh,
+    foreignCurrencyMaterial,
     missingElectricityPrice: energyKwh > 0 && electricityPrice <= 0,
     missingMaterialPrices,
     missingWorkforceRates,
@@ -457,20 +462,86 @@ export function calculatePlanDailyCost(result = {}, operationsWorkspace = {}, se
   };
 }
 
+export const DEFAULT_ASSET_USEFUL_LIFE_YEARS = 10;
+
+const COST_COMPONENTS = ["material", "labor", "energy"];
+
+// A saved plan's output is its target quantity, even when the schedule needs more
+// time than the machines are available. Scale the output down to what fits.
+export function getPlanDailyOutput(result = {}, operationsWorkspace = {}) {
+  const target = Math.max(0, toFiniteNumber(result?.producedQuantity));
+  const makespanMinutes = Math.max(0, toFiniteNumber(result?.totalProductionTimeMinutes));
+  const machines = buildIdMap(operationsWorkspace.machines);
+  const availabilityHours = asObjectArray(result?.machineRows)
+    .map((row) => toFiniteNumber(machines.get(row.machineId)?.availability_hours, toFiniteNumber(row.availabilityHours)))
+    .filter((hours) => hours > 0);
+
+  if (!target || !makespanMinutes || !availabilityHours.length) {
+    return { availableMinutes: null, limited: false, makespanMinutes, output: target, target };
+  }
+
+  const availableMinutes = Math.max(...availabilityHours) * 60;
+  const ratio = Math.min(1, availableMinutes / makespanMinutes);
+
+  return {
+    availableMinutes,
+    limited: ratio < 1,
+    makespanMinutes,
+    output: target * ratio,
+    target,
+  };
+}
+
+// Daily output and cost per product. Materials and energy scale with output;
+// workforce hours are a fixed daily shift.
 export function buildProductionCostProfile(activePlans = [], operationsWorkspace = {}, settings = {}) {
-  const daily = { energy: 0, labor: 0, material: 0 };
-  const warnings = { missingElectricityPrice: false, missingMaterialPrices: new Set(), missingWorkforceRates: new Set() };
-  let dailyProduced = 0;
+  const products = new Map();
+  const warnings = {
+    capacityLimitedPlans: [],
+    missingElectricityPrice: false,
+    missingMaterialPrices: new Set(),
+    missingWorkforceRates: new Set(),
+  };
 
   activePlans.forEach((plan) => {
     const cost = calculatePlanDailyCost(plan.result, operationsWorkspace, settings);
-    dailyProduced += cost.producedQuantity;
-    daily.energy += cost.daily.energy;
-    daily.labor += cost.daily.labor;
-    daily.material += cost.daily.material;
+    const capacity = getPlanDailyOutput(plan.result, operationsWorkspace);
+    const ratio = capacity.target ? capacity.output / capacity.target : 0;
+    const productId = getPlanProductId(plan) || plan.id || "unknown";
+    const current = products.get(productId) || { daily: { energy: 0, labor: 0, material: 0 }, dailyOutput: 0, foreignCurrencyMaterial: 0, productId };
+
+    current.dailyOutput += capacity.output;
+    current.foreignCurrencyMaterial += cost.foreignCurrencyMaterial * ratio;
+    current.daily.material += cost.daily.material * ratio;
+    current.daily.energy += cost.daily.energy * ratio;
+    current.daily.labor += cost.daily.labor;
+    products.set(productId, current);
+
+    if (capacity.limited) {
+      warnings.capacityLimitedPlans.push({
+        output: capacity.output,
+        planName: plan.plan_name || plan.result?.planName || plan.result?.productName || productId,
+        target: capacity.target,
+      });
+    }
     cost.missingMaterialPrices.forEach((name) => warnings.missingMaterialPrices.add(name));
     cost.missingWorkforceRates.forEach((name) => warnings.missingWorkforceRates.add(name));
     warnings.missingElectricityPrice = warnings.missingElectricityPrice || cost.missingElectricityPrice;
+  });
+
+  const daily = { energy: 0, labor: 0, material: 0 };
+  let dailyProduced = 0;
+
+  products.forEach((product) => {
+    product.foreignCurrencyMaterialShare = product.daily.material > 0 ? product.foreignCurrencyMaterial / product.daily.material : 0;
+    product.unit = Object.fromEntries(COST_COMPONENTS.map((key) => [
+      key,
+      product.dailyOutput > 0 ? product.daily[key] / product.dailyOutput : 0,
+    ]));
+    dailyProduced += product.dailyOutput;
+    COST_COMPONENTS.forEach((key) => {
+      daily[key] += product.daily[key];
+    });
   });
 
   const perUnit = (value) => (dailyProduced > 0 ? value / dailyProduced : 0);
@@ -478,12 +549,14 @@ export function buildProductionCostProfile(activePlans = [], operationsWorkspace
   return {
     daily,
     dailyProduced,
+    products,
     unit: {
       energy: perUnit(daily.energy),
       labor: perUnit(daily.labor),
       material: perUnit(daily.material),
     },
     warnings: {
+      capacityLimitedPlans: warnings.capacityLimitedPlans,
       missingElectricityPrice: warnings.missingElectricityPrice,
       missingMaterialPrices: Array.from(warnings.missingMaterialPrices),
       missingWorkforceRates: Array.from(warnings.missingWorkforceRates),
@@ -508,6 +581,78 @@ export function buildCampaignSpendSchedule(campaigns = [], monthCount = 0) {
   return schedule;
 }
 
+function getCollectionDelayMonths(days) {
+  return Math.max(0, Math.ceil(Math.max(0, toFiniteNumber(days)) / 30));
+}
+
+// Allocates the month's sellable stock to channels in their listed order.
+function allocateChannelSales(monthIndex, salesStrategy, productMap, stockUnits, settings) {
+  const channels = Array.isArray(salesStrategy.channels) ? salesStrategy.channels : [];
+  const priceIncreaseMultiplier = getPeriodicAnnualIncreaseMultiplier(settings.priceIncreaseAnnualPercent, monthIndex, settings.increaseFrequency);
+
+  return channels.map((channel) => {
+    const productId = channel.productId || channel.product_id || "";
+    const desiredUnits = getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy);
+    const availableUnits = productId ? Math.max(0, stockUnits.get(productId) || 0) : 0;
+    const shippedUnits = Math.min(desiredUnits, availableUnits);
+    const product = productMap.get(productId) || channel.product || {};
+    const channelUnitPrice = getOptionalPositiveNumber(channel.unitSalesPrice);
+    const price = Math.max(0, channelUnitPrice ?? toFiniteNumber(product.price)) * priceIncreaseMultiplier;
+    const discountRate = Math.min(1, Math.max(0, toFiniteNumber(channel.discountRatePercent)) / 100);
+    const returnRate = Math.min(1, Math.max(0, toFiniteNumber(channel.returnRatePercent)) / 100);
+    const returnedUnits = shippedUnits * returnRate;
+    const netUnits = Math.max(0, shippedUnits - returnedUnits);
+    const netSales = netUnits * price * (1 - discountRate);
+    const launchFee = monthIndex + 1 === Math.max(1, Math.round(toFiniteNumber(channel.startMonth, 1)))
+      ? Math.max(0, toFiniteNumber(channel.launchFee))
+      : 0;
+    const channelCost =
+      (netSales * Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100) +
+      (netUnits * Math.max(0, toFiniteNumber(channel.customerAcquisitionCost))) +
+      launchFee;
+    const collectionDays = toOptionalFiniteNumber(channel.collectionDays) ?? toFiniteNumber(settings.receivablesCollectionDays, 30);
+
+    if (productId) {
+      stockUnits.set(productId, Math.max(0, availableUnits - shippedUnits));
+    }
+
+    return {
+      channelCost,
+      collectionDays,
+      delayMonths: getCollectionDelayMonths(collectionDays),
+      desiredUnits,
+      discountCost: netUnits * price * discountRate,
+      netSales,
+      netUnits,
+      productId,
+      returnedUnits,
+      shippedUnits,
+    };
+  });
+}
+
+function getAverageUnitCost(stock) {
+  if (!stock || stock.units <= 0) return { energy: 0, labor: 0, material: 0 };
+  return Object.fromEntries(COST_COMPONENTS.map((key) => [key, stock.value[key] / stock.units]));
+}
+
+function removeFromStock(stock, units) {
+  const average = getAverageUnitCost(stock);
+  const removed = Math.min(stock.units, Math.max(0, units));
+  const cost = Object.fromEntries(COST_COMPONENTS.map((key) => [key, average[key] * removed]));
+
+  stock.units -= removed;
+  COST_COMPONENTS.forEach((key) => {
+    stock.value[key] = Math.max(0, stock.value[key] - cost[key]);
+  });
+
+  return cost;
+}
+
+const sumComponents = (cost) => COST_COMPONENTS.reduce((total, key) => total + cost[key], 0);
+
+// Monthly three-statement projection. Prices and costs are VAT exclusive; VAT is
+// collected and paid through cash and the balance sheet, never expensed.
 export function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput, operationsWorkspace, horizon) {
   const settings = {
     ...defaultFinancialSettings,
@@ -519,18 +664,17 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
   const workingDaysPerMonth = Math.max(1, toFiniteNumber(settings.workingDaysPerMonth, 22));
   const investmentGrantAmount = Math.max(0, toFiniteNumber(settings.investmentGrantAmount));
   const initialCapacityUnits = Math.max(0, toFiniteNumber(settings.initialCapacityUnits));
+  const initialCash = Math.max(0, toFiniteNumber(settings.initialCash));
+  const usefulLifeYears = Math.max(1, toFiniteNumber(settings.assetUsefulLifeYears, DEFAULT_ASSET_USEFUL_LIFE_YEARS));
   const costProfile = buildProductionCostProfile(activePlans, operationsWorkspace, settings);
   const dailyProduced = costProfile.dailyProduced;
   const unitMaterialCost = costProfile.unit.material;
   const unitWorkforceCost = costProfile.unit.labor;
   const unitElectricityCost = costProfile.unit.energy;
-  const unitOtherProductionCost = 0;
-  const unitProductionCost = unitMaterialCost + unitWorkforceCost + unitElectricityCost + unitOtherProductionCost;
-  const dailyMaterialCost = costProfile.daily.material;
-  const dailyWorkforceCost = costProfile.daily.labor;
-  const uniqueMachines = new Map();
-
+  const unitProductionCost = unitMaterialCost + unitWorkforceCost + unitElectricityCost;
+  const productMap = getOperationProductMap(operationsWorkspace);
   const machineRecords = buildIdMap(operationsWorkspace.machines);
+  const uniqueMachines = new Map();
 
   activePlans.forEach((plan) => {
     (plan.result?.machineRows || []).forEach((row) => {
@@ -551,11 +695,12 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     (total, equipment) => total + (Math.max(0, toFiniteNumber(equipment.price)) * Math.max(0, toFiniteNumber(equipment.quantity, 1))),
     0,
   );
+  const capitalExpenditure = machinePurchaseCost + equipmentPurchaseCost;
+  const monthlyDepreciation = capitalExpenditure / (usefulLifeYears * 12);
   const extraCosts = baseModel.extraCosts || [];
   const extraInitialCost = extraCosts.reduce((total, cost) => total + (cost.costType === "initial" ? Math.max(0, toFiniteNumber(cost.amount)) : 0), 0);
   const extraRecurringCost = extraCosts.reduce((total, cost) => total + (cost.costType === "recurring" ? Math.max(0, toFiniteNumber(cost.amount)) : 0), 0);
-  const monthlyMaterialCost = dailyMaterialCost * workingDaysPerMonth;
-  const monthlyWorkforceCost = dailyWorkforceCost * workingDaysPerMonth;
+  const initialInvestment = capitalExpenditure + extraInitialCost;
   const projectionStartMonth = getMonthStart(new Date());
   const loanRows = getFinancialLoanRows(settings).map((loan) => ({
     ...loan,
@@ -587,39 +732,52 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
   const salesVatRate = Math.max(0, toFiniteNumber(settings.salesVatRate, settings.vatRate ?? 20)) / 100;
   const expenseVatRate = Math.max(0, toFiniteNumber(settings.expenseVatRate, settings.vatRate ?? 20)) / 100;
   const incomeTaxRate = Math.max(0, toFiniteNumber(settings.incomeTaxRate, 25)) / 100;
-  const taxPaymentDelayMonths = Math.max(0, Math.round(toFiniteNumber(settings.taxPaymentDelayMonths, 0)));
-  const initialCash = Math.max(0, toFiniteNumber(settings.initialCash));
-  const initialInvestment = machinePurchaseCost + equipmentPurchaseCost + extraInitialCost;
-  const receivablesWorkingCapital = Math.max(0, calculateChannelMonth(0, salesStrategy, operationsWorkspace, workingDaysPerMonth, settings).revenue) *
-    (Math.max(0, toFiniteNumber(settings.receivablesCollectionDays, 30)) / 30);
-  const materialStockMonths = Math.max(0, toFiniteNumber(settings.rawMaterialStockDays)) / 30;
-  const supplierCreditMonths = Math.max(0, toFiniteNumber(settings.supplierPaymentDays)) / 30;
-  const materialWorkingCapital = monthlyMaterialCost * Math.max(0, Math.max(0, toFiniteNumber(settings.rawMaterialBufferMonths, 1)) + materialStockMonths - supplierCreditMonths);
-  const adjustedWorkingCapitalRequirement =
-    materialWorkingCapital +
-    receivablesWorkingCapital +
-    (monthlyWorkforceCost * Math.max(0, toFiniteNumber(settings.salaryBufferMonths, 1))) +
+  const taxPaymentDelayMonths = Math.max(1, Math.round(toFiniteNumber(settings.taxPaymentDelayMonths, 3)));
+  const supplierDelayMonths = getCollectionDelayMonths(settings.supplierPaymentDays);
+  const rawMaterialBufferMonths =
+    Math.max(0, toFiniteNumber(settings.rawMaterialBufferMonths, 1)) +
+    (Math.max(0, toFiniteNumber(settings.rawMaterialStockDays)) / 30);
+  const rawMaterialBufferValue = costProfile.daily.material * workingDaysPerMonth * rawMaterialBufferMonths;
+  const minimumCashReserve =
+    (costProfile.daily.labor * workingDaysPerMonth * Math.max(0, toFiniteNumber(settings.salaryBufferMonths, 1))) +
     (extraRecurringCost * Math.max(0, toFiniteNumber(settings.rentBufferMonths, 1)));
-  const workingCapitalRequirement = adjustedWorkingCapitalRequirement;
-  const requiredOwnCash = Math.max(0, initialInvestment + adjustedWorkingCapitalRequirement - initialLoanFunding - investmentGrantAmount);
-  const cashReceipts = Array.from({ length: monthCount + 24 }, () => 0);
-  const loanReceipts = Array.from({ length: monthCount + 24 }, () => 0);
+  const campaignSchedule = buildCampaignSpendSchedule(salesStrategy.campaigns, monthCount);
+  const scheduleLength = monthCount + 36;
+  const collections = Array.from({ length: scheduleLength }, () => 0);
+  const supplierPayments = Array.from({ length: scheduleLength }, () => 0);
+  const vatPayments = Array.from({ length: scheduleLength }, () => 0);
+  const taxPayments = Array.from({ length: scheduleLength }, () => 0);
+  const loanReceipts = Array.from({ length: scheduleLength }, () => 0);
   loanRows.forEach((loan) => {
     if (loan.receivedMonthIndex > 0 && loan.receivedMonthIndex < loanReceipts.length) {
       loanReceipts[loan.receivedMonthIndex] += loan.amount;
     }
   });
-  const taxPayments = Array.from({ length: monthCount + taxPaymentDelayMonths + 24 }, () => 0);
-  const campaignSchedule = buildCampaignSpendSchedule(salesStrategy.campaigns, monthCount);
-  const rows = [];
-  const loanBalances = loanRows.map((row) => row.amount);
-  let cashBalance = initialCash + initialLoanFunding + investmentGrantAmount - initialInvestment - adjustedWorkingCapitalRequirement;
-  let cumulativePayback = -initialInvestment - adjustedWorkingCapitalRequirement + initialLoanFunding + investmentGrantAmount;
+  const loanBalances = loanRows.map((row) => (row.receivedMonthIndex === 0 ? row.amount : 0));
+  const stock = new Map(Array.from(costProfile.products.keys()).map((productId) => [
+    productId,
+    { units: 0, value: { energy: 0, labor: 0, material: 0 } },
+  ]));
+  const paidInCapital = initialCash + investmentGrantAmount;
+  let cashBalance = initialCash + initialLoanFunding + investmentGrantAmount - capitalExpenditure;
+  let accumulatedDepreciation = 0;
+  let retainedEarnings = 0;
+  let vatCredit = 0;
+  let taxPayable = 0;
+  let taxLossCarryForward = 0;
+  let yearToDateTaxableProfit = 0;
+  let yearToDateTaxProvision = 0;
+  let cumulativeNetIncome = 0;
+  let cumulativeProjectCashFlow = -capitalExpenditure;
   let cashRunwayMonths = cashBalance < 0 ? 0 : monthCount;
   let breakEvenMonth = null;
   let paybackMonth = null;
+  let peakWorkingCapital = 0;
+  const rows = [];
   const totals = {
     cashFlow: 0,
+    channelCost: 0,
+    depreciation: 0,
     discountCost: 0,
     electricityCost: 0,
     expiredWriteOffCost: 0,
@@ -631,56 +789,100 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     marketingCost: 0,
     materialCost: 0,
     netIncome: 0,
-    otherProductionCost: 0,
     netSoldUnits: 0,
+    overheadCost: 0,
     producedUnits: 0,
-    retailerMarginCost: 0,
     returnedUnits: 0,
     revenue: 0,
     totalCost: 0,
-    unsoldInventoryUnits: 0,
     vatPayable: 0,
     workforceCost: 0,
   };
 
   for (let index = 0; index < monthCount; index += 1) {
-    const cogsCostMultiplier = compoundMonthlyRate(monthlyCogsInflationRate, index);
-    const opexCostMultiplier = compoundMonthlyRate(monthlyOpexInflationRate, index);
-    const materialCostMultiplier = compoundMonthlyRate(monthlyCurrencyIncreaseRate, index) * compoundMonthlyRate(monthlyInflationRate, index) * cogsCostMultiplier;
-    const workforceCostMultiplier = compoundMonthlyRate(monthlyWageIncreaseRate || monthlyInflationRate, index);
-    const electricityCostMultiplier = compoundMonthlyRate(monthlyEnergyPriceIncreaseRate || monthlyInflationRate, index) * cogsCostMultiplier;
-    const overheadCostMultiplier = compoundMonthlyRate(monthlyInflationRate, index) * opexCostMultiplier;
-    const monthlyUnitMaterialCost = unitMaterialCost * materialCostMultiplier;
-    const monthlyUnitWorkforceCost = unitWorkforceCost * workforceCostMultiplier;
-    const monthlyUnitElectricityCost = unitElectricityCost * electricityCostMultiplier;
-    const monthlyUnitOtherProductionCost = unitOtherProductionCost * cogsCostMultiplier;
-    const monthlyUnitProductionCost =
-      monthlyUnitMaterialCost +
-      monthlyUnitWorkforceCost +
-      monthlyUnitElectricityCost +
-      monthlyUnitOtherProductionCost;
-    const monthlyExtraRecurringCost = extraRecurringCost * overheadCostMultiplier;
+    // Each cost line grows with one rate: its own assumption when given,
+    // otherwise general inflation. FX drift applies only to FX-priced materials.
+    const localMaterialMultiplier = compoundMonthlyRate(monthlyCogsInflationRate || monthlyInflationRate, index);
+    const foreignMaterialMultiplier = compoundMonthlyRate(monthlyCurrencyIncreaseRate, index);
+    const multipliers = {
+      energy: compoundMonthlyRate(monthlyEnergyPriceIncreaseRate || monthlyInflationRate, index),
+      labor: compoundMonthlyRate(monthlyWageIncreaseRate || monthlyInflationRate, index),
+    };
+    const overheadMultiplier = compoundMonthlyRate(monthlyOpexInflationRate || monthlyInflationRate, index);
+    const plannedUnits = dailyProduced * workingDaysPerMonth;
+    const capacityScale = index === 0 && initialCapacityUnits > 0 && plannedUnits > initialCapacityUnits
+      ? initialCapacityUnits / plannedUnits
+      : 1;
+
+    // 1. Production: costs go into finished-goods stock.
+    const productionSpend = { energy: 0, labor: 0, material: 0 };
+    let producedUnits = 0;
+    costProfile.products.forEach((product, productId) => {
+      const units = product.dailyOutput * workingDaysPerMonth * capacityScale;
+      const productStock = stock.get(productId);
+      producedUnits += units;
+      productStock.units += units;
+      const productMultipliers = {
+        ...multipliers,
+        material: ((1 - product.foreignCurrencyMaterialShare) * localMaterialMultiplier) + (product.foreignCurrencyMaterialShare * foreignMaterialMultiplier),
+      };
+      COST_COMPONENTS.forEach((key) => {
+        const amount = units * product.unit[key] * productMultipliers[key];
+        productStock.value[key] += amount;
+        productionSpend[key] += amount;
+      });
+    });
+
+    // 2. Sales from stock.
+    const stockUnits = new Map(Array.from(stock.entries()).map(([productId, item]) => [productId, item.units]));
+    const channelResults = allocateChannelSales(index, salesStrategy, productMap, stockUnits, settings);
+    const cogs = { energy: 0, labor: 0, material: 0 };
+    let writeOffCost = 0;
+    let netSales = 0;
+    let channelCost = 0;
+    let discountCost = 0;
+    let netSoldUnits = 0;
+    let returnedUnits = 0;
+    let forecastUnits = 0;
+
+    channelResults.forEach((channel) => {
+      const productStock = stock.get(channel.productId);
+      forecastUnits += channel.desiredUnits;
+      netSales += channel.netSales;
+      channelCost += channel.channelCost;
+      discountCost += channel.discountCost;
+      netSoldUnits += channel.netUnits;
+      returnedUnits += channel.returnedUnits;
+
+      if (productStock && channel.shippedUnits > 0) {
+        const soldCost = removeFromStock(productStock, channel.netUnits);
+        const returnedCost = removeFromStock(productStock, channel.returnedUnits);
+        COST_COMPONENTS.forEach((key) => {
+          cogs[key] += soldCost[key];
+        });
+        writeOffCost += sumComponents(returnedCost);
+      }
+
+      const receiptIndex = index + channel.delayMonths;
+      if (receiptIndex < collections.length) {
+        collections[receiptIndex] += channel.netSales * (1 + salesVatRate);
+      }
+    });
+
+    // 3. Operating expenses.
+    const overheadCost = extraRecurringCost * overheadMultiplier;
     const marketingCost = campaignSchedule[index] || 0;
-    const plannedProducedUnits = dailyProduced * workingDaysPerMonth;
-    const producedUnits = index === 0 && initialCapacityUnits > 0
-      ? Math.min(plannedProducedUnits, initialCapacityUnits)
-      : plannedProducedUnits;
-    const forecastUnits = getSalesForecastForMonth(salesStrategy, index);
-    const channelMonth = calculateChannelMonth(index, salesStrategy, operationsWorkspace, workingDaysPerMonth, settings);
-    const grossSoldUnits = channelMonth.netSoldUnits;
-    const unsoldUnits = Math.max(0, producedUnits - grossSoldUnits);
-    const spoilageRate = 0;
-    const expiredUnits = unsoldUnits * spoilageRate;
-    const writeOffUnits = expiredUnits + channelMonth.returnedUnits;
-    const writeOffCost = writeOffUnits * monthlyUnitProductionCost;
-    const cogsSold = channelMonth.netSoldUnits * monthlyUnitProductionCost;
-    const cashProductionCost = producedUnits * monthlyUnitProductionCost;
-    const materialCost = producedUnits * monthlyUnitMaterialCost;
-    const workforceCost = producedUnits * monthlyUnitWorkforceCost;
-    const electricityCost = producedUnits * monthlyUnitElectricityCost;
-    const otherProductionCost = producedUnits * monthlyUnitOtherProductionCost;
+    const initialExpense = index === 0 ? extraInitialCost : 0;
+    const depreciation = Math.min(monthlyDepreciation, Math.max(0, capitalExpenditure - accumulatedDepreciation));
+    accumulatedDepreciation += depreciation;
+    const rawMaterialPurchase = index === 0 ? rawMaterialBufferValue : 0;
+
+    // 4. Financing.
     const loanMonth = loanRows.reduce((total, loan, loanIndex) => {
       const monthsSinceReceived = index - loan.receivedMonthIndex;
+      if (monthsSinceReceived === 0 && loan.receivedMonthIndex > 0) {
+        loanBalances[loanIndex] = loan.amount;
+      }
       if (monthsSinceReceived < 0 || monthsSinceReceived >= loan.loanTermMonths) {
         return total;
       }
@@ -689,7 +891,9 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       const monthlyRate = loan.annualInterestRate / 100 / 12;
       const interest = balance * monthlyRate;
       const isGraceMonth = monthsSinceReceived < loan.gracePeriodMonths;
-      const payment = !isGraceMonth ? Math.min(loan.monthlyPayment, balance + interest) : 0;
+      const isLastMonth = monthsSinceReceived === loan.loanTermMonths - 1;
+      const scheduledPayment = isLastMonth ? balance + interest : Math.min(loan.monthlyPayment, balance + interest);
+      const payment = !isGraceMonth ? scheduledPayment : 0;
       const principal = Math.max(0, payment - interest);
 
       loanBalances[loanIndex] = isGraceMonth
@@ -699,107 +903,181 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       return {
         interest: total.interest + interest,
         payment: total.payment + payment,
-        principal: total.principal + principal,
       };
-    }, { interest: 0, payment: 0, principal: 0 });
-    const loanPayment = loanMonth.payment;
-    const loanInterest = loanMonth.interest;
+    }, { interest: 0, payment: 0 });
 
-    channelMonth.channels.forEach((channel) => {
-      const receiptIndex = index + channel.delayMonths;
-      if (receiptIndex < cashReceipts.length) {
-        cashReceipts[receiptIndex] += channel.revenue;
-      }
-    });
-
-    const cashIn = (cashReceipts[index] || 0) + (loanReceipts[index] || 0);
-    const outputVat = channelMonth.revenue * salesVatRate;
-    const inputVat = Math.max(
-      0,
-      (materialCost + electricityCost + otherProductionCost + monthlyExtraRecurringCost + marketingCost) *
-        expenseVatRate,
-    );
-    const vatPayable = Math.max(0, outputVat - inputVat);
-    const profitBeforeTax = channelMonth.revenue - cogsSold - writeOffCost - monthlyExtraRecurringCost - marketingCost - loanInterest;
-    const incomeTax = Math.max(0, profitBeforeTax * incomeTaxRate);
-    const netIncome = profitBeforeTax - incomeTax;
-    const taxPaymentIndex = index + taxPaymentDelayMonths;
-    if (taxPaymentIndex < taxPayments.length) {
-      taxPayments[taxPaymentIndex] += vatPayable + incomeTax;
+    // 5. VAT: output minus input, credit carried forward, paid the next month.
+    const vatableExpenses =
+      productionSpend.material + productionSpend.energy + overheadCost + marketingCost + channelCost + initialExpense + rawMaterialPurchase;
+    const outputVat = netSales * salesVatRate;
+    const inputVat = vatableExpenses * expenseVatRate;
+    const vatPosition = outputVat - inputVat - vatCredit;
+    const vatPayable = Math.max(0, vatPosition);
+    vatCredit = Math.max(0, -vatPosition);
+    if (index + 1 < vatPayments.length) {
+      vatPayments[index + 1] += vatPayable;
     }
-    const taxCashOut = taxPayments[index] || 0;
-    const cashFlow = cashIn - cashProductionCost - monthlyExtraRecurringCost - marketingCost - loanPayment - taxCashOut;
-    const totalCost = cogsSold + writeOffCost + monthlyExtraRecurringCost + marketingCost + loanInterest + incomeTax;
+
+    // 6. Income tax on the year's profit, after losses carried from earlier years.
+    const costOfSales = sumComponents(cogs);
+    const operatingExpenses = channelCost + marketingCost + overheadCost + initialExpense;
+    const profitBeforeTax = netSales - costOfSales - writeOffCost - depreciation - operatingExpenses - loanMonth.interest;
+    yearToDateTaxableProfit += profitBeforeTax;
+    const yearToDateTaxDue = Math.max(0, yearToDateTaxableProfit - taxLossCarryForward) * incomeTaxRate;
+    const incomeTax = yearToDateTaxDue - yearToDateTaxProvision;
+    yearToDateTaxProvision = yearToDateTaxDue;
+    taxPayable += incomeTax;
+    const netIncome = profitBeforeTax - incomeTax;
+
+    if ((index + 1) % 12 === 0) {
+      if (yearToDateTaxableProfit < 0) {
+        taxLossCarryForward += -yearToDateTaxableProfit;
+      } else {
+        taxLossCarryForward = Math.max(0, taxLossCarryForward - yearToDateTaxableProfit);
+      }
+      const paymentIndex = index + taxPaymentDelayMonths;
+      if (paymentIndex < taxPayments.length) {
+        taxPayments[paymentIndex] += yearToDateTaxProvision;
+      }
+      yearToDateTaxableProfit = 0;
+      yearToDateTaxProvision = 0;
+    }
+
+    // 7. Cash.
+    const materialPurchaseWithVat = productionSpend.material * (1 + expenseVatRate);
+    if (index + supplierDelayMonths < supplierPayments.length) {
+      supplierPayments[index + supplierDelayMonths] += materialPurchaseWithVat;
+    }
+    const supplierPayment = supplierPayments[index] || 0;
+    const vatPayment = vatPayments[index] || 0;
+    const taxPayment = taxPayments[index] || 0;
+    taxPayable -= taxPayment;
+    const collected = collections[index] || 0;
+    const operatingCashOut =
+      supplierPayment +
+      productionSpend.labor +
+      (productionSpend.energy * (1 + expenseVatRate)) +
+      ((overheadCost + marketingCost + channelCost + initialExpense + rawMaterialPurchase) * (1 + expenseVatRate)) +
+      vatPayment +
+      taxPayment;
+    const operatingCashFlow = collected - operatingCashOut;
+    const cashIn = collected + (loanReceipts[index] || 0);
+    const cashFlow = operatingCashFlow + (loanReceipts[index] || 0) - loanMonth.payment;
 
     cashBalance += cashFlow;
-    cumulativePayback += cashFlow;
+    cumulativeNetIncome += netIncome;
+    cumulativeProjectCashFlow += operatingCashFlow;
+    retainedEarnings += netIncome;
 
     if (cashBalance < 0 && cashRunwayMonths === monthCount) {
       cashRunwayMonths = index;
     }
-
-    if (breakEvenMonth === null && netIncome >= 0) {
+    if (breakEvenMonth === null && cumulativeNetIncome >= 0) {
       breakEvenMonth = index + 1;
     }
-
-    if (paybackMonth === null && cumulativePayback >= 0) {
+    if (paybackMonth === null && cumulativeProjectCashFlow >= 0) {
       paybackMonth = index + 1;
     }
 
+    // 8. Balance sheet at month end.
+    const receivables = collections.slice(index + 1).reduce((total, value) => total + value, 0);
+    const payables = supplierPayments.slice(index + 1).reduce((total, value) => total + value, 0);
+    const vatDue = vatPayments.slice(index + 1).reduce((total, value) => total + value, 0);
+    const finishedGoodsValue = Array.from(stock.values()).reduce((total, item) => total + sumComponents(item.value), 0);
+    const inventoryValue = finishedGoodsValue + rawMaterialBufferValue;
+    const inventoryUnits = Array.from(stock.values()).reduce((total, item) => total + item.units, 0);
+    const fixedAssets = capitalExpenditure - accumulatedDepreciation;
+    const loanBalance = loanBalances.reduce((total, value) => total + value, 0);
+    const totalAssets = cashBalance + receivables + inventoryValue + vatCredit + fixedAssets;
+    const equity = paidInCapital + retainedEarnings;
+    const totalLiabilities = payables + vatDue + taxPayable + loanBalance;
+    const workingCapital = receivables + inventoryValue + vatCredit - payables - vatDue - taxPayable;
+    peakWorkingCapital = Math.max(peakWorkingCapital, workingCapital);
+    const totalCost = costOfSales + writeOffCost + depreciation + operatingExpenses + loanMonth.interest + incomeTax;
+
     totals.cashFlow += cashFlow;
-    totals.discountCost += channelMonth.discountCost;
-    totals.electricityCost += electricityCost;
+    totals.channelCost += channelCost;
+    totals.depreciation += depreciation;
+    totals.discountCost += discountCost;
+    totals.electricityCost += cogs.energy;
     totals.expiredWriteOffCost += writeOffCost;
-    totals.expiredWriteOffUnits += writeOffUnits;
+    totals.expiredWriteOffUnits += returnedUnits;
     totals.forecastSalesUnits += forecastUnits;
     totals.incomeTax += incomeTax;
-    totals.loanInterest += loanInterest;
-    totals.loanPayment += loanPayment;
+    totals.loanInterest += loanMonth.interest;
+    totals.loanPayment += loanMonth.payment;
     totals.marketingCost += marketingCost;
-    totals.materialCost += materialCost;
+    totals.materialCost += cogs.material;
     totals.netIncome += netIncome;
-    totals.otherProductionCost += otherProductionCost;
-    totals.netSoldUnits += channelMonth.netSoldUnits;
+    totals.netSoldUnits += netSoldUnits;
+    totals.overheadCost += overheadCost + initialExpense;
     totals.producedUnits += producedUnits;
-    totals.retailerMarginCost += channelMonth.marginCost;
-    totals.returnedUnits += channelMonth.returnedUnits;
-    totals.revenue += channelMonth.revenue;
+    totals.returnedUnits += returnedUnits;
+    totals.revenue += netSales;
     totals.totalCost += totalCost;
-    totals.unsoldInventoryUnits += unsoldUnits;
     totals.vatPayable += vatPayable;
-    totals.workforceCost += workforceCost;
+    totals.workforceCost += cogs.labor;
 
     rows.push({
       cashBalance,
       cashFlow,
       cashIn,
-      electricityCost,
+      channelCost,
+      depreciation,
+      electricityCost: cogs.energy,
+      equity,
+      fixedAssets,
       forecastUnits,
       incomeTax,
-      loanInterest,
+      initialExpense,
+      inventoryUnits,
+      inventoryValue,
+      loanBalance,
+      loanInterest: loanMonth.interest,
+      loanPayment: loanMonth.payment,
       marketingCost,
-      materialCost,
+      materialCost: cogs.material,
       netIncome,
-      netSoldUnits: channelMonth.netSoldUnits,
-      otherProductionCost,
+      netSoldUnits,
+      operatingCashFlow,
+      otherProductionCost: depreciation,
+      overheadCost: overheadCost + initialExpense,
+      payables,
       period: index + 1,
       producedUnits,
-      salesRevenue: channelMonth.revenue,
+      profitBeforeTax,
+      receivables,
+      salesRevenue: netSales,
+      sellingCost: channelCost + marketingCost,
+      taxPayable,
+      totalAssets,
       totalCost,
-      unsoldUnits,
+      totalLiabilities,
+      totalLiabilitiesAndEquity: totalLiabilities + equity,
+      unsoldUnits: inventoryUnits,
+      vatCredit,
+      vatDue,
       vatPayable,
-      workforceCost,
+      workforceCost: cogs.labor,
+      workingCapital,
       writeOffCost,
-      writeOffUnits,
+      writeOffUnits: returnedUnits,
     });
   }
 
+  const lastRow = rows[rows.length - 1] || {};
   const firstMonth = rows[0] || {};
   const averageNetPrice = totals.netSoldUnits ? totals.revenue / totals.netSoldUnits : toFiniteNumber(operationsWorkspace.products?.[0]?.price);
   const contributionPerUnit = Math.max(0, averageNetPrice - unitProductionCost);
   const requiredMonthlySalesVolume = contributionPerUnit
     ? (extraRecurringCost + Math.min(monthlyLoanPayment, loanAmount || monthlyLoanPayment)) / contributionPerUnit
     : 0;
+  // Own cash needed so that cash never drops below the salary and rent reserve.
+  const lowestCashWithoutOwnCash = Math.min(
+    initialLoanFunding + investmentGrantAmount - capitalExpenditure,
+    ...rows.map((row) => row.cashBalance - initialCash),
+  );
+  const requiredOwnCash = Math.max(0, -lowestCashWithoutOwnCash) + minimumCashReserve;
   const maxChartValue = Math.max(
     1,
     ...rows.map((row) => Math.max(row.salesRevenue, row.totalCost, row.netIncome, 0)),
@@ -816,29 +1094,29 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       { amount: totals.materialCost, id: "materialCost", label: "Raw materials and packaging" },
       { amount: totals.workforceCost, id: "workforceCost", label: "Salaries and labor" },
       { amount: totals.electricityCost, id: "electricityCost", label: "Electricity" },
-      { amount: totals.otherProductionCost, id: "otherProductionCost", label: "Depreciation, maintenance and mold" },
-      { amount: totals.expiredWriteOffCost, id: "writeOffCost", label: "Spoilage, returns and expired write-off" },
-      { amount: extraRecurringCost * monthCount, id: "recurringExtraCost", label: "Recurring overhead" },
+      { amount: totals.depreciation, id: "otherProductionCost", label: "Depreciation" },
+      { amount: totals.expiredWriteOffCost, id: "writeOffCost", label: "Returns write-off" },
+      { amount: totals.channelCost, id: "channelCost", label: "Channel commission and acquisition" },
+      { amount: totals.overheadCost, id: "recurringExtraCost", label: "Overhead and start-up costs" },
       { amount: totals.marketingCost, id: "marketingCost", label: "Marketing campaigns" },
-      { amount: totals.vatPayable, id: "vatPayable", label: "VAT payable" },
       { amount: totals.incomeTax, id: "incomeTax", label: "Income tax" },
       { amount: totals.loanInterest, id: "loanInterest", label: "Loan interest" },
     ],
     extraCosts,
     incomeRows: [
-      { amount: totals.revenue, id: "salesRevenue", kind: "income", label: "Sales revenue from monthly forecast" },
+      { amount: totals.revenue, id: "salesRevenue", kind: "income", label: "Net sales" },
       { amount: investmentGrantAmount, id: "investmentGrant", kind: "income", label: "Investment grant / subsidy" },
       { amount: totals.materialCost, costType: "recurring", id: "materialCost", kind: "cost", label: "Raw materials and packaging" },
       { amount: totals.workforceCost, costType: "recurring", id: "workforceCost", kind: "cost", label: "Salaries and labor" },
       { amount: totals.electricityCost, costType: "recurring", id: "electricityCost", kind: "cost", label: "Electricity" },
-      { amount: totals.otherProductionCost, costType: "recurring", id: "otherProductionCost", kind: "cost", label: "Depreciation, maintenance and mold" },
-      { amount: totals.expiredWriteOffCost, costType: "recurring", id: "writeOffCost", kind: "cost", label: "Spoilage, returns and expired write-off" },
+      { amount: totals.depreciation, costType: "recurring", id: "otherProductionCost", kind: "cost", label: "Depreciation" },
+      { amount: totals.expiredWriteOffCost, costType: "recurring", id: "writeOffCost", kind: "cost", label: "Returns write-off" },
+      { amount: totals.channelCost, costType: "recurring", id: "channelCost", kind: "cost", label: "Channel commission and acquisition" },
       { amount: totals.marketingCost, costType: "recurring", id: "marketingCost", kind: "cost", label: "Marketing campaigns" },
       { amount: machinePurchaseCost, costType: "initial", id: "machinePurchase", kind: "cost", label: "Machine investment" },
       { amount: equipmentPurchaseCost, costType: "initial", id: "equipmentPurchase", kind: "cost", label: "Equipment investment" },
       { amount: extraInitialCost, costType: "initial", id: "extraInitialCost", kind: "cost", label: "Initial extra costs" },
-      { amount: workingCapitalRequirement, costType: "initial", id: "workingCapital", kind: "cost", label: "Working capital requirement" },
-      { amount: totals.vatPayable, costType: "recurring", id: "vatPayable", kind: "cost", label: "VAT payable" },
+      { amount: peakWorkingCapital, costType: "initial", id: "workingCapital", kind: "cost", label: "Peak working capital" },
       { amount: totals.incomeTax, costType: "recurring", id: "incomeTax", kind: "cost", label: "Income tax" },
       { amount: totals.loanInterest, costType: "recurring", id: "loanInterest", kind: "cost", label: "Loan interest" },
     ],
@@ -846,22 +1124,30 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     summary: {
       ...emptyFinancialModel.summary,
       ...baseModel.summary,
+      assetUsefulLifeYears: usefulLifeYears,
       averageNetPrice,
       breakEvenMonth,
       cashRunwayMonths,
+      channelCost: totals.channelCost,
       costWarnings: costProfile.warnings,
+      dailyProduction: dailyProduced,
+      depreciation: totals.depreciation,
       discountCost: totals.discountCost,
       electricityCost: totals.electricityCost,
+      endingCash: toFiniteNumber(lastRow.cashBalance),
+      endingInventoryUnits: toFiniteNumber(lastRow.inventoryUnits),
       equipmentPurchaseCost,
       expiredWriteOffCost: totals.expiredWriteOffCost,
       expiredWriteOffUnits: totals.expiredWriteOffUnits,
       extraInitialCost,
       extraRecurringCost: extraRecurringCost * monthCount,
+      firstMonthCashBalance: firstMonth.cashBalance || 0,
       forecastSalesUnits: totals.forecastSalesUnits,
       incomeTax: totals.incomeTax,
       initialCash,
-      investmentGrantAmount,
       initialCashRequired: requiredOwnCash,
+      initialInvestment,
+      investmentGrantAmount,
       loanAmount,
       loanInterest: totals.loanInterest,
       loanPayment: monthlyLoanPayment,
@@ -870,13 +1156,15 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       machinePurchaseCost,
       marketingCost: totals.marketingCost,
       materialCost: totals.materialCost,
+      minimumCashReserve,
       netIncome: totals.netIncome,
       netSoldUnits: totals.netSoldUnits,
-      otherProductionCost: totals.otherProductionCost,
+      otherProductionCost: totals.depreciation,
+      overheadCost: totals.overheadCost,
       paybackMonth,
       planCount: activePlans.length,
       requiredMonthlySalesVolume,
-      retailerMarginCost: totals.retailerMarginCost,
+      retailerMarginCost: totals.channelCost,
       returnedUnits: totals.returnedUnits,
       salesRevenue: totals.revenue,
       totalCashFlow: totals.cashFlow,
@@ -886,12 +1174,11 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       unitMaterialCost,
       unitProductionCost,
       unitWorkforceCost,
-      unsoldInventoryUnits: totals.unsoldInventoryUnits,
+      unsoldInventoryUnits: toFiniteNumber(lastRow.inventoryUnits),
       vatPayable: totals.vatPayable,
       weightedPaymentDelayDays: calculateChannelMonth(0, salesStrategy, operationsWorkspace, workingDaysPerMonth, settings).weightedPaymentDelayDays,
-      workingCapitalRequirement,
+      workingCapitalRequirement: peakWorkingCapital,
       workingDaysPerMonth,
-      firstMonthCashBalance: firstMonth.cashBalance || 0,
     },
     trendChart: {
       costPath: getPath("totalCost"),
