@@ -7060,8 +7060,10 @@ function App() {
     const timeHorizonMonths = Math.max(1, Math.round(positiveParam("timeHorizonMonths", defaultHorizonMonths)));
     const productMap = getOperationProductMap(operationsWorkspaceForFinance);
     const firstChannelProduct = salesStrategy.channels.map((channel) => productMap.get(channel.productId) || channel.product).find(Boolean);
+    // The linked model covers the financial horizon; turn its totals into
+    // monthly values before applying the variant's own horizon.
     const defaultSalesUnits = Math.round(
-      toFiniteNumber(linkedSummary.netSoldUnits) / timeHorizonMonths ||
+      toFiniteNumber(linkedSummary.netSoldUnits) / defaultHorizonMonths ||
       getSalesForecastForMonth(salesStrategy, 0),
     );
     const defaultUnitSalesPrice = toFiniteNumber(
@@ -7072,7 +7074,7 @@ function App() {
     const scenarioUnitSalesPrice = Math.max(0, positiveParam("unitSalesPrice", defaultUnitSalesPrice));
     const scenarioProductionUnits = Math.max(
       scenarioSalesUnits,
-      positiveParam("productionUnits", Math.round(toFiniteNumber(linkedSummary.totalProduced) / timeHorizonMonths) || scenarioSalesUnits),
+      positiveParam("productionUnits", Math.round(toFiniteNumber(linkedSummary.totalProduced) / defaultHorizonMonths) || scenarioSalesUnits),
     );
     const discountPercent = Math.min(100, Math.max(0, finiteParam("discountPercent", 0)));
     const returnRatePercent = Math.min(100, Math.max(0, finiteParam("returnRatePercent", 0)));
@@ -7093,13 +7095,13 @@ function App() {
     const competitorDrag = numberParam("competitorPressure") / 100;
     const simulationAlgorithm = normalizeSimulationAlgorithm(parameters.simulationAlgorithm);
     const simulationAlgorithmOptions = [
-      [simulationAlgorithms.withTendency, copy("FBM Monte Carlo + bull/bear tendency", "FBM Monte Carlo + boğa/ayı eğilimi")],
-      [simulationAlgorithms.withoutTendency, copy("FBM Monte Carlo without tendency", "FBM Monte Carlo eğilimsiz")],
+      [simulationAlgorithms.withTendency, copy("Apply assumption changes", "Varsayım değişikliklerini uygula")],
+      [simulationAlgorithms.withoutTendency, copy("Base plan only", "Yalnız baz plan")],
     ];
     const simulationAlgorithmLabel = simulationAlgorithmOptions.find(([value]) => value === simulationAlgorithm)?.[1] || simulationAlgorithmOptions[0][1];
     const volatility = numberParam("volatility") / 100;
     const costVolatility = numberParam("costVolatility") / 100;
-    const fixedCost = Math.max(0, positiveParam("fixedCost", toFiniteNumber(linkedSummary.extraRecurringCost)));
+    const fixedCost = Math.max(0, positiveParam("fixedCost", (toFiniteNumber(linkedSummary.extraRecurringCost) / defaultHorizonMonths) * timeHorizonMonths));
     const marketingBudget = Math.max(0, finiteParam("marketingBudget", 0)) * timeHorizonMonths;
     const derivedVariableCostRatio = baseRevenue ? Math.min(95, (scenarioProductionCost / baseRevenue) * 100) : 0;
     const variableCostRatio = Math.min(0.95, Math.max(0, finiteParam("variableCostRatio", derivedVariableCostRatio) / 100));
@@ -7109,7 +7111,7 @@ function App() {
     const projectedVariableCost = scenarioProductionCost || (trendAdjustedRevenue * Math.min(variableCostRatio + costVolatility * 0.22, 0.92));
     const outcomeSpread = trendAdjustedRevenue * Math.max(volatility + costVolatility * 0.65 + competitorDrag * 0.35, 0.08);
     const contributionPerUnit = Math.max(0, (scenarioUnitSalesPrice * Math.max(0, 1 - discountRate)) - unitProductionCost);
-    const buildOutcome = (key, percentile, label, tone, multiplier) => {
+    const buildOutcome = (key, shiftLabel, label, tone, multiplier) => {
       const revenue = trendAdjustedRevenue + outcomeSpread * multiplier;
       const variableCost = projectedVariableCost * (revenue / Math.max(trendAdjustedRevenue, 1));
       const tailCost = outcomeSpread * (multiplier < 0 ? Math.abs(multiplier) * 0.45 : -multiplier * 0.18);
@@ -7121,17 +7123,32 @@ function App() {
         key,
         label,
         net,
-        percentile,
         revenue,
+        shiftLabel,
         tone,
       };
     };
+    // Deterministic scenarios: base revenue shifted by a fixed share of the
+    // volatility spread. These are sensitivity cases, not probabilities.
+    const scenarioShiftLabel = (multiplier) => {
+      const shift = trendAdjustedRevenue ? (outcomeSpread * multiplier) / trendAdjustedRevenue : 0;
+      if (Math.abs(shift) < 0.0005) return copy("Base revenue", "Baz gelir");
+      return `${copy("Revenue", "Gelir")} ${shift > 0 ? "+" : "−"}%${formatNumber(Math.abs(shift) * 100, 1)}`;
+    };
     const outcomes = [
-      buildOutcome("worst", "Worst 5%", copy("Highly Risky Scenario", "Çok Riskli Senaryo"), "danger", -1.32),
-      buildOutcome("bad", "20th", copy("Bad Scenario", "Kötü Senaryo"), "bad", -0.72),
-      buildOutcome("likely", "50th", copy("Most Likely Scenario", "En Olası Senaryo"), "likely", 0),
-      buildOutcome("good", "80th", copy("Good Scenario", "İyi Senaryo"), "good", 0.78),
+      buildOutcome("worst", scenarioShiftLabel(-1.32), copy("Pessimistic", "Kötümser"), "danger", -1.32),
+      buildOutcome("bad", scenarioShiftLabel(-0.72), copy("Cautious", "Temkinli"), "bad", -0.72),
+      buildOutcome("likely", scenarioShiftLabel(0), copy("Base case", "Baz senaryo"), "likely", 0),
+      buildOutcome("good", scenarioShiftLabel(0.78), copy("Optimistic", "İyimser"), "good", 0.78),
     ];
+    const netUnitPrice = scenarioUnitSalesPrice * Math.max(0, 1 - discountRate);
+    const breakEvenFixedCost = fixedCost + marketingBudget;
+    const breakEvenVolume = contributionPerUnit > 0 ? breakEvenFixedCost / contributionPerUnit : null;
+    const projectedVolume = scenarioSalesUnits * timeHorizonMonths;
+    const chartVolumeMax = Math.max(1, projectedVolume * 1.2, (breakEvenVolume || 0) * 1.5);
+    const chartMoneyMax = Math.max(1, netUnitPrice * chartVolumeMax, breakEvenFixedCost + (unitProductionCost * chartVolumeMax));
+    const chartX = (volume) => 50 + ((volume / chartVolumeMax) * 520);
+    const chartY = (money) => 240 - ((money / chartMoneyMax) * 198);
     const likelyOutcome = outcomes.find((outcome) => outcome.key === "likely");
     const maxRevenue = Math.max(...outcomes.map((outcome) => outcome.revenue), 1);
     const maxNetAbs = Math.max(...outcomes.map((outcome) => Math.abs(outcome.net)), 1);
@@ -7204,33 +7221,33 @@ function App() {
           "Simülasyon; Operations, Satış ve Finans verisi kaydedildikten sonra en anlamlı hale gelir. Eksik girdiler sağda işaretli.",
         )
       : copy(
-          `Likely net is ${formatLira(likelyOutcome.net)}, worst 5% net is ${formatLira(simulationWorstNet)}, and ${positiveOutcomeCount} of ${outcomes.length} scenario bands stay positive.`,
-          `Olası net ${formatLira(likelyOutcome.net)}, en kötü %5 net ${formatLira(simulationWorstNet)} ve ${outcomes.length} senaryo bandının ${positiveOutcomeCount} tanesi pozitif kalıyor.`,
+          `Base-case net is ${formatLira(likelyOutcome.net)}, the pessimistic case is ${formatLira(simulationWorstNet)}, and ${positiveOutcomeCount} of ${outcomes.length} scenarios stay positive.`,
+          `Baz senaryo net ${formatLira(likelyOutcome.net)}, kötümser senaryo ${formatLira(simulationWorstNet)}; ${outcomes.length} senaryonun ${positiveOutcomeCount} tanesi pozitif kalıyor.`,
         );
     const simulationSignalRows = [
       {
-        detail: copy(`${positiveOutcomeCount}/${outcomes.length} positive percentile bands`, `${outcomes.length} bandın ${positiveOutcomeCount} tanesi pozitif`),
-        label: copy("Positive bands", "Pozitif bantlar"),
+        detail: copy(`${positiveOutcomeCount}/${outcomes.length} scenarios with positive net`, `${outcomes.length} senaryonun ${positiveOutcomeCount} tanesi pozitif`),
+        label: copy("Positive scenarios", "Pozitif senaryolar"),
         tone: positiveOutcomeCount >= 3 ? "good" : positiveOutcomeCount >= 2 ? "watch" : "risk",
         value: `${simulationConfidencePercent}%`,
       },
       {
-        detail: copy("likely minus worst 5%", "olası eksi en kötü %5"),
+        detail: copy("base case minus pessimistic", "baz eksi kötümser"),
         label: copy("Downside gap", "Aşağı fark"),
         tone: simulationWorstNet >= 0 ? "good" : "risk",
         value: formatLira(simulationDownsideGap),
       },
       {
-        detail: copy("80th percentile minus likely", "80. persentil eksi olası"),
+        detail: copy("optimistic minus base case", "iyimser eksi baz"),
         label: copy("Upside room", "Yukarı alan"),
         tone: "good",
         value: formatLira(simulationUpsideGap),
       },
       {
-        detail: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("without bull/bear tendency", "boğa/ayı eğilimsiz") : copy("with bull/bear tendency", "boğa/ayı eğilimli"),
-        label: copy("Algorithm", "Algoritma"),
+        detail: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("assumption changes ignored", "varsayım değişiklikleri yok sayılıyor") : copy("assumption changes applied", "varsayım değişiklikleri uygulanıyor"),
+        label: copy("Mode", "Mod"),
         tone: "neutral",
-        value: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("Neutral", "Nötr") : copy("Tendency", "Eğilimli"),
+        value: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("Base", "Baz") : copy("Adjusted", "Ayarlı"),
       },
     ];
     return renderDashboardLayout(
@@ -7238,7 +7255,7 @@ function App() {
         <section className="simulation-workspace monte-carlo-workspace">
           <div className="simulation-header">
             <div>
-              <span>{dashboardCompanyName} / {copy("Monte Carlo Simulation", "Monte Carlo Simülasyonu")}</span>
+              <span>{dashboardCompanyName} / {copy("Scenario Analysis", "Senaryo Analizi")}</span>
               <h1>{variant.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : variant.name}</h1>
               <p>{copy("Variants are saved with simple product and sales assumptions. Outputs are recalculated from the saved operations, sales, and financial data available now.", "Varyantlar basit ürün ve satış varsayımlarıyla kaydedilir. Çıktılar kayıtlı operasyon, satış ve finans verilerinden yeniden hesaplanır.")}</p>
             </div>
@@ -7325,10 +7342,10 @@ function App() {
 
           <div className="monte-carlo-summary">
             {[
-              [copy("Most likely net", "En olası net"), formatLira(likelyOutcome.net), copy("50th percentile", "50. persentil")],
+              [copy("Base-case net", "Baz senaryo net"), formatLira(likelyOutcome.net), scenarioShiftLabel(0)],
               [copy("Break-even point", "Başa baş noktası"), `${formatNumber(likelyOutcome.breakEvenUnits)} ${copy("units", "adet")}`, copy("current price basis", "mevcut fiyat bazlı")],
-              [copy("Worst 5% net", "En kötü %5 net"), formatLira(outcomes[0].net), copy("highly risky scenario", "çok riskli senaryo")],
-              [copy("Revenue range", "Gelir aralığı"), `${formatLira(outcomes[1].revenue)} - ${formatLira(outcomes[3].revenue)}`, copy("20th to 80th percentile", "20-80 persentil")],
+              [copy("Pessimistic net", "Kötümser net"), formatLira(outcomes[0].net), outcomes[0].shiftLabel],
+              [copy("Revenue range", "Gelir aralığı"), `${formatLira(outcomes[1].revenue)} - ${formatLira(outcomes[3].revenue)}`, copy("cautious to optimistic", "temkinliden iyimsere")],
             ].map(([label, value, detail]) => (
               <article className="monte-carlo-stat" key={label}>
                 <span>{label}</span>
@@ -7385,14 +7402,15 @@ function App() {
               <article className="simulation-card percentile-card">
                 <div className="simulation-card-heading">
                   <div>
-                    <span>{copy("Percentile outcomes", "Persentil çıktıları")}</span>
-                    <h2>{copy("Bad, most likely, good and worst 5% scenarios", "Kötü, en olası, iyi ve en kötü %5 senaryolar")}</h2>
+                    <span>{copy("Sensitivity scenarios", "Duyarlılık senaryoları")}</span>
+                    <h2>{copy("Pessimistic, cautious, base and optimistic cases", "Kötümser, temkinli, baz ve iyimser senaryolar")}</h2>
+                    <p>{copy("Each case shifts base revenue by a fixed share of the volatility you enter (at least 8%). They show sensitivity, not probability.", "Her senaryo baz geliri, girdiğiniz oynaklığın (en az %8) sabit bir katı kadar kaydırır. Olasılık değil, duyarlılık gösterir.")}</p>
                   </div>
                 </div>
                 <div className="percentile-grid">
                   {outcomes.map((outcome) => (
                     <article className={`percentile-outcome ${outcome.tone}`} key={outcome.key}>
-                      <span>{outcome.percentile}</span>
+                      <span>{outcome.shiftLabel}</span>
                       <h3>{outcome.label}</h3>
                       <strong>{formatLira(outcome.net)}</strong>
                       <p>{copy("Revenue", "Gelir")}: {formatLira(outcome.revenue)}</p>
@@ -7413,12 +7431,18 @@ function App() {
                   <svg className="monte-chart break-even-chart" viewBox="0 0 620 280" role="img" aria-label={copy("Break-even chart", "Başa baş grafiği")}>
                     <path className="chart-grid" d="M42 40 H580 M42 90 H580 M42 140 H580 M42 190 H580 M42 240 H580" />
                     <path className="chart-axis" d="M42 28 V240 H585" />
-                    <path className="break-even-cost" d="M50 218 L130 202 L210 184 L290 166 L370 148 L450 130 L570 104" />
-                    <path className="break-even-revenue" d="M50 232 L130 206 L210 178 L290 150 L370 122 L450 94 L570 52" />
-                    <line className="break-even-marker" x1="285" x2="285" y1="42" y2="240" />
-                    <text className="chart-tick" x="294" y="68">{copy("Break-even", "Başa baş")}</text>
-                    <text className="chart-tick" x="48" y="262">{copy("Volume", "Hacim")}</text>
-                    <text className="chart-tick chart-tick-end" x="502" y="262">{copy("Projected sales", "Projeksiyon satış")}</text>
+                    <path className="break-even-cost" d={`M${chartX(0)} ${chartY(breakEvenFixedCost)} L${chartX(chartVolumeMax)} ${chartY(breakEvenFixedCost + (unitProductionCost * chartVolumeMax))}`} />
+                    <path className="break-even-revenue" d={`M${chartX(0)} ${chartY(0)} L${chartX(chartVolumeMax)} ${chartY(netUnitPrice * chartVolumeMax)}`} />
+                    {breakEvenVolume !== null && breakEvenVolume <= chartVolumeMax ? (
+                      <>
+                        <line className="break-even-marker" x1={chartX(breakEvenVolume)} x2={chartX(breakEvenVolume)} y1="42" y2="240" />
+                        <text className="chart-tick" x={chartX(breakEvenVolume) + 8} y="68">{copy("Break-even", "Başa baş")}: {formatNumber(breakEvenVolume)} {copy("units", "adet")}</text>
+                      </>
+                    ) : (
+                      <text className="chart-tick" x="60" y="68">{copy("No break-even: price does not cover unit cost", "Başa baş yok: fiyat birim maliyeti karşılamıyor")}</text>
+                    )}
+                    <text className="chart-tick" x="48" y="262">{copy("Units over the horizon", "Ufuk boyunca adet")}</text>
+                    <text className="chart-tick chart-tick-end" x="570" y="262" textAnchor="end">{copy("Projected sales", "Projeksiyon satış")}: {formatNumber(projectedVolume)}</text>
                   </svg>
                 </div>
                 <div className="chart-legend">
@@ -7480,28 +7504,10 @@ function App() {
                 </div>
               </article>
 
-              <article className="simulation-card path-preview-card simulation-trend-card">
-                <div className="simulation-card-heading">
-                  <div>
-                    <span>{copy("Sales path", "Satış yolu")}</span>
-                    <h2>{copy("Revenue sensitivity preview", "Gelir hassasiyeti önizlemesi")}</h2>
-                  </div>
-                </div>
-                <div className="simulation-chart-stage">
-                  <svg className="monte-chart path-preview-chart" viewBox="0 0 420 220" aria-hidden="true">
-                    <path className="chart-grid" d="M24 42 H396 M24 88 H396 M24 134 H396 M24 180 H396" />
-                    <path className="percentile-band" d="M28 166 C76 144 118 154 162 126 S248 108 294 82 360 80 392 58 L392 128 C340 140 312 154 266 166 S178 174 128 188 62 196 28 202 Z" />
-                    <path className="path-worst" d="M28 196 C74 184 118 190 164 176 S244 166 294 152 350 150 392 136" />
-                    <path className="path-likely" d="M28 168 C82 148 124 158 168 128 S248 118 296 90 352 82 392 68" />
-                    <path className="path-good" d="M28 142 C78 112 122 120 168 92 S248 74 296 54 350 46 392 34" />
-                  </svg>
-                </div>
-                <p>{copy("This preview shows how the selected sales assumptions can move revenue across low, likely, and high outcomes.", "Bu önizleme seçilen satış varsayımlarının geliri düşük, olası ve yüksek çıktılarda nasıl oynatabileceğini gösterir.")}</p>
-              </article>
 
               <article className="simulation-card risk-card">
-                <h2>{copy("Highly risky scenario", "Çok riskli senaryo")}</h2>
-                <p>{copy("The worst 5% outcome is displayed separately because it represents the tail-risk case that can threaten margin, cash flow, and break-even timing.", "En kötü %5 çıktı ayrı gösterilir; marjı, nakit akışını ve başa baş zamanlamasını tehdit edebilecek kuyruk riskini temsil eder.")}</p>
+                <h2>{copy("Pessimistic scenario", "Kötümser senaryo")}</h2>
+                <p>{copy("The pessimistic case is shown separately: if it is negative, check margin, cash and break-even timing before committing capital.", "Kötümser senaryo ayrıca gösterilir: negatifse sermaye bağlamadan önce marjı, nakdi ve başa baş zamanlamasını kontrol edin.")}</p>
                 <strong>{formatLira(outcomes[0].net)}</strong>
               </article>
             </aside>
