@@ -3365,52 +3365,30 @@ function App() {
     event.preventDefault();
     setAuthorizationStatus("");
 
-    if (!supabase || !currentProfile?.company?.name || !authorizationAccess.write) return;
+    if (!supabase || !currentProfile?.company_id || !authorizationAccess.write) return;
 
     setAuthorizationLoading(true);
     try {
-      const adminSession = session;
-      const { data, error } = await supabase.auth.signUp({
-        email: managedUserForm.email.trim(),
-        password: managedUserForm.password,
-        options: {
-          data: {
-            username: managedUserForm.username.trim(),
-            phone_number: managedUserForm.phoneNumber.trim(),
-            company: currentProfile.company.name,
-            department: managedUserForm.department.trim(),
-            access_level: managedUserForm.accessLevel,
-            language: managedUserForm.language,
-            theme,
-          },
+      // Users are created server-side so the company comes from the caller's
+      // profile, never from sign-up metadata the browser controls.
+      const { data, error } = await supabase.functions.invoke("create-company-user", {
+        body: {
+          accessLevel: managedUserForm.accessLevel,
+          department: managedUserForm.department.trim(),
+          email: managedUserForm.email.trim(),
+          language: managedUserForm.language,
+          password: managedUserForm.password,
+          phoneNumber: managedUserForm.phoneNumber.trim(),
+          theme,
+          username: managedUserForm.username.trim(),
         },
       });
 
-      if (error) throw error;
-      if (!data.user) throw new Error(labels.missingUser);
-
-      if (data.session && adminSession?.access_token && adminSession?.refresh_token) {
-        const { error: restoreError } = await supabase.auth.setSession({
-          access_token: adminSession.access_token,
-          refresh_token: adminSession.refresh_token,
-        });
-
-        if (restoreError) throw restoreError;
-        setSession(adminSession);
+      if (error) {
+        const detail = await error.context?.json?.().catch(() => null);
+        throw new Error(detail?.error || error.message);
       }
-
-      const { error: profileUpdateError } = await supabase
-        .from("profiles")
-        .update({
-          access_level: managedUserForm.accessLevel,
-          department: managedUserForm.department.trim(),
-          language: managedUserForm.language,
-          phone_number: managedUserForm.phoneNumber.trim(),
-          theme,
-        })
-        .eq("id", data.user.id);
-
-      if (profileUpdateError) throw profileUpdateError;
+      if (!data?.userId) throw new Error(labels.missingUser);
 
       setManagedUserForm({ ...emptyManagedUserForm, language: form.language });
       await loadAuthorizationData();
@@ -10526,7 +10504,7 @@ function App() {
                       <span>{labels.password}</span>
                       <input
                         disabled={!authorizationAccess.write || authorizationLoading}
-                        minLength="6"
+                        minLength="8"
                         required
                         type="password"
                         value={managedUserForm.password}

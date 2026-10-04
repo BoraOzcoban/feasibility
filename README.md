@@ -18,23 +18,34 @@ Fill `.env` with the values from your new Supabase project:
 
 ## Supabase setup
 
+Database changes live in `supabase/migrations` and are applied in file-name order.
+
+New project:
+
 1. Create a new Supabase project.
-2. Open `SQL Editor`.
-3. Run `supabase/schema.sql`.
-4. Optional: run `supabase/startup_feasibility_seed.sql` to load the functional cold-chain beverage startup test scenario.
-5. In `Authentication > URL Configuration`, set the site URL to your local Vite URL. This app usually runs at `http://127.0.0.1:5173` or `http://127.0.0.1:5174`.
-6. Add these to the redirect URLs:
+2. Apply the migrations, either with the Supabase CLI (`supabase link --project-ref <ref>`, then `supabase db push`) or by running each file in `supabase/migrations` in order in the SQL Editor.
+3. Optional: run `supabase/seeds/startup_feasibility_seed.sql` to load the functional cold-chain beverage startup test scenario.
+4. Deploy the user provisioning function: `supabase functions deploy create-company-user`.
+5. In `Authentication > Sign In / Providers`, turn off **Allow new users to sign up**. Company users are created by the function above, not by public sign-up.
+6. In `Authentication > URL Configuration`, set the site URL to your local Vite URL. This app usually runs at `http://127.0.0.1:5173` or `http://127.0.0.1:5174`.
+7. Add these to the redirect URLs:
    - `http://127.0.0.1:5173/login`
    - `http://127.0.0.1:5174/login`
-7. Confirm the storage bucket named `profile-pictures` exists and is private. The SQL file creates it and applies owner-only policies.
+8. Confirm the storage bucket named `profile-pictures` exists and is private. The baseline migration creates it and applies owner-only policies.
+
+Existing project that was set up with the old `schema.sql` and patch files: the baseline migration is that same schema, so mark it as applied instead of running it (`supabase migration repair --status applied 20261004000000`), then apply the later migrations.
+
+`supabase/legacy-patches` holds the old hand-run patches for history only. Do not run them; see the README in that folder.
 
 Passwords are not stored in `public.profiles`. Supabase Auth stores password hashes securely in its own auth schema.
 
 ## Access model
 
-Users do not self-register from the public login screen. Company admins create users from `Yetkilendirme > Kullanıcı tanımlama`, which creates the Supabase Auth user and the matching profile record.
+Users do not self-register. Company admins create users from `Yetkilendirme > Kullanıcı tanımlama`. The browser calls the `create-company-user` Edge Function, which checks that the caller has write access to the authorization module and creates the user in the caller's company with the service role.
 
-The first company admin should be created through Supabase/Auth setup or an already trusted admin flow. After that, users should be provisioned in the app.
+A new user joins an existing company only through `app_metadata.company_id`, which only the service role can set. Anyone who signs up without it gets a new, separate company and becomes its admin, so a company name typed at sign-up can never be used to join someone else's company.
+
+The first admin of a company can be created in the Supabase dashboard (`Authentication > Users > Add user`). They get their own new company; to put them into an existing company, set `company_id` (and optionally `access_level`) in their app metadata.
 
 ## QA commands
 
