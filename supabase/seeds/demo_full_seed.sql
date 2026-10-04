@@ -1,5 +1,5 @@
 -- Demo seed for Atera.
--- Run after schema.sql + patch files in the Supabase SQL Editor.
+-- Run after the migrations in supabase/migrations.
 -- It seeds every company with a complete, form-filled scenario so the app can be tested visually.
 -- Re-running is safe: demo plans/one-off demo records are replaced, master records are upserted.
 

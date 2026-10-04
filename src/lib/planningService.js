@@ -96,7 +96,7 @@ function throwPlanningError(error) {
     message.includes("schema cache") ||
     message.includes("Could not find the table")
   ) {
-    throw new Error("Planning tables are missing in Supabase. Run supabase/planning_patch.sql in the Supabase SQL Editor, then refresh this page.");
+    throw new Error("Planning tables are missing in the database. Apply the migrations in supabase/migrations, then refresh this page.");
   }
 
   throw error;

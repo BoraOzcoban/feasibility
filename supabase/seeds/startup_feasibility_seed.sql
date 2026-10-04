@@ -1,5 +1,5 @@
 -- Startup feasibility seed for the functional cold-chain beverage scenario.
--- Run after schema.sql and the patch files. Re-running is safe for the records
+-- Run after the migrations in supabase/migrations. Re-running is safe for the records
 -- owned by this scenario. It seeds each company with one coherent test case.
 
 insert into public.companies (name)
