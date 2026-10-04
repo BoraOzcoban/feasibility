@@ -23798,3 +23798,190 @@ body > .floating-info-tip-panel,
     grid-template-columns: 1fr;
   }
 }
+
+/* Printable report (Reports > PDF). Plain, light and readable on paper. */
+.print-report {
+  --print-ink: #1d2328;
+  --print-muted: #5b6168;
+  --print-line: #d9d9d6;
+  --print-brand: #00263e;
+  background: #ffffff;
+  color: var(--print-ink);
+  margin: 0 auto;
+  max-width: 1040px;
+  min-height: 100vh;
+  padding: 32px 40px 56px;
+}
+
+.print-toolbar {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+}
+
+.print-toolbar button {
+  background: #ffffff;
+  border: 1px solid var(--print-line);
+  border-radius: 8px;
+  color: var(--print-ink);
+  cursor: pointer;
+  font-weight: 600;
+  padding: 10px 16px;
+}
+
+.print-toolbar button.primary {
+  background: var(--print-brand);
+  border-color: var(--print-brand);
+  color: #ffffff;
+}
+
+.print-cover {
+  border-bottom: 3px solid var(--print-brand);
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+}
+
+.print-cover span,
+.print-cover small {
+  color: var(--print-muted);
+  font-size: 13px;
+}
+
+.print-cover h1 {
+  color: var(--print-brand);
+  font-size: 28px;
+  margin: 4px 0;
+}
+
+.print-cover p {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.print-section {
+  break-inside: avoid;
+  margin-bottom: 28px;
+}
+
+.print-section h2 {
+  color: var(--print-brand);
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+
+.print-verdict {
+  font-size: 15px;
+  margin: 0 0 16px;
+}
+
+.print-verdict strong {
+  margin-right: 6px;
+}
+
+.print-kpis {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.print-kpis div {
+  border: 1px solid var(--print-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.print-kpis span {
+  color: var(--print-muted);
+  display: block;
+  font-size: 12px;
+}
+
+.print-kpis strong {
+  font-size: 16px;
+}
+
+.print-table {
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.print-table th,
+.print-table td {
+  border-bottom: 1px solid var(--print-line);
+  padding: 6px 8px;
+  text-align: right;
+}
+
+.print-table th:first-child,
+.print-table td:first-child {
+  text-align: left;
+}
+
+.print-table th {
+  color: var(--print-muted);
+  font-weight: 600;
+}
+
+.print-table tr.emphasis td {
+  font-weight: 700;
+}
+
+.print-table td small {
+  color: var(--print-muted);
+  display: block;
+  font-size: 11px;
+}
+
+.print-table-compact {
+  max-width: 560px;
+}
+
+.print-risks {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.print-risks li {
+  margin-bottom: 6px;
+}
+
+.print-footer {
+  border-top: 1px solid var(--print-line);
+  color: var(--print-muted);
+  font-size: 11.5px;
+  padding-top: 12px;
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+    size: A4;
+  }
+
+  .print-toolbar {
+    display: none;
+  }
+
+  .print-report {
+    max-width: none;
+    padding: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .print-report {
+    padding: 16px;
+  }
+
+  .print-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .print-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

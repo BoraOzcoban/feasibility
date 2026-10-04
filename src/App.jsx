@@ -46,6 +46,7 @@ import {
 import { calculateCurrentPlanResult, getCurrentOperationPlans, hasViablePlanResult } from "./lib/operationsCalculations";
 import { emptyOperationForms, emptyOperationPlan, emptyPlanRows, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
 import { deleteSimulationVariantRecord, emptySalesStrategy, emptySimulationVariant, loadSalesStrategy, loadSimulationVariants, saveSalesStrategy, saveSimulationVariant } from "./lib/planningService";
+import { buildFeasibilityReport, buildReportSheets, getStatementLayout, reportPackSections } from "./lib/reportExport";
 import logoUrl from "./assets/atera-logo.svg";
 
 const emptyForm = {
@@ -90,9 +91,15 @@ function isAdminRole(roleOrName) {
   return String(name || "").trim().toLowerCase() === "admin";
 }
 
+// A value that rounds to zero would otherwise print as "-0" / "-₺0".
+function withoutNegativeZero(value, maximumFractionDigits) {
+  const number = Number(value) || 0;
+  return Math.abs(number) < 0.5 * 10 ** -maximumFractionDigits ? 0 : number;
+}
+
 function formatNumber(value, maximumFractionDigits = 0) {
   const locale = document.documentElement.lang === "tr" ? "tr-TR" : "en-US";
-  return new Intl.NumberFormat(locale, { maximumFractionDigits }).format(value || 0);
+  return new Intl.NumberFormat(locale, { maximumFractionDigits }).format(withoutNegativeZero(value, maximumFractionDigits));
 }
 
 function formatLira(value, maximumFractionDigits = 0) {
@@ -101,7 +108,7 @@ function formatLira(value, maximumFractionDigits = 0) {
     currency: "TRY",
     maximumFractionDigits,
     style: "currency",
-  }).format(value || 0);
+  }).format(withoutNegativeZero(value, maximumFractionDigits));
 }
 
 function useMatchedPanelHeight(dependencyKey) {
@@ -648,6 +655,7 @@ function applyGlobalTermInfobars(root, language) {
       || element.closest(".info-tip")
       || element.closest(".info-tip-panel")
       || element.closest(".floating-info-tip-panel")
+      || element.closest(".print-report")
       || element.closest(".dashboard-sidebar")
       || element.closest(".landing-nav")
       || element.closest(".dashboard-nav")
@@ -684,7 +692,7 @@ function formatCurrencyAmount(value, currency = "TRY", maximumFractionDigits = 0
       currency: currencyCode,
       maximumFractionDigits,
       style: "currency",
-    }).format(value || 0);
+    }).format(withoutNegativeZero(value, maximumFractionDigits));
   } catch {
     return `${formatNumber(value, maximumFractionDigits)} ${currencyCode}`;
   }
@@ -3163,25 +3171,35 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
-  function downloadReportPlaceholder(report, format) {
-    const extension = format.extension || format.key;
-    const fileSafeName = `${report.key || "report"}-${new Date().toISOString().slice(0, 10)}`.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
-    const body = [
-      "Atera report export placeholder",
-      `Report: ${report.label || report.title}`,
-      `Format: ${format.label}`,
-      `Period: ${periodLabel}`,
-      `Created by: ${currentProfile?.username || currentProfile?.email || "Atera"}`,
-      "",
-      "Real PDF/XLSX/PPTX generation will be connected later. This file is downloaded locally only and is not saved to the database.",
-    ].join("\n");
-    const blob = new Blob([body], { type: format.mime || "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${fileSafeName}.${extension}`;
-    link.click();
-    URL.revokeObjectURL(url);
+  function buildExportReport() {
+    const exportModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, "5y");
+
+    return buildFeasibilityReport({
+      companyName: dashboardCompanyName,
+      model: exportModel,
+      operationsWorkspace: operationsWorkspaceForFinance,
+      productName: dashboardProductName,
+      risks: dashboardRiskRows.map((risk) => ({ detail: risk.detail, title: risk.title })),
+      salesStrategy,
+      settings: financialSettingsForModel,
+      t: copy,
+      verdict: { copy: feasibilityVerdict.copy, label: feasibilityVerdict.label },
+    });
+  }
+
+  async function downloadReport(pack, format) {
+    if (format.key === "pdf") {
+      goTo(`/reports/print/${pack.key}`, "login");
+      return;
+    }
+
+    try {
+      const { default: writeXlsxFile } = await import("write-excel-file/browser");
+      const fileName = `atera-${pack.key}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      await writeXlsxFile(buildReportSheets(buildExportReport(), pack.key, copy)).toFile(fileName);
+    } catch (error) {
+      window.alert(`${copy("The spreadsheet could not be created:", "Tablo oluşturulamadı:")} ${error.message}`);
+    }
   }
 
   function normalizeRole(role) {
@@ -8672,14 +8690,13 @@ function App() {
   ];
   const activeReportTab = reportTabs.find((tab) => tab.key === reportsTab) || reportTabs[0];
   const reportFormats = [
-    { extension: "pdf", key: "pdf", label: "PDF", mime: "application/pdf", note: copy("presentation-ready document", "sunuma hazır doküman") },
+    { extension: "pdf", key: "pdf", label: "PDF", mime: "application/pdf", note: copy("print-ready report", "yazdırmaya hazır rapor") },
     { extension: "xlsx", key: "xlsx", label: "XLSX", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", note: copy("spreadsheet model extract", "tablo model çıktısı") },
-    { extension: "pptx", key: "pptx", label: "PPTX", mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", note: copy("slide deck for meetings", "toplantı sunum dosyası") },
   ];
   const reportStats = [
     [copy("Selected pack", "Seçili paket"), activeReportTab.label, copy("choose one report type", "tek rapor türü seçin")],
-    [copy("Output formats", "Çıktı formatları"), "PDF / XLSX / PPTX", copy("download only", "yalnızca indir")],
-    [copy("Storage", "Kayıt"), copy("Local file", "Lokal dosya"), copy("not saved to database", "database'e kaydedilmez")],
+    [copy("Output formats", "Çıktı formatları"), "PDF / XLSX", copy("built from current data", "güncel veriden üretilir")],
+    [copy("Storage", "Kayıt"), copy("Local file", "Lokal dosya"), copy("not archived", "arşivlenmez")],
     [copy("Period", "Dönem"), periodLabel, copy("uses current horizon", "mevcut ufku kullanır")],
   ];
   const financeWindowLabel =
@@ -9268,6 +9285,203 @@ function App() {
     );
   }
 
+  function renderPrintableReport(packKey) {
+    const pack = reportTabs.find((tab) => tab.key === packKey) || reportTabs[0];
+    const sections = reportPackSections[pack.key] || reportPackSections.full;
+    const report = buildExportReport();
+    const layout = getStatementLayout(copy);
+    const has = (section) => sections.includes(section);
+    const formatKpi = (value, format) => {
+      if (format === "month") return value ? `${formatNumber(value)}. ${copy("month", "ay")}` : copy("Not reached", "Ulaşılmadı");
+      return formatLira(value, format === "money2" ? 2 : 0);
+    };
+    const renderStatement = (title, rows) => (
+      <section className="print-section">
+        <h2>{title}</h2>
+        <table className="print-table">
+          <thead>
+            <tr>
+              <th>{copy("TRY", "TL")}</th>
+              {report.years.map((year) => <th key={year.label}>{copy(`Year ${year.label}`, `Yıl ${year.label}`)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr className={row.emphasis ? "emphasis" : ""} key={row.key}>
+                <td>{row.label}</td>
+                {report.years.map((year) => (
+                  <td key={year.label}>
+                    {row.format === "percent" ? `${formatNumber(year[row.key], 1)}%` : formatLira(year[row.key])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    );
+
+    return (
+      <main className="print-report">
+        <div className="print-toolbar">
+          <button type="button" onClick={() => goTo("/reports", "login")}>{copy("Back", "Geri")}</button>
+          <button type="button" className="primary" onClick={() => window.print()}>{copy("Print / Save as PDF", "Yazdır / PDF olarak kaydet")}</button>
+        </div>
+
+        <header className="print-cover">
+          <span>{pack.label}</span>
+          <h1>{report.companyName}</h1>
+          <p>{report.productName}</p>
+          <small>{copy("Prepared on", "Hazırlanma tarihi")} {new Date().toLocaleDateString(locale)} · {copy("5-year projection", "5 yıllık projeksiyon")}</small>
+        </header>
+
+        {has("summary") && (
+          <section className="print-section">
+            <h2>{copy("Decision", "Karar")}</h2>
+            <p className="print-verdict"><strong>{report.verdict.label}</strong> {report.verdict.copy}</p>
+            <div className="print-kpis">
+              {report.kpis.map(([label, value, format]) => (
+                <div key={label}>
+                  <span>{label}</span>
+                  <strong>{formatKpi(value, format)}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {has("assumptions") && (
+          <section className="print-section">
+            <h2>{copy("Key assumptions", "Temel varsayımlar")}</h2>
+            <table className="print-table print-table-compact">
+              <tbody>
+                {report.assumptions.map(([label, value]) => (
+                  <tr key={label}><td>{label}</td><td>{formatNumber(value, 2)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {has("income") && renderStatement(copy("Income statement", "Gelir tablosu"), layout.income)}
+        {has("cash") && renderStatement(copy("Cash flow", "Nakit akışı"), layout.cash)}
+        {has("balance") && renderStatement(copy("Balance sheet (year end)", "Bilanço (yıl sonu)"), layout.balance)}
+
+        {has("loans") && report.loans.length > 0 && (
+          <section className="print-section">
+            <h2>{copy("Loans", "Krediler")}</h2>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>{copy("Loan", "Kredi")}</th>
+                  <th>{copy("Amount", "Tutar")}</th>
+                  <th>{copy("Interest % / year", "Faiz % / yıl")}</th>
+                  <th>{copy("Term (months)", "Vade (ay)")}</th>
+                  <th>{copy("Grace (months)", "Ödemesiz (ay)")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.loans.map((loan) => (
+                  <tr key={`${loan.name}-${loan.receivedDate}`}>
+                    <td>{loan.name}</td>
+                    <td>{formatCurrencyAmount(loan.amount, loan.currency)}</td>
+                    <td>{formatNumber(loan.annualInterestRate, 2)}</td>
+                    <td>{formatNumber(loan.loanTermMonths)}</td>
+                    <td>{formatNumber(loan.gracePeriodMonths)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {has("operations") && (
+          <section className="print-section">
+            <h2>{copy("Production plans", "Üretim planları")}</h2>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>{copy("Plan", "Plan")}</th>
+                  <th>{copy("Output / day", "Çıktı / gün")}</th>
+                  <th>{copy("Material / unit", "Malzeme / birim")}</th>
+                  <th>{copy("Labour / unit", "İşçilik / birim")}</th>
+                  <th>{copy("Energy / unit", "Enerji / birim")}</th>
+                  <th>{copy("Daily cost", "Günlük maliyet")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.plans.map((plan) => (
+                  <tr key={plan.name}>
+                    <td>{plan.name}<small>{plan.product}</small></td>
+                    <td>{formatNumber(plan.dailyOutput)}{plan.dailyOutput < plan.target ? ` / ${formatNumber(plan.target)}` : ""}</td>
+                    <td>{formatLira(plan.unitMaterial, 2)}</td>
+                    <td>{formatLira(plan.unitLabor, 2)}</td>
+                    <td>{formatLira(plan.unitEnergy, 2)}</td>
+                    <td>{formatLira(plan.dailyCost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {has("sales") && (
+          <section className="print-section">
+            <h2>{copy("Sales channels", "Satış kanalları")}</h2>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>{copy("Channel", "Kanal")}</th>
+                  <th>{copy("First month units", "İlk ay adet")}</th>
+                  <th>{copy("Unit price", "Birim fiyat")}</th>
+                  <th>{copy("Commission %", "Komisyon %")}</th>
+                  <th>{copy("Collection days", "Tahsilat günü")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.channels.map((channel) => (
+                  <tr key={channel.name}>
+                    <td>{channel.name}<small>{channel.product}</small></td>
+                    <td>{formatNumber(channel.firstMonthUnits)}</td>
+                    <td>{formatLira(channel.unitPrice, 2)}</td>
+                    <td>{formatNumber(channel.commissionPercent, 1)}</td>
+                    <td>{formatNumber(channel.collectionDays)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>{copy("Units", "Adet")}</th>
+                  {report.years.map((year) => <th key={year.label}>{copy(`Year ${year.label}`, `Yıl ${year.label}`)}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>{copy("Produced", "Üretilen")}</td>{report.years.map((year) => <td key={year.label}>{formatNumber(year.producedUnits)}</td>)}</tr>
+                <tr><td>{copy("Sold", "Satılan")}</td>{report.years.map((year) => <td key={year.label}>{formatNumber(year.netSoldUnits)}</td>)}</tr>
+                <tr><td>{copy("In stock at year end", "Yıl sonu stok")}</td>{report.years.map((year) => <td key={year.label}>{formatNumber(year.inventoryUnits)}</td>)}</tr>
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {has("risks") && report.risks.length > 0 && (
+          <section className="print-section">
+            <h2>{copy("Risks to resolve", "Çözülmesi gereken riskler")}</h2>
+            <ul className="print-risks">
+              {report.risks.map((risk) => <li key={risk.title}><strong>{risk.title}</strong> {risk.detail}</li>)}
+            </ul>
+          </section>
+        )}
+
+        <footer className="print-footer">
+          {copy("Prices and costs exclude VAT. Projections are estimates based on the assumptions entered in Atera.", "Fiyat ve maliyetler KDV hariçtir. Projeksiyonlar Atera'ya girilen varsayımlara dayanan tahminlerdir.")}
+        </footer>
+      </main>
+    );
+  }
+
   function renderDashboardLayout(activePage, children) {
     return (
       <>
@@ -9605,6 +9819,10 @@ function App() {
         </section>
       </main>
     );
+  }
+
+  if (session && routePath.startsWith("/reports/print/")) {
+    return renderPrintableReport(routePath.split("/")[3]);
   }
 
   if (session && routePath === "/dashboard") {
@@ -10297,11 +10515,11 @@ function App() {
               <div>
                 <span>{dashboardCompanyName} / {copy("Export center", "Export merkezi")}</span>
                 <h1>{copy("Report Downloads", "Rapor İndirme")}</h1>
-                <p>{copy("Choose one report pack and download it as PDF, XLSX, or PPTX. This page does not save reports to Supabase or keep a report archive.", "Bir rapor paketi seçin ve PDF, XLSX veya PPTX olarak indirin. Bu sayfa raporları Supabase'e kaydetmez ve rapor arşivi tutmaz.")}</p>
+                <p>{copy("Choose a report pack and download it as PDF or XLSX. Reports are built from the current data and are not archived.", "Bir rapor paketi seçin ve PDF ya da XLSX olarak indirin. Raporlar güncel veriden üretilir, arşivlenmez.")}</p>
               </div>
               <div className="reports-header-panel" aria-label={copy("Download behavior", "İndirme davranışı")}>
                 <strong>{copy("Download only", "Sadece indir")}</strong>
-                <span>{copy("No database save", "Database kaydı yok")}</span>
+                <span>{copy("Not archived", "Arşivlenmez")}</span>
               </div>
             </div>
 
@@ -10360,14 +10578,14 @@ function App() {
                   </div>
                   <div className="reports-format-grid">
                     {reportFormats.map((format) => (
-                      <button type="button" onClick={() => downloadReportPlaceholder(activeReportTab, format)} key={format.key}>
+                      <button type="button" onClick={() => downloadReport(activeReportTab, format)} key={format.key}>
                         <strong>{format.label}</strong>
                         <span>{format.note}</span>
                         <small>{copy("Download", "İndir")}</small>
                       </button>
                     ))}
                   </div>
-                  <p>{copy("These buttons currently download placeholder files with the selected extension. Real report rendering can be connected later.", "Bu butonlar şimdilik seçilen uzantıyla placeholder dosya indirir. Gerçek rapor üretimi daha sonra bağlanabilir.")}</p>
+                  <p>{copy("PDF opens a print-ready report; choose \"Save as PDF\" in the print dialog. XLSX downloads the statements as a spreadsheet.", "PDF, yazdırmaya hazır raporu açar; yazdırma penceresinde \"PDF olarak kaydet\"i seçin. XLSX tabloları Excel dosyası olarak indirir.")}</p>
                 </article>
 
                 <article className="reports-card reports-readiness-card">
