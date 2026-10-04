@@ -400,6 +400,114 @@ export function calculateChannelMonth(monthIndex, salesStrategy, operationsWorks
   };
 }
 
+function buildIdMap(rows) {
+  return new Map(asObjectArray(rows).map((row) => [row.id, row]));
+}
+
+// Daily cost of one saved process plan, priced with the current (TRY-converted)
+// material, workforce and electricity records so price edits apply without
+// re-saving the plan.
+export function calculatePlanDailyCost(result = {}, operationsWorkspace = {}, settings = {}) {
+  const materials = buildIdMap(operationsWorkspace.materials);
+  const workforce = buildIdMap(operationsWorkspace.workforce);
+  const producedQuantity = Math.max(0, toFiniteNumber(result?.producedQuantity));
+  const electricityPrice = Math.max(0, toFiniteNumber(settings.electricityPricePerKwh));
+  const missingMaterialPrices = [];
+  const missingWorkforceRates = [];
+
+  const material = asObjectArray(result?.materialRows).reduce((total, row) => {
+    const record = materials.get(row.materialId) || row.material || null;
+    const price = Math.max(0, toFiniteNumber(record?.price_per_unit));
+    const quantity = Math.max(0, toFiniteNumber(row.dailyQuantity));
+    if (quantity > 0 && price <= 0) missingMaterialPrices.push(record?.name || row.name || row.materialId);
+    return total + (quantity * price);
+  }, 0);
+
+  const labor = asObjectArray(result?.workforceRows).reduce((total, row) => {
+    const record = workforce.get(row.workforceId);
+    const rate = Math.max(0, toFiniteNumber(record?.hourly_cost));
+    const hours = Math.max(
+      0,
+      toFiniteNumber(row.hoursUsed, toFiniteNumber(row.peopleAssigned) * toFiniteNumber(row.dailyHours)),
+    );
+    if (hours > 0 && rate <= 0) missingWorkforceRates.push(record?.role_name || row.roleName || row.workforceId);
+    return total + (hours * rate);
+  }, 0);
+
+  const machineRows = asObjectArray(result?.machineRows);
+  const energyKwh = machineRows.length
+    ? machineRows.reduce((total, row) => total + Math.max(0, toFiniteNumber(row.energyConsumptionKwh)), 0)
+    : Math.max(0, toFiniteNumber(result?.energyConsumptionKwh));
+  const energy = energyKwh * electricityPrice;
+  const perUnit = (value) => (producedQuantity > 0 ? value / producedQuantity : 0);
+
+  return {
+    daily: { energy, labor, material, total: material + labor + energy },
+    energyKwh,
+    missingElectricityPrice: energyKwh > 0 && electricityPrice <= 0,
+    missingMaterialPrices,
+    missingWorkforceRates,
+    producedQuantity,
+    unit: {
+      energy: perUnit(energy),
+      labor: perUnit(labor),
+      material: perUnit(material),
+      total: perUnit(material + labor + energy),
+    },
+  };
+}
+
+export function buildProductionCostProfile(activePlans = [], operationsWorkspace = {}, settings = {}) {
+  const daily = { energy: 0, labor: 0, material: 0 };
+  const warnings = { missingElectricityPrice: false, missingMaterialPrices: new Set(), missingWorkforceRates: new Set() };
+  let dailyProduced = 0;
+
+  activePlans.forEach((plan) => {
+    const cost = calculatePlanDailyCost(plan.result, operationsWorkspace, settings);
+    dailyProduced += cost.producedQuantity;
+    daily.energy += cost.daily.energy;
+    daily.labor += cost.daily.labor;
+    daily.material += cost.daily.material;
+    cost.missingMaterialPrices.forEach((name) => warnings.missingMaterialPrices.add(name));
+    cost.missingWorkforceRates.forEach((name) => warnings.missingWorkforceRates.add(name));
+    warnings.missingElectricityPrice = warnings.missingElectricityPrice || cost.missingElectricityPrice;
+  });
+
+  const perUnit = (value) => (dailyProduced > 0 ? value / dailyProduced : 0);
+
+  return {
+    daily,
+    dailyProduced,
+    unit: {
+      energy: perUnit(daily.energy),
+      labor: perUnit(daily.labor),
+      material: perUnit(daily.material),
+    },
+    warnings: {
+      missingElectricityPrice: warnings.missingElectricityPrice,
+      missingMaterialPrices: Array.from(warnings.missingMaterialPrices),
+      missingWorkforceRates: Array.from(warnings.missingWorkforceRates),
+    },
+  };
+}
+
+// Campaign budgets have no start date yet, so each one is spread evenly over its
+// duration starting in the first projection month.
+export function buildCampaignSpendSchedule(campaigns = [], monthCount = 0) {
+  const schedule = Array.from({ length: Math.max(0, monthCount) }, () => 0);
+
+  asObjectArray(campaigns).forEach((campaign) => {
+    const budget = Math.max(0, toFiniteNumber(campaign.budget));
+    if (!budget) return;
+    const months = Math.max(1, Math.ceil(Math.max(0, toFiniteNumber(campaign.durationDays, 30)) / 30));
+    for (let index = 0; index < months && index < schedule.length; index += 1) {
+      schedule[index] += budget / months;
+    }
+  });
+
+  return schedule;
+}
+
 export function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput, operationsWorkspace, horizon) {
   const settings = {
     ...defaultFinancialSettings,
@@ -411,40 +519,29 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
   const workingDaysPerMonth = Math.max(1, toFiniteNumber(settings.workingDaysPerMonth, 22));
   const investmentGrantAmount = Math.max(0, toFiniteNumber(settings.investmentGrantAmount));
   const initialCapacityUnits = Math.max(0, toFiniteNumber(settings.initialCapacityUnits));
-  const dailyProduced = activePlans.reduce((total, plan) => total + Math.max(0, toFiniteNumber(plan.result?.producedQuantity)), 0);
-  const operationCostResult = settings.operationCostResult || null;
-  const eurToTry =
-    getCurrencyRateToTry(settings.exchangeRates, "EUR") ||
-    Math.max(0, toFiniteNumber(operationCostResult?.assumptions?.common?.tryPerEur));
-  const costBreakdownEur = operationCostResult?.breakdown || {};
-  const unitMaterialCost = operationCostResult
-    ? (toFiniteNumber(costBreakdownEur.material) + toFiniteNumber(costBreakdownEur.consumables)) * eurToTry
-    : 0;
-  const unitWorkforceCost = operationCostResult
-    ? toFiniteNumber(costBreakdownEur.labor) * eurToTry
-    : 0;
-  const unitElectricityCost = operationCostResult
-    ? toFiniteNumber(costBreakdownEur.electricity) * eurToTry
-    : 0;
-  const unitOtherProductionCost = operationCostResult
-    ? (
-        toFiniteNumber(costBreakdownEur.depreciation) +
-        toFiniteNumber(costBreakdownEur.maintenance) +
-        toFiniteNumber(costBreakdownEur.mold)
-      ) * eurToTry
-    : 0;
-  const unitProductionCost = operationCostResult
-    ? toFiniteNumber(operationCostResult.totalUnitCostEur) * eurToTry
-    : 0;
-  const dailyMaterialCost = dailyProduced * unitMaterialCost;
-  const dailyWorkforceCost = dailyProduced * unitWorkforceCost;
-  const dailyElectricityCost = dailyProduced * unitElectricityCost;
+  const costProfile = buildProductionCostProfile(activePlans, operationsWorkspace, settings);
+  const dailyProduced = costProfile.dailyProduced;
+  const unitMaterialCost = costProfile.unit.material;
+  const unitWorkforceCost = costProfile.unit.labor;
+  const unitElectricityCost = costProfile.unit.energy;
+  const unitOtherProductionCost = 0;
+  const unitProductionCost = unitMaterialCost + unitWorkforceCost + unitElectricityCost + unitOtherProductionCost;
+  const dailyMaterialCost = costProfile.daily.material;
+  const dailyWorkforceCost = costProfile.daily.labor;
   const uniqueMachines = new Map();
+
+  const machineRecords = buildIdMap(operationsWorkspace.machines);
 
   activePlans.forEach((plan) => {
     (plan.result?.machineRows || []).forEach((row) => {
       if (row.machineId && !uniqueMachines.has(row.machineId)) {
-        uniqueMachines.set(row.machineId, Math.max(0, toFiniteNumber(row.price)));
+        // Saved plan rows keep the machine price in its original currency; the
+        // workspace record is already converted to TRY.
+        const record = machineRecords.get(row.machineId);
+        const price = record
+          ? toFiniteNumber(record.price)
+          : (normalizeCurrencyCode(row.priceCurrency) === "TRY" ? toFiniteNumber(row.price) : 0);
+        uniqueMachines.set(row.machineId, Math.max(0, price));
       }
     });
   });
@@ -513,6 +610,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     }
   });
   const taxPayments = Array.from({ length: monthCount + taxPaymentDelayMonths + 24 }, () => 0);
+  const campaignSchedule = buildCampaignSpendSchedule(salesStrategy.campaigns, monthCount);
   const rows = [];
   const loanBalances = loanRows.map((row) => row.amount);
   let cashBalance = initialCash + initialLoanFunding + investmentGrantAmount - initialInvestment - adjustedWorkingCapitalRequirement;
@@ -530,6 +628,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     incomeTax: 0,
     loanInterest: 0,
     loanPayment: 0,
+    marketingCost: 0,
     materialCost: 0,
     netIncome: 0,
     otherProductionCost: 0,
@@ -561,6 +660,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       monthlyUnitElectricityCost +
       monthlyUnitOtherProductionCost;
     const monthlyExtraRecurringCost = extraRecurringCost * overheadCostMultiplier;
+    const marketingCost = campaignSchedule[index] || 0;
     const plannedProducedUnits = dailyProduced * workingDaysPerMonth;
     const producedUnits = index === 0 && initialCapacityUnits > 0
       ? Math.min(plannedProducedUnits, initialCapacityUnits)
@@ -616,11 +716,11 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     const outputVat = channelMonth.revenue * salesVatRate;
     const inputVat = Math.max(
       0,
-      (materialCost + electricityCost + otherProductionCost + monthlyExtraRecurringCost) *
+      (materialCost + electricityCost + otherProductionCost + monthlyExtraRecurringCost + marketingCost) *
         expenseVatRate,
     );
     const vatPayable = Math.max(0, outputVat - inputVat);
-    const profitBeforeTax = channelMonth.revenue - cogsSold - writeOffCost - monthlyExtraRecurringCost - loanInterest;
+    const profitBeforeTax = channelMonth.revenue - cogsSold - writeOffCost - monthlyExtraRecurringCost - marketingCost - loanInterest;
     const incomeTax = Math.max(0, profitBeforeTax * incomeTaxRate);
     const netIncome = profitBeforeTax - incomeTax;
     const taxPaymentIndex = index + taxPaymentDelayMonths;
@@ -628,8 +728,8 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       taxPayments[taxPaymentIndex] += vatPayable + incomeTax;
     }
     const taxCashOut = taxPayments[index] || 0;
-    const cashFlow = cashIn - cashProductionCost - monthlyExtraRecurringCost - loanPayment - taxCashOut;
-    const totalCost = cogsSold + writeOffCost + monthlyExtraRecurringCost + loanInterest + incomeTax;
+    const cashFlow = cashIn - cashProductionCost - monthlyExtraRecurringCost - marketingCost - loanPayment - taxCashOut;
+    const totalCost = cogsSold + writeOffCost + monthlyExtraRecurringCost + marketingCost + loanInterest + incomeTax;
 
     cashBalance += cashFlow;
     cumulativePayback += cashFlow;
@@ -655,6 +755,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     totals.incomeTax += incomeTax;
     totals.loanInterest += loanInterest;
     totals.loanPayment += loanPayment;
+    totals.marketingCost += marketingCost;
     totals.materialCost += materialCost;
     totals.netIncome += netIncome;
     totals.otherProductionCost += otherProductionCost;
@@ -676,6 +777,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       forecastUnits,
       incomeTax,
       loanInterest,
+      marketingCost,
       materialCost,
       netIncome,
       netSoldUnits: channelMonth.netSoldUnits,
@@ -717,6 +819,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       { amount: totals.otherProductionCost, id: "otherProductionCost", label: "Depreciation, maintenance and mold" },
       { amount: totals.expiredWriteOffCost, id: "writeOffCost", label: "Spoilage, returns and expired write-off" },
       { amount: extraRecurringCost * monthCount, id: "recurringExtraCost", label: "Recurring overhead" },
+      { amount: totals.marketingCost, id: "marketingCost", label: "Marketing campaigns" },
       { amount: totals.vatPayable, id: "vatPayable", label: "VAT payable" },
       { amount: totals.incomeTax, id: "incomeTax", label: "Income tax" },
       { amount: totals.loanInterest, id: "loanInterest", label: "Loan interest" },
@@ -730,6 +833,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       { amount: totals.electricityCost, costType: "recurring", id: "electricityCost", kind: "cost", label: "Electricity" },
       { amount: totals.otherProductionCost, costType: "recurring", id: "otherProductionCost", kind: "cost", label: "Depreciation, maintenance and mold" },
       { amount: totals.expiredWriteOffCost, costType: "recurring", id: "writeOffCost", kind: "cost", label: "Spoilage, returns and expired write-off" },
+      { amount: totals.marketingCost, costType: "recurring", id: "marketingCost", kind: "cost", label: "Marketing campaigns" },
       { amount: machinePurchaseCost, costType: "initial", id: "machinePurchase", kind: "cost", label: "Machine investment" },
       { amount: equipmentPurchaseCost, costType: "initial", id: "equipmentPurchase", kind: "cost", label: "Equipment investment" },
       { amount: extraInitialCost, costType: "initial", id: "extraInitialCost", kind: "cost", label: "Initial extra costs" },
@@ -745,6 +849,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       averageNetPrice,
       breakEvenMonth,
       cashRunwayMonths,
+      costWarnings: costProfile.warnings,
       discountCost: totals.discountCost,
       electricityCost: totals.electricityCost,
       equipmentPurchaseCost,
@@ -763,10 +868,10 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       loanPaymentTotal: totals.loanPayment,
       loanRows,
       machinePurchaseCost,
+      marketingCost: totals.marketingCost,
       materialCost: totals.materialCost,
       netIncome: totals.netIncome,
       netSoldUnits: totals.netSoldUnits,
-      operationCostResult,
       otherProductionCost: totals.otherProductionCost,
       paybackMonth,
       planCount: activePlans.length,
@@ -777,7 +882,10 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       totalCashFlow: totals.cashFlow,
       totalCost: totals.totalCost,
       totalProduced: totals.producedUnits,
+      unitElectricityCost,
+      unitMaterialCost,
       unitProductionCost,
+      unitWorkforceCost,
       unsoldInventoryUnits: totals.unsoldInventoryUnits,
       vatPayable: totals.vatPayable,
       weightedPaymentDelayDays: calculateChannelMonth(0, salesStrategy, operationsWorkspace, workingDaysPerMonth, settings).weightedPaymentDelayDays,

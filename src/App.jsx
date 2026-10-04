@@ -15,11 +15,11 @@ import {
   saveFinancialExtraCost,
   saveFinancialModelSettings,
 } from "./lib/financialService";
-import { calculateTotalProductionCost } from "./lib/costEngine";
 import {
   addMonths,
   asObjectArray,
   buildFinancialFeasibilityModel,
+  calculatePlanDailyCost,
   convertMoneyToTry,
   defaultExchangeRates,
   getBaseMonthlySalesUnits,
@@ -43,7 +43,6 @@ import {
   parseDateInput,
   toFiniteNumber,
 } from "./lib/feasibilityModel";
-import { excelOperationCostRegressionInput } from "./lib/costEngineRegressionFixture";
 import { calculateCurrentPlanResult, getCurrentOperationPlans, hasViablePlanResult } from "./lib/operationsCalculations";
 import { emptyOperationForms, emptyOperationPlan, emptyPlanRows, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
 import { deleteSimulationVariantRecord, emptySalesStrategy, emptySimulationVariant, loadSalesStrategy, loadSimulationVariants, saveSalesStrategy, saveSimulationVariant } from "./lib/planningService";
@@ -103,39 +102,6 @@ function formatLira(value, maximumFractionDigits = 0) {
     maximumFractionDigits,
     style: "currency",
   }).format(value || 0);
-}
-
-function formatEuro(value, maximumFractionDigits = 6) {
-  const locale = document.documentElement.lang === "tr" ? "tr-TR" : "en-US";
-  return new Intl.NumberFormat(locale, {
-    currency: "EUR",
-    maximumFractionDigits,
-    minimumFractionDigits: Math.min(2, maximumFractionDigits),
-    style: "currency",
-  }).format(value || 0);
-}
-
-function flattenCostAssumptions(value, prefix = "") {
-  if (!value || typeof value !== "object") return [];
-
-  return Object.entries(value).flatMap(([key, entry]) => {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (entry && typeof entry === "object" && !Array.isArray(entry)) {
-      return flattenCostAssumptions(entry, path);
-    }
-    return [{ key: path, value: typeof entry === "boolean" ? String(entry) : entry }];
-  });
-}
-
-const operationCostInputStorageKey = "atera.operation-cost-input.v1";
-
-function getStoredOperationCostInput() {
-  try {
-    const stored = window.localStorage.getItem(operationCostInputStorageKey);
-    return stored ? JSON.parse(stored) : structuredClone(excelOperationCostRegressionInput);
-  } catch {
-    return structuredClone(excelOperationCostRegressionInput);
-  }
 }
 
 function useMatchedPanelHeight(dependencyKey) {
@@ -1593,9 +1559,6 @@ function App() {
   const [financialStatus, setFinancialStatus] = useState("");
   const [financialLoading, setFinancialLoading] = useState(false);
   const [financialOverviewWidgets, setFinancialOverviewWidgets] = useState([]);
-  const [operationCostInput, setOperationCostInput] = useState(
-    getStoredOperationCostInput,
-  );
   const [incomeExpenseChartInView, setIncomeExpenseChartInView] = useState(false);
   const [incomeExpenseChartNode, setIncomeExpenseChartNode] = useState(null);
   const [exchangeRates, setExchangeRates] = useState(defaultExchangeRates);
@@ -1633,30 +1596,6 @@ function App() {
   const labels = text[form.language] || text.en;
   const copy = (en, tr) => (form.language === "tr" ? tr : en);
   const locale = form.language === "tr" ? "tr-TR" : "en-US";
-  const operationCostCalculation = useMemo(() => {
-    try {
-      return {
-        error: "",
-        result: calculateTotalProductionCost(operationCostInput),
-      };
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error.message : String(error),
-        result: null,
-      };
-    }
-  }, [operationCostInput]);
-  const operationCostResult = operationCostCalculation.result;
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        operationCostInputStorageKey,
-        JSON.stringify(operationCostInput),
-      );
-    } catch {
-      // Cost calculation remains available even when browser storage is unavailable.
-    }
-  }, [operationCostInput]);
   const heightMatchKey = `${path}|${form.language}`;
   const [materialFormRef, materialListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|material`);
   const [workforceFormRef, workforceListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|workforce`);
@@ -1670,17 +1609,6 @@ function App() {
     incomeExpenseChartRef.current = node;
     setIncomeExpenseChartNode(node);
   }, []);
-
-  function updateOperationCostAssumption(path, value) {
-    setOperationCostInput((current) => {
-      const next = structuredClone(current);
-      const fields = path.split(".");
-      const lastField = fields.pop();
-      const target = fields.reduce((object, field) => object[field], next);
-      target[lastField] = value;
-      return next;
-    });
-  }
 
   const editableWorkspaceSnapshot = useMemo(() => createUnsavedWorkspaceSnapshot({
     financialExtraCostForm,
@@ -4035,6 +3963,7 @@ function App() {
     const resultBufferRows = asObjectArray(result?.bufferRows);
     const resultWorkforceRows = asObjectArray(result?.workforceRows);
     const resultMaterialRows = asObjectArray(result?.materialRows);
+    const planDailyCost = result ? calculatePlanDailyCost(result, operationsWorkspaceForFinance, financialSettingsForm) : null;
     const flowStrategyLabels = {
       batch: copy("Push system", "İtme sistemi"),
       flow: copy("Pull system", "Çekme sistemi"),
@@ -4177,30 +4106,21 @@ function App() {
       {
         id: "material-cost",
         group: copy("Cost", "Maliyet"),
-        label: copy("Material + Consumables / Unit", "Malzeme + Sarf / Birim"),
-        value: operationCostResult
-          ? formatEuro(
-              operationCostResult.breakdown.material +
-              operationCostResult.breakdown.consumables,
-              9,
-            )
-          : "-",
+        label: copy("Material / Unit", "Malzeme / Birim"),
+        value: planDailyCost ? formatLira(planDailyCost.unit.material, 2) : "-",
       },
       {
         id: "workforce-cost",
         group: copy("Cost", "Maliyet"),
         label: copy("Labor / Unit", "İşçilik / Birim"),
-        value: operationCostResult
-          ? formatEuro(operationCostResult.breakdown.labor, 9)
-          : "-",
+        value: planDailyCost ? formatLira(planDailyCost.unit.labor, 2) : "-",
       },
       {
         id: "daily-cost",
         group: copy("Cost", "Maliyet"),
-        label: copy("CostEngine Daily Cost", "CostEngine Günlük Maliyet"),
-        value: operationCostResult
-          ? formatEuro(operationCostResult.totalUnitCostEur * result.producedQuantity, 2)
-          : "-",
+        label: copy("Daily Production Cost", "Günlük Üretim Maliyeti"),
+        value: planDailyCost ? formatLira(planDailyCost.daily.total) : "-",
+        info: copy("Recipe materials, workforce hours and machine energy priced with the current records and the electricity price from financial inputs.", "Reçete malzemeleri, işgücü saatleri ve makine enerjisi; güncel kayıtlar ve finans girdilerindeki elektrik fiyatıyla hesaplanır."),
       },
       {
         id: "waiting-cost",
@@ -5457,15 +5377,12 @@ function App() {
               <strong>{formatNumber(activePlans.reduce((total, plan) => total + (Number(plan.result?.producedQuantity) || 0), 0), 2)}</strong>
             </article>
             <article className="operation-card process-summary-card">
-              <span>{copy("CostEngine Daily Cost", "CostEngine Günlük Maliyet")}</span>
-              <strong>{operationCostResult
-                ? formatEuro(
-                    activePlans.reduce(
-                      (total, plan) => total + (Number(plan.result?.producedQuantity) || 0),
-                      0,
-                    ) * operationCostResult.totalUnitCostEur,
-                    2,
-                  )
+              <span>{copy("Daily Production Cost", "Günlük Üretim Maliyeti")}</span>
+              <strong>{activePlans.length
+                ? formatLira(activePlans.reduce(
+                    (total, plan) => total + calculatePlanDailyCost(plan.result, operationsWorkspaceForFinance, financialSettingsForm).daily.total,
+                    0,
+                  ))
                 : "-"}</strong>
             </article>
           </div>
@@ -5503,9 +5420,7 @@ function App() {
                     <span>{copy("Bottleneck", "Darboğaz")} <strong>{result.bottleneck?.operationName || "-"}</strong></span>
                     <span>{copy("Main Machine Hours", "Ana Makine Saati")} <strong>{formatNumber(result.primaryMachineDailyHours, 2)} {copy("hours", "saat")}</strong></span>
                     <span>{copy("Energy", "Enerji")} <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
-                    <span>{copy("CostEngine Cost", "CostEngine Maliyeti")} <strong>{operationCostResult
-                      ? formatEuro(operationCostResult.totalUnitCostEur * toFiniteNumber(result.producedQuantity), 2)
-                      : "-"}</strong></span>
+                    <span>{copy("Daily Cost", "Günlük Maliyet")} <strong>{formatLira(calculatePlanDailyCost(result, operationsWorkspaceForFinance, financialSettingsForm).daily.total)}</strong></span>
                   </div>
 
                   <div className="process-detail-grid">
@@ -6950,182 +6865,6 @@ function App() {
             )}
 
             {renderWidgetSelector()}
-          </section>,
-      );
-    }
-
-    if (currentFinancialPage.key === "product-cost") {
-      const operationLabels = {
-        injection: copy("Injection", "Enjeksiyon"),
-        roughDeflashing: copy("Rough Deflashing", "Kaba Çapak Alma"),
-        nitrogenDeflashing: copy("Nitrogen Deflashing", "Azotlu Çapak Alma"),
-        postCuring: copy("Post Curing", "Post Kürleme"),
-        washing: copy("Washing", "Yıkama"),
-        compressionSet: "Compression Set",
-      };
-      const breakdownLabels = {
-        material: copy("Material", "Malzeme"),
-        consumables: copy("Consumables", "Sarf"),
-        labor: copy("Labor", "İşçilik"),
-        electricity: copy("Electricity", "Elektrik"),
-        depreciation: copy("Depreciation", "Amortisman"),
-        maintenance: copy("Maintenance", "Bakım"),
-        mold: copy("Mold", "Kalıp"),
-      };
-      const operationRows = Object.entries(operationCostResult?.operations || {});
-      const assumptionRows = flattenCostAssumptions(operationCostInput);
-
-      return renderDashboardLayout(
-        `financial-modelling/${currentFinancialPage.key}`,
-          <section className="financial-workspace operation-cost-workspace">
-            <div className="financial-header">
-              <div>
-                <span>{currentFinancialPage.group} / CostEngine</span>
-                <h1>{financialPageMeta.title}</h1>
-                <p>{financialPageMeta.description}</p>
-              </div>
-            </div>
-
-            {operationCostCalculation.error && (
-              <p className="status-message error">
-                {copy("Cost validation error:", "Maliyet doğrulama hatası:")} {operationCostCalculation.error}
-              </p>
-            )}
-
-            {operationCostResult && (
-            <>
-            <div className="operation-cost-totals">
-              <article className="finance-metric-card">
-                <span>{copy("Total unit cost", "Toplam birim maliyet")}</span>
-                <strong>{formatEuro(operationCostResult.totalUnitCostEur, 9)}</strong>
-                <small>{copy("per piece", "parça başına")}</small>
-              </article>
-              <article className="finance-metric-card">
-                <span>{copy("Total order cost", "Toplam sipariş maliyeti")}</span>
-                <strong>{formatEuro(operationCostResult.totalOrderCostEur, 2)}</strong>
-                <small>{formatNumber(operationCostResult.orderQuantity)} {copy("pieces", "parça")}</small>
-              </article>
-              <article className="finance-metric-card">
-                <span>{copy("Production lead time / unit", "Üretim süresi / birim")}</span>
-                <strong>{formatNumber(operationCostResult.productionLeadTimeSeconds, 6)} sn</strong>
-                <small>{copy("quality-control wait excluded", "kalite kontrol beklemesi hariç")}</small>
-              </article>
-              <article className="finance-metric-card">
-                <span>{copy("Quality-control time", "Kalite kontrol süresi")}</span>
-                <strong>{formatNumber(operationCostResult.qualityControlTimeSeconds, 2)} sn</strong>
-                <small>Compression Set</small>
-              </article>
-            </div>
-
-            <article className="financial-card operation-cost-summary-card">
-              <div className="financial-card-heading">
-                <h2>{copy("Operation cost summary", "Operasyon maliyet özeti")}</h2>
-              </div>
-              <div className="operation-cost-table">
-                <div className="operation-cost-row operation-cost-head">
-                  <span>{copy("Operation", "Operasyon")}</span>
-                  <span>{copy("Unit cost", "Birim maliyet")}</span>
-                  <span>{copy("Order cost", "Sipariş maliyeti")}</span>
-                  <span>{copy("Share", "Pay")}</span>
-                  <span>{copy("Unit cycle", "Birim çevrim")}</span>
-                </div>
-                {operationRows.map(([key, operation]) => (
-                  <div className="operation-cost-row" key={key}>
-                    <strong>{operationLabels[key]}</strong>
-                    <span>{formatEuro(operation.unitCostEur, 9)}</span>
-                    <span>{formatEuro(operation.orderCostEur, 2)}</span>
-                    <span>{formatNumber(
-                      operationCostResult.totalUnitCostEur
-                        ? operation.unitCostEur / operationCostResult.totalUnitCostEur * 100
-                        : 0,
-                      3,
-                    )}%</span>
-                    <span>{formatNumber(operation.unitCycleTimeSeconds, 6)} sn</span>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <div className="operation-cost-detail-grid">
-              {operationRows.map(([key, operation]) => (
-                <details className="financial-card operation-cost-detail-card" open key={key}>
-                  <summary>
-                    <strong>{operationLabels[key]}</strong>
-                    <span>{formatEuro(operation.unitCostEur, 9)}</span>
-                  </summary>
-                  <div className="operation-cost-detail-section">
-                    <h3>{copy("Breakdown", "Maliyet kırılımı")}</h3>
-                    {Object.entries(operation.breakdown).map(([breakdownKey, amount]) => (
-                      <div className="operation-cost-value-row" key={breakdownKey}>
-                        <span>{breakdownLabels[breakdownKey] || breakdownKey}</span>
-                        <strong>{formatEuro(amount, 9)}</strong>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="operation-cost-detail-section">
-                    <h3>{copy("Intermediate values and capacity", "Ara değerler ve kapasite")}</h3>
-                    {Object.entries(operation.intermediateValues).map(([field, value]) => (
-                      <div className="operation-cost-value-row" key={field}>
-                        <span>{field}</span>
-                        <strong>{formatNumber(value, 8)}</strong>
-                      </div>
-                    ))}
-                    {operation.operationCount !== undefined && (
-                      <div className="operation-cost-value-row">
-                        <span>operationCount</span>
-                        <strong>{formatNumber(operation.operationCount, 8)}</strong>
-                      </div>
-                    )}
-                    {operation.piecesPerOperation !== undefined && (
-                      <div className="operation-cost-value-row">
-                        <span>piecesPerOperation</span>
-                        <strong>{formatNumber(operation.piecesPerOperation, 8)}</strong>
-                      </div>
-                    )}
-                  </div>
-                </details>
-              ))}
-            </div>
-            </>
-            )}
-
-            <details className="financial-card operation-cost-assumptions" open>
-              <summary>
-                <strong>{copy("All assumptions", "Kullanılan bütün varsayımlar")}</strong>
-                <span>{assumptionRows.length} {copy("values", "değer")}</span>
-              </summary>
-              <div className="operation-cost-assumption-grid">
-                {assumptionRows.map((row) => (
-                  <div className="operation-cost-value-row" key={row.key}>
-                    <span>{row.key}</span>
-                    {typeof row.value === "boolean" || row.value === "true" || row.value === "false" ? (
-                      <input
-                        checked={row.value === true || row.value === "true"}
-                        type="checkbox"
-                        onChange={(event) => updateOperationCostAssumption(row.key, event.target.checked)}
-                      />
-                    ) : row.key.endsWith("employeeGroup") ? (
-                      <select
-                        value={String(row.value)}
-                        onChange={(event) => updateOperationCostAssumption(row.key, event.target.value)}
-                      >
-                        {["Operatör", "Mühendis", "Usta", "Çırak"].map((group) => (
-                          <option value={group} key={group}>{group}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        inputMode="decimal"
-                        step="any"
-                        type="number"
-                        value={row.value}
-                        onChange={(event) => updateOperationCostAssumption(row.key, event.target.value)}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </details>
           </section>,
       );
     }
@@ -8726,10 +8465,15 @@ function App() {
   const financialSettingsForModel = {
     ...financialSettingsForm,
     exchangeRates,
-    operationCostResult,
   };
   const projectedFinancialModel = buildFinancialFeasibilityModel(financialModel, dashboardSalesStrategy, financialSettingsForModel, dashboardOperationsWorkspace, financialHorizon);
   const financialSummary = projectedFinancialModel.summary || emptyFinancialModel.summary;
+  const financialCostWarnings = financialSummary.costWarnings || {};
+  const missingCostInputs = [
+    ...(financialCostWarnings.missingMaterialPrices || []),
+    ...(financialCostWarnings.missingWorkforceRates || []),
+    ...(financialCostWarnings.missingElectricityPrice ? [copy("electricity price", "elektrik fiyatı")] : []),
+  ];
   const financialTrendRows = projectedFinancialModel.trendRows || [];
   const financialMonthCount = getProjectionMonthCount(financialHorizon);
   const currentOperationPlans = getCurrentOperationPlans(dashboardOperationsWorkspace);
@@ -9183,6 +8927,15 @@ function App() {
       severity: copy("High", "Yüksek"),
       tone: "risk-high",
       title: copy("Financial assumptions incomplete", "Finans varsayımları eksik"),
+    },
+    activePlanResults.length > 0 && missingCostInputs.length > 0 && {
+      action: copy("Complete prices", "Fiyatları tamamla"),
+      detail: `${copy("Counted as zero cost:", "Sıfır maliyetle hesaplanıyor:")} ${missingCostInputs.join(", ")}`,
+      path: "/operations/resources",
+      priority: dashboardRiskPriority.high,
+      severity: copy("High", "Yüksek"),
+      tone: "risk-high",
+      title: copy("Cost data missing", "Maliyet verisi eksik"),
     },
     hasFinancialSourceData && unmetForecastUnits > 0 && {
       action: copy("Fix capacity", "Kapasiteyi düzelt"),
