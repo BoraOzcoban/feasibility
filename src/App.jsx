@@ -371,8 +371,8 @@ const glossaryEntries = [
     infoTr: "İlgili maliyetler düşüldükten sonra cirodan kalan pay.",
   },
   {
-    en: ["Break-even"],
-    tr: ["Başa baş"],
+    en: ["Break-even", "Break-even point", "Break-even month"],
+    tr: ["Başa baş", "Başa baş noktası", "Başa baş ayı"],
     infoEn: "The point where accumulated income covers accumulated costs.",
     infoTr: "Birikmiş gelirin birikmiş maliyeti karşıladığı nokta.",
   },
@@ -387,6 +387,36 @@ const glossaryEntries = [
     tr: ["Nakit dayanma", "Kısa nakit dayanma"],
     infoEn: "How long available cash can support the plan before it runs out.",
     infoTr: "Mevcut nakdin planı tükenmeden ne kadar süre taşıyabileceği.",
+  },
+  {
+    en: ["Net present value", "NPV"],
+    tr: ["Net bugünkü değer", "NBD"],
+    infoEn: "Today's value of the project's future cash flows, discounted at the discount rate, minus the investment. Positive means the project earns more than that rate.",
+    infoTr: "Projenin gelecekteki nakit akışlarının iskonto oranıyla bugüne indirgenmiş değerinden yatırımın düşülmüş hali. Pozitifse proje bu orandan fazla kazandırır.",
+  },
+  {
+    en: ["Internal rate of return", "IRR"],
+    tr: ["İç verim oranı"],
+    infoEn: "The yearly return at which net present value is zero. Compare it with the discount rate.",
+    infoTr: "Net bugünkü değeri sıfır yapan yıllık getiri. İskonto oranıyla karşılaştırın.",
+  },
+  {
+    en: ["Payback", "Payback month"],
+    tr: ["Geri dönüş süresi", "Geri dönüş", "Geri dönüş ayı"],
+    infoEn: "The month in which cumulative cash from operations covers the machine and equipment investment.",
+    infoTr: "Faaliyetlerden gelen kümülatif nakdin makine ve ekipman yatırımını karşıladığı ay.",
+  },
+  {
+    en: ["Lowest cash", "Lowest cash balance"],
+    tr: ["En düşük nakit"],
+    infoEn: "The lowest month-end cash balance over 5 years with the entered starting cash. Below zero means more funding is needed.",
+    infoTr: "Girilen başlangıç nakdiyle 5 yıl içindeki en düşük ay sonu nakit. Sıfırın altındaysa ek finansman gerekir.",
+  },
+  {
+    en: ["Capacity use"],
+    tr: ["Kapasite kullanımı"],
+    infoEn: "5-year sales demand divided by what the production plan can make. Over 100% means part of the demand cannot be produced.",
+    infoTr: "5 yıllık satış talebinin üretim planının üretebileceği miktara oranı. %100'ün üstü, talebin bir kısmının üretilemeyeceği anlamına gelir.",
   },
   {
     en: ["Loan", "Loans", "Loan amount", "Total loan", "Loan records"],
@@ -483,215 +513,13 @@ function normalizeGlossaryText(value) {
     .toLocaleLowerCase("tr-TR");
 }
 
-function getDirectTextContent(element) {
-  return Array.from(element.childNodes)
-    .filter((node) => node.nodeType === Node.TEXT_NODE)
-    .map((node) => node.textContent)
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+// Glossary text for a label, shown as a static InfoTip next to it.
+function GlossaryTip({ language, term }) {
+  const key = normalizeGlossaryText(term);
+  const entry = glossaryEntries.find((item) => [...item.en, ...item.tr].some((value) => normalizeGlossaryText(value) === key));
+  if (!entry) return null;
 
-function buildGlossaryLookup(language) {
-  return glossaryEntries.flatMap((entry) => {
-    const terms = language === "tr" ? entry.tr : entry.en;
-    const text = language === "tr" ? entry.infoTr : entry.infoEn;
-
-    return terms.map((term) => ({
-      key: normalizeGlossaryText(term),
-      label: term,
-      text,
-      wordCount: normalizeGlossaryText(term).split(" ").filter(Boolean).length,
-    }));
-  }).sort((left, right) => right.key.length - left.key.length);
-}
-
-const obviousGlossaryLabels = new Set([
-  "dashboard",
-  "overview",
-  "product",
-  "ürün",
-  "recipe",
-  "reçete",
-  "material",
-  "malzeme",
-  "machine",
-  "makine",
-  "equipment",
-  "ekipman",
-  "workforce",
-  "işgücü",
-  "process",
-  "süreç",
-  "capacity",
-  "kapasite",
-  "cycle",
-  "çevrim",
-  "speed",
-  "hız",
-  "flow",
-  "akış",
-  "cost",
-  "maliyet",
-  "revenue",
-  "ciro",
-  "income",
-  "gelir",
-  "loan",
-  "kredi",
-  "currency",
-  "döviz",
-  "kur",
-  "demand",
-  "talep",
-  "inventory",
-  "stok",
-  "scenario",
-  "senaryo",
-  "simulation",
-  "simülasyon",
-  "variant",
-  "varyant",
-  "risk",
-  "report",
-  "rapor",
-  "permission",
-  "izin",
-  "role",
-  "yetki",
-  "user",
-  "kullanıcı",
-  "status",
-  "durum",
-  "ready",
-  "hazır",
-  "needed",
-  "gerekli",
-  "required",
-  "zorunlu",
-  "optional",
-  "opsiyonel",
-]);
-
-function findGlossaryEntry(label, lookup) {
-  const normalized = normalizeGlossaryText(label);
-  if (!normalized || /^\d+([.,]\d+)?$/.test(normalized)) return null;
-  if (obviousGlossaryLabels.has(normalized)) return null;
-
-  return lookup.find((entry) => (
-    normalized === entry.key
-    || (entry.wordCount > 1 && (
-      normalized.startsWith(`${entry.key} `)
-      || normalized.endsWith(` ${entry.key}`)
-      || normalized.includes(` ${entry.key} `)
-    ))
-  ));
-}
-
-function createGlossaryInfoTip(entry, language) {
-  const wrapper = document.createElement("span");
-  wrapper.className = "info-tip global-term-infobar";
-  wrapper.dataset.globalTermInfobar = "true";
-
-  const trigger = document.createElement("span");
-  trigger.className = "info-tip-icon";
-  trigger.setAttribute("aria-label", `${entry.label} ${language === "tr" ? "bilgi" : "info"}`);
-  trigger.setAttribute("role", "button");
-  trigger.setAttribute("tabindex", "0");
-  trigger.textContent = "i";
-
-  const panel = document.createElement("span");
-  panel.className = "info-tip-panel floating-info-tip-panel global-floating-info-panel";
-  panel.setAttribute("role", "tooltip");
-  panel.textContent = entry.text;
-  document.body.appendChild(panel);
-  const listenerController = new AbortController();
-
-  const showPanel = () => {
-    panel.classList.add("is-visible");
-    positionFloatingInfoPanel(trigger, panel);
-  };
-  const hidePanel = () => {
-    panel.classList.remove("is-visible");
-  };
-  const updatePanelPosition = () => {
-    if (panel.classList.contains("is-visible")) {
-      positionFloatingInfoPanel(trigger, panel);
-    }
-  };
-
-  wrapper.addEventListener("mouseenter", showPanel, { signal: listenerController.signal });
-  wrapper.addEventListener("mouseleave", hidePanel, { signal: listenerController.signal });
-  trigger.addEventListener("focus", showPanel, { signal: listenerController.signal });
-  trigger.addEventListener("blur", hidePanel, { signal: listenerController.signal });
-  window.addEventListener("resize", updatePanelPosition, { signal: listenerController.signal });
-  window.addEventListener("scroll", updatePanelPosition, { capture: true, signal: listenerController.signal });
-  wrapper.cleanupFloatingInfoPanel = () => {
-    listenerController.abort();
-    panel.remove();
-  };
-
-  wrapper.append(trigger);
-  return wrapper;
-}
-
-function applyGlobalTermInfobars(root, language) {
-  if (!root) return;
-
-  const lookup = buildGlossaryLookup(language);
-  const selector = [
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "dt",
-    "th",
-    "mark",
-    "label > span",
-    "summary span",
-    "article > span",
-    ".operations-tabs button",
-    ".mini-tabs button",
-    ".reports-tabs button",
-    ".financial-loan-summary-card > span",
-    ".financial-loan-card-metrics > span",
-    ".dashboard-detail-list span",
-    ".dashboard-kpi-card span",
-    ".process-product-selected span",
-    ".machine-row span:first-child",
-  ].join(",");
-
-  root.querySelectorAll(selector).forEach((element) => {
-    if (
-      element.dataset.termInfobarApplied
-      || element.closest(".info-tip")
-      || element.closest(".info-tip-panel")
-      || element.closest(".floating-info-tip-panel")
-      || element.closest(".print-report")
-      || element.closest(".dashboard-sidebar")
-      || element.closest(".landing-nav")
-      || element.closest(".dashboard-nav")
-      || element.closest(".dashboard-subnav")
-      || element.closest(".operations-header")
-      || element.closest(".reports-header")
-      || element.closest(".financial-loan-hero")
-      || element.closest(".financial-header")
-      || element.closest(".simulation-header")
-      || element.closest(".sales-header")
-      || element.querySelector(":scope > .global-term-infobar")
-      || element.matches("input, select, textarea, option")
-    ) {
-      return;
-    }
-
-    const label = getDirectTextContent(element);
-    const entry = findGlossaryEntry(label, lookup);
-    if (!entry) return;
-
-    element.dataset.termInfobarApplied = "true";
-    element.classList.add("term-with-infobar");
-    element.appendChild(createGlossaryInfoTip(entry, language));
-  });
+  return <InfoTip label={`${term} ${language === "tr" ? "bilgi" : "info"}`} text={language === "tr" ? entry.infoTr : entry.infoEn} />;
 }
 
 
@@ -1732,56 +1560,6 @@ function App() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
-
-  useEffect(() => {
-    const root = document.body;
-    let frameId = 0;
-    let observer;
-
-    const refreshInfobars = () => {
-      if (frameId) {
-        cancelAnimationFrame(frameId);
-      }
-
-      frameId = requestAnimationFrame(() => {
-        observer?.disconnect();
-        document.querySelectorAll(".global-term-infobar").forEach((node) => {
-          node.cleanupFloatingInfoPanel?.();
-          node.remove();
-        });
-        document.querySelectorAll(".global-floating-info-panel").forEach((node) => node.remove());
-        document.querySelectorAll("[data-term-infobar-applied]").forEach((node) => {
-          node.classList.remove("term-with-infobar");
-          delete node.dataset.termInfobarApplied;
-        });
-        applyGlobalTermInfobars(root, form.language);
-        observer?.observe(root, { childList: true, subtree: true });
-      });
-    };
-
-    refreshInfobars();
-
-    observer = new MutationObserver((mutations) => {
-      if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest(".info-tip"))) {
-        return;
-      }
-      refreshInfobars();
-    });
-
-    observer.observe(root, { childList: true, subtree: true });
-
-    return () => {
-      if (frameId) {
-        cancelAnimationFrame(frameId);
-      }
-      observer.disconnect();
-      document.querySelectorAll(".global-term-infobar").forEach((node) => {
-        node.cleanupFloatingInfoPanel?.();
-        node.remove();
-      });
-      document.querySelectorAll(".global-floating-info-panel").forEach((node) => node.remove());
-    };
-  }, [form.language, path]);
 
   useEffect(() => {
     if (path === "/operations/data-entry") {
@@ -6657,7 +6435,7 @@ function App() {
     );
     const renderWidgetMetric = (label, value, detail) => (
       <div className="financial-widget-metric">
-        <span>{label}</span>
+        <span className="label-with-info">{label}<GlossaryTip language={form.language} term={label} /></span>
         <strong>{value}</strong>
         <small>{detail}</small>
       </div>
@@ -6992,7 +6770,7 @@ function App() {
           <div className="financial-decision-metrics">
             {overviewDecisionMetrics.map((metric) => (
               <article className={`financial-decision-card ${metric.tone}`} key={metric.label}>
-                <span>{metric.label}</span>
+                <span className="label-with-info">{metric.label}<GlossaryTip language={form.language} term={metric.label} /></span>
                 <strong>{metric.value}</strong>
                 <small>{metric.detail}</small>
               </article>
@@ -7044,7 +6822,7 @@ function App() {
               [copy("Payback", "Geri Dönüş"), overviewIsDecisionReady ? formatMonth(summary.paybackMonth) : "-", copy("investment recovery month", "yatırımın geri dönüş ayı")],
             ].map(([label, value, detail]) => (
               <article className="financial-quick-card" key={label}>
-                <span>{label}</span>
+                <span className="label-with-info">{label}<GlossaryTip language={form.language} term={label} /></span>
                 <strong>{value}</strong>
                 <small>{detail}</small>
               </article>
@@ -7368,7 +7146,7 @@ function App() {
               [copy("Revenue range", "Gelir aralığı"), `${formatLira(outcomes[1].revenue)} - ${formatLira(outcomes[3].revenue)}`, copy("cautious to optimistic", "temkinliden iyimsere")],
             ].map(([label, value, detail]) => (
               <article className="monte-carlo-stat" key={label}>
-                <span>{label}</span>
+                <span className="label-with-info">{label}<GlossaryTip language={form.language} term={label} /></span>
                 <strong>{value}</strong>
                 <small>{detail}</small>
               </article>
@@ -10035,7 +9813,7 @@ function App() {
                 <div className="decision-kpi-grid">
                   {decisionKpis.map((kpi) => (
                     <article className={`decision-kpi ${kpi.ok ? "ok" : "failed"}`} key={kpi.key}>
-                      <span>{kpi.label}</span>
+                      <span className="label-with-info">{kpi.label}<GlossaryTip language={form.language} term={kpi.label} /></span>
                       <strong>{kpi.value}</strong>
                       <small>{kpi.detail}</small>
                     </article>
@@ -10077,7 +9855,7 @@ function App() {
                 ? visibleDashboardExecutiveMetrics.map((metric) => (
                   <article className={`command-card executive-metric-card ${metric.tone}`} key={metric.id}>
                     <span>{metric.category}</span>
-                    <h3>{metric.label}</h3>
+                    <h3 className="label-with-info">{metric.label}<GlossaryTip language={form.language} term={metric.label} /></h3>
                     <strong>{metric.value}</strong>
                     <small>{metric.detail}</small>
                   </article>

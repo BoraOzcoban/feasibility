@@ -110,16 +110,6 @@ textarea:focus-visible {
   user-select: none;
 }
 
-.term-with-infobar {
-  align-items: center;
-  display: inline-flex;
-  gap: 7px;
-}
-
-.global-term-infobar {
-  flex: 0 0 auto;
-}
-
 .info-tip .info-tip-panel {
   background: #102033;
   border: 1px solid rgba(115, 209, 190, 0.36);
