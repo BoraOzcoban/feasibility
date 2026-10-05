@@ -2188,6 +2188,43 @@ body > .floating-info-tip-panel,
   --brief-tone: var(--color-clay);
 }
 
+.decision-kpi-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.decision-kpi {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-left: 4px solid var(--color-green);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.decision-kpi.failed {
+  border-left-color: var(--color-amber);
+}
+
+.decision-kpi span,
+.decision-kpi small {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.75rem;
+}
+
+.decision-kpi strong {
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .decision-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .executive-brief-copy,
 .executive-readiness-card {
   position: relative;

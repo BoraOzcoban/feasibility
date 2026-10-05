@@ -651,6 +651,79 @@ function removeFromStock(stock, units) {
 
 const sumComponents = (cost) => COST_COMPONENTS.reduce((total, key) => total + cost[key], 0);
 
+export const DEFAULT_DISCOUNT_RATE_ANNUAL_PERCENT = 30;
+
+// Net present value of monthly cash flows; flows[0] happens today, flows[i]
+// at the end of month i.
+export function calculateNetPresentValue(flows = [], annualRatePercent = DEFAULT_DISCOUNT_RATE_ANNUAL_PERCENT) {
+  const monthlyRate = getMonthlyRateFromAnnualPercent(annualRatePercent);
+  return flows.reduce((total, flow, month) => total + (toFiniteNumber(flow) / ((1 + monthlyRate) ** month)), 0);
+}
+
+// Annual internal rate of return in percent, or null when the flows never
+// change sign (nothing invested, or never paid back).
+export function calculateInternalRateOfReturn(flows = []) {
+  const values = flows.map((flow) => toFiniteNumber(flow));
+  if (!values.some((value) => value < 0) || !values.some((value) => value > 0)) return null;
+
+  const npvAt = (monthlyRate) => values.reduce((total, value, month) => total + (value / ((1 + monthlyRate) ** month)), 0);
+  let low = -0.99;
+  let high = 1;
+  let npvLow = npvAt(low);
+  let npvHigh = npvAt(high);
+  while (Math.sign(npvLow) === Math.sign(npvHigh) && high < 100) {
+    high *= 2;
+    npvHigh = npvAt(high);
+  }
+  if (Math.sign(npvLow) === Math.sign(npvHigh)) return null;
+
+  for (let step = 0; step < 200; step += 1) {
+    const middle = (low + high) / 2;
+    const npvMiddle = npvAt(middle);
+    if (Math.abs(npvMiddle) < 1e-7 || (high - low) < 1e-12) {
+      low = middle;
+      high = middle;
+      break;
+    }
+    if (Math.sign(npvMiddle) === Math.sign(npvLow)) {
+      low = middle;
+      npvLow = npvMiddle;
+    } else {
+      high = middle;
+    }
+  }
+
+  return (((1 + ((low + high) / 2)) ** 12) - 1) * 100;
+}
+
+// Decision thresholds are a team decision (see the audit's open questions);
+// keep them here so the dashboard, report and tests use the same values.
+export const defaultDecisionThresholds = {
+  maxPaybackMonths: 36,
+};
+
+// Turns the model summary into "feasible" / "wait" / "risky":
+// - risky: the investment loses value (NPV < 0) or does not pay back in the horizon;
+// - feasible: NPV ≥ 0, payback within the limit, cash never runs out and
+//   capacity covers demand;
+// - wait: it creates value, but one of the other checks fails.
+export function evaluateFeasibilityDecision(summary = {}, thresholds = defaultDecisionThresholds) {
+  const paybackMonth = summary.paybackMonth ?? null;
+  const checks = [
+    { key: "npv", ok: toFiniteNumber(summary.netPresentValue) >= 0 },
+    { key: "payback", ok: paybackMonth !== null && paybackMonth <= thresholds.maxPaybackMonths },
+    { key: "cash", ok: toFiniteNumber(summary.lowestCashBalance) >= 0 },
+    // null means there is demand but no production capacity at all.
+    { key: "capacity", ok: summary.capacityUtilization !== null && toFiniteNumber(summary.capacityUtilization) <= 1 },
+  ];
+  const failed = new Set(checks.filter((check) => !check.ok).map((check) => check.key));
+  const status = failed.has("npv") || paybackMonth === null
+    ? "risky"
+    : failed.size ? "wait" : "feasible";
+
+  return { checks, status, thresholds };
+}
+
 // Monthly three-statement projection. Prices and costs are VAT exclusive; VAT is
 // collected and paid through cash and the balance sheet, never expensed.
 export function buildFinancialFeasibilityModel(baseModel, salesStrategy, settingsInput, operationsWorkspace, horizon) {
@@ -769,6 +842,10 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
   let yearToDateTaxProvision = 0;
   let cumulativeNetIncome = 0;
   let cumulativeProjectCashFlow = -capitalExpenditure;
+  // Project (unlevered) cash flows for NPV and IRR: machines today, then
+  // monthly operating cash flow; loans are financing and stay out.
+  const projectCashFlows = [-capitalExpenditure];
+  let lowestCashBalance = cashBalance;
   let cashRunwayMonths = cashBalance < 0 ? 0 : monthCount;
   let breakEvenMonth = null;
   let paybackMonth = null;
@@ -967,6 +1044,8 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     cashBalance += cashFlow;
     cumulativeNetIncome += netIncome;
     cumulativeProjectCashFlow += operatingCashFlow;
+    projectCashFlows.push(operatingCashFlow);
+    lowestCashBalance = Math.min(lowestCashBalance, cashBalance);
     retainedEarnings += netIncome;
 
     if (cashBalance < 0 && cashRunwayMonths === monthCount) {
@@ -1078,6 +1157,17 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     ...rows.map((row) => row.cashBalance - initialCash),
   );
   const requiredOwnCash = Math.max(0, -lowestCashWithoutOwnCash) + minimumCashReserve;
+  // At the horizon the business is still running: count the machines' book
+  // value and the working capital tied up in it as recovered.
+  const residualValue = toFiniteNumber(lastRow.fixedAssets) + toFiniteNumber(lastRow.workingCapital);
+  const valuationFlows = projectCashFlows.map((flow, month) => (month === rows.length && month > 0 ? flow + residualValue : flow));
+  const discountRateAnnualPercent = Math.max(0, toFiniteNumber(settings.discountRateAnnualPercent, DEFAULT_DISCOUNT_RATE_ANNUAL_PERCENT));
+  const netPresentValue = calculateNetPresentValue(valuationFlows, discountRateAnnualPercent);
+  const internalRateOfReturn = calculateInternalRateOfReturn(valuationFlows);
+  const productionCapacityUnits = dailyProduced * workingDaysPerMonth * monthCount;
+  const capacityUtilization = productionCapacityUnits > 0
+    ? totals.forecastSalesUnits / productionCapacityUnits
+    : (totals.forecastSalesUnits > 0 ? null : 0);
   const maxChartValue = Math.max(
     1,
     ...rows.map((row) => Math.max(row.salesRevenue, row.totalCost, row.netIncome, 0)),
@@ -1127,12 +1217,14 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       assetUsefulLifeYears: usefulLifeYears,
       averageNetPrice,
       breakEvenMonth,
+      capacityUtilization,
       cashRunwayMonths,
       channelCost: totals.channelCost,
       costWarnings: costProfile.warnings,
       dailyProduction: dailyProduced,
       depreciation: totals.depreciation,
       discountCost: totals.discountCost,
+      discountRateAnnualPercent,
       electricityCost: totals.electricityCost,
       endingCash: toFiniteNumber(lastRow.cashBalance),
       endingInventoryUnits: toFiniteNumber(lastRow.inventoryUnits),
@@ -1147,23 +1239,28 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       initialCash,
       initialCashRequired: requiredOwnCash,
       initialInvestment,
+      internalRateOfReturn,
       investmentGrantAmount,
       loanAmount,
       loanInterest: totals.loanInterest,
       loanPayment: monthlyLoanPayment,
       loanPaymentTotal: totals.loanPayment,
       loanRows,
+      lowestCashBalance,
       machinePurchaseCost,
       marketingCost: totals.marketingCost,
       materialCost: totals.materialCost,
       minimumCashReserve,
       netIncome: totals.netIncome,
+      netPresentValue,
       netSoldUnits: totals.netSoldUnits,
       otherProductionCost: totals.depreciation,
       overheadCost: totals.overheadCost,
       paybackMonth,
       planCount: activePlans.length,
+      productionCapacityUnits,
       requiredMonthlySalesVolume,
+      residualValue,
       retailerMarginCost: totals.channelCost,
       returnedUnits: totals.returnedUnits,
       salesRevenue: totals.revenue,

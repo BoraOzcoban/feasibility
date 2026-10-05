@@ -148,6 +148,7 @@ export function buildFeasibilityReport({
       [t("COGS inflation % / year", "SMM enflasyonu % / yıl"), toFiniteNumber(settings.cogsInflationAnnualPercent)],
       [t("Overhead inflation % / year", "Genel gider enflasyonu % / yıl"), toFiniteNumber(settings.opexInflationAnnualPercent)],
       [t("Price increase % / year", "Fiyat artışı % / yıl"), toFiniteNumber(settings.priceIncreaseAnnualPercent)],
+      [t("Discount rate % / year", "İskonto oranı % / yıl"), toFiniteNumber(summary.discountRateAnnualPercent)],
       [t("Depreciation (years, straight-line)", "Amortisman (yıl, doğrusal)"), toFiniteNumber(summary.assetUsefulLifeYears)],
     ],
     channels: (salesStrategy.channels || []).map((channel) => ({
@@ -171,6 +172,11 @@ export function buildFeasibilityReport({
       [t("Peak working capital", "En yüksek işletme sermayesi"), toFiniteNumber(summary.workingCapitalRequirement), "money"],
       [t("Break-even month", "Başa baş ayı"), summary.breakEvenMonth ?? null, "month"],
       [t("Payback month", "Geri dönüş ayı"), summary.paybackMonth ?? null, "month"],
+      [t("Net present value", "Net bugünkü değer"), toFiniteNumber(summary.netPresentValue), "money"],
+      [t("Internal rate of return % / year", "İç verim oranı % / yıl"), summary.internalRateOfReturn ?? null, "percent"],
+      [t("Discount rate % / year", "İskonto oranı % / yıl"), toFiniteNumber(summary.discountRateAnnualPercent), "percent"],
+      [t("Lowest cash balance", "En düşük nakit"), toFiniteNumber(summary.lowestCashBalance), "money"],
+      [t("Capacity use %", "Kapasite kullanımı %"), summary.capacityUtilization === null || summary.capacityUtilization === undefined ? null : summary.capacityUtilization * 100, "percent"],
       [t("Closing cash", "Dönem sonu nakit"), toFiniteNumber(summary.endingCash), "money"],
     ],
     loans: (summary.loanRows || []).map((loan) => ({
@@ -255,7 +261,9 @@ export function buildReportSheets(report, pack, t = (en) => en) {
           label,
           format === "month"
             ? (value ? numberCell(value, formats.units) : t("Not reached", "Ulaşılmadı"))
-            : numberCell(value, format === "money2" ? formats.money2 : formats.money),
+            : format === "percent"
+              ? (value === null ? "-" : numberCell(value, formats.percent))
+              : numberCell(value, format === "money2" ? formats.money2 : formats.money),
         ]),
       ],
       sheet: t("Summary", "Özet"),

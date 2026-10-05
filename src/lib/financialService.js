@@ -2,6 +2,7 @@ export const defaultFinancialSettings = {
   annualInterestRate: 0,
   assetValueIncreaseAnnualPercent: 0,
   cogsInflationAnnualPercent: 0,
+  discountRateAnnualPercent: 30,
   electricityPricePerKwh: 0,
   expenseVatRate: 20,
   incomeTaxRate: 25,
@@ -98,6 +99,11 @@ export const optionalFinancialSettingFields = [
   "loanRows",
 ];
 
+// Valuation inputs: optional, the defaults above apply when blank.
+export const valuationFinancialSettingFields = [
+  "discountRateAnnualPercent",
+];
+
 export const optionalMacroFinancialSettingFields = [
   "monthlyCurrencyIncreasePercent",
   "monthlyInflationPercent",
@@ -109,7 +115,6 @@ export const inflationRevaluationFinancialFields = [
   "cogsInflationAnnualPercent",
   "opexInflationAnnualPercent",
   "priceIncreaseAnnualPercent",
-  "assetValueIncreaseAnnualPercent",
   "increaseFrequency",
 ];
 
@@ -117,6 +122,7 @@ const financialSettingRules = {
   annualInterestRate: { min: 0 },
   assetValueIncreaseAnnualPercent: { min: 0 },
   cogsInflationAnnualPercent: { min: 0 },
+  discountRateAnnualPercent: { min: 0 },
   electricityPricePerKwh: { min: 0 },
   expenseVatRate: { min: 0 },
   incomeTaxRate: { min: 0 },
@@ -269,6 +275,7 @@ export function normalizeFinancialModelSettings(input = {}) {
     ...requiredFinancialSettingFields,
     ...generalFinancialAssumptionFields,
     ...optionalMacroFinancialSettingFields,
+    ...valuationFinancialSettingFields,
     ...inflationRevaluationFinancialFields.filter((field) => field !== "increaseFrequency"),
   ];
 
@@ -385,6 +392,7 @@ function mapFinancialSettingsRow(row) {
     annualInterestRate: row.annual_interest_rate,
     assetValueIncreaseAnnualPercent: row.asset_value_increase_annual_percent,
     cogsInflationAnnualPercent: row.cogs_inflation_annual_percent,
+    discountRateAnnualPercent: row.discount_rate_annual_percent ?? defaultFinancialSettings.discountRateAnnualPercent,
     electricityPricePerKwh: row.electricity_price_per_kwh,
     expenseVatRate: row.expense_vat_rate ?? row.vat_rate,
     incomeTaxRate: row.income_tax_rate,
@@ -442,7 +450,9 @@ export async function loadFinancialModel(supabase, horizon = "6m") {
   ] = await Promise.all([
     supabase
       .from("financial_model_settings")
-      .select("electricity_price_per_kwh, working_days_per_month, initial_cash, investment_grant_amount, loan_amount, loan_rows, annual_interest_rate, loan_term_months, vat_rate, sales_vat_rate, expense_vat_rate, income_tax_rate, tax_payment_delay_months, receivables_collection_days, raw_material_stock_days, supplier_payment_days, initial_capacity_units, raw_material_buffer_months, salary_buffer_months, rent_buffer_months, monthly_currency_increase_percent, monthly_inflation_percent, monthly_energy_price_increase_percent, monthly_wage_increase_percent, cogs_inflation_annual_percent, opex_inflation_annual_percent, price_increase_annual_percent, asset_value_increase_annual_percent, increase_frequency")
+      // "*" so a database without the latest columns still loads; missing
+      // values fall back to defaultFinancialSettings.
+      .select("*")
       .maybeSingle(),
     supabase
       .from("financial_extra_costs")

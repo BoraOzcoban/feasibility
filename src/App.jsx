@@ -12,6 +12,7 @@ import {
   loadFinancialModel,
   optionalMacroFinancialSettingFields,
   requiredFinancialSettingFields,
+  valuationFinancialSettingFields,
   saveFinancialExtraCost,
   saveFinancialModelSettings,
 } from "./lib/financialService";
@@ -22,6 +23,7 @@ import {
   calculatePlanDailyCost,
   convertMoneyToTry,
   defaultExchangeRates,
+  evaluateFeasibilityDecision,
   getBaseMonthlySalesUnits,
   getFinancialLoanRows,
   getMonthDifference,
@@ -2834,12 +2836,12 @@ function App() {
         flowStrategy: normalizeFlowStrategy(savedPlan.input?.flowStrategy),
       });
       setOperationPlanResult(savedPlan.result);
+      await loadOperationsData();
+      await loadFinancialData();
       setOperationsStatus(copy(
         "Resource plan was saved and calculated.",
         "Kaynak planı kaydedildi ve hesaplandı.",
       ));
-      await loadOperationsData();
-      await loadFinancialData();
       markWorkspaceSnapshotClean();
       return true;
     } catch (error) {
@@ -2906,8 +2908,8 @@ function App() {
       });
 
       setOperationForms((current) => ({ ...current, [entity]: emptyOperationForms[entity] }));
-      setOperationsStatus(copy("Operations record was saved.", "Operasyon kaydı kaydedildi."));
       await loadOperationsData();
+      setOperationsStatus(copy("Operations record was saved.", "Operasyon kaydı kaydedildi."));
       markWorkspaceSnapshotClean();
       return true;
     } catch (error) {
@@ -2962,8 +2964,9 @@ function App() {
 
     try {
       await saveFinancialModelSettings(supabase, financialSettingsForm);
-      setFinancialStatus(copy("Financial assumptions were saved.", "Finansal varsayımlar kaydedildi."));
       await loadFinancialData();
+      // After the reload, which clears the status line.
+      setFinancialStatus(copy("Financial assumptions were saved.", "Finansal varsayımlar kaydedildi."));
       markWorkspaceSnapshotClean();
       return true;
     } catch (error) {
@@ -3023,8 +3026,8 @@ function App() {
     try {
       await saveFinancialExtraCost(supabase, financialExtraCostForm);
       setFinancialExtraCostForm(emptyFinancialExtraCostForm);
-      setFinancialStatus(copy("Extra financial cost was saved.", "Ek finansal gider kaydedildi."));
       await loadFinancialData();
+      setFinancialStatus(copy("Extra financial cost was saved.", "Ek finansal gider kaydedildi."));
       markWorkspaceSnapshotClean();
       return true;
     } catch (error) {
@@ -3184,6 +3187,88 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
+  // Decision text and KPIs for a 5-year model summary; the dashboard and the
+  // report both use it so they never disagree.
+  function describeFeasibilityDecision(summary) {
+    const decision = evaluateFeasibilityDecision(summary);
+    const failedChecks = new Set(decision.checks.filter((check) => !check.ok).map((check) => check.key));
+    const reasons = [
+      failedChecks.has("npv") && copy(
+        `Net present value is negative at a ${formatNumber(summary.discountRateAnnualPercent, 1)}% discount rate: the investment loses value.`,
+        `Net bugünkü değer %${formatNumber(summary.discountRateAnnualPercent, 1)} iskonto oranıyla negatif: yatırım değer kaybettiriyor.`,
+      ),
+      failedChecks.has("payback") && (summary.paybackMonth
+        ? copy(
+          `Payback takes ${formatNumber(summary.paybackMonth)} months; the limit is ${decision.thresholds.maxPaybackMonths}.`,
+          `Geri dönüş ${formatNumber(summary.paybackMonth)} ay sürüyor; sınır ${decision.thresholds.maxPaybackMonths} ay.`,
+        )
+        : copy("The investment does not pay back within 5 years.", "Yatırım 5 yıl içinde geri dönmüyor.")),
+      failedChecks.has("cash") && copy(
+        `Cash falls to ${formatLira(summary.lowestCashBalance)}: about ${formatLira(-summary.lowestCashBalance)} more funding is needed.`,
+        `Nakit ${formatLira(summary.lowestCashBalance)} seviyesine düşüyor: yaklaşık ${formatLira(-summary.lowestCashBalance)} ek finansman gerekiyor.`,
+      ),
+      failedChecks.has("capacity") && (summary.capacityUtilization === null
+        ? copy("There is demand but no production capacity.", "Talep var ama üretim kapasitesi yok.")
+        : copy(
+          `Demand is ${formatNumber(summary.capacityUtilization * 100)}% of capacity: some sales cannot be produced.`,
+          `Talep kapasitenin %${formatNumber(summary.capacityUtilization * 100)}'i: satışların bir kısmı üretilemiyor.`,
+        )),
+    ].filter(Boolean);
+    const verdictByStatus = {
+      feasible: {
+        action: copy("Open report pack", "Rapor paketini aç"),
+        copy: copy("The investment creates value, pays back in time, cash never runs out and capacity covers demand.", "Yatırım değer yaratıyor, zamanında geri dönüyor, nakit hiç tükenmiyor ve kapasite talebi karşılıyor."),
+        label: copy("Feasible", "Uygun"),
+        path: "/reports",
+        tone: "teal",
+      },
+      risky: {
+        action: copy("Improve plan", "Planı iyileştir"),
+        copy: reasons.join(" "),
+        label: copy("Risky", "Riskli"),
+        path: "/financial-modelling/analiz",
+        tone: "clay",
+      },
+      wait: {
+        action: copy("Review risks", "Riskleri incele"),
+        copy: reasons.join(" "),
+        label: copy("Wait", "Beklenmeli"),
+        path: "/financial-modelling/analiz",
+        tone: "amber",
+      },
+    };
+    const kpis = [
+      {
+        detail: copy(`limit ${decision.thresholds.maxPaybackMonths} months`, `sınır ${decision.thresholds.maxPaybackMonths} ay`),
+        key: "payback",
+        label: copy("Payback", "Geri dönüş süresi"),
+        value: summary.paybackMonth ? `${formatNumber(summary.paybackMonth)} ${copy("mo", "ay")}` : copy("Over 5 years", "5 yıldan uzun"),
+      },
+      {
+        detail: summary.internalRateOfReturn === null
+          ? copy(`at ${formatNumber(summary.discountRateAnnualPercent, 1)}% discount rate`, `%${formatNumber(summary.discountRateAnnualPercent, 1)} iskonto oranıyla`)
+          : copy(`IRR ${formatNumber(summary.internalRateOfReturn, 1)}% / year`, `İç verim oranı yıllık %${formatNumber(summary.internalRateOfReturn, 1)}`),
+        key: "npv",
+        label: copy("Net present value", "Net bugünkü değer"),
+        value: formatLira(summary.netPresentValue),
+      },
+      {
+        detail: copy("5-year demand / production capacity", "5 yıllık talep / üretim kapasitesi"),
+        key: "capacity",
+        label: copy("Capacity use", "Kapasite kullanımı"),
+        value: summary.capacityUtilization === null ? "-" : `${formatNumber(summary.capacityUtilization * 100)}%`,
+      },
+      {
+        detail: copy("with the entered starting cash", "girilen başlangıç nakdiyle"),
+        key: "cash",
+        label: copy("Lowest cash", "En düşük nakit"),
+        value: formatLira(summary.lowestCashBalance),
+      },
+    ].map((kpi) => ({ ...kpi, ok: !failedChecks.has(kpi.key) }));
+
+    return { decision, kpis, verdict: verdictByStatus[decision.status] };
+  }
+
   function buildExportReport() {
     const exportModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, "5y");
 
@@ -3196,7 +3281,7 @@ function App() {
       salesStrategy,
       settings: financialSettingsForModel,
       t: copy,
-      verdict: { copy: feasibilityVerdict.copy, label: feasibilityVerdict.label },
+      verdict: hasFinancialSourceData ? describeFeasibilityDecision(exportModel.summary).verdict : feasibilityVerdict,
     });
   }
 
@@ -3458,17 +3543,19 @@ function App() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({
         email: form.email.trim(),
         password: form.password,
       });
 
       if (error) throw error;
 
+      // Admins can read every profile in their company, so filter to our own.
       const { data: userProfile } = await supabase
         .from("profiles")
         .select("profile_picture_url, language, theme")
-        .single();
+        .eq("id", signInData.user.id)
+        .maybeSingle();
 
       setProfilePreview(userProfile?.profile_picture_url ? await resolveProfilePicturePreview(userProfile.profile_picture_url) : "");
       if (userProfile?.language && ["en", "tr"].includes(userProfile.language)) {
@@ -5694,8 +5781,8 @@ function App() {
       </div>
     );
     const financialInputConfig = {
-      assetValueIncreaseAnnualPercent: { label: copy("Asset value increase % / year", "Varlık değer artışı (% yıllık)"), min: "0", step: "0.01" },
       cogsInflationAnnualPercent: { label: copy("COGS inflation % / year", "SMM enflasyonu (% yıllık)"), min: "0", step: "0.01" },
+      discountRateAnnualPercent: { info: copy("The yearly return you would expect from this money elsewhere, used to discount future cash flows for net present value. For TRY projects, the policy rate plus a risk premium is a common starting point.", "Bu parayı başka yerde değerlendirseniz bekleyeceğiniz yıllık getiri; net bugünkü değer hesabında gelecekteki nakit akışlarını indirgemek için kullanılır. TL projelerde politika faizi + risk primi yaygın bir başlangıç noktasıdır."), label: copy("Discount rate % / year", "İskonto oranı (% yıllık)"), min: "0", step: "0.01" },
       electricityPricePerKwh: { label: copy("Electricity kWh price", "Elektrik kWh fiyatı"), min: "0", step: "0.0001" },
       expenseVatRate: { label: copy("Average expense VAT %", "Ortalama gider KDV oranı (%)"), min: "0", step: "0.01" },
       incomeTaxRate: { label: copy("Corporate tax %", "Kurumlar vergisi oranı"), min: "0", step: "0.01" },
@@ -5863,11 +5950,23 @@ function App() {
             <summary className="financial-input-section-heading progressive-section-summary">
               <div>
                 <span>{copy("Inflation and revaluation", "Enflasyon ve yeniden değerleme")}</span>
-                <p>{copy("Annual COGS, OpEx, price increase and asset value policies. Frequency controls how annual increases step through the projection.", "Yıllık SMM, OpEx, fiyat artışı ve varlık değer politikaları. Artış sıklığı yıllık artışların projeksiyona nasıl dağıtılacağını belirler.")}</p>
+                <p>{copy("Annual COGS, OpEx and price increase policies. Frequency controls how annual increases step through the projection.", "Yıllık SMM, OpEx ve fiyat artışı politikaları. Artış sıklığı yıllık artışların projeksiyona nasıl dağıtılacağını belirler.")}</p>
               </div>
             </summary>
             <div className="financial-input-grid">
               {inflationRevaluationFinancialFields.map((field) => renderFinancialField(field, true))}
+            </div>
+          </details>
+
+          <details className="financial-input-section valuation-section progressive-input-box">
+            <summary className="financial-input-section-heading progressive-section-summary">
+              <div>
+                <span>{copy("Investment valuation", "Yatırım değerlemesi")}</span>
+                <p>{copy("Discount rate for net present value. Leave empty to use 30% a year.", "Net bugünkü değer için iskonto oranı. Boş bırakırsanız yıllık %30 kullanılır.")}</p>
+              </div>
+            </summary>
+            <div className="financial-input-grid">
+              {valuationFinancialSettingFields.map((field) => renderFinancialField(field, false))}
             </div>
           </details>
 
@@ -8312,6 +8411,10 @@ function App() {
   };
   const projectedFinancialModel = buildFinancialFeasibilityModel(financialModel, dashboardSalesStrategy, financialSettingsForModel, dashboardOperationsWorkspace, financialHorizon);
   const financialSummary = projectedFinancialModel.summary || emptyFinancialModel.summary;
+  // The decision always looks five years ahead, whatever horizon the screen shows.
+  const decisionSummary = financialHorizon === "5y"
+    ? financialSummary
+    : (buildFinancialFeasibilityModel(financialModel, dashboardSalesStrategy, financialSettingsForModel, dashboardOperationsWorkspace, "5y").summary || emptyFinancialModel.summary);
   const financialCostWarnings = financialSummary.costWarnings || {};
   const missingCostInputs = [
     ...(financialCostWarnings.missingMaterialPrices || []),
@@ -8564,6 +8667,7 @@ function App() {
   const hasPositiveNet = hasFinancialSourceData && monthlyNet > 0;
   const hasEnoughRunway = hasFinancialSourceData && financialSummary.cashRunwayMonths >= Math.min(financialMonthCount, 6);
   const hasNoCapacityGap = hasFinancialSourceData && unmetForecastUnits <= 0;
+  const { kpis: decisionKpis, verdict: decisionVerdict } = describeFeasibilityDecision(decisionSummary);
   const feasibilityVerdict = !hasFinancialSourceData
     ? {
         action: missingFeasibilityItem?.action || copy("Complete Inputs", "Girdileri Tamamla"),
@@ -8572,29 +8676,7 @@ function App() {
         path: missingFeasibilityItem?.path || "/operations/products",
         tone: "amber",
       }
-    : (hasPositiveNet && hasEnoughRunway && hasNoCapacityGap)
-        ? {
-            action: copy("Open Simulation", "Simülasyonu Aç"),
-            copy: copy("The current plan covers the sales forecast, keeps cash alive in the selected horizon, and shows positive monthly net.", "Mevcut plan satış tahminini karşılıyor, seçilen ufukta nakdi taşıyor ve pozitif aylık net gösteriyor."),
-            label: copy("Looks feasible", "Fizibl görünüyor"),
-            path: "/simulation/current-situation",
-            tone: "teal",
-          }
-        : hasPositiveNet
-          ? {
-              action: copy("Review Risks", "Riskleri İncele"),
-              copy: copy("The plan can make money, but capacity, cash runway, or inventory risk needs attention before committing.", "Plan para kazanabilir; fakat kapasite, nakit dayanma veya stok riski karar öncesi kontrol edilmeli."),
-              label: copy("Feasible with watchouts", "Dikkatle fizibl"),
-              path: "/financial-modelling/analiz",
-              tone: "amber",
-            }
-          : {
-              action: copy("Improve Plan", "Planı İyileştir"),
-              copy: copy("The current assumptions do not yet support a healthy production decision. Start with price, cost, capacity, or cash.", "Mevcut varsayımlar sağlıklı bir üretim kararını henüz desteklemiyor. Fiyat, maliyet, kapasite veya nakitten başlayın."),
-              label: copy("High risk", "Yüksek risk"),
-              path: "/financial-modelling/analiz",
-              tone: "clay",
-            };
+    : decisionVerdict;
   const dashboardQuickActions = [
     { label: copy("Product setup", "Ürün kurulumu"), path: "/operations/products", value: operationsWorkspace.products.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli") },
     { label: copy("Process plan", "Süreç planı"), path: "/operations/data-entry", value: activePlanResults.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli") },
@@ -9106,6 +9188,7 @@ function App() {
     const has = (section) => sections.includes(section);
     const formatKpi = (value, format) => {
       if (format === "month") return value ? `${formatNumber(value)}. ${copy("month", "ay")}` : copy("Not reached", "Ulaşılmadı");
+      if (format === "percent") return value === null ? "-" : `%${formatNumber(value, 1)}`;
       return formatLira(value, format === "money2" ? 2 : 0);
     };
     const renderStatement = (title, rows) => (
@@ -9820,6 +9903,17 @@ function App() {
               <span>{copy("Feasibility executive brief", "Fizibilite yönetici özeti")}</span>
               <h1>{feasibilityVerdict.label}</h1>
               <p>{feasibilityVerdict.copy}</p>
+              {hasFinancialSourceData && (
+                <div className="decision-kpi-grid">
+                  {decisionKpis.map((kpi) => (
+                    <article className={`decision-kpi ${kpi.ok ? "ok" : "failed"}`} key={kpi.key}>
+                      <span>{kpi.label}</span>
+                      <strong>{kpi.value}</strong>
+                      <small>{kpi.detail}</small>
+                    </article>
+                  ))}
+                </div>
+              )}
               <div className="executive-brief-actions">
                 <button type="button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
                 <button type="button" className="secondary" onClick={() => goTo("/simulation/current-situation", "login")}>{copy("Test scenario", "Senaryo test et")}</button>

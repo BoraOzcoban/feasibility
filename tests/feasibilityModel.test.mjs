@@ -3,7 +3,10 @@ import test from "node:test";
 import {
   buildCampaignSpendSchedule,
   buildFinancialFeasibilityModel,
+  calculateInternalRateOfReturn,
+  calculateNetPresentValue,
   calculatePlanDailyCost,
+  evaluateFeasibilityDecision,
 } from "../src/lib/feasibilityModel.js";
 import { defaultFinancialSettings, emptyFinancialModel } from "../src/lib/financialService.js";
 
@@ -271,4 +274,69 @@ test("FX drift applies to materials priced in foreign currency", () => {
   const row = model.trendRows[6];
 
   approx(row.materialCost / row.netSoldUnits, 1 + (5 * (1.02 ** 6)), 1e-6);
+});
+
+test("NPV discounts monthly flows at the monthly equivalent of the annual rate", () => {
+  // 12 months at 10% a year: one year of discounting exactly.
+  const flows = [-1000, ...Array.from({ length: 11 }, () => 0), 1100];
+  approx(calculateNetPresentValue(flows, 10), 0, 1e-9);
+  approx(calculateNetPresentValue([-1000, 0, 0], 0), -1000);
+});
+
+test("IRR is the annual rate where NPV is zero, or null without a sign change", () => {
+  const flows = [-1000, ...Array.from({ length: 11 }, () => 0), 1100];
+  approx(calculateInternalRateOfReturn(flows), 10, 1e-6);
+  assert.equal(calculateInternalRateOfReturn([100, 200]), null);
+  assert.equal(calculateInternalRateOfReturn([-100, -200]), null);
+
+  const monthly = [-50000, ...Array.from({ length: 24 }, () => 3000)];
+  const irr = calculateInternalRateOfReturn(monthly);
+  approx(calculateNetPresentValue(monthly, irr), 0, 1e-4);
+});
+
+test("the model values the project from its unlevered cash flows plus residual value", () => {
+  const model = runModel({ horizon: "1y", settings: { discountRateAnnualPercent: 20 } });
+  const { summary, trendRows } = model;
+  const last = trendRows[trendRows.length - 1];
+  const flows = [-summary.machinePurchaseCost, ...trendRows.map((row) => row.operatingCashFlow)];
+  flows[flows.length - 1] += last.fixedAssets + last.workingCapital;
+
+  approx(summary.residualValue, last.fixedAssets + last.workingCapital);
+  approx(summary.netPresentValue, calculateNetPresentValue(flows, 20), 1e-6);
+  approx(summary.internalRateOfReturn, calculateInternalRateOfReturn(flows), 1e-6);
+  assert.equal(summary.discountRateAnnualPercent, 20);
+
+  // A loan changes cash, not the project's value.
+  const withLoan = runModel({
+    horizon: "1y",
+    settings: { discountRateAnnualPercent: 20, loanRows: [{ amount: 200000, annualInterestRate: 0, loanTermMonths: 6, receivedDate: "2000-01-01" }] },
+  });
+  assert.ok(withLoan.summary.lowestCashBalance > summary.lowestCashBalance);
+});
+
+test("lowest cash and capacity use come from the projection", () => {
+  const model = runModel({ horizon: "1y" });
+  const lowest = Math.min(baseSettings.initialCash - model.summary.machinePurchaseCost, ...model.trendRows.map((row) => row.cashBalance));
+
+  approx(model.summary.lowestCashBalance, lowest);
+  approx(model.summary.capacityUtilization, model.summary.forecastSalesUnits / (model.summary.dailyProduction * 20 * 12));
+
+  const short = runModel({ channels: [channel({ monthlySalesUnits: 1e6 })], horizon: "1y" });
+  assert.ok(short.summary.capacityUtilization > 1);
+});
+
+test("the decision is risky without value or payback, waits on a failed check, else feasible", () => {
+  const good = { capacityUtilization: 0.8, lowestCashBalance: 10, netPresentValue: 1, paybackMonth: 12 };
+
+  assert.equal(evaluateFeasibilityDecision(good).status, "feasible");
+  assert.equal(evaluateFeasibilityDecision({ ...good, netPresentValue: -1 }).status, "risky");
+  assert.equal(evaluateFeasibilityDecision({ ...good, paybackMonth: null }).status, "risky");
+  assert.equal(evaluateFeasibilityDecision({ ...good, paybackMonth: 48 }).status, "wait");
+  assert.equal(evaluateFeasibilityDecision({ ...good, lowestCashBalance: -5 }).status, "wait");
+  assert.equal(evaluateFeasibilityDecision({ ...good, capacityUtilization: 1.2 }).status, "wait");
+  assert.equal(evaluateFeasibilityDecision({ ...good, capacityUtilization: null }).status, "wait");
+  assert.deepEqual(
+    evaluateFeasibilityDecision({ ...good, paybackMonth: 48 }).checks.filter((check) => !check.ok).map((check) => check.key),
+    ["payback"],
+  );
 });
