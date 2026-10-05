@@ -4599,6 +4599,24 @@ body > .floating-info-tip-panel,
   justify-self: end;
 }
 
+.table-delete-button {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--decision-risky) 45%, var(--color-line));
+  border-radius: 6px;
+  color: var(--decision-risky);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  justify-self: end;
+  min-height: 26px;
+  padding: 2px 10px;
+}
+
+.table-delete-button:hover {
+  background: var(--decision-risky);
+  color: #ffffff;
+}
+
 .table-row-action-head {
   align-items: center;
   color: rgba(255, 255, 255, 0.58);
@@ -24038,6 +24056,23 @@ body > .floating-info-tip-panel,
 }
 
 .decision-badge.risky {
+  background: var(--decision-risky);
+  color: #ffffff;
+}
+
+.scenario-row.has-row-action {
+  grid-template-columns: 1fr auto auto;
+}
+
+/* Beats the financial workspace's generic ".scenario-row button" styling. */
+.dashboard-shell .financial-workspace .scenario-row .table-delete-button {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--decision-risky) 45%, var(--color-line));
+  color: var(--decision-risky);
+  min-height: 26px;
+}
+
+.dashboard-shell .financial-workspace .scenario-row .table-delete-button:hover {
   background: var(--decision-risky);
   color: #ffffff;
 }

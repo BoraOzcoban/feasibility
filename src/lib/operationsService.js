@@ -184,3 +184,30 @@ export async function saveOperationRecord(supabase, entity, input) {
 
   return data;
 }
+
+// entity: "material" | "machine" | "workforce" | "equipment" | "product".
+// A record still used by a recipe, process step or saved plan is refused
+// with error.message "record_in_use"; see getRecordInUseCounts.
+export async function deleteOperationRecord(supabase, entity, id) {
+  const { error } = await supabase.rpc("delete_operation_record", {
+    p_entity: entity,
+    p_id: id,
+  });
+
+  if (error) throw error;
+}
+
+export function getRecordInUseCounts(error) {
+  if (error?.message !== "record_in_use") return null;
+
+  try {
+    const counts = JSON.parse(error.details || "{}");
+    return {
+      plans: Number(counts.plans) || 0,
+      processes: Number(counts.processes) || 0,
+      recipes: Number(counts.recipes) || 0,
+    };
+  } catch {
+    return { plans: 0, processes: 0, recipes: 0 };
+  }
+}

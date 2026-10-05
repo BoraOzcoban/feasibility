@@ -502,3 +502,9 @@ export async function saveFinancialExtraCost(supabase, input) {
 
   return data;
 }
+
+export async function deleteFinancialExtraCost(supabase, id) {
+  const { error } = await supabase.rpc("delete_financial_extra_cost", { p_id: id });
+
+  if (error) throw error;
+}

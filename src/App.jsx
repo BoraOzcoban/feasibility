@@ -13,6 +13,7 @@ import {
   optionalMacroFinancialSettingFields,
   requiredFinancialSettingFields,
   valuationFinancialSettingFields,
+  deleteFinancialExtraCost,
   saveFinancialExtraCost,
   saveFinancialModelSettings,
 } from "./lib/financialService";
@@ -47,7 +48,7 @@ import {
   toFiniteNumber,
 } from "./lib/feasibilityModel";
 import { calculateCurrentPlanResult, getCurrentOperationPlans, hasViablePlanResult } from "./lib/operationsCalculations";
-import { emptyOperationForms, emptyOperationPlan, emptyPlanRows, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
+import { deleteOperationRecord, emptyOperationForms, emptyOperationPlan, emptyPlanRows, getRecordInUseCounts, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
 import { deleteSimulationVariantRecord, emptySalesStrategy, emptySimulationVariant, loadSalesStrategy, loadSimulationVariants, saveSalesStrategy, saveSimulationVariant } from "./lib/planningService";
 import { buildFeasibilityReport, buildReportSheets, getStatementLayout, reportPackSections } from "./lib/reportExport";
 import logoUrl from "./assets/atera-logo.svg";
@@ -2978,6 +2979,47 @@ function App() {
     }
   }
 
+  async function handleDeleteOperationRecord(entity, row) {
+    const name = row.name || row.role_name || "";
+    const question = entity === "product"
+      ? copy(`Delete "${name}"? Its recipe, process steps and saved plans are deleted too.`, `"${name}" silinsin mi? Reçetesi, süreç adımları ve kayıtlı planları da silinir.`)
+      : copy(`Delete "${name}"?`, `"${name}" silinsin mi?`);
+    if (!supabase || !window.confirm(question)) return;
+
+    setOperationsLoading(true);
+    try {
+      await deleteOperationRecord(supabase, entity, row.id);
+      await loadOperationsData();
+      await loadFinancialData();
+      setOperationsStatus(copy(`"${name}" was deleted.`, `"${name}" silindi.`));
+    } catch (error) {
+      const inUse = getRecordInUseCounts(error);
+      setOperationsStatus(inUse
+        ? copy(
+          `"${name}" is still used (${inUse.recipes} recipes, ${inUse.processes} process steps, ${inUse.plans} saved plans). Remove it there first.`,
+          `"${name}" hâlâ kullanılıyor (${inUse.recipes} reçete, ${inUse.processes} süreç adımı, ${inUse.plans} kayıtlı plan). Önce oradan çıkarın.`,
+        )
+        : error.message);
+    } finally {
+      setOperationsLoading(false);
+    }
+  }
+
+  async function handleDeleteFinancialExtraCost(cost) {
+    if (!supabase || !window.confirm(copy(`Delete "${cost.name}"?`, `"${cost.name}" silinsin mi?`))) return;
+
+    setFinancialLoading(true);
+    try {
+      await deleteFinancialExtraCost(supabase, cost.id);
+      await loadFinancialData();
+      setFinancialStatus(copy(`"${cost.name}" was deleted.`, `"${cost.name}" silindi.`));
+    } catch (error) {
+      setFinancialStatus(error.message);
+    } finally {
+      setFinancialLoading(false);
+    }
+  }
+
   function toggleFinancialOverviewWidget(widgetId) {
     setFinancialOverviewWidgets((current) => (
       current.includes(widgetId)
@@ -3934,6 +3976,7 @@ function App() {
     emptyLabel,
     gridTemplateColumns,
     getRowKey = (row) => row.id,
+    onDeleteRow,
     onRowClick,
     rows,
     tableId,
@@ -3982,17 +4025,32 @@ function App() {
                         </span>
                       );
                     })}
-                    <button
-                      type="button"
-                      className="table-hide-button row-hide-button"
-                      aria-label={copy("Hide row", "Satırı gizle")}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        hideTableRow(tableId, String(rowKey));
-                      }}
-                    >
-                      ◉
-                    </button>
+                    {onDeleteRow ? (
+                      <button
+                        type="button"
+                        className="table-delete-button"
+                        aria-label={copy("Delete record", "Kaydı sil")}
+                        title={copy("Delete record", "Kaydı sil")}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteRow(row);
+                        }}
+                      >
+                        {copy("Delete", "Sil")}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="table-hide-button row-hide-button"
+                        aria-label={copy("Hide row", "Satırı gizle")}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          hideTableRow(tableId, String(rowKey));
+                        }}
+                      >
+                        ◉
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -4922,6 +4980,7 @@ function App() {
                 columns: materialColumns,
                 gridTemplateColumns: "1.2fr 0.8fr 0.6fr 0.9fr 0.7fr",
                 onRowClick: (material) => copyOperationRecordToForm("material", material),
+                onDeleteRow: (row) => handleDeleteOperationRecord("material", row),
                 rows: operationsWorkspace.materials,
                 tableId: "materials",
                 useButtonRows: true,
@@ -4977,6 +5036,7 @@ function App() {
                 columns: workforceColumns,
                 gridTemplateColumns: "1.2fr 0.9fr 0.7fr",
                 onRowClick: (workforce) => copyOperationRecordToForm("workforce", workforce),
+                onDeleteRow: (row) => handleDeleteOperationRecord("workforce", row),
                 rows: operationsWorkspace.workforce,
                 tableId: "workforce",
                 useButtonRows: true,
@@ -5468,6 +5528,7 @@ function App() {
                 columns: productColumns,
                 gridTemplateColumns: "1.1fr 0.5fr 0.7fr 0.7fr 0.9fr 1.6fr 1.3fr",
                 onRowClick: copyProductToForm,
+                onDeleteRow: (row) => handleDeleteOperationRecord("product", row),
                 rows: operationsWorkspace.products,
                 tableId: "products",
                 useButtonRows: true,
@@ -6847,12 +6908,17 @@ function App() {
                 <div className="financial-card-heading"><h2>{copy("Saved Optional Expenses", "Kayıtlı Opsiyonel Giderler")}</h2></div>
                 <div className="scenario-list">
                   {(model.extraCosts?.length ? model.extraCosts : [{ id: "empty", name: copy("No extra cost yet", "Henüz ek gider yok"), costType: "-", amount: 0 }]).map((cost) => (
-                    <div className="scenario-row" key={cost.id}>
+                    <div className={`scenario-row${cost.id === "empty" ? "" : " has-row-action"}`} key={cost.id}>
                       <div>
                         <strong>{cost.name}</strong>
                         <span>{cost.costType === "initial" ? copy("Initial expense", "Başlangıç gideri") : cost.costType === "recurring" ? copy("Recurring expense", "Tekrarlayan gider") : "-"}</span>
                       </div>
                       <strong>{cost.id === "empty" ? "-" : formatLira(cost.amount)}</strong>
+                      {cost.id !== "empty" && (
+                        <button type="button" className="table-delete-button" onClick={() => handleDeleteFinancialExtraCost(cost)}>
+                          {copy("Delete", "Sil")}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -7581,12 +7647,8 @@ function App() {
       { field: "commissionPercent", info: copy("Commission is deducted from gross channel revenue before net revenue is reported.", "Komisyon, net ciro raporlanmadan önce brüt kanal cirosundan düşülür."), label: copy("Channel commission (%)", "Kanal Komisyonu (%)"), max: 100, min: 0, step: "0.1" },
     ];
     const advancedChannelFields = [
-      { field: "basketSize", label: copy("Basket Size", "Sepet Büyüklüğü"), min: 0, step: "0.01" },
-      { field: "conversionRatePercent", label: copy("Conversion Rate (%)", "Dönüşüm Oranı (%)"), min: 0, step: "0.001" },
       { field: "trafficScore", info: copy("A simple demand strength multiplier. 1 keeps demand unchanged, 1.2 lifts it by 20%, 0.8 lowers it by 20%.", "Basit talep gücü çarpanı. 1 talebi değiştirmez, 1,2 %20 artırır, 0,8 %20 düşürür."), label: copy("Traffic Score", "Trafik Skoru"), min: 0, step: "0.01" },
       { field: "unitSalesPrice", info: copy("Optional channel-specific TRY price. If empty, finance uses the selected product price.", "Opsiyonel kanala özel TL satış fiyatı. Boş bırakılırsa finans seçili ürün fiyatını kullanır."), label: copy("Channel Unit Price (TRY)", "Kanal Birim Fiyatı (TL)"), min: 0, step: "0.01" },
-      { field: "repeatRatePercent", label: copy("Repeat Rate (%)", "Tekrar Oranı (%)"), min: 0, step: "0.001" },
-      { field: "churnRatePercent", label: copy("Churn Rate (%)", "Kayıp Oranı (%)"), min: 0, step: "0.001" },
       { field: "discountRatePercent", label: copy("Discount Rate (%)", "İndirim Oranı (%)"), min: 0, step: "0.01" },
       { field: "returnRatePercent", label: copy("Return Rate (%)", "İade Oranı (%)"), min: 0, step: "0.001" },
       { field: "capacityLimit", info: copy("Maximum units this channel can sell in a month after all multipliers are applied.", "Tüm çarpanlardan sonra bu kanalın bir ayda satabileceği maksimum adet."), label: copy("Capacity Limit", "Kapasite Limiti"), min: 0, step: "1" },
@@ -7656,7 +7718,7 @@ function App() {
             label: copy("Expectation multiplier period", "Beklenti çarpanı periyodu"),
           },
           {
-            detail: copy("Basket, conversion, traffic, capacity, seasonality, ramp-up and channel-specific price fields.", "Sepet, dönüşüm, trafik, kapasite, sezonsallık, ramp-up ve kanala özel fiyat alanları."),
+            detail: copy("Traffic, capacity, seasonality, ramp-up, returns and channel-specific price fields.", "Trafik, kapasite, sezonsallık, ramp-up, iade ve kanala özel fiyat alanları."),
             id: "advancedChannelParameters",
             label: copy("Advanced channel parameters", "Gelişmiş kanal parametreleri"),
           },
@@ -8271,6 +8333,7 @@ function App() {
                 {renderSortableDataTable({
                   columns: machineColumns,
                   gridTemplateColumns: `repeat(${machineColumns.length}, minmax(120px, 1fr))`,
+                  onDeleteRow: (row) => handleDeleteOperationRecord("machine", row),
                   rows: operationsWorkspace.machines,
                   tableId: "machines",
                 })}
@@ -8287,6 +8350,7 @@ function App() {
                 {renderSortableDataTable({
                   columns: equipmentColumns,
                   gridTemplateColumns: `repeat(${equipmentColumns.length}, minmax(120px, 1fr))`,
+                  onDeleteRow: (row) => handleDeleteOperationRecord("equipment", row),
                   rows: operationsWorkspace.equipment || [],
                   tableId: "equipment",
                 })}
