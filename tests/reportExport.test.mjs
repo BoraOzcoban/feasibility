@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import writeExcelFile from "write-excel-file/node";
-import { buildFinancialFeasibilityModel } from "../src/lib/feasibilityModel.js";
+import { buildFinancialFeasibilityModel, buildSensitivityTable } from "../src/lib/feasibilityModel.js";
 import { defaultFinancialSettings, emptyFinancialModel } from "../src/lib/financialService.js";
 import { buildFeasibilityReport, buildReportSheets, reportPackSections, summarizeYears } from "../src/lib/reportExport.js";
 
@@ -39,6 +39,7 @@ const report = buildFeasibilityReport({
   productName: "Drink",
   risks: [{ detail: "Demand above capacity", title: "Capacity gap" }],
   salesStrategy,
+  sensitivity: buildSensitivityTable(emptyFinancialModel, salesStrategy, settings, { ...workspace, activePlans: [plan] }),
   settings,
   verdict: { copy: "Check cash", label: "Proceed with care" },
 });
@@ -58,10 +59,10 @@ test("yearly summary adds up the monthly rows and keeps year-end balances", () =
 test("each report pack produces its own sheets", () => {
   const names = (pack) => buildReportSheets(report, pack).map((sheet) => sheet.sheet);
 
-  assert.deepEqual(names("executive"), ["Summary", "Income statement", "Cash flow", "Risks"]);
+  assert.deepEqual(names("executive"), ["Summary", "Sensitivity", "Income statement", "Cash flow", "Risks"]);
   assert.deepEqual(names("operations"), ["Summary", "Production"]);
   // No loans in this scenario, so the full pack has no loan sheet.
-  assert.deepEqual(names("full"), ["Summary", "Assumptions", "Income statement", "Cash flow", "Balance sheet", "Production", "Sales channels", "Risks", "Monthly"]);
+  assert.deepEqual(names("full"), ["Summary", "Sensitivity", "Assumptions", "Income statement", "Cash flow", "Balance sheet", "Production", "Sales channels", "Risks", "Monthly"]);
   assert.equal(reportPackSections.full.includes("loans"), true);
 });
 
@@ -71,4 +72,12 @@ test("the workbook can be written as a real xlsx file", async () => {
   // An .xlsx file is a zip archive.
   assert.equal(buffer.subarray(0, 2).toString(), "PK");
   assert.ok(buffer.length > 2000);
+});
+
+test("the sensitivity sheet lists the plan and the six one-lever cases", () => {
+  const sheet = buildReportSheets(report, "financial").find((item) => item.sheet === "Sensitivity");
+
+  assert.equal(sheet.data.length, 1 + 7);
+  assert.equal(sheet.data[1][2], "-");
+  assert.equal(sheet.data[1][1].value, report.sensitivity[0].netPresentValue);
 });

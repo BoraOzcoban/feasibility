@@ -5,6 +5,7 @@ import {
   buildFinancialFeasibilityModel,
   calculateInternalRateOfReturn,
   calculateNetPresentValue,
+  buildSensitivityTable,
   calculatePlanDailyCost,
   evaluateFeasibilityDecision,
 } from "../src/lib/feasibilityModel.js";
@@ -339,4 +340,31 @@ test("the decision is risky without value or payback, waits on a failed check, e
     evaluateFeasibilityDecision({ ...good, paybackMonth: 48 }).checks.filter((check) => !check.ok).map((check) => check.key),
     ["payback"],
   );
+});
+
+test("sensitivity moves one lever at a time through the full model", () => {
+  const args = [
+    { ...emptyFinancialModel, extraCosts: [] },
+    { campaigns: [], channels: [channel({ monthlySalesUnits: 1500 })], company: { monthlyMultipliers: Array.from({ length: 12 }, () => 1) } },
+    { ...baseSettings },
+    { ...workspace, activePlans: [{ id: "plan", product_id: "drink", result: planResult }] },
+    "1y",
+  ];
+  const rows = buildSensitivityTable(...args);
+  const byCase = (lever, change) => rows.find((row) => row.lever === lever && row.change === change);
+  const base = rows[0];
+
+  assert.equal(rows.length, 7);
+  assert.equal(base.lever, "base");
+  approx(base.netPresentValue, buildFinancialFeasibilityModel(...args).summary.netPresentValue);
+  assert.ok(byCase("price", 0.1).netPresentValue > base.netPresentValue);
+  assert.ok(byCase("price", -0.1).netPresentValue < base.netPresentValue);
+  assert.ok(byCase("volume", -0.2).netIncome < base.netIncome);
+  assert.ok(byCase("cost", 0.1).netPresentValue < base.netPresentValue);
+  assert.ok(byCase("cost", -0.1).netPresentValue > base.netPresentValue);
+  approx(byCase("cost", 0.1).netPresentValueChange, byCase("cost", 0.1).netPresentValue - base.netPresentValue);
+
+  // A 10% price cut on sold units lowers net sales by 10% when nothing else moves.
+  const priceModel = buildFinancialFeasibilityModel(args[0], args[1], { ...args[2], sensitivity: { price: 0.9 } }, args[3], args[4]);
+  approx(priceModel.summary.salesRevenue, buildFinancialFeasibilityModel(...args).summary.salesRevenue * 0.9, 1e-6);
 });

@@ -2,9 +2,9 @@ import { calculatePlanDailyCost, getPlanDailyOutput, toFiniteNumber } from "./fe
 import { getCurrentOperationPlans, hasViablePlanResult } from "./operationsCalculations.js";
 
 export const reportPackSections = {
-  executive: ["summary", "income", "cash", "risks"],
-  financial: ["summary", "assumptions", "income", "cash", "balance", "loans", "monthly"],
-  full: ["summary", "assumptions", "income", "cash", "balance", "loans", "operations", "sales", "risks", "monthly"],
+  executive: ["summary", "sensitivity", "income", "cash", "risks"],
+  financial: ["summary", "sensitivity", "assumptions", "income", "cash", "balance", "loans", "monthly"],
+  full: ["summary", "sensitivity", "assumptions", "income", "cash", "balance", "loans", "operations", "sales", "risks", "monthly"],
   operations: ["summary", "operations"],
   sales: ["summary", "sales"],
 };
@@ -123,6 +123,7 @@ export function buildFeasibilityReport({
   productName = "",
   risks = [],
   salesStrategy = {},
+  sensitivity = [],
   settings = {},
   t = (en) => en,
   verdict = {},
@@ -205,6 +206,7 @@ export function buildFeasibilityReport({
     }),
     productName,
     risks,
+    sensitivity,
     verdict,
     years: summarizeYears(rows),
   };
@@ -267,6 +269,26 @@ export function buildReportSheets(report, pack, t = (en) => en) {
         ]),
       ],
       sheet: t("Summary", "Özet"),
+    });
+  }
+
+  if (sections.includes("sensitivity") && report.sensitivity?.length) {
+    const decisionLabels = { feasible: t("Feasible", "Uygun"), risky: t("Risky", "Riskli"), wait: t("Wait", "Beklenmeli") };
+    sheets.push({
+      columns: [{ width: 26 }, { width: 18 }, { width: 16 }, { width: 18 }, { width: 14 }, { width: 18 }, { width: 14 }],
+      data: [
+        [t("Case", "Senaryo"), t("Net present value", "Net bugünkü değer"), t("Change", "Fark"), t("5-year net profit", "5 yıllık net kâr"), t("Payback (months)", "Geri dönüş (ay)"), t("Lowest cash", "En düşük nakit"), t("Decision", "Karar")].map(headerCell),
+        ...report.sensitivity.map((row) => [
+          row.label || row.lever,
+          numberCell(row.netPresentValue),
+          row.lever === "base" ? "-" : numberCell(row.netPresentValueChange),
+          numberCell(row.netIncome),
+          row.paybackMonth ? numberCell(row.paybackMonth, formats.units) : t("Over 5 years", "5 yıldan uzun"),
+          numberCell(row.lowestCashBalance),
+          decisionLabels[row.decision] || row.decision,
+        ]),
+      ],
+      sheet: t("Sensitivity", "Duyarlılık"),
     });
   }
 

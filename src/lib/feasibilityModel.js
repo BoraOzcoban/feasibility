@@ -586,13 +586,24 @@ function getCollectionDelayMonths(days) {
 }
 
 // Allocates the month's sellable stock to channels in their listed order.
+// Multipliers for sensitivity runs; 1 = the user's plan.
+function getSensitivity(settings = {}) {
+  const sensitivity = settings.sensitivity || {};
+  return {
+    cost: Math.max(0, toFiniteNumber(sensitivity.cost, 1)),
+    price: Math.max(0, toFiniteNumber(sensitivity.price, 1)),
+    volume: Math.max(0, toFiniteNumber(sensitivity.volume, 1)),
+  };
+}
+
 function allocateChannelSales(monthIndex, salesStrategy, productMap, stockUnits, settings) {
   const channels = Array.isArray(salesStrategy.channels) ? salesStrategy.channels : [];
-  const priceIncreaseMultiplier = getPeriodicAnnualIncreaseMultiplier(settings.priceIncreaseAnnualPercent, monthIndex, settings.increaseFrequency);
+  const sensitivity = getSensitivity(settings);
+  const priceIncreaseMultiplier = getPeriodicAnnualIncreaseMultiplier(settings.priceIncreaseAnnualPercent, monthIndex, settings.increaseFrequency) * sensitivity.price;
 
   return channels.map((channel) => {
     const productId = channel.productId || channel.product_id || "";
-    const desiredUnits = getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy);
+    const desiredUnits = getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy) * sensitivity.volume;
     const availableUnits = productId ? Math.max(0, stockUnits.get(productId) || 0) : 0;
     const shippedUnits = Math.min(desiredUnits, availableUnits);
     const product = productMap.get(productId) || channel.product || {};
@@ -740,10 +751,11 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
   const initialCash = Math.max(0, toFiniteNumber(settings.initialCash));
   const usefulLifeYears = Math.max(1, toFiniteNumber(settings.assetUsefulLifeYears, DEFAULT_ASSET_USEFUL_LIFE_YEARS));
   const costProfile = buildProductionCostProfile(activePlans, operationsWorkspace, settings);
+  const costSensitivity = getSensitivity(settings).cost;
   const dailyProduced = costProfile.dailyProduced;
-  const unitMaterialCost = costProfile.unit.material;
-  const unitWorkforceCost = costProfile.unit.labor;
-  const unitElectricityCost = costProfile.unit.energy;
+  const unitMaterialCost = costProfile.unit.material * costSensitivity;
+  const unitWorkforceCost = costProfile.unit.labor * costSensitivity;
+  const unitElectricityCost = costProfile.unit.energy * costSensitivity;
   const unitProductionCost = unitMaterialCost + unitWorkforceCost + unitElectricityCost;
   const productMap = getOperationProductMap(operationsWorkspace);
   const machineRecords = buildIdMap(operationsWorkspace.machines);
@@ -810,9 +822,9 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
   const rawMaterialBufferMonths =
     Math.max(0, toFiniteNumber(settings.rawMaterialBufferMonths, 1)) +
     (Math.max(0, toFiniteNumber(settings.rawMaterialStockDays)) / 30);
-  const rawMaterialBufferValue = costProfile.daily.material * workingDaysPerMonth * rawMaterialBufferMonths;
+  const rawMaterialBufferValue = costProfile.daily.material * costSensitivity * workingDaysPerMonth * rawMaterialBufferMonths;
   const minimumCashReserve =
-    (costProfile.daily.labor * workingDaysPerMonth * Math.max(0, toFiniteNumber(settings.salaryBufferMonths, 1))) +
+    (costProfile.daily.labor * costSensitivity * workingDaysPerMonth * Math.max(0, toFiniteNumber(settings.salaryBufferMonths, 1))) +
     (extraRecurringCost * Math.max(0, toFiniteNumber(settings.rentBufferMonths, 1)));
   const campaignSchedule = buildCampaignSpendSchedule(salesStrategy.campaigns, monthCount);
   const scheduleLength = monthCount + 36;
@@ -904,7 +916,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
         material: ((1 - product.foreignCurrencyMaterialShare) * localMaterialMultiplier) + (product.foreignCurrencyMaterialShare * foreignMaterialMultiplier),
       };
       COST_COMPONENTS.forEach((key) => {
-        const amount = units * product.unit[key] * productMultipliers[key];
+        const amount = units * product.unit[key] * productMultipliers[key] * costSensitivity;
         productStock.value[key] += amount;
         productionSpend[key] += amount;
       });
@@ -1285,4 +1297,37 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     },
     trendRows: rows,
   };
+}
+
+export const sensitivityCases = [
+  { change: -0.1, key: "price", lever: "price" },
+  { change: 0.1, key: "price", lever: "price" },
+  { change: -0.2, key: "volume", lever: "volume" },
+  { change: 0.2, key: "volume", lever: "volume" },
+  { change: 0.1, key: "cost", lever: "cost" },
+  { change: -0.1, key: "cost", lever: "cost" },
+];
+
+// Re-runs the full 5-year model (tax, VAT, stock, loans) with one lever
+// moved at a time: price ±10%, sales volume ±20%, unit production cost ±10%.
+export function buildSensitivityTable(baseModel, salesStrategy, settingsInput, operationsWorkspace, horizon = "5y") {
+  const run = (sensitivity) => {
+    const { summary } = buildFinancialFeasibilityModel(baseModel, salesStrategy, { ...settingsInput, sensitivity }, operationsWorkspace, horizon);
+    return {
+      decision: evaluateFeasibilityDecision(summary).status,
+      lowestCashBalance: summary.lowestCashBalance,
+      netIncome: summary.netIncome,
+      netPresentValue: summary.netPresentValue,
+      paybackMonth: summary.paybackMonth,
+    };
+  };
+  const base = run({});
+
+  return [
+    { change: 0, lever: "base", ...base },
+    ...sensitivityCases.map((item) => {
+      const result = run({ [item.lever]: 1 + item.change });
+      return { ...item, ...result, netPresentValueChange: result.netPresentValue - base.netPresentValue };
+    }),
+  ];
 }

@@ -1,4 +1,8 @@
 :root {
+  /* Decision colours from the Hande design language (Pantone 354 C, 123 C, 186 C). */
+  --decision-feasible: #00b140;
+  --decision-wait: #ffc72c;
+  --decision-risky: #c8102e;
   --color-ink: #17221f;
   --color-heading: #0d1f24;
   --color-muted: #52635d;
@@ -23885,8 +23889,33 @@ body > .floating-info-tip-panel,
   font-weight: 600;
 }
 
-.print-table tr.emphasis td {
+.print-table tr.emphasis td,
+.print-table tr.sensitivity-base th,
+.print-table tr.sensitivity-base td {
   font-weight: 700;
+}
+
+.print-table-sensitivity {
+  font-size: 11px;
+}
+
+.print-table-sensitivity th,
+.print-table-sensitivity td {
+  padding: 5px 6px;
+  white-space: nowrap;
+}
+
+.print-note {
+  color: var(--print-muted);
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+
+@media print {
+  .decision-badge {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }
 
 .print-table td small {
@@ -23944,4 +23973,71 @@ body > .floating-info-tip-panel,
     display: block;
     overflow-x: auto;
   }
+}
+
+.sensitivity-card {
+  margin-top: 18px;
+}
+
+.sensitivity-card p {
+  color: var(--color-muted);
+  margin: 0 0 12px;
+}
+
+.sensitivity-table-wrap {
+  overflow-x: auto;
+}
+
+.sensitivity-table {
+  border-collapse: collapse;
+  min-width: 720px;
+  width: 100%;
+}
+
+.sensitivity-table th,
+.sensitivity-table td {
+  border-bottom: 1px solid var(--color-line);
+  padding: 8px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sensitivity-table th:first-child,
+.sensitivity-table thead th {
+  text-align: left;
+}
+
+.sensitivity-table thead th {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sensitivity-table .sensitivity-base th,
+.sensitivity-table .sensitivity-base td {
+  font-weight: 800;
+}
+
+.decision-badge {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 10px;
+}
+
+.decision-badge.feasible {
+  background: var(--decision-feasible);
+  color: #ffffff;
+}
+
+.decision-badge.wait {
+  background: var(--decision-wait);
+  color: #00263e;
+}
+
+.decision-badge.risky {
+  background: var(--decision-risky);
+  color: #ffffff;
 }

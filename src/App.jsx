@@ -22,6 +22,7 @@ import {
   buildFinancialFeasibilityModel,
   calculatePlanDailyCost,
   convertMoneyToTry,
+  buildSensitivityTable,
   defaultExchangeRates,
   evaluateFeasibilityDecision,
   getBaseMonthlySalesUnits,
@@ -3269,6 +3270,45 @@ function App() {
     return { decision, kpis, verdict: verdictByStatus[decision.status] };
   }
 
+  function getSensitivityCaseLabel(row) {
+    if (row.lever === "base") return copy("Your plan", "Mevcut plan");
+    const lever = { cost: copy("Unit cost", "Birim maliyet"), price: copy("Price", "Fiyat"), volume: copy("Sales volume", "Satış hacmi") }[row.lever];
+    return `${lever} ${row.change > 0 ? "+" : "−"}%${formatNumber(Math.abs(row.change * 100))}`;
+  }
+
+  function renderSensitivityTable(rows, className) {
+    const decisionLabels = { feasible: copy("Feasible", "Uygun"), risky: copy("Risky", "Riskli"), wait: copy("Wait", "Beklenmeli") };
+
+    return (
+      <table className={className}>
+        <thead>
+          <tr>
+            <th>{copy("Case", "Senaryo")}</th>
+            <th>{copy("Net present value", "Net bugünkü değer")}</th>
+            <th>{copy("Change", "Fark")}</th>
+            <th>{copy("5-year net profit", "5 yıllık net kâr")}</th>
+            <th>{copy("Payback", "Geri dönüş")}</th>
+            <th>{copy("Lowest cash", "En düşük nakit")}</th>
+            <th>{copy("Decision", "Karar")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr className={row.lever === "base" ? "sensitivity-base" : ""} key={`${row.lever}-${row.change}`}>
+              <th scope="row">{getSensitivityCaseLabel(row)}</th>
+              <td>{formatLira(row.netPresentValue)}</td>
+              <td>{row.lever === "base" ? "-" : formatLira(row.netPresentValueChange)}</td>
+              <td>{formatLira(row.netIncome)}</td>
+              <td>{row.paybackMonth ? `${formatNumber(row.paybackMonth)} ${copy("mo", "ay")}` : copy("Over 5 years", "5 yıldan uzun")}</td>
+              <td>{formatLira(row.lowestCashBalance)}</td>
+              <td><span className={`decision-badge ${row.decision}`}>{decisionLabels[row.decision]}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+
   function buildExportReport() {
     const exportModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, "5y");
 
@@ -3279,6 +3319,7 @@ function App() {
       productName: dashboardProductName,
       risks: dashboardRiskRows.map((risk) => ({ detail: risk.detail, title: risk.title })),
       salesStrategy,
+      sensitivity: buildSensitivityTable(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance).map((row) => ({ ...row, label: getSensitivityCaseLabel(row) })),
       settings: financialSettingsForModel,
       t: copy,
       verdict: hasFinancialSourceData ? describeFeasibilityDecision(exportModel.summary).verdict : feasibilityVerdict,
@@ -7425,6 +7466,21 @@ function App() {
               </article>
             </aside>
           </div>
+
+          {hasFinancialSourceData && (
+            <article className="simulation-card sensitivity-card">
+              <div className="simulation-card-heading">
+                <div>
+                  <span>{copy("Sensitivity", "Duyarlılık")}</span>
+                  <h2>{copy("What if one assumption is wrong?", "Bir varsayım tutmazsa ne olur?")}</h2>
+                </div>
+              </div>
+              <p>{copy("Each row re-runs the full 5-year model (tax, VAT, stock and loans) with one lever moved and everything else kept as planned.", "Her satır, tek bir kaldıraç değiştirilip diğer her şey plandaki gibi tutularak tam 5 yıllık modeli (vergi, KDV, stok ve krediler) yeniden çalıştırır.")}</p>
+              <div className="sensitivity-table-wrap">
+                {renderSensitivityTable(buildSensitivityTable(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance), "sensitivity-table")}
+              </div>
+            </article>
+          )}
         </section>,
     );
   }
@@ -9243,6 +9299,14 @@ function App() {
                 </div>
               ))}
             </div>
+          </section>
+        )}
+
+        {has("sensitivity") && report.sensitivity.length > 0 && (
+          <section className="print-section">
+            <h2>{copy("Sensitivity", "Duyarlılık analizi")}</h2>
+            <p className="print-note">{copy("Full 5-year model re-run with one assumption changed at a time.", "Her seferinde tek bir varsayım değiştirilerek tam 5 yıllık model yeniden çalıştırıldı.")}</p>
+            {renderSensitivityTable(report.sensitivity, "print-table print-table-sensitivity")}
           </section>
         )}
 
