@@ -25,7 +25,7 @@ New project:
 1. Create a new Supabase project.
 2. Apply the migrations, either with the Supabase CLI (`supabase link --project-ref <ref>`, then `supabase db push`) or by running each file in `supabase/migrations` in order in the SQL Editor.
 3. Optional: run `supabase/seeds/startup_feasibility_seed.sql` to load the functional cold-chain beverage startup test scenario.
-4. Deploy the user provisioning function: `supabase functions deploy create-company-user`.
+4. Deploy the Edge Functions: `supabase functions deploy create-company-user` (user provisioning) and `supabase functions deploy tcmb-rates` (TCMB exchange rates; tcmb.gov.tr cannot be read from the browser because it sends no CORS headers, so the deployed app fetches it through this function).
 5. In `Authentication > Sign In / Providers`, turn off **Allow new users to sign up**. Company users are created by the function above, not by public sign-up.
 6. In `Authentication > URL Configuration`, set the site URL to your local Vite URL. This app usually runs at `http://127.0.0.1:5173` or `http://127.0.0.1:5174`.
 7. Add these to the redirect URLs:

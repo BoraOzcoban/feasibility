@@ -698,10 +698,16 @@ function getTcmBRatesFromXml(xmlText) {
 
 async function fetchTcmBExchangeRates(signal) {
   const isLocalDev = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
-  const url = isLocalDev
-    ? `/tcmb-rates/kurlar/today.xml?_=${Date.now()}`
-    : `https://www.tcmb.gov.tr/kurlar/today.xml?_=${Date.now()}`;
-  const response = await fetch(url, {
+
+  // tcmb.gov.tr sends no CORS headers, so outside local development (where
+  // the Vite proxy serves /tcmb-rates) the tcmb-rates Edge Function fetches it.
+  if (!isLocalDev && supabase) {
+    const { data, error } = await supabase.functions.invoke("tcmb-rates", { method: "GET", signal });
+    if (error) throw new Error(`TCMB: ${error.message}`);
+    return getTcmBRatesFromXml(typeof data === "string" ? data : await new Response(data).text());
+  }
+
+  const response = await fetch(`/tcmb-rates/kurlar/today.xml?_=${Date.now()}`, {
     headers: { Accept: "application/xml,text/xml,*/*" },
     signal,
   });
@@ -1664,7 +1670,7 @@ function App() {
     // Signed-in users on /login or on a URL no page handles (such as the
     // removed /product-plus pages) go to the dashboard instead of the login form.
     if (session && path !== "/" && mode !== "reset") {
-      if (path === "/login" || !isSignedInRoute(normalizeRoutePath(path))) goTo("/dashboard", "login");
+      if (path === "/login" || !isSignedInRoute(normalizeRoutePath(path))) goTo("/dashboard", "login", { replace: true });
     }
   }, [session, path, mode]);
 
@@ -1770,7 +1776,8 @@ function App() {
       return;
     }
 
-    window.history.pushState({}, "", nextPath);
+    // Redirects replace the history entry so Back does not bounce into them again.
+    window.history[options.replace ? "replaceState" : "pushState"]({}, "", nextPath);
     setPath(nextPath);
     setMode(nextMode);
     setStatus("");
@@ -8223,6 +8230,28 @@ function App() {
   const isOperationsRoute = routePath === "/operations" || routePath.startsWith("/operations/");
   const isFinancialRoute = routePath === "/financial-modelling" || routePath.startsWith("/financial-modelling/");
   const isSimulationRoute = routePath === "/simulation" || routePath.startsWith("/simulation/");
+  // Bare module URLs and old links point somewhere else. Worked out here and
+  // applied in an effect, so rendering never navigates.
+  const routeRedirect = !session
+    ? null
+    : ["/dashboard/riskler-karlilik-mevcut-durum", "/dashboard/kisa-ozet"].includes(routePath)
+      ? "/dashboard"
+      : isOperationsRoute && routePath !== "/operations" && !activeOperationsSubmodule
+        ? (["/operations/material-definitions", "/operations/human-resources"].includes(routePath) ? "/operations/resources" : "/operations")
+        : routePath === "/financial-modelling"
+          ? "/financial-modelling/girdiler"
+          : isFinancialRoute && !activeFinancialSubmodule
+            ? (isLegacyFinancialDetailPath ? "/financial-modelling/analiz" : "/financial-modelling/girdiler")
+            : isSimulationRoute && (routePath === "/simulation" || !activeSimulationVariant)
+              ? "/simulation/current-situation"
+              : null;
+
+  useEffect(() => {
+    if (routeRedirect) goTo(routeRedirect, "login", { force: true, replace: true });
+    // goTo is recreated every render; the redirect target is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeRedirect]);
+
   const editableAuthorizationRoles = roles.filter((role) => !isAdminRole(role));
   const moduleLabelByKey = Object.fromEntries(dashboardModules.map((module) => [module.key, module.label]));
   const getModuleLabel = (module) => moduleLabelByKey[module.module_key] || module.name;
@@ -9977,15 +10006,7 @@ function App() {
     );
   }
 
-  if (session && routePath === "/dashboard/riskler-karlilik-mevcut-durum") {
-    goTo("/dashboard", "login", { force: true });
-    return null;
-  }
-
-  if (session && routePath === "/dashboard/kisa-ozet") {
-    goTo("/dashboard", "login", { force: true });
-    return null;
-  }
+  if (routeRedirect) return null;
 
   if (session && (activeModule || isOperationsRoute || isFinancialRoute || isSimulationRoute)) {
     if (routePath === "/operations") {
@@ -10016,11 +10037,6 @@ function App() {
             </div>
           </section>,
       );
-    }
-
-    if (isOperationsRoute && !activeOperationsSubmodule) {
-      goTo(["/operations/material-definitions", "/operations/human-resources"].includes(routePath) ? "/operations/resources" : "/operations", "login", { force: true });
-      return null;
     }
 
     if (activeOperationsSubmodule?.key === "data-entry") {
@@ -10123,26 +10139,11 @@ function App() {
       );
     }
 
-    if (routePath === "/financial-modelling") {
-      goTo("/financial-modelling/girdiler", "login", { force: true });
-      return null;
-    }
-
-    if (isFinancialRoute && !activeFinancialSubmodule) {
-      goTo(isLegacyFinancialDetailPath ? "/financial-modelling/analiz" : "/financial-modelling/girdiler", "login", { force: true });
-      return null;
-    }
-
     if (activeModule?.key === "financial-modelling" || activeFinancialSubmodule) {
       return renderFinancialModellingPage();
     }
 
     if (isSimulationRoute) {
-      if (routePath === "/simulation" || !activeSimulationVariant) {
-        goTo("/simulation/current-situation", "login", { force: true });
-        return null;
-      }
-
       return renderSimulationPage();
     }
 
