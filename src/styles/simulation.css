@@ -1,0 +1,116 @@
+/*
+ * Scenario analysis: variant tabs, parameter panel beside the results,
+ * scenario cards and the two small charts. Chart axes and legend come from
+ * finance.css.
+ */
+@layer skin {
+  .tab-row {
+    align-self: start;
+    flex-wrap: wrap;
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .simulation-layout {
+    align-items: start;
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  }
+
+  .parameter-group {
+    border: 0;
+    border-top: 1px solid var(--line);
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    min-width: 0;
+    padding: var(--space-3) 0 0;
+  }
+
+  .parameter-group legend {
+    float: left;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    margin-bottom: var(--space-1);
+    padding: 0;
+    width: 100%;
+  }
+
+  .scenario-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .scenario-outcome {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: var(--space-3);
+  }
+
+  .scenario-outcome.is-base {
+    border-color: var(--brand);
+    box-shadow: inset 0 0 0 1px var(--brand);
+  }
+
+  .scenario-outcome small + small {
+    margin-top: -4px;
+  }
+
+  .sim-chart {
+    display: block;
+    height: auto;
+    margin: 0 auto;
+    max-height: 320px;
+    width: 100%;
+  }
+
+  .sim-chart :is(.break-even-cost, .break-even-revenue) {
+    fill: none;
+    stroke-linecap: round;
+    stroke-width: 2.5;
+  }
+
+  .sim-chart .break-even-revenue {
+    stroke: var(--chart-income);
+  }
+
+  .sim-chart .break-even-cost {
+    stroke: var(--chart-expense);
+  }
+
+  .sim-chart .break-even-marker {
+    stroke: var(--brand);
+    stroke-dasharray: 4 4;
+  }
+
+  .sim-chart .income-positive {
+    fill: var(--chart-income);
+  }
+
+  .sim-chart .income-negative {
+    fill: var(--chart-expense);
+  }
+
+  .sim-income-list {
+    align-content: start;
+    grid-template-columns: 1fr;
+  }
+
+  .sim-income-list > span {
+    border-top: 1px solid var(--line);
+    display: flex;
+    font-size: var(--text-sm);
+    justify-content: space-between;
+    padding-top: var(--space-2);
+  }
+
+  .sim-income-list > span > strong {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 1100px) {
+    .simulation-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}

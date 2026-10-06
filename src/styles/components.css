@@ -606,7 +606,23 @@
     white-space: nowrap;
   }
 
-  .data-table tbody tr:last-child td {
+  /* Row headers read like body cells, not like column headings. */
+  .data-table tbody th[scope="row"] {
+    background: transparent;
+    color: var(--ink);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: normal;
+  }
+
+  .data-table tr.is-emphasis :is(th, td) {
+    background: var(--surface-muted);
+    font-weight: var(--weight-bold);
+  }
+
+  .data-table tbody tr:last-child :is(td, th) {
     border-bottom: 0;
   }
 
@@ -772,7 +788,8 @@
 
     .kpi > strong,
     .kpi-value {
-      font-size: var(--text-lg);
+      font-size: 18px;
+      letter-spacing: -0.01em;
     }
 
     .action-row {

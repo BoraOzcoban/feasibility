@@ -21,7 +21,6 @@ export default function SimulationPage() {
     addSimulationVariant,
     copy,
     dashboardCompanyName,
-    deleteSimulationVariant,
     financialHorizon,
     financialModel,
     financialSettingsForModel,
@@ -311,9 +310,26 @@ export default function SimulationPage() {
         simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("Base", "Baz") : copy("Adjusted", "Ayarlı"),
     },
   ];
+  const simulationKpis = [
+    ...simulationSignalRows.map((signal) => [signal.label, signal.value, signal.detail]),
+    [copy("Base-case net", "Baz senaryo net"), formatLira(likelyOutcome.net), scenarioShiftLabel(0)],
+    [
+      copy("Break-even point", "Başa baş noktası"),
+      `${formatNumber(likelyOutcome.breakEvenUnits)} ${copy("units", "adet")}`,
+      copy("current price basis", "mevcut fiyat bazlı"),
+    ],
+    [copy("Pessimistic net", "Kötümser net"), formatLira(outcomes[0].net), outcomes[0].shiftLabel],
+    [
+      copy("Revenue range", "Gelir aralığı"),
+      `${formatLira(outcomes[1].revenue)} - ${formatLira(outcomes[3].revenue)}`,
+      copy("cautious to optimistic", "temkinliden iyimsere"),
+    ],
+  ];
+  const simulationStatusBadge = { amber: "wait", clay: "risky", teal: "feasible" }[simulationRiskTone] || "neutral";
+
   return (
     <DashboardLayout activePage={`simulation/${variant.id}`}>
-      <section className="page simulation-workspace monte-carlo-workspace">
+      <section className="page simulation-workspace">
         <div className="page-header">
           <div>
             <span>
@@ -331,11 +347,16 @@ export default function SimulationPage() {
             <button type="button" onClick={loadPlanningData} disabled={simulationLoading}>
               {copy("Refresh Data", "Verileri Yenile")}
             </button>
-            <button type="button" onClick={() => persistSimulationVariant(variant)} disabled={simulationLoading}>
-              {simulationLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Variant", "Varyantı Kaydet")}
-            </button>
-            <button type="button" className="primary" onClick={addSimulationVariant}>
+            <button type="button" onClick={addSimulationVariant}>
               {copy("Add Variant", "Varyant Ekle")}
+            </button>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => persistSimulationVariant(variant)}
+              disabled={simulationLoading}
+            >
+              {simulationLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Variant", "Varyantı Kaydet")}
             </button>
           </div>
         </div>
@@ -343,109 +364,47 @@ export default function SimulationPage() {
         {simulationStatus && <p className="status-message">{simulationStatus}</p>}
 
         <div
-          className="simulation-variant-strip"
+          className="segmented tab-row"
           role="tablist"
           aria-label={copy("Simulation variants", "Simülasyon varyantları")}
         >
           {simulationVariants.map((item) => (
-            <div
-              className={variant.id === item.id ? "simulation-variant-pill active" : "simulation-variant-pill"}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={variant.id === item.id}
+              className={variant.id === item.id ? "active" : ""}
+              onClick={() => goTo(item.path, "login")}
               key={item.id}
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={variant.id === item.id}
-                onClick={() => goTo(item.path, "login")}
-              >
-                {item.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : item.name || item.label}
-              </button>
-              {item.id !== "current-situation" && (
-                <button
-                  type="button"
-                  className="variant-delete-button"
-                  aria-label={copy("Delete variant", "Varyantı sil")}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    deleteSimulationVariant(item.id);
-                  }}
-                >
-                  x
-                </button>
-              )}
-            </div>
+              {item.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : item.name || item.label}
+            </button>
           ))}
         </div>
 
-        <section className={`simulation-command-hero ${simulationRiskTone}`}>
-          <div className="simulation-command-copy">
-            <span>{copy("Scenario command center", "Senaryo komuta merkezi")}</span>
-            <h2>{simulationHeadline}</h2>
-            <p>{simulationBrief}</p>
-            <div className="simulation-command-actions">
-              <button
-                type="button"
-                className="primary"
-                onClick={() => persistSimulationVariant(variant)}
-                disabled={simulationLoading}
-              >
-                {simulationLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Variant", "Varyantı Kaydet")}
-              </button>
-              <button type="button" className="secondary" onClick={() => goTo("/financial-modelling/analiz", "login")}>
-                {copy("Open finance model", "Finans modelini aç")}
-              </button>
+        <section className="card" aria-label={copy("Scenario summary", "Senaryo özeti")}>
+          <div className="card-header">
+            <div>
+              <span>{copy("Scenario summary", "Senaryo özeti")}</span>
+              <h2>
+                <span className={`badge badge-${simulationStatusBadge}`}>{simulationReadinessPercent}%</span>{" "}
+                {simulationHeadline}
+              </h2>
+              <p>{simulationBrief}</p>
             </div>
-          </div>
-          <div
-            className="simulation-confidence-panel"
-            aria-label={copy("Simulation readiness", "Simülasyon hazırlığı")}
-          >
-            <div className="readiness-ring" style={{ "--readiness": `${simulationReadinessPercent}%` }}>
-              <strong>{simulationReadinessPercent}%</strong>
-              <span>{copy("Ready", "Hazır")}</span>
-            </div>
-            <div className="simulation-source-list">
+            <div className="badge-row">
               {simulationReadinessItems.map((item) => (
-                <button
-                  type="button"
-                  className={item.done ? "done" : ""}
-                  onClick={() => goTo(item.path, "login")}
-                  key={item.label}
-                >
-                  <span>{item.label}</span>
-                  <strong>{item.done ? copy("Done", "Tamam") : copy("Needed", "Gerekli")}</strong>
-                </button>
+                <span className={`badge badge-${item.done ? "feasible" : "neutral"}`} key={item.label}>
+                  {item.label}: {item.done ? copy("Done", "Tamam") : copy("Needed", "Gerekli")}
+                </span>
               ))}
             </div>
           </div>
         </section>
 
-        <div className="simulation-signal-grid" aria-label={copy("Scenario risk signals", "Senaryo risk sinyalleri")}>
-          {simulationSignalRows.map((signal) => (
-            <article className={`simulation-signal-card ${signal.tone}`} key={signal.label}>
-              <span>{signal.label}</span>
-              <strong>{signal.value}</strong>
-              <small>{signal.detail}</small>
-            </article>
-          ))}
-        </div>
-
-        <div className="monte-carlo-summary">
-          {[
-            [copy("Base-case net", "Baz senaryo net"), formatLira(likelyOutcome.net), scenarioShiftLabel(0)],
-            [
-              copy("Break-even point", "Başa baş noktası"),
-              `${formatNumber(likelyOutcome.breakEvenUnits)} ${copy("units", "adet")}`,
-              copy("current price basis", "mevcut fiyat bazlı"),
-            ],
-            [copy("Pessimistic net", "Kötümser net"), formatLira(outcomes[0].net), outcomes[0].shiftLabel],
-            [
-              copy("Revenue range", "Gelir aralığı"),
-              `${formatLira(outcomes[1].revenue)} - ${formatLira(outcomes[3].revenue)}`,
-              copy("cautious to optimistic", "temkinliden iyimsere"),
-            ],
-          ].map(([label, value, detail]) => (
-            <article className="monte-carlo-stat" key={label}>
+        <div className="kpi-grid" aria-label={copy("Scenario risk signals", "Senaryo risk sinyalleri")}>
+          {simulationKpis.map(([label, value, detail]) => (
+            <article className="card kpi" key={label}>
               <span className="label-with-info">
                 {label}
                 <GlossaryTip language={form.language} term={label} />
@@ -456,22 +415,22 @@ export default function SimulationPage() {
           ))}
         </div>
 
-        <div className="monte-carlo-grid">
-          <aside className="simulation-card simulation-parameter-panel">
-            <div className="simulation-card-heading">
+        <div className="simulation-layout">
+          <aside className="card">
+            <div className="card-header">
               <div>
                 <span>{copy("Variant setup", "Varyant kurulumu")}</span>
                 <h2>{copy("Algorithm and sales assumptions", "Algoritma ve satış varsayımları")}</h2>
               </div>
             </div>
-            <label className="simulation-name-field">
+            <label>
               <span>{copy("Variant name", "Varyant adı")}</span>
               <input
                 value={variant.name}
                 onChange={(event) => updateSimulationVariant(variant.id, "name", event.target.value)}
               />
             </label>
-            <label className="simulation-name-field">
+            <label>
               <span>{copy("Simulation algorithm", "Simülasyon algoritması")}</span>
               <select
                 value={simulationAlgorithm}
@@ -485,14 +444,14 @@ export default function SimulationPage() {
               </select>
             </label>
             {editableVariantGroups.map((group) => (
-              <div className="parameter-group" key={group.title}>
-                <h3>{group.title}</h3>
+              <fieldset className="parameter-group" key={group.title}>
+                <legend>{group.title}</legend>
                 {group.fields.map(([field, label, min, max, step]) => {
                   const linkedDefault = linkedFieldDefaults[field];
                   const usesLinkedDefault = linkedDefault !== undefined && !(Number(parameters[field]) > 0);
 
                   return (
-                    <label className="sim-input-row" key={field}>
+                    <label key={field}>
                       <span>{label}</span>
                       <input
                         min={min}
@@ -510,13 +469,13 @@ export default function SimulationPage() {
                     </label>
                   );
                 })}
-              </div>
+              </fieldset>
             ))}
           </aside>
 
-          <main className="monte-carlo-main">
-            <article className="simulation-card percentile-card">
-              <div className="simulation-card-heading">
+          <div className="stack">
+            <article className="card">
+              <div className="card-header">
                 <div>
                   <span>{copy("Sensitivity scenarios", "Duyarlılık senaryoları")}</span>
                   <h2>
@@ -533,138 +492,138 @@ export default function SimulationPage() {
                   </p>
                 </div>
               </div>
-              <div className="percentile-grid">
+              <div className="kpi-grid scenario-grid">
                 {outcomes.map((outcome) => (
-                  <article className={`percentile-outcome ${outcome.tone}`} key={outcome.key}>
-                    <span>{outcome.shiftLabel}</span>
-                    <h3>{outcome.label}</h3>
+                  <article
+                    className={`kpi scenario-outcome${outcome.key === "likely" ? " is-base" : ""}`}
+                    key={outcome.key}
+                  >
+                    <span>{outcome.label}</span>
                     <strong>{formatLira(outcome.net)}</strong>
-                    <p>
-                      {copy("Revenue", "Gelir")}: {formatLira(outcome.revenue)}
-                    </p>
-                    <p>
-                      {copy("Break-even", "Başa baş")}: {formatNumber(outcome.breakEvenUnits)} {copy("units", "adet")}
-                    </p>
+                    <small>
+                      <span className={`badge badge-${outcome.net > 0 ? "feasible" : "risky"}`}>
+                        {outcome.net > 0 ? copy("Positive", "Pozitif") : copy("Negative", "Negatif")}
+                      </span>{" "}
+                      {outcome.shiftLabel}
+                    </small>
+                    <small>
+                      {copy("Revenue", "Gelir")}: {formatLira(outcome.revenue)} · {copy("Break-even", "Başa baş")}:{" "}
+                      {formatNumber(outcome.breakEvenUnits)} {copy("units", "adet")}
+                    </small>
                   </article>
                 ))}
               </div>
             </article>
 
-            <article className="simulation-card monte-chart-card simulation-trend-card">
-              <div className="simulation-card-heading">
+            <article className="card">
+              <div className="card-header">
                 <div>
                   <span>{copy("Break-even graph", "Başa baş grafiği")}</span>
                   <h2>{copy("Revenue, cost and break-even estimate", "Gelir, gider ve başa baş tahmini")}</h2>
                 </div>
-              </div>
-              <div className="simulation-chart-stage">
-                <svg
-                  className="monte-chart break-even-chart"
-                  viewBox="0 0 620 280"
-                  role="img"
-                  aria-label={copy("Break-even chart", "Başa baş grafiği")}
-                >
-                  <path className="chart-grid" d="M42 40 H580 M42 90 H580 M42 140 H580 M42 190 H580 M42 240 H580" />
-                  <path className="chart-axis" d="M42 28 V240 H585" />
-                  <path
-                    className="break-even-cost"
-                    d={`M${chartX(0)} ${chartY(breakEvenFixedCost)} L${chartX(chartVolumeMax)} ${chartY(breakEvenFixedCost + unitProductionCost * chartVolumeMax)}`}
-                  />
-                  <path
-                    className="break-even-revenue"
-                    d={`M${chartX(0)} ${chartY(0)} L${chartX(chartVolumeMax)} ${chartY(netUnitPrice * chartVolumeMax)}`}
-                  />
-                  {breakEvenVolume !== null && breakEvenVolume <= chartVolumeMax ? (
-                    <>
-                      <line
-                        className="break-even-marker"
-                        x1={chartX(breakEvenVolume)}
-                        x2={chartX(breakEvenVolume)}
-                        y1="42"
-                        y2="240"
-                      />
-                      <text className="chart-tick" x={chartX(breakEvenVolume) + 8} y="68">
-                        {copy("Break-even", "Başa baş")}: {formatNumber(breakEvenVolume)} {copy("units", "adet")}
-                      </text>
-                    </>
-                  ) : (
-                    <text className="chart-tick" x="60" y="68">
-                      {copy(
-                        "No break-even: price does not cover unit cost",
-                        "Başa baş yok: fiyat birim maliyeti karşılamıyor",
-                      )}
-                    </text>
-                  )}
-                  <text className="chart-tick" x="48" y="262">
-                    {copy("Units over the horizon", "Ufuk boyunca adet")}
-                  </text>
-                  <text className="chart-tick chart-tick-end" x="570" y="262" textAnchor="end">
-                    {copy("Projected sales", "Projeksiyon satış")}: {formatNumber(projectedVolume)}
-                  </text>
-                </svg>
               </div>
               <div className="chart-legend">
                 <span className="legend-sales">{copy("Revenue", "Gelir")}</span>
                 <span className="legend-costs">{copy("Cost", "Gider")}</span>
                 <span className="legend-net">{copy("Break-even point", "Başa baş noktası")}</span>
               </div>
+              <svg
+                className="sim-chart"
+                viewBox="0 0 620 280"
+                role="img"
+                aria-label={copy("Break-even chart", "Başa baş grafiği")}
+              >
+                <path className="chart-grid" d="M42 40 H580 M42 90 H580 M42 140 H580 M42 190 H580 M42 240 H580" />
+                <path className="chart-axis" d="M42 28 V240 H585" />
+                <path
+                  className="break-even-cost"
+                  d={`M${chartX(0)} ${chartY(breakEvenFixedCost)} L${chartX(chartVolumeMax)} ${chartY(breakEvenFixedCost + unitProductionCost * chartVolumeMax)}`}
+                />
+                <path
+                  className="break-even-revenue"
+                  d={`M${chartX(0)} ${chartY(0)} L${chartX(chartVolumeMax)} ${chartY(netUnitPrice * chartVolumeMax)}`}
+                />
+                {breakEvenVolume !== null && breakEvenVolume <= chartVolumeMax ? (
+                  <>
+                    <line
+                      className="break-even-marker"
+                      x1={chartX(breakEvenVolume)}
+                      x2={chartX(breakEvenVolume)}
+                      y1="42"
+                      y2="240"
+                    />
+                    <text className="chart-tick" x={chartX(breakEvenVolume) + 8} y="68">
+                      {copy("Break-even", "Başa baş")}: {formatNumber(breakEvenVolume)} {copy("units", "adet")}
+                    </text>
+                  </>
+                ) : (
+                  <text className="chart-tick" x="60" y="68">
+                    {copy(
+                      "No break-even: price does not cover unit cost",
+                      "Başa baş yok: fiyat birim maliyeti karşılamıyor",
+                    )}
+                  </text>
+                )}
+                <text className="chart-tick" x="48" y="262">
+                  {copy("Units over the horizon", "Ufuk boyunca adet")}
+                </text>
+                <text className="chart-tick" x="570" y="262" textAnchor="end">
+                  {copy("Projected sales", "Projeksiyon satış")}: {formatNumber(projectedVolume)}
+                </text>
+              </svg>
             </article>
 
-            <article className="simulation-card income-simulation-card simulation-trend-card">
-              <div className="simulation-card-heading">
+            <article className="card">
+              <div className="card-header">
                 <div>
                   <span>{copy("Income statement", "Gelir gider tablosu")}</span>
-                  <h2>{copy("Projected gelir gider table and graph", "Projeksiyon gelir gider tablosu ve grafiği")}</h2>
+                  <h2>{copy("Projected income and expense", "Projeksiyon gelir ve gider")}</h2>
                 </div>
               </div>
-              <div className="sim-income-layout">
-                <div className="sim-income-table">
+              <div className="two-up">
+                <div className="facts sim-income-list">
                   {incomeRows.map(([label, value]) => (
-                    <div key={label}>
-                      <span>{label}</span>
+                    <span key={label}>
+                      {label}
                       <strong>{formatLira(value)}</strong>
-                    </div>
+                    </span>
                   ))}
                 </div>
-                <div className="simulation-chart-stage">
-                  <svg className="monte-chart income-bars-chart" viewBox="0 0 520 250" aria-hidden="true">
-                    <path className="chart-grid" d="M34 35 H500 M34 85 H500 M34 135 H500 M34 185 H500" />
-                    {incomeRows.map(([label, value], index) => {
-                      const height = Math.max(14, (Math.abs(value) / Math.max(maxRevenue, maxNetAbs)) * 165);
-                      const x = 58 + index * 88;
-                      const y = value >= 0 ? 202 - height : 202;
-                      return (
-                        <React.Fragment key={label}>
-                          <rect
-                            className={value >= 0 ? "income-positive" : "income-negative"}
-                            x={x}
-                            y={y}
-                            width="46"
-                            height={height}
-                            rx="6"
-                          />
-                          <text className="chart-tick" x={x - 8} y="230">
-                            {index + 1}
-                          </text>
-                        </React.Fragment>
-                      );
-                    })}
-                    <path className="chart-axis" d="M34 22 V202 H500" />
-                  </svg>
-                </div>
+                <svg className="sim-chart" viewBox="0 0 520 250" aria-hidden="true">
+                  <path className="chart-grid" d="M34 35 H500 M34 85 H500 M34 135 H500 M34 185 H500" />
+                  {incomeRows.map(([label, value], index) => {
+                    const height = Math.max(14, (Math.abs(value) / Math.max(maxRevenue, maxNetAbs)) * 165);
+                    const x = 58 + index * 88;
+                    const y = value >= 0 ? 202 - height : 202;
+                    return (
+                      <React.Fragment key={label}>
+                        <rect
+                          className={value >= 0 ? "income-positive" : "income-negative"}
+                          x={x}
+                          y={y}
+                          width="46"
+                          height={height}
+                          rx="4"
+                        />
+                        <text className="chart-tick" x={x + 23} y="230" textAnchor="middle">
+                          {index + 1}
+                        </text>
+                      </React.Fragment>
+                    );
+                  })}
+                  <path className="chart-axis" d="M34 22 V202 H500" />
+                </svg>
               </div>
             </article>
-          </main>
 
-          <aside className="simulation-side">
-            <article className="simulation-card simulation-used-params">
-              <div className="simulation-card-heading">
+            <article className="card">
+              <div className="card-header">
                 <div>
                   <span>{copy("Scenario summary", "Senaryo özeti")}</span>
                   <h2>{copy("Visible assumptions", "Görünen varsayımlar")}</h2>
                 </div>
               </div>
-              <div className="used-parameter-list">
+              <div className="facts">
                 {visibleAssumptions.map(([label, value]) => (
                   <span key={label}>
                     {label}
@@ -673,46 +632,33 @@ export default function SimulationPage() {
                 ))}
               </div>
             </article>
-
-            <article className="simulation-card risk-card">
-              <h2>{copy("Pessimistic scenario", "Kötümser senaryo")}</h2>
-              <p>
-                {copy(
-                  "The pessimistic case is shown separately: if it is negative, check margin, cash and break-even timing before committing capital.",
-                  "Kötümser senaryo ayrıca gösterilir: negatifse sermaye bağlamadan önce marjı, nakdi ve başa baş zamanlamasını kontrol edin.",
-                )}
-              </p>
-              <strong>{formatLira(outcomes[0].net)}</strong>
-            </article>
-          </aside>
+          </div>
         </div>
 
         {hasFinancialSourceData && (
-          <article className="simulation-card sensitivity-card">
-            <div className="simulation-card-heading">
+          <article className="card">
+            <div className="card-header">
               <div>
                 <span>{copy("Sensitivity", "Duyarlılık")}</span>
                 <h2>{copy("What if one assumption is wrong?", "Bir varsayım tutmazsa ne olur?")}</h2>
+                <p>
+                  {copy(
+                    "Each row re-runs the full 5-year model (tax, VAT, stock and loans) with one lever moved and everything else kept as planned.",
+                    "Her satır, tek bir kaldıraç değiştirilip diğer her şey plandaki gibi tutularak tam 5 yıllık modeli (vergi, KDV, stok ve krediler) yeniden çalıştırır.",
+                  )}
+                </p>
               </div>
             </div>
-            <p>
-              {copy(
-                "Each row re-runs the full 5-year model (tax, VAT, stock and loans) with one lever moved and everything else kept as planned.",
-                "Her satır, tek bir kaldıraç değiştirilip diğer her şey plandaki gibi tutularak tam 5 yıllık modeli (vergi, KDV, stok ve krediler) yeniden çalıştırır.",
-              )}
-            </p>
-            <div className="sensitivity-table-wrap">
-              {
-                <SensitivityTable
-                  rows={buildSensitivityTable(
-                    financialModel,
-                    salesStrategy,
-                    financialSettingsForModel,
-                    operationsWorkspaceForFinance,
-                  )}
-                  className="sensitivity-table"
-                />
-              }
+            <div className="table-scroll">
+              <SensitivityTable
+                rows={buildSensitivityTable(
+                  financialModel,
+                  salesStrategy,
+                  financialSettingsForModel,
+                  operationsWorkspaceForFinance,
+                )}
+                className="data-table sensitivity-table"
+              />
             </div>
           </article>
         )}

@@ -40,12 +40,12 @@
   }
 
   .statement-table tbody th[scope="row"] {
-    color: var(--ink);
-    font-size: var(--text-sm);
     font-weight: var(--weight-regular);
-    letter-spacing: 0;
-    text-transform: none;
-    white-space: normal;
+  }
+
+  .statement-table tr.is-emphasis th[scope="row"] {
+    background: var(--surface-muted);
+    font-weight: var(--weight-bold);
   }
 
   .statement-table tbody th strong {
@@ -61,11 +61,6 @@
     letter-spacing: 0.04em;
     text-align: left;
     text-transform: uppercase;
-  }
-
-  .statement-table tr.is-emphasis :is(th, td) {
-    background: var(--surface-muted);
-    font-weight: var(--weight-bold);
   }
 
   .statement-table td.negative {
@@ -113,23 +108,26 @@
     background: var(--chart-expense);
   }
 
+  .chart-legend .legend-net::before {
+    background: var(--brand);
+  }
+
   .trend-chart .chart-panel {
     fill: none;
   }
 
-  .trend-chart .chart-grid,
-  .trend-chart .chart-x-guide {
+  :is(.trend-chart, .sim-chart) :is(.chart-grid, .chart-x-guide) {
     fill: none;
     stroke: var(--line);
     stroke-width: 1;
   }
 
-  .trend-chart .chart-axis {
+  :is(.trend-chart, .sim-chart) .chart-axis {
     fill: none;
     stroke: var(--line-strong);
   }
 
-  .trend-chart :is(.chart-tick, .axis-label) {
+  :is(.trend-chart, .sim-chart) :is(.chart-tick, .axis-label) {
     fill: var(--ink-muted);
     font-family: var(--font);
     font-size: 10px;
