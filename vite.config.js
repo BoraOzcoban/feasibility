@@ -1,6 +1,9 @@
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  // Fast Refresh in development and the automatic JSX runtime.
+  plugins: [react()],
   build: {
     rollupOptions: {
       // react-router marks its modules "use client" for server components;
