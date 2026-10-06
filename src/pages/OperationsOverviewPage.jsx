@@ -52,7 +52,7 @@ export default function OperationsOverviewPage() {
                   )}
               </p>
               <div className="button-row">
-                <button type="button" onClick={() => goTo(submodule.path, "login")}>
+                <button type="button" onClick={() => goTo(submodule.path)}>
                   {copy("Open", "Aç")}
                 </button>
               </div>

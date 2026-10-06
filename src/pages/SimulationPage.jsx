@@ -374,7 +374,7 @@ export default function SimulationPage() {
               role="tab"
               aria-selected={variant.id === item.id}
               className={variant.id === item.id ? "active" : ""}
-              onClick={() => goTo(item.path, "login")}
+              onClick={() => goTo(item.path)}
               key={item.id}
             >
               {item.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : item.name || item.label}

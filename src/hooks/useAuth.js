@@ -4,7 +4,7 @@ import { text } from "../i18n/text";
 import { emptyForm } from "../lib/appDefaults";
 import { supabase } from "../lib/supabaseClient";
 
-export function useAuth({ goTo, path }) {
+export function useAuth({ goTo }) {
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState(emptyForm);
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -114,7 +114,7 @@ export function useAuth({ goTo, path }) {
       if (userProfile?.theme && ["light", "dark"].includes(userProfile.theme)) {
         setTheme(userProfile.theme);
       }
-      goTo(path && !["/", "/login"].includes(path) ? path : "/dashboard", "login");
+      // The new session moves /login on to the dashboard; any other URL stays.
     } catch (error) {
       setStatus(error.message);
     } finally {
@@ -172,8 +172,8 @@ export function useAuth({ goTo, path }) {
       return;
     }
 
+    goTo("/login");
     setStatus(labels.passwordUpdated);
-    goTo("/login", "login");
     updateField("password", "");
     setConfirmPassword("");
   }
@@ -181,7 +181,7 @@ export function useAuth({ goTo, path }) {
   async function handleLogout() {
     if (!supabase) return;
     await supabase.auth.signOut();
-    goTo("/login", "login");
+    goTo("/login", { force: true });
   }
 
   return {

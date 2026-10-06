@@ -16,7 +16,7 @@ import {
 } from "../lib/operationsService";
 import { supabase } from "../lib/supabaseClient";
 
-export function useOperations({ copy, labels, loadFinancialData, markWorkspaceSnapshotClean, path }) {
+export function useOperations({ copy, labels, loadFinancialData, markWorkspaceSnapshotClean, routePath }) {
   const [operationForms, setOperationForms] = useState(emptyOperationForms);
   const [operationPlan, setOperationPlan] = useState(emptyOperationPlan);
   const [operationPlanResult, setOperationPlanResult] = useState(null);
@@ -37,10 +37,10 @@ export function useOperations({ copy, labels, loadFinancialData, markWorkspaceSn
   });
 
   useEffect(() => {
-    if (path === "/operations/data-entry") {
+    if (routePath === "/operations/data-entry") {
       setProcessDefinitionOpen(false);
     }
-  }, [path]);
+  }, [routePath]);
 
   function handleDashboardProductChange(productId) {
     const nextProduct =

@@ -1,6 +1,8 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.jsx";
+import { RouterProvider } from "react-router/dom";
+import { ErrorScreen } from "./app/ErrorScreen";
+import { router } from "./app/router";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/shell.css";
@@ -12,6 +14,7 @@ import "./styles/simulation.css";
 import "./styles/reports.css";
 import "./styles/auth.css";
 
+// Catches errors outside the routes; the router has its own boundary for pages.
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -23,27 +26,14 @@ class AppErrorBoundary extends React.Component {
   }
 
   render() {
-    if (this.state.error) {
-      return (
-        <main className="auth-shell">
-          <section className="auth-card">
-            <h1>Atera</h1>
-            <p className="status-message">
-              {this.state.error.message || "A runtime error prevented the page from rendering."}
-            </p>
-          </section>
-        </main>
-      );
-    }
-
-    return this.props.children;
+    return this.state.error ? <ErrorScreen error={this.state.error} /> : this.props.children;
   }
 }
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <App />
+      <RouterProvider router={router} />
     </AppErrorBoundary>
   </React.StrictMode>,
 );

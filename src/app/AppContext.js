@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 
-// App() still owns the state and handlers; pages read what they need from
-// here instead of being closures inside App().
+// App() gathers the state and handlers from the domain hooks; pages and the
+// route guards read what they need from here.
 export const AppContext = createContext(null);
 
 export function useAppContext() {

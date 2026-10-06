@@ -327,7 +327,7 @@ export default function ResourcesPage() {
                 <span>{copy("Services", "Hizmetler")}</span>
                 <h2>{copy("Persist service cost in finance", "Hizmet maliyetini finansta kaydedin")}</h2>
               </div>
-              <button type="button" onClick={() => goTo("/financial-modelling/girdiler", "login")}>
+              <button type="button" onClick={() => goTo("/financial-modelling/girdiler")}>
                 {copy("Open Financial Inputs", "Finans Girdilerini Aç")}
               </button>
             </div>

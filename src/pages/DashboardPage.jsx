@@ -69,16 +69,16 @@ export default function DashboardPage() {
             <p>{feasibilityVerdict.copy}</p>
           </div>
           <div className="button-row">
-            <button type="button" className="primary" onClick={() => goTo(feasibilityVerdict.path, "login")}>
+            <button type="button" className="primary" onClick={() => goTo(feasibilityVerdict.path)}>
               {feasibilityVerdict.action}
             </button>
             {status !== "pending" && (
-              <button type="button" onClick={() => goTo("/simulation/current-situation", "login")}>
+              <button type="button" onClick={() => goTo("/simulation/current-situation")}>
                 {copy("Test scenario", "Senaryo test et")}
               </button>
             )}
             {status !== "pending" && feasibilityVerdict.path !== "/reports" && (
-              <button type="button" onClick={() => goTo("/reports", "login")}>
+              <button type="button" onClick={() => goTo("/reports")}>
                 {copy("Open report pack", "Rapor paketini aç")}
               </button>
             )}
@@ -114,7 +114,7 @@ export default function DashboardPage() {
             <ol className="action-list">
               {feasibilityChecklist.map((item) => (
                 <li key={item.label}>
-                  <button type="button" className="action-row" onClick={() => goTo(item.path, "login")}>
+                  <button type="button" className="action-row" onClick={() => goTo(item.path)}>
                     <span className={`badge badge-${item.done ? "feasible" : "neutral"}`}>
                       {item.done ? copy("Ready", "Hazır") : copy("Missing", "Eksik")}
                     </span>
@@ -138,7 +138,7 @@ export default function DashboardPage() {
               {risks.length ? (
                 risks.map((risk) => (
                   <li key={risk.title}>
-                    <button type="button" className="action-row" onClick={() => goTo(risk.path, "login")}>
+                    <button type="button" className="action-row" onClick={() => goTo(risk.path)}>
                       <span className={`badge badge-${riskBadgeByTone[risk.tone] || "neutral"}`}>{risk.severity}</span>
                       <span className="action-row-text">
                         <strong>{risk.title}</strong>

@@ -1,7 +1,9 @@
 // Tracks edits across pages and asks before navigation would drop them.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useBlocker } from "react-router";
 import { toFiniteNumber } from "../lib/feasibilityModel";
 import { emptyOperationForms } from "../lib/operationsService";
+import { normalizeRoutePath } from "../lib/routes";
 import { createUnsavedWorkspaceSnapshot } from "../lib/unsavedChanges";
 
 export function useUnsavedChanges({
@@ -10,7 +12,6 @@ export function useUnsavedChanges({
   financialExtraCostForm,
   financialLoading,
   financialSettingsForm,
-  goTo,
   handleSaveFinancialExtraCost,
   handleSaveFinancialSettings,
   handleSaveOperationPlan,
@@ -34,12 +35,7 @@ export function useUnsavedChanges({
 }) {
   const [savedWorkspaceSnapshot, setSavedWorkspaceSnapshot] = useState("");
 
-  const [unsavedPrompt, setUnsavedPrompt] = useState({
-    message: "",
-    open: false,
-    pendingNavigation: null,
-    saving: false,
-  });
+  const [promptState, setPromptState] = useState({ message: "", saving: false });
 
   const workspaceSnapshotRef = useRef("");
 
@@ -60,6 +56,16 @@ export function useUnsavedChanges({
     session && savedWorkspaceSnapshot && editableWorkspaceSnapshot !== savedWorkspaceSnapshot,
   );
 
+  // Holds any move to another page, including Back and Forward, while there
+  // are unsaved edits. The prompt is open for as long as a move is held.
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges &&
+      !nextLocation.state?.force &&
+      normalizeRoutePath(nextLocation.pathname) !== normalizeRoutePath(currentLocation.pathname),
+  );
+  const unsavedPrompt = { ...promptState, open: blocker.state === "blocked" };
+
   useEffect(() => {
     workspaceSnapshotRef.current = editableWorkspaceSnapshot;
   }, [editableWorkspaceSnapshot]);
@@ -71,9 +77,6 @@ export function useUnsavedChanges({
   useEffect(() => {
     if (!session) {
       setSavedWorkspaceSnapshot("");
-      setUnsavedPrompt((current) =>
-        current.open ? { message: "", open: false, pendingNavigation: null, saving: false } : current,
-      );
       return;
     }
 
@@ -90,6 +93,10 @@ export function useUnsavedChanges({
     session,
     simulationLoading,
   ]);
+
+  useEffect(() => {
+    if (!session && blocker.state === "blocked") blocker.reset();
+  }, [blocker, session]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return undefined;
@@ -161,7 +168,7 @@ export function useUnsavedChanges({
       return true;
     }
 
-    setUnsavedPrompt((current) => ({
+    setPromptState((current) => ({
       ...current,
       message: getUnsavedManualSaveMessage(),
     }));
@@ -169,29 +176,21 @@ export function useUnsavedChanges({
   }
 
   function closeUnsavedPrompt() {
-    setUnsavedPrompt({
-      message: "",
-      open: false,
-      pendingNavigation: null,
-      saving: false,
-    });
+    setPromptState({ message: "", saving: false });
+    if (blocker.state === "blocked") blocker.reset();
   }
 
   function continuePendingNavigation() {
-    const pendingNavigation = unsavedPrompt.pendingNavigation;
-    closeUnsavedPrompt();
-
-    if (pendingNavigation) {
-      goTo(pendingNavigation.pathname, pendingNavigation.nextMode, { force: true });
-    }
+    setPromptState({ message: "", saving: false });
+    if (blocker.state === "blocked") blocker.proceed();
   }
 
   async function handleSaveUnsavedAndContinue() {
-    setUnsavedPrompt((current) => ({ ...current, message: "", saving: true }));
+    setPromptState((current) => ({ ...current, message: "", saving: true }));
     const saved = await saveCurrentWorkspaceChanges();
 
     if (!saved) {
-      setUnsavedPrompt((current) => ({
+      setPromptState((current) => ({
         ...current,
         message:
           current.message ||
@@ -217,8 +216,6 @@ export function useUnsavedChanges({
     closeUnsavedPrompt,
     handleLeaveWithoutSaving,
     handleSaveUnsavedAndContinue,
-    hasUnsavedChanges,
-    setUnsavedPrompt,
     unsavedPrompt,
   };
 }

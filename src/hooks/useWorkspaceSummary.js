@@ -171,7 +171,7 @@ export function useWorkspaceSummary({
 
   async function downloadReport(pack, format) {
     if (format.key === "pdf") {
-      goTo(`/reports/print/${pack.key}`, "login");
+      goTo(`/reports/print/${pack.key}`);
       return;
     }
 

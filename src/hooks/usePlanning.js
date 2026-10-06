@@ -30,7 +30,7 @@ export function usePlanning({
   markWorkspaceSnapshotClean,
   operationsWorkspace,
   operationsWorkspaceForFinance,
-  path,
+  routePath,
 }) {
   const [salesStrategy, setSalesStrategy] = useState(emptySalesStrategy);
   const [salesStatus, setSalesStatus] = useState("");
@@ -38,6 +38,8 @@ export function usePlanning({
   const [simulationVariants, setSimulationVariants] = useState([emptySimulationVariant]);
   const [simulationStatus, setSimulationStatus] = useState("");
   const [simulationLoading, setSimulationLoading] = useState(false);
+  // Set once the saved variants have been read, so unknown variant URLs can be told apart.
+  const [planningLoaded, setPlanningLoaded] = useState(false);
 
   function updateSalesCompany(field, value) {
     setSalesStrategy((current) => ({
@@ -281,7 +283,7 @@ export function usePlanning({
     };
 
     setSimulationVariants((current) => [...current, nextVariant]);
-    goTo(nextVariant.path, "login", { force: true });
+    goTo(nextVariant.path, { force: true });
   }
 
   async function deleteSimulationVariant(id) {
@@ -303,11 +305,14 @@ export function usePlanning({
     }
 
     setSimulationVariants((current) => current.filter((variant) => variant.id !== id));
-    if (path === `/simulation/${id}`) goTo("/simulation/current-situation", "login", { force: true });
+    if (routePath === `/simulation/${id}`) goTo("/simulation/current-situation", { force: true });
   }
 
   async function loadPlanningData() {
-    if (!supabase) return;
+    if (!supabase) {
+      setPlanningLoaded(true);
+      return;
+    }
 
     setSalesLoading(true);
     setSimulationLoading(true);
@@ -331,6 +336,7 @@ export function usePlanning({
     } finally {
       setSalesLoading(false);
       setSimulationLoading(false);
+      setPlanningLoaded(true);
     }
   }
 
@@ -405,10 +411,12 @@ export function usePlanning({
     handleSaveSalesStrategy,
     loadPlanningData,
     persistSimulationVariant,
+    planningLoaded,
     removeSalesItem,
     salesLoading,
     salesStatus,
     salesStrategy,
+    setPlanningLoaded,
     setSalesStatus,
     setSalesStrategy,
     setSimulationStatus,

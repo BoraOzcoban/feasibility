@@ -50,7 +50,7 @@ export default function ActiveProcessesPage() {
             <button
               type="button"
 
-              onClick={() => goTo("/operations/data-entry", "login")}
+              onClick={() => goTo("/operations/data-entry")}
             >
               {copy("New Plan", "Yeni Plan")}
             </button>

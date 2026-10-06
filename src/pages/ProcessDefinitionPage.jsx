@@ -65,7 +65,7 @@ export default function ProcessDefinitionPage() {
                   <p>{item.isReady ? item.readyCopy : item.todoCopy}</p>
                 </div>
                 <div className="button-row">
-                  <button type="button" onClick={() => goTo(item.path, "login")}>
+                  <button type="button" onClick={() => goTo(item.path)}>
                     {item.isReady ? copy("Review", "İncele") : copy("Add", "Ekle")}
                   </button>
                 </div>

@@ -29,11 +29,7 @@ export default function DashboardLayout({ activePage, children }) {
         <aside className="dashboard-sidebar" aria-label="Dashboard navigation">
           <div className="dashboard-brand-block">
             <div className="dashboard-sidebar-top">
-              <button
-                type="button"
-                className="landing-brand dashboard-brand"
-                onClick={() => goTo("/dashboard", "login")}
-              >
+              <button type="button" className="landing-brand dashboard-brand" onClick={() => goTo("/dashboard")}>
                 <img src={logoUrl} alt="Atera logo" />
                 <strong>Atera</strong>
               </button>
@@ -69,7 +65,7 @@ export default function DashboardLayout({ activePage, children }) {
             <button
               type="button"
               className={`dashboard-nav-item ${activePage.startsWith("dashboard") ? "active" : ""}`}
-              onClick={() => goTo("/dashboard", "login")}
+              onClick={() => goTo("/dashboard")}
             >
               <strong>{labels.dashboard}</strong>
             </button>
@@ -85,7 +81,6 @@ export default function DashboardLayout({ activePage, children }) {
                         : module.key === "simulation"
                           ? "/simulation/current-situation"
                           : module.path,
-                      "login",
                     )
                   }
                 >
@@ -99,7 +94,7 @@ export default function DashboardLayout({ activePage, children }) {
                         <button
                           type="button"
                           className={activePage === `operations/${submodule.key}` ? "active" : ""}
-                          onClick={() => goTo(submodule.path, "login")}
+                          onClick={() => goTo(submodule.path)}
                           key={submodule.key}
                         >
                           {submodule.label}
@@ -119,7 +114,7 @@ export default function DashboardLayout({ activePage, children }) {
                               <button
                                 type="button"
                                 className={activePage === `financial-modelling/${submodule.key}` ? "active" : ""}
-                                onClick={() => goTo(submodule.path, "login")}
+                                onClick={() => goTo(submodule.path)}
                                 key={submodule.key}
                               >
                                 {submodule.label}
@@ -140,7 +135,7 @@ export default function DashboardLayout({ activePage, children }) {
                           <button
                             type="button"
                             className={activePage === `simulation/${variant.id}` ? "active" : ""}
-                            onClick={() => goTo(variant.path, "login")}
+                            onClick={() => goTo(variant.path)}
                           >
                             {variant.id === "current-situation"
                               ? copy("Current Situation", "Mevcut Durum")
@@ -172,7 +167,7 @@ export default function DashboardLayout({ activePage, children }) {
               <button
                 type="button"
                 className={`dashboard-nav-item ${activePage === "authorization" ? "active" : ""}`}
-                onClick={() => goTo("/authorization", "login")}
+                onClick={() => goTo("/authorization")}
               >
                 <strong>{labels.authorizationPage}</strong>
               </button>

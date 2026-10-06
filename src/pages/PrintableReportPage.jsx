@@ -1,10 +1,12 @@
 import React from "react";
+import { useParams } from "react-router";
 import { formatCurrencyAmount, formatLira, formatNumber } from "../lib/format";
 import { getStatementLayout, reportPackSections } from "../lib/reportExport";
 import { useAppContext } from "../app/AppContext";
 import SensitivityTable from "../components/SensitivityTable";
 
-export default function PrintableReportPage({ packKey }) {
+export default function PrintableReportPage() {
+  const { packKey } = useParams();
   const { buildExportReport, copy, goTo, locale, reportTabs } = useAppContext();
 
   const pack = reportTabs.find((tab) => tab.key === packKey) || reportTabs[0];
@@ -49,7 +51,7 @@ export default function PrintableReportPage({ packKey }) {
   return (
     <main className="print-report">
       <div className="print-toolbar">
-        <button type="button" onClick={() => goTo("/reports", "login")}>
+        <button type="button" onClick={() => goTo("/reports")}>
           {copy("Back", "Geri")}
         </button>
         <button type="button" className="primary" onClick={() => window.print()}>
