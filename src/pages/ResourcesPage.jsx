@@ -4,7 +4,7 @@ import { operationCurrencyOptions } from "../lib/appDefaults";
 import { toFiniteNumber } from "../lib/feasibilityModel";
 import { formatNumber, formatOperationMoney } from "../lib/format";
 import { useAppContext } from "../app/AppContext";
-import SortableDataTable from "../components/SortableDataTable";
+import DataTable from "../components/DataTable";
 import DashboardLayout from "../components/DashboardLayout";
 
 export default function ResourcesPage() {
@@ -16,15 +16,11 @@ export default function ResourcesPage() {
     handleDeleteOperationRecord,
     handleSaveOperationRecord,
     loadOperationsData,
-    materialFormRef,
-    materialListHeightStyle,
     operationForms,
     operationsLoading,
     operationsStatus,
     operationsWorkspace,
     updateOperationForm,
-    workforceFormRef,
-    workforceListHeightStyle,
   } = useAppContext();
 
   const unitOptions = ["kg", "gr", "mg", "adet", "metre", "litre", "ml"];
@@ -80,8 +76,8 @@ export default function ResourcesPage() {
 
   return (
     <DashboardLayout activePage="operations/resources">
-      <section className="operations-workspace operations-modern operations-entry-page operations-resources-page">
-        <div className="operations-header">
+      <section className="page operations-page operations-resources-page">
+        <div className="page-header">
           <div>
             <span>
               {copy("Operations", "Operasyon")} / {copy("Resources", "Kaynak")}
@@ -94,27 +90,27 @@ export default function ResourcesPage() {
               )}
             </p>
           </div>
-          <div className="operations-actions">
-            <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>
+          <div className="button-row">
+            <button type="button" onClick={loadOperationsData}>
               {copy("Refresh Data", "Verileri Yenile")}
             </button>
           </div>
         </div>
 
-        <div className="process-summary-grid operations-entry-summary">
-          <article className="operation-card process-summary-card">
+        <div className="kpi-grid">
+          <article className="card kpi">
             <span>{copy("Materials", "Malzemeler")}</span>
             <strong>{formatNumber(operationsWorkspace.materials.length)}</strong>
             <small>
               {copy("priced production inputs", "fiyatlı üretim girdileri")}: {formatNumber(pricedMaterialCount)}
             </small>
           </article>
-          <article className="operation-card process-summary-card">
+          <article className="card kpi">
             <span>{copy("Workforce roles", "İşgücü rolleri")}</span>
             <strong>{formatNumber(operationsWorkspace.workforce.length)}</strong>
             <small>{copy("available for process plans", "süreç planlarına hazır")}</small>
           </article>
-          <article className="operation-card process-summary-card">
+          <article className="card kpi">
             <span>{copy("Currencies", "Para birimleri")}</span>
             <strong>{formatNumber(resourceCurrencyCount)}</strong>
             <small>{copy("converted in financial analysis", "finans analizinde çevrilir")}</small>
@@ -123,17 +119,16 @@ export default function ResourcesPage() {
 
         <div className="resource-definition-grid">
           <form
-            ref={materialFormRef}
-            className="operation-card operation-data-form resource-definition-card operations-record-form-card operations-material-form-card"
+            className="card operation-data-form resource-definition-card operations-record-form-card operations-material-form-card"
             onSubmit={(event) => handleSaveOperationRecord("material", event)}
           >
-            <div className="operation-card-heading">
+            <div className="card-header">
               <div>
                 <span>{copy("Add material", "Malzeme ekle")}</span>
                 <h2>{copy("Material", "Malzeme")}</h2>
               </div>
             </div>
-            <div className="operation-data-fields">
+            <div className="form-grid">
               <label>
                 <span>{copy("Material name", "Malzeme adı")}</span>
                 <input
@@ -208,48 +203,37 @@ export default function ResourcesPage() {
                 </select>
               </label>
             </div>
-            <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
+            <button className="primary" disabled={operationsLoading} type="submit">
               {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Add Material", "Malzeme Ekle")}
             </button>
           </form>
 
-          <article
-            className="operation-card resource-definition-card operation-data-table-card operations-record-list-card operations-material-list-card"
-            style={materialListHeightStyle}
-          >
-            <div className="operation-card-heading">
+          <article className="card resource-definition-card operation-data-table-card operations-record-list-card operations-material-list-card">
+            <div className="card-header">
               <h2>{copy("Materials", "Malzemeler")}</h2>
               <span>
                 {operationsWorkspace.materials.length} {copy("records", "kayıt")}
               </span>
             </div>
-            {
-              <SortableDataTable
-                {...{
-                  columns: materialColumns,
-                  gridTemplateColumns: "1.2fr 0.8fr 0.6fr 0.9fr 0.7fr",
-                  onRowClick: (material) => copyOperationRecordToForm("material", material),
-                  onDeleteRow: (row) => handleDeleteOperationRecord("material", row),
-                  rows: operationsWorkspace.materials,
-                  tableId: "materials",
-                  useButtonRows: true,
-                }}
-              />
-            }
+            <DataTable
+              columns={materialColumns}
+              onRowClick={(material) => copyOperationRecordToForm("material", material)}
+              onDeleteRow={(row) => handleDeleteOperationRecord("material", row)}
+              rows={operationsWorkspace.materials}
+            />
           </article>
 
           <form
-            ref={workforceFormRef}
-            className="operation-card operation-data-form resource-definition-card operations-record-form-card operations-workforce-form-card"
+            className="card operation-data-form resource-definition-card operations-record-form-card operations-workforce-form-card"
             onSubmit={(event) => handleSaveOperationRecord("workforce", event)}
           >
-            <div className="operation-card-heading">
+            <div className="card-header">
               <div>
                 <span>{copy("Add human resource", "İnsan kaynağı ekle")}</span>
                 <h2>{copy("Human Resources", "İnsan Kaynağı")}</h2>
               </div>
             </div>
-            <div className="operation-data-fields">
+            <div className="form-grid">
               <label>
                 <span>{copy("Role", "Rol")}</span>
                 <input
@@ -300,40 +284,30 @@ export default function ResourcesPage() {
                 </select>
               </label>
             </div>
-            <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
+            <button className="primary" disabled={operationsLoading} type="submit">
               {operationsLoading
                 ? copy("Saving...", "Kaydediliyor...")
                 : copy("Add Human Resource", "İnsan Kaynağı Ekle")}
             </button>
           </form>
 
-          <article
-            className="operation-card resource-definition-card operation-data-table-card operations-record-list-card operations-workforce-list-card"
-            style={workforceListHeightStyle}
-          >
-            <div className="operation-card-heading">
+          <article className="card resource-definition-card operation-data-table-card operations-record-list-card operations-workforce-list-card">
+            <div className="card-header">
               <h2>{copy("Human Resources", "İnsan Kaynağı")}</h2>
               <span>
                 {operationsWorkspace.workforce.length} {copy("records", "kayıt")}
               </span>
             </div>
-            {
-              <SortableDataTable
-                {...{
-                  columns: workforceColumns,
-                  gridTemplateColumns: "1.2fr 0.9fr 0.7fr",
-                  onRowClick: (workforce) => copyOperationRecordToForm("workforce", workforce),
-                  onDeleteRow: (row) => handleDeleteOperationRecord("workforce", row),
-                  rows: operationsWorkspace.workforce,
-                  tableId: "workforce",
-                  useButtonRows: true,
-                }}
-              />
-            }
+            <DataTable
+              columns={workforceColumns}
+              onRowClick={(workforce) => copyOperationRecordToForm("workforce", workforce)}
+              onDeleteRow={(row) => handleDeleteOperationRecord("workforce", row)}
+              rows={operationsWorkspace.workforce}
+            />
           </article>
 
-          <article className="operation-card resource-definition-card resource-guidance-card">
-            <div className="operation-card-heading">
+          <article className="card resource-definition-card resource-guidance-card">
+            <div className="card-header">
               <div>
                 <span>{copy("Semi-finished items", "Yarı mamüller")}</span>
                 <h2>{copy("Use a material record for now", "Şimdilik malzeme kaydı kullanın")}</h2>
@@ -347,8 +321,8 @@ export default function ResourcesPage() {
             </p>
           </article>
 
-          <article className="operation-card resource-definition-card resource-guidance-card">
-            <div className="operation-card-heading">
+          <article className="card resource-definition-card resource-guidance-card">
+            <div className="card-header">
               <div>
                 <span>{copy("Services", "Hizmetler")}</span>
                 <h2>{copy("Persist service cost in finance", "Hizmet maliyetini finansta kaydedin")}</h2>

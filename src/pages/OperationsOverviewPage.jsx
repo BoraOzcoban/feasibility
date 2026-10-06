@@ -7,21 +7,23 @@ export default function OperationsOverviewPage() {
 
   return (
     <DashboardLayout activePage="operations">
-      <section className="module-placeholder operations-overview">
-        <div>
-          <span>Operations</span>
-          <h1>{copy("Operations", "Operasyon")}</h1>
-          <p>
-            {copy(
-              "Choose the operational workspace you want to work on: resources, products, machines, process definition, or active processes.",
-              "Çalışmak istediğiniz operasyon alanını seçin: kaynaklar, ürünler, makineler, süreç tanımı veya mevcut süreçler.",
-            )}
-          </p>
+      <section className="page">
+        <div className="page-header">
+          <div>
+            <span>{copy("Production", "Üretim")}</span>
+            <h1>{copy("Operations", "Operasyon")}</h1>
+            <p>
+              {copy(
+                "Choose the operational workspace you want to work on: resources, products, machines, process definition, or active processes.",
+                "Çalışmak istediğiniz operasyon alanını seçin: kaynaklar, ürünler, makineler, süreç tanımı veya mevcut süreçler.",
+              )}
+            </p>
+          </div>
         </div>
-        <div className="placeholder-grid">
+        <div className="tile-grid">
           {operationsSubmodules.map((submodule) => (
-            <article key={submodule.key}>
-              <strong>{submodule.label}</strong>
+            <article className="card tile" key={submodule.key}>
+              <h2>{submodule.label}</h2>
               <p>
                 {submodule.key === "resources" &&
                   copy(
@@ -49,9 +51,11 @@ export default function OperationsOverviewPage() {
                     "Kayıtlı süreç planlarını ve son fizibilite çıktılarını inceleyin.",
                   )}
               </p>
-              <button type="button" onClick={() => goTo(submodule.path, "login")}>
-                {copy("Open", "Aç")}
-              </button>
+              <div className="button-row">
+                <button type="button" onClick={() => goTo(submodule.path, "login")}>
+                  {copy("Open", "Aç")}
+                </button>
+              </div>
             </article>
           ))}
         </div>

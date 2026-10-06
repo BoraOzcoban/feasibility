@@ -2081,8 +2081,8 @@ export default function FinancialModellingPage() {
   if (currentFinancialPage.key === "inputs") {
     return (
       <DashboardLayout activePage={`financial-modelling/${currentFinancialPage.key}`}>
-        <section className="financial-workspace">
-          <div className="financial-header">
+        <section className="page financial-workspace">
+          <div className="page-header">
             <div>
               <span>
                 {currentFinancialPage.group} / {copy("Financial assumptions", "Finansal varsayımlar")}
@@ -2142,8 +2142,8 @@ export default function FinancialModellingPage() {
   if (currentFinancialPage.key === "loans") {
     return (
       <DashboardLayout activePage={`financial-modelling/${currentFinancialPage.key}`}>
-        <section className="financial-workspace">
-          <div className="financial-header">
+        <section className="page financial-workspace">
+          <div className="page-header">
             <div>
               <span>
                 {currentFinancialPage.group} / {copy("Financing inputs", "Finansman girdileri")}
@@ -2208,8 +2208,8 @@ export default function FinancialModellingPage() {
   // Overview is the last financial page; legacy detail URLs redirect here.
   return (
     <DashboardLayout activePage={`financial-modelling/${currentFinancialPage.key}`}>
-      <section className="financial-workspace">
-        <div className="financial-header">
+      <section className="page financial-workspace">
+        <div className="page-header">
           <div>
             <span>
               {currentFinancialPage.group} /{" "}

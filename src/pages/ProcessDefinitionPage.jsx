@@ -33,8 +33,8 @@ export default function ProcessDefinitionPage() {
 
   return (
     <DashboardLayout activePage={`operations/${activeOperationsSubmodule.key}`}>
-      <section className="operations-workspace operations-modern operations-process-page">
-        <div className="operations-header">
+      <section className="page operations-page operations-process-page">
+        <div className="page-header">
           <div>
             <span>
               {copy("Operations", "Operasyon")} / {copy("Process Definition", "Süreç Tanımlama")}
@@ -47,27 +47,28 @@ export default function ProcessDefinitionPage() {
               )}
             </p>
           </div>
-          <div className="operations-actions">
-            <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>
+          <div className="button-row">
+            <button type="button" onClick={loadOperationsData}>
               {copy("Refresh Data", "Verileri Yenile")}
             </button>
           </div>
         </div>
         {!isProcessSetupReady ? (
-          <div className="process-setup-grid">
+          <div className="tile-grid">
             {processSetupItems.map((item) => (
-              <article
-                className={`operation-card process-setup-card ${item.isReady ? "ready" : "todo"}`}
-                key={item.label}
-              >
+              <article className="card tile" key={item.label}>
                 <div>
-                  <mark>{item.isReady ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</mark>
+                  <span className={`badge ${item.isReady ? "badge-feasible" : "badge-neutral"}`}>
+                    {item.isReady ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}
+                  </span>
                   <h2>{item.label}</h2>
                   <p>{item.isReady ? item.readyCopy : item.todoCopy}</p>
                 </div>
-                <button type="button" onClick={() => goTo(item.path, "login")}>
-                  {item.isReady ? copy("Review", "İncele") : copy("Add", "Ekle")}
-                </button>
+                <div className="button-row">
+                  <button type="button" onClick={() => goTo(item.path, "login")}>
+                    {item.isReady ? copy("Review", "İncele") : copy("Add", "Ekle")}
+                  </button>
+                </div>
               </article>
             ))}
           </div>

@@ -1,0 +1,597 @@
+/*
+ * Shared building blocks: page header, card, field, button row, badge, KPI,
+ * decision card and action list. Pages compose these instead of defining
+ * their own card or header styles.
+ */
+@layer skin {
+  /* ---------- Page ---------- */
+  .page {
+    display: grid;
+    gap: var(--space-5);
+    margin: 0 auto;
+    max-width: 1200px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .page-header {
+    align-items: flex-end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    justify-content: space-between;
+  }
+
+  .page-header h1 {
+    font-size: var(--text-2xl);
+    margin: var(--space-1) 0;
+  }
+
+  .page-header p {
+    color: var(--ink-muted);
+    font-size: var(--text-md);
+    margin: 0;
+    max-width: 72ch;
+  }
+
+  .page-header-field {
+    min-width: 220px;
+  }
+
+  .eyebrow,
+  .page-header > div:first-child > span:first-child {
+    color: var(--ink-muted);
+    display: block;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- Field ---------- */
+  .field {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .field > span {
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+  }
+
+  /* ---------- Card ---------- */
+  .card {
+    align-content: start;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    color: var(--ink);
+    display: grid;
+    gap: var(--space-4);
+    min-width: 0;
+    padding: var(--space-5);
+  }
+
+  .card-header {
+    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    justify-content: space-between;
+  }
+
+  .card-header :is(h2, p) {
+    margin: 0;
+  }
+
+  .card-header h2 {
+    font-size: var(--text-lg);
+  }
+
+  .card-header > div > span:first-child {
+    color: var(--ink-muted);
+    display: block;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+  }
+
+  .card-header > div > p {
+    color: var(--ink-muted);
+    margin-top: var(--space-1);
+  }
+
+  .card-header-meta,
+  .card-header > span {
+    color: var(--ink-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  /* ---------- Forms ---------- */
+  .form-grid {
+    display: grid;
+    gap: var(--space-3) var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  .label-with-info {
+    align-items: center;
+    display: inline-flex;
+    gap: var(--space-1);
+  }
+
+  .status-message {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--brand);
+    border-radius: var(--radius-sm);
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .planner-empty-state {
+    color: var(--ink-muted);
+    margin: 0;
+  }
+
+  /* ---------- Facts: label over value, wrapping ---------- */
+  .facts {
+    display: grid;
+    gap: var(--space-3) var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+
+  .facts > span {
+    color: var(--ink-muted);
+    display: grid;
+    font-size: var(--text-xs);
+    gap: 2px;
+  }
+
+  .facts > span > strong {
+    color: var(--ink);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  /* ---------- Buttons ---------- */
+  .button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .button-row > button {
+    min-height: 40px;
+    padding: 0 var(--space-4);
+  }
+
+  /* ---------- Badge: decision and status colours only ---------- */
+  .badge {
+    align-items: center;
+    border-radius: var(--radius-pill);
+    display: inline-flex;
+    flex: none;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    padding: 5px 10px;
+    white-space: nowrap;
+  }
+
+  .badge-feasible {
+    background: color-mix(in srgb, var(--decision-feasible) 14%, var(--surface));
+    color: var(--decision-feasible-ink);
+  }
+
+  .badge-wait {
+    background: color-mix(in srgb, var(--decision-wait) 30%, var(--surface));
+    color: var(--decision-wait-ink);
+  }
+
+  .badge-risky {
+    background: color-mix(in srgb, var(--decision-risky) 12%, var(--surface));
+    color: var(--decision-risky-ink);
+  }
+
+  .badge-neutral {
+    background: var(--surface-muted);
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--ink-muted);
+  }
+
+  /* ---------- Decision card ---------- */
+  .decision-card {
+    --decision: var(--line-strong);
+    --decision-ink: var(--ink);
+    border-left: 6px solid var(--decision);
+    display: grid;
+    gap: var(--space-5);
+    padding: var(--space-6);
+  }
+
+  .decision-card.is-feasible {
+    --decision: var(--decision-feasible);
+    --decision-ink: var(--decision-feasible-ink);
+  }
+
+  .decision-card.is-wait {
+    --decision: var(--decision-wait);
+    --decision-ink: var(--decision-wait-ink);
+  }
+
+  .decision-card.is-risky {
+    --decision: var(--decision-risky);
+    --decision-ink: var(--decision-risky-ink);
+  }
+
+  .decision-card-label {
+    align-items: center;
+    color: var(--decision-ink);
+    display: flex;
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-bold);
+    gap: var(--space-3);
+    margin: var(--space-2) 0;
+  }
+
+  .decision-dot {
+    background: var(--decision);
+    border-radius: 50%;
+    flex: none;
+    height: 16px;
+    width: 16px;
+  }
+
+  .decision-card-body p {
+    font-size: var(--text-md);
+    margin: 0;
+    max-width: 80ch;
+  }
+
+  /* ---------- KPI ---------- */
+  .kpi-grid {
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .kpi {
+    align-content: start;
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .kpi > span:first-child,
+  .kpi-label {
+    align-items: center;
+    color: var(--ink-muted);
+    display: flex;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    gap: var(--space-1);
+  }
+
+  .kpi > strong,
+  .kpi-value {
+    font-size: var(--text-xl);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--weight-bold);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  .kpi > small,
+  .kpi-detail {
+    align-items: center;
+    color: var(--ink-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--text-xs);
+    gap: var(--space-2);
+  }
+
+  /* ---------- Action list: risks, missing inputs ---------- */
+  .action-list {
+    display: grid;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .action-list > li + li {
+    border-top: 1px solid var(--line);
+  }
+
+  .action-row {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    display: grid;
+    font-weight: var(--weight-regular);
+    gap: var(--space-4);
+    grid-template-columns: 104px minmax(0, 1fr) auto;
+    padding: var(--space-3) var(--space-2);
+    text-align: left;
+    width: 100%;
+  }
+
+  button.action-row:hover:not(:disabled) {
+    background: var(--surface-muted);
+  }
+
+  .action-row > .badge {
+    justify-self: start;
+  }
+
+  .action-row-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .action-row-text strong {
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+  }
+
+  .action-row-text span {
+    color: var(--ink-muted);
+    font-size: var(--text-sm);
+  }
+
+  .action-row-link {
+    color: var(--brand);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+  }
+
+  /* ---------- Data table ---------- */
+  .data-table-block {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .data-table-toolbar {
+    align-items: center;
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  .data-table-toolbar input {
+    flex: 1;
+    max-width: 320px;
+    min-width: 0;
+  }
+
+  .data-table-toolbar span,
+  .data-table-pager span {
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .table-scroll {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    max-width: 100%;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .data-table {
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+    min-width: 100%;
+  }
+
+  .data-table th,
+  .data-table td {
+    border-bottom: 1px solid var(--line);
+    padding: var(--space-2) var(--space-3);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  /* Text columns keep a readable width; the table scrolls instead of
+     breaking words letter by letter. */
+  .data-table td {
+    max-width: 360px;
+    min-width: 96px;
+  }
+
+  .data-table td:first-child {
+    min-width: 180px;
+  }
+
+  .data-table th {
+    background: var(--surface-muted);
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .data-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .data-table .is-num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .data-table .is-action {
+    min-width: 0;
+    text-align: right;
+    width: 1%;
+  }
+
+  .data-table tr.is-clickable {
+    cursor: pointer;
+  }
+
+  .data-table tr.is-clickable:hover,
+  .data-table tr.is-clickable:focus-visible {
+    background: var(--surface-muted);
+    outline: none;
+  }
+
+  .data-table .sort-button {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    display: inline-flex;
+    font: inherit;
+    gap: var(--space-1);
+    letter-spacing: inherit;
+    min-height: 0;
+    padding: 0;
+    text-transform: inherit;
+  }
+
+  .data-table .sort-button:hover:not(:disabled) {
+    background: transparent;
+    color: var(--ink);
+  }
+
+  .data-table .is-num .sort-button {
+    flex-direction: row-reverse;
+  }
+
+  .data-table-empty {
+    color: var(--ink-muted);
+    padding: var(--space-5);
+    text-align: center;
+  }
+
+  .data-table td button {
+    font-size: var(--text-xs);
+    min-height: 28px;
+    padding: 0 var(--space-3);
+  }
+
+  .table-delete-button {
+    font-size: var(--text-xs);
+    min-height: 28px;
+    padding: 0 var(--space-3);
+  }
+
+  .table-delete-button:hover:not(:disabled) {
+    border-color: var(--decision-risky);
+    color: var(--decision-risky-ink);
+  }
+
+  .data-table-pager {
+    align-items: center;
+    display: flex;
+    gap: var(--space-3);
+    justify-content: flex-end;
+  }
+
+  .data-table-pager button {
+    min-height: 32px;
+    padding: 0 var(--space-3);
+  }
+
+  .visually-hidden {
+    clip: rect(0 0 0 0);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  /* ---------- Info tip (panel is portalled to <body>) ---------- */
+  .info-tip {
+    display: inline-flex;
+    margin-left: var(--space-1);
+    vertical-align: middle;
+  }
+
+  .info-tip > button {
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-pill);
+    color: var(--ink-muted);
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: var(--weight-bold);
+    height: 18px;
+    justify-content: center;
+    min-height: 18px;
+    padding: 0;
+    width: 18px;
+  }
+
+  .info-tip > button:hover:not(:disabled) {
+    background: var(--surface);
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
+  .floating-info-tip-panel {
+    background: var(--brand);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-2);
+    color: var(--ink-inverse);
+    font-family: var(--font);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-regular);
+    left: 0;
+    line-height: 1.45;
+    max-width: 320px;
+    padding: var(--space-2) var(--space-3);
+    pointer-events: none;
+    position: fixed;
+    text-transform: none;
+    top: 0;
+    visibility: hidden;
+    z-index: 200;
+  }
+
+  .floating-info-tip-panel.is-visible {
+    visibility: visible;
+  }
+
+  @media (max-width: 640px) {
+    .decision-card {
+      padding: var(--space-5);
+    }
+
+    .kpi-grid {
+      gap: var(--space-3);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .kpi {
+      padding: var(--space-4);
+    }
+
+    .kpi > strong,
+    .kpi-value {
+      font-size: var(--text-lg);
+    }
+
+    .action-row {
+      gap: var(--space-2);
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}

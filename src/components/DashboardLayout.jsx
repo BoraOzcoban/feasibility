@@ -44,7 +44,12 @@ export default function DashboardLayout({ activePage, children }) {
                 aria-expanded={dashboardSidebarOpen}
                 onClick={() => setDashboardSidebarOpen((isOpen) => !isOpen)}
               >
-                <span aria-hidden="true">{dashboardSidebarOpen ? "<" : ">"}</span>
+                <span className="toggle-icon-wide" aria-hidden="true">
+                  {dashboardSidebarOpen ? "‹" : "›"}
+                </span>
+                <span className="toggle-icon-narrow" aria-hidden="true">
+                  {dashboardSidebarOpen ? "✕" : "☰"}
+                </span>
               </button>
             </div>
 
@@ -63,10 +68,10 @@ export default function DashboardLayout({ activePage, children }) {
           <nav className="dashboard-nav">
             <button
               type="button"
-              className={activePage.startsWith("dashboard") ? "active" : ""}
+              className={`dashboard-nav-item ${activePage.startsWith("dashboard") ? "active" : ""}`}
               onClick={() => goTo("/dashboard", "login")}
             >
-              {labels.dashboard}
+              <strong>{labels.dashboard}</strong>
             </button>
             {dashboardModules.map((module) => (
               <React.Fragment key={module.key}>
@@ -166,10 +171,10 @@ export default function DashboardLayout({ activePage, children }) {
             {authorizationAccess.read && (
               <button
                 type="button"
-                className={activePage === "authorization" ? "active" : ""}
+                className={`dashboard-nav-item ${activePage === "authorization" ? "active" : ""}`}
                 onClick={() => goTo("/authorization", "login")}
               >
-                {labels.authorizationPage}
+                <strong>{labels.authorizationPage}</strong>
               </button>
             )}
           </nav>
@@ -188,9 +193,16 @@ export default function DashboardLayout({ activePage, children }) {
           </div>
         </aside>
 
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label={copy("Close menu", "Menüyü kapat")}
+          tabIndex={-1}
+          onClick={() => setDashboardSidebarOpen(false)}
+        />
         <section className="dashboard-content">{children}</section>
       </main>
-      {<UnsavedChangesPrompt />}
+      <UnsavedChangesPrompt />
     </>
   );
 }

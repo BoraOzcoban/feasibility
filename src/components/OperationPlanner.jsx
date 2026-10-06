@@ -12,7 +12,7 @@ import {
 } from "../lib/format";
 import { calculateCurrentPlanResult } from "../lib/operationsCalculations";
 import { useAppContext } from "../app/AppContext";
-import SimpleSortableGrid from "./SimpleSortableGrid";
+import DataTable from "./DataTable";
 
 export default function OperationPlanner() {
   const {
@@ -349,7 +349,7 @@ export default function OperationPlanner() {
       className={`operation-planner process-definition-builder ${showProcessSteps ? "is-open" : "is-closed"}`}
       aria-label={copy("Process definition", "Süreç tanımlama")}
     >
-      <form className="operation-card planner-input-card process-definition-form" onSubmit={handleSaveOperationPlan}>
+      <form className="card planner-input-card process-definition-form" onSubmit={handleSaveOperationPlan}>
         <section className={`process-product-gate ${showProcessSteps ? "open" : ""}`}>
           <div className="process-product-copy">
             <span>{copy("Product", "Ürün")}</span>
@@ -383,7 +383,7 @@ export default function OperationPlanner() {
           </div>
           {selectedProduct && (
             <div
-              className="process-product-selected"
+              className="facts process-product-selected"
               aria-label={copy("Selected product summary", "Seçili ürün özeti")}
             >
               <span>
@@ -847,7 +847,7 @@ export default function OperationPlanner() {
                 <strong>{copy("Calculate this production process", "Bu üretim sürecini hesapla")}</strong>
                 <p>{`${formatNumber(operationRows.length)} ${copy("processes", "süreç")} / ${formatNumber(activeWorkforceRows.length)} ${copy("crew roles", "ekip rolü")}`}</p>
               </div>
-              <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
+              <button className="primary" disabled={operationsLoading} type="submit">
                 {operationsLoading
                   ? copy("Saving...", "Kaydediliyor...")
                   : copy("Calculate and Save", "Hesapla ve Kaydet")}
@@ -860,27 +860,15 @@ export default function OperationPlanner() {
       </form>
 
       {showProcessSteps && result && (
-        <article className="operation-card planner-result-card process-definition-result">
-          <div className="operation-card-heading">
+        <article className="card planner-result-card process-definition-result">
+          <div className="card-header">
             <div>
               <span>{latestProcessName || copy("Result", "Sonuç")}</span>
               <h2>{copy("Production system and cost summary", "Üretim sistemi ve maliyet özeti")}</h2>
             </div>
-            <mark className="ok">{`${formatNumber(result.energyConsumptionKwh, 2)} kWh`}</mark>
+            <span className="badge badge-neutral">{`${formatNumber(result.energyConsumptionKwh, 2)} kWh`}</span>
           </div>
-          {
-            <SimpleSortableGrid
-              {...{
-                columns: resultSummaryColumns,
-                gridTemplateColumns: "0.72fr 1.15fr 1fr",
-                headClassName: "process-result-table-head",
-                rowClassName: "process-result-table-row",
-                rows: resultTableRows,
-                tableClassName: "process-result-table",
-                tableId: "process-result-summary",
-              }}
-            />
-          }
+          <DataTable columns={resultSummaryColumns} pageSize={100} rows={resultTableRows} searchable={false} />
         </article>
       )}
     </section>

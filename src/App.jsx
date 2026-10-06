@@ -26,7 +26,7 @@ import {
   hasUsableExchangeRates,
   toFiniteNumber,
 } from "./lib/feasibilityModel";
-import { calculateCurrentPlanResult, getCurrentOperationPlans, hasViablePlanResult } from "./lib/operationsCalculations";
+import { getCurrentOperationPlans, hasViablePlanResult } from "./lib/operationsCalculations";
 import { deleteOperationRecord, emptyOperationForms, emptyOperationPlan, emptyPlanRows, getRecordInUseCounts, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
 import { deleteSimulationVariantRecord, emptySalesStrategy, emptySimulationVariant, loadSalesStrategy, loadSimulationVariants, saveSalesStrategy, saveSimulationVariant } from "./lib/planningService";
 import { buildFeasibilityReport, buildReportSheets } from "./lib/reportExport";
@@ -56,13 +56,11 @@ import {
 import {
   formatLira,
   formatNumber,
-  formatQuantity,
   getCycleTimeMinutes,
   normalizeCycleTimeUnit,
 } from "./lib/format";
-import { useMatchedPanelHeight } from "./hooks/useMatchedPanelHeight";
 import { normalizeGlossaryText } from "./lib/glossary";
-import { cloneDashboardVisibleSections, cloneSalesVisibleSections, createUnsavedWorkspaceSnapshot, dashboardStorageKey, getStoredDashboardVisibleSections, getStoredSalesVisibleSections, normalizeDashboardVisibleSections, normalizeSalesVisibleSections, salesStrategyStorageKey } from "./lib/uiPreferences";
+import { cloneSalesVisibleSections, createUnsavedWorkspaceSnapshot, getStoredSalesVisibleSections, normalizeSalesVisibleSections, salesStrategyStorageKey } from "./lib/uiPreferences";
 import { fetchExchangeRates, isMissingExchangeRatesTableError, loadLatestExchangeRatesFromSupabase, saveExchangeRatesToSupabase, withTryOperationWorkspace } from "./lib/exchangeRates";
 import { text } from "./i18n/text";
 import { isSignedInRoute, normalizeRoutePath } from "./lib/routes";
@@ -82,9 +80,6 @@ function App() {
   const [currentProfile, setCurrentProfile] = useState(null);
   // Narrow screens start with the menu closed; it overlays the page when opened.
   const [dashboardSidebarOpen, setDashboardSidebarOpen] = useState(() => typeof window === "undefined" || window.innerWidth > 1024);
-  const [dashboardAssumptionMenu, setDashboardAssumptionMenu] = useState(null);
-  const [dashboardEditorOpen, setDashboardEditorOpen] = useState(false);
-  const [dashboardVisibleSections, setDashboardVisibleSections] = useState(getStoredDashboardVisibleSections);
   const [salesEditorOpen, setSalesEditorOpen] = useState(false);
   const [salesVisibleSections, setSalesVisibleSections] = useState(getStoredSalesVisibleSections);
   const [savedWorkspaceSnapshot, setSavedWorkspaceSnapshot] = useState("");
@@ -141,12 +136,6 @@ function App() {
   const labels = text[form.language] || text.en;
   const copy = (en, tr) => (form.language === "tr" ? tr : en);
   const locale = form.language === "tr" ? "tr-TR" : "en-US";
-  const heightMatchKey = `${path}|${form.language}`;
-  const [materialFormRef, materialListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|material`);
-  const [workforceFormRef, workforceListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|workforce`);
-  const [productFormRef, productListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|product`);
-  const [machineFormRef, machineListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|machine`);
-  const [equipmentFormRef, equipmentListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|equipment`);
   const workspaceSnapshotRef = useRef("");
   const syncSavedWorkspaceSnapshotRef = useRef(false);
 
@@ -182,15 +171,6 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = form.language;
   }, [form.language]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    window.localStorage.setItem(
-      dashboardStorageKey,
-      JSON.stringify(normalizeDashboardVisibleSections(dashboardVisibleSections)),
-    );
-  }, [dashboardVisibleSections]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1619,6 +1599,7 @@ function App() {
         copy: copy("The investment creates value, pays back in time, cash never runs out and capacity covers demand.", "Yatırım değer yaratıyor, zamanında geri dönüyor, nakit hiç tükenmiyor ve kapasite talebi karşılıyor."),
         label: copy("Feasible", "Uygun"),
         path: "/reports",
+        status: "feasible",
         tone: "teal",
       },
       risky: {
@@ -1626,6 +1607,7 @@ function App() {
         copy: reasons.join(" "),
         label: copy("Risky", "Riskli"),
         path: "/financial-modelling/analiz",
+        status: "risky",
         tone: "clay",
       },
       wait: {
@@ -1633,6 +1615,7 @@ function App() {
         copy: reasons.join(" "),
         label: copy("Wait", "Beklenmeli"),
         path: "/financial-modelling/analiz",
+        status: "wait",
         tone: "amber",
       },
     };
@@ -2398,32 +2381,12 @@ function App() {
   const financialMonthCount = getProjectionMonthCount(financialHorizon);
   const currentOperationPlans = getCurrentOperationPlans(dashboardOperationsWorkspace);
   const activePlanResults = currentOperationPlans.map((plan) => plan.result || {}).filter(hasViablePlanResult);
-  const latestPlan = currentOperationPlans[0] || dashboardOperationsWorkspace.latestPlan || null;
-  const latestPlanResult = latestPlan?.result || (operationPlanResult
-    ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, dashboardOperationsWorkspace, { optimize: false })
-    : null);
-  const totalDailyProduction = toFiniteNumber(financialSummary.dailyProduction, activePlanResults.reduce((total, result) => total + toFiniteNumber(result.producedQuantity), 0));
   const dashboardProductName = dashboardSelectedProduct?.name || copy("Product input needed", "Ürün girdisi gerekli");
   const dashboardCompanyName = currentProfile?.company?.name || currentProfile?.company_id || "Atera";
-  const dashboardProductContext = dashboardSelectedProduct?.product_group || dashboardSelectedProduct?.name || copy("No product selected", "Ürün seçilmedi");
   const hasOperationData = Boolean(operationsWorkspace.products.length || operationsWorkspace.machines.length || operationsWorkspace.materials.length || operationsWorkspace.workforce.length || activePlanResults.length);
-  const dashboardExpectedSalesUnits = Array.from({ length: 12 }, (_, index) => index)
-    .reduce((total, index) => total + getSalesForecastForMonth(dashboardSalesStrategy, index), 0);
   const hasSalesForecast = dashboardSalesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
   const hasFinancialSourceData = Boolean(activePlanResults.length && hasSalesForecast && financialModel.settingsSaved);
-  const noDataValue = "-";
-  const moneyOrMissing = (value) => (hasFinancialSourceData ? formatLira(value) : noDataValue);
-  const monthlyRevenue = financialMonthCount ? toFiniteNumber(financialSummary.salesRevenue) / financialMonthCount : 0;
-  const monthlyCost = financialMonthCount ? toFiniteNumber(financialSummary.totalCost) / financialMonthCount : 0;
   const monthlyNet = financialMonthCount ? toFiniteNumber(financialSummary.netIncome) / financialMonthCount : 0;
-  const operationUnitSalePrice = toFiniteNumber(
-    latestPlanResult?.productPrice,
-    toFiniteNumber(dashboardOperationsWorkspace.product?.price, toFiniteNumber(dashboardOperationsWorkspace.products[0]?.price)),
-  );
-  const operationUnitCost = toFiniteNumber(financialSummary.unitProductionCost);
-  const operationUnitProfit = operationUnitSalePrice - operationUnitCost;
-  const operationProfitMargin = operationUnitSalePrice ? (operationUnitProfit / operationUnitSalePrice) * 100 : 0;
-  const reportAuthor = currentProfile?.username || currentProfile?.email || copy("Current user", "Mevcut kullanıcı");
   const financialHorizonOptions = [
     ["6m", copy("Next 6 months", "Gelecek 6 ay")],
     ["1y", copy("Next 12 months", "Gelecek 12 ay")],
@@ -2433,37 +2396,6 @@ function App() {
   const dashboardProductSelectLabel = dashboardSelectedProduct
     ? dashboardSelectedProduct.name || dashboardSelectedProduct.product_code || copy("Unnamed product", "İsimsiz ürün")
     : copy("No products yet", "Henüz ürün yok");
-  const dashboardHorizonSelectLabel = periodLabel;
-  const recentReports = [
-    dashboardSelectedProduct && [
-      copy("Product Definition Snapshot", "Ürün Tanımı Anlık Görünümü"),
-      copy("Production Reports", "Üretim Raporları"),
-      new Date(dashboardSelectedProduct.updated_at || dashboardSelectedProduct.created_at).toLocaleString(locale),
-      dashboardSelectedProduct.product_code || "-",
-      reportAuthor,
-    ],
-    latestPlan && [
-      latestPlan.plan_name || copy("Latest Process Plan", "Son Süreç Planı"),
-      copy("Production Reports", "Üretim Raporları"),
-      new Date(latestPlan.created_at).toLocaleString(locale),
-      latestPlanResult?.productName || dashboardProductName,
-      reportAuthor,
-    ],
-    hasFinancialSourceData && [
-      copy("Financial Feasibility Snapshot", "Finansal Fizibilite Anlık Görünümü"),
-      copy("Financial Reports", "Finansal Raporlar"),
-      new Date().toLocaleString(locale),
-      periodLabel,
-      reportAuthor,
-    ],
-    hasSalesForecast && [
-      copy("Sales Strategy Snapshot", "Satış Stratejisi Anlık Görünümü"),
-      copy("Sales Reports", "Satış Raporları"),
-      new Date().toLocaleString(locale),
-      copy("12 month sales plan", "12 aylık satış planı"),
-      reportAuthor,
-    ],
-  ].filter(Boolean);
   const reportTabs = [
     {
       detail: copy("A concise decision pack for investors, founders, and management meetings.", "Yatırımcı, kurucu ve yönetim toplantıları için kısa karar paketi."),
@@ -2545,14 +2477,9 @@ function App() {
     },
   ];
   const missingFeasibilityItem = feasibilityChecklist.find((item) => !item.done);
-  const feasibilityReadyCount = feasibilityChecklist.filter((item) => item.done).length;
-  const feasibilityReadinessStatus = feasibilityReadyCount === feasibilityChecklist.length
-    ? copy("All data ready", "Tüm veriler hazır")
-    : copy("Data entry needed", "Veri girişi gerekiyor");
   const unmetForecastUnits = hasFinancialSourceData
     ? Math.max(0, toFiniteNumber(financialSummary.forecastSalesUnits) - toFiniteNumber(financialSummary.netSoldUnits))
     : 0;
-  const hasEnoughRunway = hasFinancialSourceData && financialSummary.cashRunwayMonths >= Math.min(financialMonthCount, 6);
   const { kpis: decisionKpis, verdict: decisionVerdict } = describeFeasibilityDecision(decisionSummary);
   const feasibilityVerdict = !hasFinancialSourceData
     ? {
@@ -2560,136 +2487,14 @@ function App() {
         copy: copy("Complete the basic product, process, sales, and finance inputs before using this as a decision report.", "Bunu karar raporu olarak kullanmadan önce temel ürün, süreç, satış ve finans girdilerini tamamlayın."),
         label: copy("Not decision-ready", "Karar için hazır değil"),
         path: missingFeasibilityItem?.path || "/operations/products",
+        status: "pending",
         tone: "amber",
       }
     : decisionVerdict;
-  const improvementFocus = [
-    !operationsWorkspace.products.length && copy("Add the product price and recipe so cost is based on a real item.", "Maliyet gerçek ürüne dayansın diye ürün fiyatını ve reçetesini ekleyin."),
-    !activePlanResults.length && copy("Save one daily process plan to calculate capacity, labor, material, and energy.", "Kapasite, işçilik, malzeme ve enerjiyi hesaplamak için bir günlük süreç planı kaydedin."),
-    !hasSalesForecast && copy("Link sales channels to products so revenue and stock risk become visible.", "Ciro ve stok riski görünsün diye satış kanallarını ürünlere bağlayın."),
-    hasFinancialSourceData && unmetForecastUnits > 0 && copy("Sales demand is above available production. Increase capacity or reduce the promise.", "Satış talebi mevcut üretimin üstünde. Kapasiteyi artırın ya da satış sözünü düşürün."),
-    hasFinancialSourceData && financialSummary.unsoldInventoryUnits > 0 && copy("Production is above sales. Reduce output, add demand, or plan stock financing.", "Üretim satışın üstünde. Çıktıyı düşürün, talep ekleyin veya stok finansmanı planlayın."),
-    hasFinancialSourceData && monthlyNet <= 0 && copy("Net result is weak. Recheck price, material cost, labor hours, and channel commissions.", "Net sonuç zayıf. Fiyatı, malzeme maliyetini, işçilik saatini ve kanal komisyonlarını kontrol edin."),
-    hasFinancialSourceData && financialSummary.cashRunwayMonths < Math.min(financialMonthCount, 3) && copy("Cash runway is short. Add starting cash, financing, or delay non-critical spend.", "Nakit dayanma kısa. Başlangıç nakdi/finansman ekleyin ya da kritik olmayan harcamayı erteleyin."),
-  ].filter(Boolean).slice(0, 3);
-  const dashboardWorkingDays = Math.max(1, toFiniteNumber(financialSummary.workingDaysPerMonth, toFiniteNumber(financialSettingsForm.workingDaysPerMonth, 22)));
-  const monthlyProductionCapacity = totalDailyProduction * dashboardWorkingDays;
-  const averageMonthlyDemand = dashboardExpectedSalesUnits / 12;
-  const capacityCoveragePercent = averageMonthlyDemand && monthlyProductionCapacity ? (monthlyProductionCapacity / averageMonthlyDemand) * 100 : 0;
-  const netMarginPercent = monthlyRevenue ? (monthlyNet / monthlyRevenue) * 100 : 0;
-  const formatDashboardMonth = (month) => (month ? `${formatNumber(month)} ${copy("mo", "ay")}` : noDataValue);
-  const dashboardExecutiveMetrics = [
-    {
-      category: copy("Decision", "Karar"),
-      detail: copy("from readiness and finance checks", "hazırlık ve finans kontrolünden"),
-      id: "verdict",
-      label: copy("Feasibility verdict", "Fizibilite kararı"),
-      tone: feasibilityVerdict.tone,
-      value: feasibilityVerdict.label,
-    },
-    {
-      category: copy("Finance", "Finans"),
-      detail: copy("monthly estimate", "aylık tahmin"),
-      id: "netResult",
-      label: copy("Net result", "Net sonuç"),
-      tone: hasFinancialSourceData && monthlyNet > 0 ? "teal" : hasFinancialSourceData ? "clay" : "amber",
-      value: moneyOrMissing(monthlyNet),
-    },
-    {
-      category: copy("Cash", "Nakit"),
-      detail: copy("before cash balance goes negative", "nakit eksiye düşmeden önce"),
-      id: "cashRunway",
-      label: copy("Cash runway", "Nakit dayanma"),
-      tone: hasFinancialSourceData && hasEnoughRunway ? "teal" : hasFinancialSourceData ? "amber" : "amber",
-      value: hasFinancialSourceData ? `${formatNumber(financialSummary.cashRunwayMonths)} ${copy("mo", "ay")}` : noDataValue,
-    },
-    {
-      category: copy("Return", "Geri dönüş"),
-      detail: copy("investment recovery month", "yatırım geri dönüş ayı"),
-      id: "payback",
-      label: copy("Payback", "Geri dönüş"),
-      tone: hasFinancialSourceData && financialSummary.paybackMonth ? "teal" : hasFinancialSourceData ? "clay" : "amber",
-      value: hasFinancialSourceData ? formatDashboardMonth(financialSummary.paybackMonth) : noDataValue,
-    },
-    {
-      category: copy("Capacity", "Kapasite"),
-      detail: copy("available monthly production", "mevcut aylık üretim"),
-      id: "capacityDemand",
-      label: copy("Capacity vs demand", "Kapasite / talep"),
-      tone: hasSalesForecast && activePlanResults.length && capacityCoveragePercent >= 100 ? "teal" : hasSalesForecast && activePlanResults.length ? "amber" : "amber",
-      value: hasSalesForecast && activePlanResults.length ? `${formatNumber(capacityCoveragePercent)}%` : noDataValue,
-    },
-    {
-      category: copy("Funding", "Finansman"),
-      detail: copy("own cash after loan and grant", "kredi ve hibe sonrası öz nakit"),
-      id: "initialCash",
-      label: copy("Initial cash needed", "Gerekli başlangıç nakdi"),
-      tone: hasFinancialSourceData && financialSummary.initialCashRequired <= 0 ? "teal" : hasFinancialSourceData ? "amber" : "amber",
-      value: hasFinancialSourceData ? formatLira(financialSummary.initialCashRequired) : noDataValue,
-    },
-  ];
-  const dashboardModuleRollup = [
-    {
-      action: operationsWorkspace.products.length ? copy("Review product", "Ürünü incele") : copy("Add product", "Ürün ekle"),
-      detail: operationsWorkspace.products.length
-        ? `${formatNumber(operationsWorkspace.products.length)} ${copy("product records", "ürün kaydı")}`
-        : copy("Product, price, and recipe are needed.", "Ürün, fiyat ve reçete gerekli."),
-      done: operationsWorkspace.products.length > 0,
-      label: copy("Product definition", "Ürün tanımı"),
-      path: "/operations/products",
-      tone: "operations",
-    },
-    {
-      action: activePlanResults.length ? copy("Review process", "Süreci incele") : copy("Save process", "Süreç kaydet"),
-      detail: activePlanResults.length
-        ? `${formatQuantity(totalDailyProduction, latestPlanResult?.productUnit)} ${latestPlanResult?.productUnit || copy("units", "adet")} ${copy("per day", "günlük")}`
-        : copy("A saved process plan unlocks capacity and cost.", "Kayıtlı süreç planı kapasite ve maliyeti açar."),
-      done: activePlanResults.length > 0,
-      label: copy("Production capacity", "Üretim kapasitesi"),
-      path: "/operations/data-entry",
-      tone: "operations",
-    },
-    {
-      action: hasSalesForecast ? copy("Review sales", "Satışı incele") : copy("Add forecast", "Tahmin ekle"),
-      detail: hasSalesForecast
-        ? `${formatNumber(averageMonthlyDemand)} ${copy("avg monthly units", "ortalama aylık adet")}`
-        : copy("Sales channels are required for revenue and stock risk.", "Ciro ve stok riski için satış kanalları gerekli."),
-      done: hasSalesForecast,
-      label: copy("Market demand", "Pazar talebi"),
-      path: "/sales-strategy",
-      tone: "sales",
-    },
-    {
-      action: hasFinancialAssumptions ? copy("Review finance", "Finansı incele") : copy("Add assumptions", "Varsayım ekle"),
-      detail: hasFinancialSourceData
-        ? `${copy("Margin", "Marj")} ${formatNumber(netMarginPercent, 1)}% / ${copy("Runway", "Dayanma")} ${formatNumber(financialSummary.cashRunwayMonths)} ${copy("mo", "ay")}`
-        : copy("Cash, tax, stock, and payment assumptions are needed.", "Nakit, vergi, stok ve ödeme varsayımları gerekli."),
-      done: hasFinancialAssumptions,
-      label: copy("Financial model", "Finansal model"),
-      path: "/financial-modelling/girdiler",
-      tone: "finance",
-    },
-    {
-      action: hasFinancialSourceData ? copy("Run scenario", "Senaryo çalıştır") : copy("Complete inputs", "Girdileri tamamla"),
-      detail: hasFinancialSourceData
-        ? copy("Use simulation to test downside and upside cases.", "Simülasyonda kötü ve iyi senaryoları test edin.")
-        : copy("Simulation is useful after core feasibility data exists.", "Simülasyon temel fizibilite verisi oluşunca anlamlıdır."),
-      done: hasFinancialSourceData,
-      label: copy("Scenario test", "Senaryo testi"),
-      path: "/simulation/current-situation",
-      tone: "decision",
-    },
-    {
-      action: recentReports.length ? copy("Open reports", "Raporları aç") : copy("Create source data", "Kaynak veri oluştur"),
-      detail: recentReports.length
-        ? `${formatNumber(recentReports.length)} ${copy("available snapshots", "mevcut anlık rapor")}`
-        : copy("Reports become useful after product, process, sales, or finance data exists.", "Raporlar ürün, süreç, satış veya finans verisi oluşunca anlamlı hale gelir."),
-      done: recentReports.length > 0,
-      label: copy("Report pack", "Rapor paketi"),
-      path: "/reports",
-      tone: "reports",
-    },
-  ];
+  const decisionBasis = copy(
+    `5-year projection, ${formatNumber(decisionSummary.discountRateAnnualPercent, 1)}% discount rate`,
+    `5 yıllık projeksiyon, %${formatNumber(decisionSummary.discountRateAnnualPercent, 1)} iskonto oranı`,
+  );
   const dashboardRiskPriority = {
     high: 1,
     medium: 2,
@@ -2702,6 +2507,7 @@ function App() {
       detail: copy("Without product price and recipe, cost and revenue are not decision-grade.", "Ürün fiyatı ve reçete olmadan maliyet ve ciro karar seviyesinde değildir."),
       path: "/operations/products",
       priority: dashboardRiskPriority.high,
+      readinessItem: true,
       severity: copy("Blocker", "Engel"),
       tone: "risk-high",
       title: copy("Product definition missing", "Ürün tanımı eksik"),
@@ -2711,6 +2517,7 @@ function App() {
       detail: copy("Capacity, labor, material, and energy must come from a saved daily process plan.", "Kapasite, işçilik, malzeme ve enerji kayıtlı günlük süreç planından gelmeli."),
       path: "/operations/data-entry",
       priority: dashboardRiskPriority.high,
+      readinessItem: true,
       severity: copy("Blocker", "Engel"),
       tone: "risk-high",
       title: copy("Production plan missing", "Üretim planı eksik"),
@@ -2720,6 +2527,7 @@ function App() {
       detail: copy("Demand, revenue, unmet sales, and inventory risk require product-linked sales channels.", "Talep, ciro, karşılanmayan satış ve stok riski ürüne bağlı satış kanalları ister."),
       path: "/sales-strategy",
       priority: dashboardRiskPriority.high,
+      readinessItem: true,
       severity: copy("Blocker", "Engel"),
       tone: "risk-high",
       title: copy("Sales forecast missing", "Satış tahmini eksik"),
@@ -2729,6 +2537,7 @@ function App() {
       detail: copy("Cash runway, payback, taxes, and working capital need saved financial assumptions.", "Nakit dayanma, geri dönüş, vergiler ve işletme sermayesi kayıtlı finans varsayımları ister."),
       path: "/financial-modelling/girdiler",
       priority: dashboardRiskPriority.high,
+      readinessItem: true,
       severity: copy("High", "Yüksek"),
       tone: "risk-high",
       title: copy("Financial assumptions incomplete", "Finans varsayımları eksik"),
@@ -2790,123 +2599,8 @@ function App() {
       title: copy("Short cash runway", "Kısa nakit dayanma"),
     },
   ].filter(Boolean).sort((left, right) => left.priority - right.priority).slice(0, 5);
-  const dashboardAssumptionRows = [
-    {
-      detail: copy("Saved process capacity multiplied by monthly working days.", "Kayıtlı süreç kapasitesinin aylık çalışma günleriyle çarpımı."),
-      id: "monthlyCapacity",
-      label: copy("Monthly capacity", "Aylık kapasite"),
-      value: activePlanResults.length ? `${formatQuantity(monthlyProductionCapacity, latestPlanResult?.productUnit)} ${latestPlanResult?.productUnit || copy("units", "adet")}` : noDataValue,
-    },
-    {
-      detail: copy("Product-linked sales forecast averaged over 12 months.", "Ürüne bağlı satış tahmininin 12 aylık ortalaması."),
-      id: "averageMonthlyDemand",
-      label: copy("Average monthly demand", "Ortalama aylık talep"),
-      value: hasSalesForecast ? `${formatNumber(averageMonthlyDemand)} ${copy("units", "adet")}` : noDataValue,
-    },
-    {
-      detail: copy("Unit sale price minus production cost, shown as a margin rate.", "Birim satış fiyatından üretim maliyeti düşülerek bulunan marj oranı."),
-      id: "unitMargin",
-      label: copy("Unit margin", "Birim marj"),
-      value: operationUnitSalePrice ? `${formatNumber(operationProfitMargin, 1)}%` : noDataValue,
-    },
-  ];
-  const dashboardFinancialDetailRows = [
-    {
-      detail: copy("Expected monthly sales income from the selected product.", "Seçili üründen beklenen aylık satış geliri."),
-      id: "monthlyRevenue",
-      label: copy("Monthly revenue", "Aylık ciro"),
-      value: moneyOrMissing(monthlyRevenue),
-    },
-    {
-      detail: copy("Operating, production, finance, and recurring costs for the month.", "Aylık operasyon, üretim, finansman ve tekrar eden maliyetler."),
-      id: "monthlyCost",
-      label: copy("Monthly cost", "Aylık maliyet"),
-      value: moneyOrMissing(monthlyCost),
-    },
-    {
-      detail: copy("Net result divided by monthly revenue.", "Net sonucun aylık ciroya oranı."),
-      id: "netMargin",
-      label: copy("Net margin", "Net marj"),
-      value: hasFinancialSourceData ? `${formatNumber(netMarginPercent, 1)}%` : noDataValue,
-    },
-    {
-      detail: copy("First month where cumulative result reaches break-even.", "Kümülatif sonucun başa baş noktasına ulaştığı ilk ay."),
-      id: "breakEven",
-      label: copy("Break-even", "Başa baş"),
-      value: hasFinancialSourceData ? formatDashboardMonth(financialSummary.breakEvenMonth) : noDataValue,
-    },
-    {
-      detail: copy("Cash tied in inventory, receivables, and operating timing.", "Stok, alacaklar ve operasyon zamanlamasında bağlı kalan nakit."),
-      id: "workingCapital",
-      label: copy("Working capital", "İşletme sermayesi"),
-      value: hasFinancialSourceData ? formatLira(financialSummary.workingCapitalRequirement) : noDataValue,
-    },
-    {
-      detail: copy("Produced units that remain unsold in the selected horizon.", "Seçilen ufukta üretilip satılamayan adet."),
-      id: "unsoldInventory",
-      label: copy("Unsold inventory", "Satılmayan stok"),
-      value: hasFinancialSourceData ? `${formatNumber(financialSummary.unsoldInventoryUnits)} ${copy("units", "adet")}` : noDataValue,
-    },
-    {
-      detail: copy("Forecast demand that available capacity cannot cover.", "Mevcut kapasitenin karşılayamadığı tahmini talep."),
-      id: "unmetSales",
-      label: copy("Unmet sales", "Karşılanmayan satış"),
-      value: hasFinancialSourceData ? `${formatNumber(unmetForecastUnits)} ${copy("units", "adet")}` : noDataValue,
-    },
-    {
-      detail: copy("Average production cost per unit from the operations plan.", "Operasyon planından gelen ortalama birim üretim maliyeti."),
-      id: "unitProductionCost",
-      label: copy("Unit production cost", "Birim üretim maliyeti"),
-      value: hasFinancialSourceData ? formatLira(financialSummary.unitProductionCost, 2) : noDataValue,
-    },
-  ];
-  const normalizedDashboardVisibleSections = normalizeDashboardVisibleSections(dashboardVisibleSections);
-  const visibleDashboardAssumptionRows = dashboardAssumptionRows.filter((row) => normalizedDashboardVisibleSections.assumptions.includes(row.id));
-  const visibleDashboardExecutiveMetrics = dashboardExecutiveMetrics.filter((metric) => normalizedDashboardVisibleSections.business.includes(metric.id));
-  const visibleDashboardFinancialDetailRows = dashboardFinancialDetailRows.filter((row) => normalizedDashboardVisibleSections.details.includes(row.id));
-  const dashboardEditorGroups = [
-    {
-      description: copy("Product and projection horizon stay fixed. Choose the extra summary signals shown next to them.", "Ürün ve projeksiyon ufku sabit kalır. Yanlarında görünecek ek özet sinyalleri seçin."),
-      fixedItems: [
-        [copy("Product", "Ürün"), dashboardProductSelectLabel],
-        [copy("Projection horizon", "Projeksiyon ufku"), dashboardHorizonSelectLabel],
-      ],
-      key: "assumptions",
-      options: dashboardAssumptionRows,
-      title: copy("Assumption summary", "Varsayım özeti"),
-    },
-    {
-      description: copy("Control the headline business model metrics in the main decision grid.", "Ana karar gridindeki iş modeli metriklerini kontrol edin."),
-      key: "business",
-      options: dashboardExecutiveMetrics,
-      title: copy("Business model", "İş modeli"),
-    },
-    {
-      description: copy("Pick which finance and operations signals appear behind the verdict.", "Kararın arkasında hangi finansal ve operasyonel sinyallerin görüneceğini seçin."),
-      key: "details",
-      options: dashboardFinancialDetailRows,
-      title: copy("Financial & operating detail", "Finansal ve operasyonel detay"),
-    },
-  ];
 
-  function toggleDashboardVisibleSection(group, key) {
-    setDashboardVisibleSections((current) => {
-      const normalized = normalizeDashboardVisibleSections(current);
-      const currentKeys = normalized[group] || [];
-      const nextKeys = currentKeys.includes(key)
-        ? currentKeys.filter((item) => item !== key)
-        : [...currentKeys, key];
 
-      return {
-        ...normalized,
-        [group]: nextKeys,
-      };
-    });
-  }
-
-  function resetDashboardVisibleSections() {
-    setDashboardVisibleSections(cloneDashboardVisibleSections());
-  }
 
   function toggleSalesVisibleSection(group, key) {
     setSalesVisibleSections((current) => {
@@ -3056,29 +2750,20 @@ function App() {
     copy,
     copyOperationRecordToForm,
     currentProfile,
-    dashboardAssumptionMenu,
     dashboardCompanyName,
-    dashboardEditorGroups,
-    dashboardEditorOpen,
-    dashboardHorizonSelectLabel,
-    dashboardModuleRollup,
     dashboardModules,
-    dashboardProductContext,
     dashboardProductSelectLabel,
     dashboardRiskPriority,
     dashboardRiskRows,
     dashboardSelectedProductId,
     dashboardSidebarOpen,
+    decisionBasis,
     decisionKpis,
     deleteSimulationVariant,
     downloadReport,
     editableAuthorizationRoles,
-    equipmentFormRef,
-    equipmentListHeightStyle,
     exchangeRates,
     feasibilityChecklist,
-    feasibilityReadinessStatus,
-    feasibilityReadyCount,
     feasibilityVerdict,
     financialExtraCostForm,
     financialHorizon,
@@ -3129,23 +2814,17 @@ function App() {
     hasFinancialSourceData,
     hasOperationData,
     hasSalesForecast,
-    improvementFocus,
     labels,
     loadFinancialData,
     loadOperationsData,
     loadPlanningData,
     loading,
     locale,
-    machineFormRef,
-    machineListHeightStyle,
     managedUserForm,
-    materialFormRef,
-    materialListHeightStyle,
     mode,
     moveProductProcessRow,
     normalizeFlowStrategy,
     normalizeTableValue,
-    normalizedDashboardVisibleSections,
     operationForms,
     operationPlan,
     operationPlanResult,
@@ -3160,8 +2839,6 @@ function App() {
     persistSimulationVariant,
     personas,
     processDefinitionOpen,
-    productFormRef,
-    productListHeightStyle,
     profilePreview,
     profiles,
     references,
@@ -3172,7 +2849,6 @@ function App() {
     reportFormats,
     reportStats,
     reportTabs,
-    resetDashboardVisibleSections,
     resetSalesVisibleSections,
     resetTableHiding,
     roleForm,
@@ -3185,8 +2861,6 @@ function App() {
     session,
     setAuthorizationTab,
     setConfirmPassword,
-    setDashboardAssumptionMenu,
-    setDashboardEditorOpen,
     setDashboardSidebarOpen,
     setFinancialExtraCostForm,
     setFinancialHorizon,
@@ -3210,7 +2884,6 @@ function App() {
     status,
     tableControls,
     theme,
-    toggleDashboardVisibleSection,
     toggleFinancialOverviewWidget,
     toggleSalesVisibleSection,
     toggleTheme,
@@ -3234,11 +2907,6 @@ function App() {
     updateSimulationVariant,
     updateTableControl,
     userTableColumns,
-    visibleDashboardAssumptionRows,
-    visibleDashboardExecutiveMetrics,
-    visibleDashboardFinancialDetailRows,
-    workforceFormRef,
-    workforceListHeightStyle,
   };
 
   return (

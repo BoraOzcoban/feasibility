@@ -29,8 +29,8 @@ export default function ActiveProcessesPage() {
 
   return (
     <DashboardLayout activePage={`operations/${activeOperationsSubmodule.key}`}>
-      <section className="operations-workspace operations-modern operations-entry-page operations-active-processes-page">
-        <div className="operations-header">
+      <section className="page operations-page operations-active-processes-page">
+        <div className="page-header">
           <div>
             <span>
               {copy("Operations", "Operasyon")} / {copy("Active Processes", "Mevcut Süreçler")}
@@ -43,13 +43,13 @@ export default function ActiveProcessesPage() {
               )}
             </p>
           </div>
-          <div className="operations-actions">
-            <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>
+          <div className="button-row">
+            <button type="button" onClick={loadOperationsData}>
               {copy("Refresh Data", "Verileri Yenile")}
             </button>
             <button
               type="button"
-              className="operations-refresh-button"
+
               onClick={() => goTo("/operations/data-entry", "login")}
             >
               {copy("New Plan", "Yeni Plan")}
@@ -57,12 +57,12 @@ export default function ActiveProcessesPage() {
           </div>
         </div>
 
-        <div className="process-summary-grid">
-          <article className="operation-card process-summary-card">
+        <div className="kpi-grid">
+          <article className="card kpi">
             <span>{copy("Active Plan", "Aktif Plan")}</span>
             <strong>{activePlans.length}</strong>
           </article>
-          <article className="operation-card process-summary-card">
+          <article className="card kpi">
             <span>{copy("Total Production", "Toplam Üretim")}</span>
             <strong>
               {formatQuantity(
@@ -71,7 +71,7 @@ export default function ActiveProcessesPage() {
               )}
             </strong>
           </article>
-          <article className="operation-card process-summary-card">
+          <article className="card kpi">
             <span>{copy("Daily Production Cost", "Günlük Üretim Maliyeti")}</span>
             <strong>
               {activePlans.length
@@ -107,16 +107,16 @@ export default function ActiveProcessesPage() {
               );
 
               return (
-                <article className="operation-card process-card" key={plan.id}>
-                  <div className="operation-card-heading">
+                <article className="card process-card" key={plan.id}>
+                  <div className="card-header">
                     <div>
                       <span>{new Date(plan.created_at).toLocaleString(locale)}</span>
                       <h2>{plan.plan_name || copy("Daily production plan", "Günlük üretim planı")}</h2>
                     </div>
-                    <mark className="ok">{copy("Active", "Aktif")}</mark>
+                    <span className="badge badge-feasible">{copy("Active", "Aktif")}</span>
                   </div>
 
-                  <div className="process-metrics">
+                  <div className="facts process-metrics">
                     <span>
                       {copy("Product", "Ürün")} <strong>{productName}</strong>
                     </span>
@@ -255,7 +255,7 @@ export default function ActiveProcessesPage() {
               );
             })
           ) : (
-            <article className="operation-card process-card">
+            <article className="card process-card">
               <p className="planner-empty-state">
                 {copy(
                   "No production plans saved yet. Save a plan from the process definition screen and it will appear here.",

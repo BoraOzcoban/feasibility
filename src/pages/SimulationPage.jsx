@@ -313,8 +313,8 @@ export default function SimulationPage() {
   ];
   return (
     <DashboardLayout activePage={`simulation/${variant.id}`}>
-      <section className="simulation-workspace monte-carlo-workspace">
-        <div className="simulation-header">
+      <section className="page simulation-workspace monte-carlo-workspace">
+        <div className="page-header">
           <div>
             <span>
               {dashboardCompanyName} / {copy("Scenario Analysis", "Senaryo Analizi")}
@@ -327,7 +327,7 @@ export default function SimulationPage() {
               )}
             </p>
           </div>
-          <div className="simulation-header-actions">
+          <div className="button-row">
             <button type="button" onClick={loadPlanningData} disabled={simulationLoading}>
               {copy("Refresh Data", "Verileri Yenile")}
             </button>

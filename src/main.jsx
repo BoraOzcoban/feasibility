@@ -3,6 +3,10 @@ import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import "./styles/tokens.css";
 import "./styles.css";
+import "./styles/base.css";
+import "./styles/shell.css";
+import "./styles/components.css";
+import "./styles/operations.css";
 import "./styles/skin.css";
 
 class AppErrorBoundary extends React.Component {

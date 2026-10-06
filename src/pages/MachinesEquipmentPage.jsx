@@ -3,7 +3,7 @@ import { operationCurrencyOptions } from "../lib/appDefaults";
 import { convertMoneyToTry, toFiniteNumber } from "../lib/feasibilityModel";
 import { formatLira, formatNumber, formatOperationMoney } from "../lib/format";
 import { useAppContext } from "../app/AppContext";
-import SortableDataTable from "../components/SortableDataTable";
+import DataTable from "../components/DataTable";
 import OperationRecordForm from "../components/OperationRecordForm";
 import DashboardLayout from "../components/DashboardLayout";
 
@@ -12,13 +12,9 @@ export default function MachinesEquipmentPage() {
     activeOperationsSubmodule,
     copy,
     copyOperationRecordToForm,
-    equipmentFormRef,
-    equipmentListHeightStyle,
     exchangeRates,
     handleDeleteOperationRecord,
     loadOperationsData,
-    machineFormRef,
-    machineListHeightStyle,
     operationsStatus,
     operationsWorkspace,
   } = useAppContext();
@@ -195,8 +191,8 @@ export default function MachinesEquipmentPage() {
 
   return (
     <DashboardLayout activePage={`operations/${activeOperationsSubmodule.key}`}>
-      <section className="operations-workspace operations-modern operations-entry-page operations-machines-page">
-        <div className="operations-header">
+      <section className="page operations-page operations-machines-page">
+        <div className="page-header">
           <div>
             <span>
               {copy("Operations", "Operasyon")} / {copy("Machines & Equipment", "Makine & Ekipman")}
@@ -209,95 +205,77 @@ export default function MachinesEquipmentPage() {
               )}
             </p>
           </div>
-          <div className="operations-actions">
-            <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>
+          <div className="button-row">
+            <button type="button" onClick={loadOperationsData}>
               {copy("Refresh Data", "Verileri Yenile")}
             </button>
           </div>
         </div>
 
-        <div className="process-summary-grid operations-entry-summary">
-          <article className="operation-card process-summary-card">
+        <div className="kpi-grid">
+          <article className="card kpi">
             <span>{copy("Machines", "Makineler")}</span>
             <strong>{formatNumber(operationsWorkspace.machines.length)}</strong>
             <small>
               {formatNumber(totalMachineHours, 1)} {copy("available hours", "çalışma saati")}
             </small>
           </article>
-          <article className="operation-card process-summary-card">
+          <article className="card kpi">
             <span>{copy("Equipment", "Ekipman")}</span>
             <strong>{formatNumber((operationsWorkspace.equipment || []).length)}</strong>
             <small>{copy("supporting investment records", "destek yatırım kayıtları")}</small>
           </article>
-          <article className="operation-card process-summary-card">
+          <article className="card kpi">
             <span>{copy("Registered investment", "Kayıtlı yatırım")}</span>
             <strong>{formatLira(machineInvestmentTry + equipmentInvestmentTry)}</strong>
             <small>{copy("converted to TRY for finance", "finans için TL'ye çevrilir")}</small>
           </article>
         </div>
 
-        <div className="machine-equipment-grid">
-          <div className="operation-data-grid compact operations-record-pair operations-machine-record-pair">
+        <div className="stack">
+          <div className="record-pair">
             {
               <OperationRecordForm
                 entity="machine"
                 fields={machineFields}
-                options={{ className: "operations-machine-form-card", formRef: machineFormRef }}
+                options={{ className: "operations-machine-form-card" }}
               />
             }
-            <article
-              className="operation-card operation-data-table-card operations-record-list-card operations-machine-list-card"
-              style={machineListHeightStyle}
-            >
-              <div className="operation-card-heading">
+            <article className="card operation-data-table-card operations-record-list-card operations-machine-list-card">
+              <div className="card-header">
                 <h2>{copy("Machines", "Makineler")}</h2>
                 <span>
                   {operationsWorkspace.machines.length} {copy("records", "kayıt")}
                 </span>
               </div>
-              {
-                <SortableDataTable
-                  {...{
-                    columns: machineColumns,
-                    gridTemplateColumns: `repeat(${machineColumns.length}, minmax(120px, 1fr))`,
-                    onDeleteRow: (row) => handleDeleteOperationRecord("machine", row),
-                    rows: operationsWorkspace.machines,
-                    tableId: "machines",
-                  }}
-                />
-              }
+              <DataTable
+                columns={machineColumns}
+                onDeleteRow={(row) => handleDeleteOperationRecord("machine", row)}
+                rows={operationsWorkspace.machines}
+              />
             </article>
           </div>
 
-          <div className="operation-data-grid compact operations-record-pair operations-equipment-record-pair">
+          <div className="record-pair">
             {
               <OperationRecordForm
                 entity="equipment"
                 fields={equipmentFields}
-                options={{ className: "operations-equipment-form-card", formRef: equipmentFormRef }}
+                options={{ className: "operations-equipment-form-card" }}
               />
             }
-            <article
-              className="operation-card operation-data-table-card operations-record-list-card operations-equipment-list-card"
-              style={equipmentListHeightStyle}
-            >
-              <div className="operation-card-heading">
+            <article className="card operation-data-table-card operations-record-list-card operations-equipment-list-card">
+              <div className="card-header">
                 <h2>{copy("Equipment", "Ekipman")}</h2>
                 <span>
                   {(operationsWorkspace.equipment || []).length} {copy("records", "kayıt")}
                 </span>
               </div>
-              {
-                <SortableDataTable
-                  {...{
-                    columns: equipmentColumns,
-                    gridTemplateColumns: `repeat(${equipmentColumns.length}, minmax(120px, 1fr))`,
-                    onDeleteRow: (row) => handleDeleteOperationRecord("equipment", row),
-                    rows: operationsWorkspace.equipment || [],
-                    tableId: "equipment",
-                  }}
-                />
-              }
+              <DataTable
+                columns={equipmentColumns}
+                onDeleteRow={(row) => handleDeleteOperationRecord("equipment", row)}
+                rows={operationsWorkspace.equipment || []}
+              />
             </article>
           </div>
         </div>

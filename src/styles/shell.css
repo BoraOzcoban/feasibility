@@ -1,0 +1,375 @@
+/*
+ * App shell: sidebar navigation and the content column.
+ * Wide screens: sticky sidebar, or a narrow rail when collapsed.
+ * 1024px and below: a top bar; the menu opens as a drawer over the content.
+ */
+@layer skin {
+  .dashboard-shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    min-height: 100vh;
+  }
+
+  .dashboard-shell.sidebar-collapsed {
+    grid-template-columns: var(--sidebar-rail-width) minmax(0, 1fr);
+  }
+
+  .dashboard-content {
+    min-width: 0;
+    padding: var(--space-6) var(--space-6) var(--space-7);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .dashboard-sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    height: 100vh;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-3);
+    position: sticky;
+    top: 0;
+  }
+
+  .dashboard-sidebar-top {
+    align-items: center;
+    display: flex;
+    gap: var(--space-2);
+    justify-content: space-between;
+  }
+
+  .dashboard-brand {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    display: flex;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    gap: var(--space-2);
+    padding: var(--space-1);
+  }
+
+  .dashboard-brand:hover:not(:disabled) {
+    background: transparent;
+  }
+
+  .dashboard-brand img {
+    height: 28px;
+    width: 28px;
+  }
+
+  .dashboard-sidebar-toggle {
+    display: inline-grid;
+    flex: none;
+    height: 32px;
+    padding: 0;
+    place-items: center;
+    width: 32px;
+  }
+
+  .dashboard-sidebar-toggle .toggle-icon-narrow {
+    display: none;
+  }
+
+  .dashboard-controls {
+    align-items: center;
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .language-picker {
+    align-items: center;
+    color: var(--ink-muted);
+    display: flex;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    gap: var(--space-2);
+  }
+
+  .language-picker select {
+    min-height: 32px;
+    padding: 2px 8px;
+  }
+
+  .theme-toggle {
+    font-size: var(--text-xs);
+    min-height: 32px;
+    padding: 0 var(--space-3);
+  }
+
+  /* ---------- Navigation ---------- */
+  .dashboard-nav {
+    align-content: start;
+    display: grid;
+    flex: 1;
+    gap: 2px;
+  }
+
+  .dashboard-nav-item {
+    background: transparent;
+    border: 0;
+    border-left: 3px solid transparent;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    display: grid;
+    font-size: var(--text-sm);
+    gap: 2px;
+    padding: var(--space-2) var(--space-3);
+    text-align: left;
+    width: 100%;
+  }
+
+  .dashboard-nav-item strong {
+    font-weight: var(--weight-semibold);
+  }
+
+  .dashboard-nav-category {
+    color: var(--ink-muted);
+    font-size: 11px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .dashboard-nav-item.active {
+    background: var(--surface-muted);
+    border-left-color: var(--brand);
+  }
+
+  .dashboard-nav-item.operations.active {
+    border-left-color: var(--module-operations);
+  }
+
+  .dashboard-nav-item.sales.active {
+    border-left-color: var(--module-sales);
+  }
+
+  .dashboard-nav-item.finance.active {
+    border-left-color: var(--module-finance);
+  }
+
+  .dashboard-nav-item.decision.active {
+    border-left-color: var(--module-simulation);
+  }
+
+  .dashboard-subnav {
+    display: grid;
+    gap: 1px;
+    padding: 2px 0 var(--space-2) var(--space-4);
+  }
+
+  .dashboard-subnav button {
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--ink-muted);
+    font-weight: var(--weight-regular);
+    min-height: 32px;
+    padding: 6px var(--space-3);
+    text-align: left;
+    width: 100%;
+  }
+
+  .dashboard-subnav button.active {
+    background: var(--surface-muted);
+    color: var(--ink);
+    font-weight: var(--weight-semibold);
+  }
+
+  .dashboard-subnav-label {
+    color: var(--ink-muted);
+    font-size: 11px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.04em;
+    padding: var(--space-2) var(--space-3) 2px;
+    text-transform: uppercase;
+  }
+
+  .simulation-subnav-item {
+    align-items: center;
+    display: flex;
+    gap: 2px;
+  }
+
+  .simulation-subnav-item > button:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dashboard-subnav .variant-delete-button {
+    flex: none;
+    min-height: 28px;
+    padding: 0;
+    text-align: center;
+    width: 28px;
+  }
+
+  /* ---------- Footer ---------- */
+  .sidebar-footer {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .sync-status-card {
+    align-items: center;
+    color: var(--ink-muted);
+    display: flex;
+    font-size: var(--text-xs);
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .sync-status-card strong {
+    color: var(--ink);
+    display: block;
+  }
+
+  .sync-status-card small {
+    font-size: 11px;
+  }
+
+  .live-dot {
+    background: var(--decision-feasible);
+    border-radius: 50%;
+    flex: none;
+    height: 8px;
+    width: 8px;
+  }
+
+  .sidebar-backdrop {
+    display: none;
+  }
+
+  /* ---------- Collapsed rail ---------- */
+  .sidebar-collapsed .dashboard-sidebar {
+    align-items: center;
+    padding: var(--space-4) var(--space-2);
+  }
+
+  .sidebar-collapsed .dashboard-sidebar-top {
+    flex-direction: column;
+  }
+
+  .sidebar-collapsed
+    .dashboard-sidebar
+    :is(.dashboard-controls, .dashboard-nav, .sidebar-footer, .dashboard-brand strong) {
+    display: none;
+  }
+
+  /* ---------- Narrow screens: top bar + drawer ---------- */
+  @media (max-width: 1024px) {
+    .dashboard-shell,
+    .dashboard-shell.sidebar-collapsed {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto 1fr;
+    }
+
+    .dashboard-content {
+      padding: var(--space-5) var(--space-4) var(--space-6);
+    }
+
+    .dashboard-sidebar-toggle .toggle-icon-wide {
+      display: none;
+    }
+
+    .dashboard-sidebar-toggle .toggle-icon-narrow {
+      display: inline;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar {
+      align-items: stretch;
+      border-bottom: 1px solid var(--line);
+      border-right: 0;
+      height: auto;
+      padding: var(--space-2) var(--space-4);
+      z-index: 30;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-top {
+      flex-direction: row;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar .dashboard-brand strong {
+      display: inline;
+    }
+
+    .sidebar-open .dashboard-sidebar {
+      box-shadow: var(--shadow-2);
+      inset: 0 auto 0 0;
+      position: fixed;
+      width: min(300px, 86vw);
+      z-index: 50;
+    }
+
+    .sidebar-open .sidebar-backdrop {
+      background: rgba(0, 38, 62, 0.35);
+      border: 0;
+      border-radius: 0;
+      display: block;
+      inset: 0;
+      position: fixed;
+      z-index: 40;
+    }
+
+    .sidebar-open .sidebar-backdrop:hover:not(:disabled) {
+      background: rgba(0, 38, 62, 0.35);
+    }
+  }
+
+  /* ---------- Unsaved changes dialog ---------- */
+  .unsaved-changes-backdrop {
+    background: rgba(0, 38, 62, 0.4);
+    display: grid;
+    inset: 0;
+    padding: var(--space-4);
+    place-items: center;
+    position: fixed;
+    z-index: 100;
+  }
+
+  .unsaved-changes-dialog {
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-2);
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-6);
+    width: min(480px, 100%);
+  }
+
+  .unsaved-changes-dialog > span {
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .unsaved-changes-dialog h2,
+  .unsaved-changes-dialog p {
+    margin: 0;
+  }
+
+  .unsaved-changes-dialog p {
+    color: var(--ink-muted);
+  }
+
+  .unsaved-changes-dialog small {
+    color: var(--decision-risky-ink);
+  }
+
+  .unsaved-changes-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: flex-end;
+    margin-top: var(--space-2);
+  }
+
+  .unsaved-changes-actions button {
+    min-height: 40px;
+    padding: 0 var(--space-4);
+  }
+}

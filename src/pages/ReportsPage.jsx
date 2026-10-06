@@ -22,8 +22,8 @@ export default function ReportsPage() {
 
   return (
     <DashboardLayout activePage={activeModule.key}>
-      <section className="reports-workspace">
-        <div className="reports-header">
+      <section className="page reports-workspace">
+        <div className="page-header">
           <div>
             <span>
               {dashboardCompanyName} / {copy("Export center", "Export merkezi")}

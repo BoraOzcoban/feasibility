@@ -4,7 +4,7 @@ import { operationCurrencyOptions } from "../lib/appDefaults";
 import { asObjectArray, toFiniteNumber } from "../lib/feasibilityModel";
 import { formatCycleTime, formatNumber, formatOperationMoney, getCycleTimeInputFromMinutes } from "../lib/format";
 import { useAppContext } from "../app/AppContext";
-import SortableDataTable from "../components/SortableDataTable";
+import DataTable from "../components/DataTable";
 import DashboardLayout from "../components/DashboardLayout";
 
 export default function ProductsPage() {
@@ -24,8 +24,6 @@ export default function ProductsPage() {
     operationsLoading,
     operationsStatus,
     operationsWorkspace,
-    productFormRef,
-    productListHeightStyle,
     removeProductMaterialRow,
     removeProductProcessRow,
     setOperationForms,
@@ -100,13 +98,22 @@ export default function ProductsPage() {
     {
       header: copy("Process order", "Süreç sırası"),
       key: "processes",
-      render: getProductProcessSummary,
+      // Count in the cell, the full order on hover; the form shows the detail.
+      render: (row) => (
+        <span title={getProductProcessSummary(row)}>
+          {formatNumber(getProductProcessRows(row).length)} {copy("steps", "süreç")}
+        </span>
+      ),
       value: getProductProcessSummary,
     },
     {
       header: copy("Materials", "Malzemeler"),
       key: "materials",
-      render: getProductRecipeSummary,
+      render: (row) => (
+        <span title={getProductRecipeSummary(row)}>
+          {formatNumber((row.material_rows || []).length)} {copy("materials", "malzeme")}
+        </span>
+      ),
       value: getProductRecipeSummary,
     },
   ];
@@ -137,8 +144,8 @@ export default function ProductsPage() {
 
   return (
     <DashboardLayout activePage={`operations/${activeOperationsSubmodule.key}`}>
-      <section className="operations-workspace operations-modern operations-entry-page operations-products-page">
-        <div className="operations-header">
+      <section className="page operations-page operations-products-page">
+        <div className="page-header">
           <div>
             <span>
               {copy("Operations", "Operasyon")} / {copy("Products", "Ürünler")}
@@ -151,29 +158,29 @@ export default function ProductsPage() {
               )}
             </p>
           </div>
-          <div className="operations-actions">
-            <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>
+          <div className="button-row">
+            <button type="button" onClick={loadOperationsData}>
               {copy("Refresh Data", "Verileri Yenile")}
             </button>
           </div>
         </div>
 
-        <div className="process-summary-grid operations-entry-summary">
-          <article className="operation-card process-summary-card">
+        <div className="kpi-grid">
+          <article className="card kpi">
             <span>{copy("Products", "Ürünler")}</span>
             <strong>{formatNumber(operationsWorkspace.products.length)}</strong>
             <small>
               {copy("priced", "fiyatlı")}: {formatNumber(pricedProductCount)}
             </small>
           </article>
-          <article className="operation-card process-summary-card">
+          <article className="card kpi">
             <span>{copy("Recipes", "Reçeteler")}</span>
             <strong>{formatNumber(productsWithRecipe)}</strong>
             <small>
               {formatNumber(productRecipeLinkCount)} {copy("material links", "malzeme bağlantısı")}
             </small>
           </article>
-          <article className="operation-card process-summary-card">
+          <article className="card kpi">
             <span>{copy("Process templates", "Süreç şablonları")}</span>
             <strong>{formatNumber(productsWithProcesses)}</strong>
             <small>{copy("products ready for planning", "planlamaya hazır ürün")}</small>
@@ -182,17 +189,16 @@ export default function ProductsPage() {
 
         <div className="operation-data-grid">
           <form
-            ref={productFormRef}
-            className="operation-card operation-data-form operations-product-form-card"
+            className="card operation-data-form operations-product-form-card"
             onSubmit={(event) => handleSaveOperationRecord("product", event)}
           >
-            <div className="operation-card-heading">
+            <div className="card-header">
               <div>
                 <span>{copy("Product definition", "Ürün tanımı")}</span>
                 <h2>{copy("Commercial and production defaults", "Ticari ve üretim varsayılanları")}</h2>
               </div>
             </div>
-            <div className="operation-data-fields">
+            <div className="form-grid">
               <label>
                 <span>{copy("Product name", "Ürün adı")}</span>
                 <input
@@ -699,34 +705,24 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
+            <button className="primary" disabled={operationsLoading} type="submit">
               {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save", "Kaydet")}
             </button>
           </form>
 
-          <article
-            className="operation-card operation-data-table-card operations-product-list-card"
-            style={productListHeightStyle}
-          >
-            <div className="operation-card-heading">
+          <article className="card operation-data-table-card operations-product-list-card">
+            <div className="card-header">
               <h2>{copy("Records", "Kayıtlar")}</h2>
               <span>
                 {operationsWorkspace.products.length} {copy("records", "kayıt")}
               </span>
             </div>
-            {
-              <SortableDataTable
-                {...{
-                  columns: productColumns,
-                  gridTemplateColumns: "1.1fr 0.5fr 0.7fr 0.7fr 0.9fr 1.6fr 1.3fr",
-                  onRowClick: copyProductToForm,
-                  onDeleteRow: (row) => handleDeleteOperationRecord("product", row),
-                  rows: operationsWorkspace.products,
-                  tableId: "products",
-                  useButtonRows: true,
-                }}
-              />
-            }
+            <DataTable
+              columns={productColumns}
+              onRowClick={copyProductToForm}
+              onDeleteRow={(row) => handleDeleteOperationRecord("product", row)}
+              rows={operationsWorkspace.products}
+            />
           </article>
         </div>
         {operationsStatus && <p className="status-message">{operationsStatus}</p>}

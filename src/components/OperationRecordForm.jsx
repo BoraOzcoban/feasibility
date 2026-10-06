@@ -5,7 +5,7 @@ import { useAppContext } from "../app/AppContext";
 export default function OperationRecordForm({ entity, fields, options = {} }) {
   const { copy, handleSaveOperationRecord, operationForms, operationsLoading, updateOperationForm } = useAppContext();
 
-  const formClassName = ["operation-card operation-data-form operations-record-form-card", options.className]
+  const formClassName = ["card operation-data-form operations-record-form-card", options.className]
     .filter(Boolean)
     .join(" ");
   const recordFormLabels = {
@@ -32,18 +32,14 @@ export default function OperationRecordForm({ entity, fields, options = {} }) {
   };
 
   return (
-    <form
-      ref={options.formRef}
-      className={formClassName}
-      onSubmit={(event) => handleSaveOperationRecord(entity, event)}
-    >
-      <div className="operation-card-heading">
+    <form className={formClassName} onSubmit={(event) => handleSaveOperationRecord(entity, event)}>
+      <div className="card-header">
         <div>
           <span>{recordFormLabel.eyebrow}</span>
           <h2>{recordFormLabel.title}</h2>
         </div>
       </div>
-      <div className="operation-data-fields">
+      <div className="form-grid">
         {fields.map((field) => (
           <label key={field.name}>
             <span className="label-with-info">
@@ -83,7 +79,7 @@ export default function OperationRecordForm({ entity, fields, options = {} }) {
           </label>
         ))}
       </div>
-      <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
+      <button className="primary" disabled={operationsLoading} type="submit">
         {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save", "Kaydet")}
       </button>
     </form>

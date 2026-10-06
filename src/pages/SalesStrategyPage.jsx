@@ -514,8 +514,8 @@ export default function SalesStrategyPage() {
 
   return (
     <DashboardLayout activePage="sales-strategy">
-      <section className="sales-workspace">
-        <div className="sales-header">
+      <section className="page sales-workspace">
+        <div className="page-header">
           <div>
             <span>
               {dashboardCompanyName} / {copy("Sales Strategy", "Satış Stratejisi")}
@@ -528,7 +528,7 @@ export default function SalesStrategyPage() {
               )}
             </p>
           </div>
-          <div className="sales-header-actions">
+          <div className="button-row">
             <button
               type="button"
               className={`sales-edit-toggle ${salesEditorOpen ? "active" : ""}`}

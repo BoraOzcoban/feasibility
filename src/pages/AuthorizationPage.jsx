@@ -1,6 +1,6 @@
 import React from "react";
 import { useAppContext } from "../app/AppContext";
-import SimpleSortableGrid from "../components/SimpleSortableGrid";
+import DataTable from "../components/DataTable";
 import DashboardLayout from "../components/DashboardLayout";
 
 export default function AuthorizationPage() {
@@ -27,7 +27,7 @@ export default function AuthorizationPage() {
 
   return (
     <DashboardLayout activePage="authorization">
-      <section className="authorization-page">
+      <section className="page authorization-page">
         <div className="authorization-heading">
           <span>{labels.dashboard}</span>
           <h1>{labels.authorizationPage}</h1>
@@ -153,19 +153,7 @@ export default function AuthorizationPage() {
                     <h2>{labels.managedUsers}</h2>
                     {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
                   </div>
-                  {
-                    <SimpleSortableGrid
-                      {...{
-                        columns: userTableColumns,
-                        gridTemplateColumns: "1fr 1.4fr 1fr 0.8fr",
-                        headClassName: "users-row-head",
-                        rowClassName: "users-row",
-                        rows: profiles,
-                        tableClassName: "users-table",
-                        tableId: "authorization-users",
-                      }}
-                    />
-                  }
+                  <DataTable columns={userTableColumns} rows={profiles} />
                 </div>
               </div>
             ) : (
@@ -205,19 +193,7 @@ export default function AuthorizationPage() {
                     <h2>{labels.permissions}</h2>
                     {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
                   </div>
-                  {
-                    <SimpleSortableGrid
-                      {...{
-                        columns: permissionTableColumns,
-                        gridTemplateColumns: "1fr 1fr 0.8fr 0.8fr",
-                        headClassName: "permissions-row-head",
-                        rowClassName: "permissions-row",
-                        rows: permissionTableRows,
-                        tableClassName: "permissions-table",
-                        tableId: "authorization-permissions",
-                      }}
-                    />
-                  }
+                  <DataTable columns={permissionTableColumns} rows={permissionTableRows} />
                 </div>
               </div>
             )}
