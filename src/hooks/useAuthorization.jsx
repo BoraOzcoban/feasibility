@@ -1,5 +1,5 @@
 // Current profile, module permissions and the roles/users admin page.
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useEffectEvent, useState } from "react";
 import { emptyManagedUserForm, emptyRoleForm, isAdminRole } from "../lib/appDefaults";
 import { supabase } from "../lib/supabaseClient";
 
@@ -15,7 +15,7 @@ export function useAuthorization({ copy, dashboardModules, form, labels, session
   const [roleForm, setRoleForm] = useState(emptyRoleForm);
   const [managedUserForm, setManagedUserForm] = useState(emptyManagedUserForm);
 
-  useEffect(() => {
+  const onSessionChange = useEffectEvent((session) => {
     if (!session || !supabase) {
       setCurrentProfile(null);
       setAuthorizationAccess({ read: false, write: false });
@@ -26,6 +26,10 @@ export function useAuthorization({ copy, dashboardModules, form, labels, session
     }
 
     loadAuthorizationData();
+  });
+
+  useEffect(() => {
+    onSessionChange(session);
   }, [session]);
 
   function updateRoleForm(field, value) {

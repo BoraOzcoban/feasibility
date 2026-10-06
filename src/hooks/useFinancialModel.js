@@ -1,5 +1,5 @@
 // Financial assumptions, extra costs, loans and exchange rates.
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import {
   fetchExchangeRates,
   isMissingExchangeRatesTableError,
@@ -34,6 +34,11 @@ export function useFinancialModel({ copy, currentProfile, labels, markWorkspaceS
   const [financialLoading, setFinancialLoading] = useState(false);
   const [exchangeRates, setExchangeRates] = useState(defaultExchangeRates);
 
+  // In the language selected when the save fails, not when the fetch started.
+  const describeRateSaveError = useEffectEvent(
+    (rates, error) => `${rates.source}, ${copy("could not be saved", "kaydedilemedi")}: ${error.message}`,
+  );
+
   useEffect(() => {
     if (!supabase || !currentProfile?.company_id) return;
 
@@ -61,9 +66,7 @@ export function useFinancialModel({ copy, currentProfile, labels, markWorkspaceS
         try {
           await saveExchangeRatesToSupabase(supabase, currentProfile.company_id, nextRates);
         } catch (saveError) {
-          sourceDetail = isMissingExchangeRatesTableError(saveError)
-            ? ""
-            : `${nextRates.source}, ${copy("could not be saved", "kaydedilemedi")}: ${saveError.message}`;
+          sourceDetail = isMissingExchangeRatesTableError(saveError) ? "" : describeRateSaveError(nextRates, saveError);
         }
 
         setExchangeRates({

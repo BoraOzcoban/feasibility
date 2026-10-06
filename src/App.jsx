@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useEffectEvent, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { supabase } from "./lib/supabaseClient";
 import { defaultFinancialSettings, emptyFinancialExtraCostForm, emptyFinancialModel } from "./lib/financialService";
@@ -258,7 +258,8 @@ function App() {
     salesStrategy,
   });
 
-  useEffect(() => {
+  // Loads every module's data when someone signs in and clears it when they sign out.
+  const onSessionChange = useEffectEvent((session) => {
     if (!session || !supabase) {
       setOperationsWorkspace({
         activePlans: [],
@@ -289,6 +290,10 @@ function App() {
     loadOperationsData();
     loadFinancialData();
     loadPlanningData();
+  });
+
+  useEffect(() => {
+    onSessionChange(session);
   }, [session]);
 
   // With no sections named, every section is recorded.
