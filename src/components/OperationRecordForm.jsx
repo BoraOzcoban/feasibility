@@ -70,7 +70,7 @@ export default function OperationRecordForm({ entity, fields, options = {} }) {
             ) : (
               <input
                 min={field.min ?? 0}
-                step={field.step || "1"}
+                step="any"
                 type={field.type || "text"}
                 value={operationForms[entity][field.name]}
                 onChange={(event) => updateOperationForm(entity, field.name, event.target.value)}

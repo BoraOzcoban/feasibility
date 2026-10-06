@@ -300,7 +300,6 @@ export default function FinancialModellingPage() {
     cogsInflationAnnualPercent: {
       label: copy("COGS inflation % / year", "SMM enflasyonu (% yıllık)"),
       min: "0",
-      step: "0.01",
     },
     discountRateAnnualPercent: {
       info: copy(
@@ -309,11 +308,10 @@ export default function FinancialModellingPage() {
       ),
       label: copy("Discount rate % / year", "İskonto oranı (% yıllık)"),
       min: "0",
-      step: "0.01",
     },
-    electricityPricePerKwh: { label: copy("Electricity kWh price", "Elektrik kWh fiyatı"), min: "0", step: "0.0001" },
-    expenseVatRate: { label: copy("Average expense VAT %", "Ortalama gider KDV oranı (%)"), min: "0", step: "0.01" },
-    incomeTaxRate: { label: copy("Corporate tax %", "Kurumlar vergisi oranı"), min: "0", step: "0.01" },
+    electricityPricePerKwh: { label: copy("Electricity kWh price", "Elektrik kWh fiyatı"), min: "0" },
+    expenseVatRate: { label: copy("Average expense VAT %", "Ortalama gider KDV oranı (%)"), min: "0" },
+    incomeTaxRate: { label: copy("Corporate tax %", "Kurumlar vergisi oranı"), min: "0" },
     increaseFrequency: {
       label: copy("Increase frequency", "Artış sıklığı"),
       options: [
@@ -331,12 +329,10 @@ export default function FinancialModellingPage() {
       ),
       label: copy("Initial cash", "Başlangıç nakdi"),
       min: "0",
-      step: "1000",
     },
     initialCapacityUnits: {
       label: copy("Initial capacity (month 1)", "Başlangıç kapasitesi (Ay 1)"),
       min: "0",
-      step: "1",
     },
     investmentGrantAmount: {
       info: copy(
@@ -345,7 +341,6 @@ export default function FinancialModellingPage() {
       ),
       label: copy("Investment / grant to receive", "Alınacak yatırım / hibe"),
       min: "0",
-      step: "1000",
     },
     monthlyCurrencyIncreasePercent: {
       info: copy(
@@ -354,7 +349,6 @@ export default function FinancialModellingPage() {
       ),
       label: copy("Monthly FX increase %", "Aylık döviz artışı %"),
       min: "0",
-      step: "0.01",
     },
     monthlyEnergyPriceIncreasePercent: {
       info: copy(
@@ -363,7 +357,6 @@ export default function FinancialModellingPage() {
       ),
       label: copy("Monthly energy price increase %", "Aylık enerji fiyat artışı %"),
       min: "0",
-      step: "0.01",
     },
     monthlyInflationPercent: {
       info: copy(
@@ -372,24 +365,20 @@ export default function FinancialModellingPage() {
       ),
       label: copy("Monthly inflation %", "Aylık enflasyon %"),
       min: "0",
-      step: "0.01",
     },
     monthlyWageIncreasePercent: {
       label: copy("Monthly wage increase %", "Aylık ücret artışı %"),
       min: "0",
-      step: "0.01",
     },
     opexInflationAnnualPercent: {
       label: copy("OpEx inflation % / year", "OpEx enflasyonu (% yıllık)"),
       min: "0",
-      step: "0.01",
     },
     priceIncreaseAnnualPercent: {
       label: copy("Price increase policy % / year", "Fiyat artış politikası (% yıllık)"),
       min: "0",
-      step: "0.01",
     },
-    rawMaterialBufferMonths: { label: copy("Material buffer months", "Malzeme tampon ay"), min: "0", step: "0.1" },
+    rawMaterialBufferMonths: { label: copy("Material buffer months", "Malzeme tampon ay"), min: "0" },
     rawMaterialStockDays: {
       info: copy(
         "Extra days of material held before sale. More stock days increase working capital need.",
@@ -397,7 +386,6 @@ export default function FinancialModellingPage() {
       ),
       label: copy("Raw material stock holding days", "Hammadde stok tutma süresi (gün)"),
       min: "0",
-      step: "1",
     },
     receivablesCollectionDays: {
       info: copy(
@@ -406,16 +394,14 @@ export default function FinancialModellingPage() {
       ),
       label: copy("Receivables collection days", "Alacak tahsil süresi (gün)"),
       min: "0",
-      step: "1",
     },
-    rentBufferMonths: { label: copy("Rent buffer months", "Kira tampon ay"), min: "0", step: "0.1" },
-    salaryBufferMonths: { label: copy("Salary buffer months", "Maaş tampon ay"), min: "0", step: "0.1" },
-    salesVatRate: { label: copy("Average sales VAT %", "Ortalama satış KDV oranı (%)"), min: "0", step: "0.01" },
-    supplierPaymentDays: { label: copy("Supplier payment days", "Tedarikçi ödeme süresi (gün)"), min: "0", step: "1" },
+    rentBufferMonths: { label: copy("Rent buffer months", "Kira tampon ay"), min: "0" },
+    salaryBufferMonths: { label: copy("Salary buffer months", "Maaş tampon ay"), min: "0" },
+    salesVatRate: { label: copy("Average sales VAT %", "Ortalama satış KDV oranı (%)"), min: "0" },
+    supplierPaymentDays: { label: copy("Supplier payment days", "Tedarikçi ödeme süresi (gün)"), min: "0" },
     taxPaymentDelayMonths: {
       label: copy("Tax payment delay months", "Vergi ödeme gecikmesi (ay)"),
       min: "0",
-      step: "1",
     },
     workingDaysPerMonth: {
       info: copy(
@@ -424,7 +410,6 @@ export default function FinancialModellingPage() {
       ),
       label: copy("Working days / month", "Aylık çalışma günü"),
       min: "1",
-      step: "1",
     },
   };
   const renderFinancialField = (field, isRequired) => {
@@ -457,7 +442,7 @@ export default function FinancialModellingPage() {
             aria-required={isRequired}
             min={config.min}
             required={isRequired}
-            step={config.step}
+            step="any"
             type="number"
             value={financialSettingsForm[field] ?? ""}
             onChange={(event) => setFinancialSettingsForm((current) => ({ ...current, [field]: event.target.value }))}
@@ -668,7 +653,7 @@ export default function FinancialModellingPage() {
             <span>{copy("Amount", "Tutar")}</span>
             <input
               min="0"
-              step="0.01"
+              step="any"
               type="number"
               value={financialExtraCostForm.amount}
               onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, amount: event.target.value }))}
@@ -1021,7 +1006,7 @@ export default function FinancialModellingPage() {
                         <input
                           min="0"
                           required
-                          step="0.01"
+                          step="any"
                           type="number"
                           value={loan.annualInterestRate ?? ""}
                           onChange={(event) => updateFinancialLoanRow(index, "annualInterestRate", event.target.value)}
@@ -1035,7 +1020,7 @@ export default function FinancialModellingPage() {
                         <input
                           min="0"
                           required
-                          step="1"
+                          step="any"
                           type="number"
                           value={loan.gracePeriodMonths ?? 0}
                           onChange={(event) => updateFinancialLoanRow(index, "gracePeriodMonths", event.target.value)}
@@ -1049,7 +1034,7 @@ export default function FinancialModellingPage() {
                         <input
                           min="1"
                           required
-                          step="1"
+                          step="any"
                           type="number"
                           value={loan.loanTermMonths ?? ""}
                           onChange={(event) => updateFinancialLoanRow(index, "loanTermMonths", event.target.value)}

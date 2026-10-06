@@ -233,7 +233,7 @@ export default function ProductsPage() {
                 </span>
                 <input
                   min="0"
-                  step="0.01"
+                  step="any"
                   type="number"
                   value={operationForms.product.price}
                   onChange={(event) => updateOperationForm("product", "price", event.target.value)}
@@ -323,7 +323,7 @@ export default function ProductsPage() {
                 </span>
                 <input
                   min="1"
-                  step="1"
+                  step="any"
                   disabled={operationForms.product.defaultFlowStrategy === "push"}
                   type="number"
                   value={operationForms.product.defaultBatchSize}
@@ -343,7 +343,7 @@ export default function ProductsPage() {
                 </span>
                 <input
                   min="1"
-                  step="1"
+                  step="any"
                   disabled={operationForms.product.defaultFlowStrategy === "push"}
                   type="number"
                   value={operationForms.product.minimumTransferQuantity}
@@ -364,7 +364,7 @@ export default function ProductsPage() {
                 <input
                   disabled={operationForms.product.defaultFlowStrategy === "push"}
                   min="0"
-                  step="1"
+                  step="any"
                   type="number"
                   value={
                     operationForms.product.defaultFlowStrategy === "push"
@@ -420,7 +420,7 @@ export default function ProductsPage() {
                           <span>{copy("Quantity per unit", "Birim başına miktar")}</span>
                           <input
                             min="0"
-                            step="0.0001"
+                            step="any"
                             type="number"
                             value={row.quantityPerUnit ?? ""}
                             onChange={(event) => updateProductMaterialRow(index, "quantityPerUnit", event.target.value)}
@@ -556,7 +556,7 @@ export default function ProductsPage() {
                             <span>{copy("Machine hours", "Makine saati")}</span>
                             <input
                               min="0"
-                              step="0.25"
+                              step="any"
                               type="number"
                               value={row.dailyHours ?? ""}
                               onChange={(event) => updateProductProcessRow(index, "dailyHours", event.target.value)}
@@ -599,7 +599,7 @@ export default function ProductsPage() {
                             <span>{copy("Recipe qty", "Reçete miktarı")}</span>
                             <input
                               min="0"
-                              step="0.0001"
+                              step="any"
                               type="number"
                               value={row.materialQuantityPerUnit ?? recipeMaterial?.quantityPerUnit ?? ""}
                               onChange={(event) =>
@@ -640,7 +640,7 @@ export default function ProductsPage() {
                             <span>{copy("People", "Kişi")}</span>
                             <input
                               min="0"
-                              step="1"
+                              step="any"
                               type="number"
                               value={row.peopleAssigned ?? ""}
                               onChange={(event) => updateProductProcessRow(index, "peopleAssigned", event.target.value)}
@@ -650,7 +650,7 @@ export default function ProductsPage() {
                             <span>{copy("Crew hours", "Ekip saati")}</span>
                             <input
                               min="0"
-                              step="0.25"
+                              step="any"
                               type="number"
                               value={row.workforceDailyHours ?? ""}
                               onChange={(event) =>
@@ -662,7 +662,7 @@ export default function ProductsPage() {
                             <span>{copy("Capacity", "Kapasite")}</span>
                             <input
                               min="1"
-                              step="1"
+                              step="any"
                               type="number"
                               value={row.capacity ?? ""}
                               onChange={(event) => updateProductProcessRow(index, "capacity", event.target.value)}
@@ -672,7 +672,7 @@ export default function ProductsPage() {
                             <span>{copy("Setup min", "Setup dk")}</span>
                             <input
                               min="0"
-                              step="0.1"
+                              step="any"
                               type="number"
                               value={row.setupMinutes ?? ""}
                               onChange={(event) => updateProductProcessRow(index, "setupMinutes", event.target.value)}

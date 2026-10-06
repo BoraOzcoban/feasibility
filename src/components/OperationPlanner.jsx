@@ -523,7 +523,7 @@ export default function OperationPlanner() {
                             <span>{copy("Machine hours", "Makine saati")}</span>
                             <input
                               min="0"
-                              step="0.25"
+                              step="any"
                               type="number"
                               value={row.dailyHours ?? ""}
                               onChange={(event) =>
@@ -565,7 +565,7 @@ export default function OperationPlanner() {
                             <span>{copy("Recipe qty", "Reçete miktarı")}</span>
                             <input
                               min="0"
-                              step="0.0001"
+                              step="any"
                               type="number"
                               value={row.materialQuantityPerUnit ?? ""}
                               onChange={(event) =>
@@ -615,7 +615,7 @@ export default function OperationPlanner() {
                             <span>{copy("People", "Kişi")}</span>
                             <input
                               min="0"
-                              step="1"
+                              step="any"
                               type="number"
                               value={row.peopleAssigned ?? ""}
                               onChange={(event) =>
@@ -627,7 +627,7 @@ export default function OperationPlanner() {
                             <span>{copy("Crew hours", "Ekip saati")}</span>
                             <input
                               min="0"
-                              step="0.25"
+                              step="any"
                               type="number"
                               value={row.workforceDailyHours ?? ""}
                               onChange={(event) =>
@@ -649,7 +649,7 @@ export default function OperationPlanner() {
                               <span>{copy("Capacity", "Kapasite")}</span>
                               <input
                                 min="1"
-                                step="1"
+                                step="any"
                                 type="number"
                                 value={row.capacity ?? ""}
                                 onChange={(event) =>
@@ -661,7 +661,7 @@ export default function OperationPlanner() {
                               <span>{copy("Setup min", "Setup dk")}</span>
                               <input
                                 min="0"
-                                step="0.1"
+                                step="any"
                                 type="number"
                                 value={row.setupMinutes ?? ""}
                                 onChange={(event) =>
@@ -738,7 +738,7 @@ export default function OperationPlanner() {
                       <input
                         disabled={operationPlan.flowStrategy === "push"}
                         min="1"
-                        step="1"
+                        step="any"
                         type="number"
                         value={operationPlan.batchSize ?? ""}
                         onChange={(event) => updateOperationPlan("batchSize", event.target.value)}
@@ -751,7 +751,7 @@ export default function OperationPlanner() {
                       <input
                         disabled={operationPlan.flowStrategy === "push"}
                         min="1"
-                        step="1"
+                        step="any"
                         type="number"
                         value={operationPlan.minimumTransferQuantity ?? ""}
                         onChange={(event) => updateOperationPlan("minimumTransferQuantity", event.target.value)}
@@ -764,7 +764,7 @@ export default function OperationPlanner() {
                       <input
                         disabled={operationPlan.flowStrategy === "push"}
                         min="0"
-                        step="1"
+                        step="any"
                         type="number"
                         value={operationPlan.flowStrategy === "push" ? 0 : (operationPlan.safetyStockQuantity ?? "")}
                         onChange={(event) => updateOperationPlan("safetyStockQuantity", event.target.value)}
@@ -782,7 +782,7 @@ export default function OperationPlanner() {
                     <div>
                       <input
                         min="0"
-                        step="1"
+                        step="any"
                         type="number"
                         value={operationPlan.bufferMaxQuantity ?? ""}
                         onChange={(event) => updateOperationPlan("bufferMaxQuantity", event.target.value)}
@@ -794,7 +794,7 @@ export default function OperationPlanner() {
                     <div>
                       <input
                         min="0"
-                        step="0.01"
+                        step="any"
                         type="number"
                         value={operationPlan.waitingCostPerHour ?? ""}
                         onChange={(event) => updateOperationPlan("waitingCostPerHour", event.target.value)}
@@ -806,7 +806,7 @@ export default function OperationPlanner() {
                     <div>
                       <input
                         min="0"
-                        step="0.01"
+                        step="any"
                         type="number"
                         value={operationPlan.inventoryCostPerUnitHour ?? ""}
                         onChange={(event) => updateOperationPlan("inventoryCostPerUnitHour", event.target.value)}
@@ -818,7 +818,7 @@ export default function OperationPlanner() {
                     <div>
                       <input
                         min="0"
-                        step="0.01"
+                        step="any"
                         type="number"
                         value={operationPlan.delayCostPerHour ?? ""}
                         onChange={(event) => updateOperationPlan("delayCostPerHour", event.target.value)}
@@ -830,7 +830,7 @@ export default function OperationPlanner() {
                     <div>
                       <input
                         min="0"
-                        step="0.01"
+                        step="any"
                         type="number"
                         value={operationPlan.capacityLossCostPerHour ?? ""}
                         onChange={(event) => updateOperationPlan("capacityLossCostPerHour", event.target.value)}

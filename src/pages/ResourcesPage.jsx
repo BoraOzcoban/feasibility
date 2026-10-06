@@ -174,7 +174,7 @@ export default function ResourcesPage() {
                 </span>
                 <input
                   min="0"
-                  step="0.01"
+                  step="any"
                   type="number"
                   value={operationForms.material.pricePerUnit}
                   onChange={(event) => updateOperationForm("material", "pricePerUnit", event.target.value)}
@@ -255,7 +255,7 @@ export default function ResourcesPage() {
                 </span>
                 <input
                   min="0"
-                  step="1"
+                  step="any"
                   type="number"
                   value={operationForms.workforce.hourlyCost}
                   onChange={(event) => updateOperationForm("workforce", "hourlyCost", event.target.value)}

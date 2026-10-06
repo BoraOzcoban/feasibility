@@ -28,7 +28,6 @@ export default function MachinesEquipmentPage() {
       ),
       name: "price",
       label: copy("Machine price", "Makine fiyatı"),
-      step: "0.01",
       type: "number",
     },
     {
@@ -44,7 +43,6 @@ export default function MachinesEquipmentPage() {
     {
       name: "hourlyEnergyConsumptionKwh",
       label: copy("Hourly energy consumption", "Saatlik enerji tüketimi"),
-      step: "0.01",
       type: "number",
     },
     {
@@ -54,7 +52,6 @@ export default function MachinesEquipmentPage() {
       ),
       name: "concurrentCapacity",
       label: copy("Concurrent capacity", "Eş zamanlı kapasite"),
-      step: "1",
       type: "number",
     },
     {
@@ -64,7 +61,6 @@ export default function MachinesEquipmentPage() {
       ),
       name: "availabilityHours",
       label: copy("Availability hours", "Çalışma saati"),
-      step: "0.25",
       type: "number",
     },
     {
@@ -74,7 +70,6 @@ export default function MachinesEquipmentPage() {
       ),
       name: "failureProbabilityPercent",
       label: copy("Failure probability %", "Arıza ihtimali %"),
-      step: "0.01",
       type: "number",
     },
   ];
@@ -87,7 +82,6 @@ export default function MachinesEquipmentPage() {
       ),
       name: "price",
       label: copy("Equipment price", "Ekipman fiyatı"),
-      step: "0.01",
       type: "number",
     },
     {
@@ -100,7 +94,7 @@ export default function MachinesEquipmentPage() {
       options: operationCurrencyOptions,
       type: "select",
     },
-    { name: "quantity", label: copy("Equipment quantity", "Ekipman miktarı"), step: "1", type: "number" },
+    { name: "quantity", label: copy("Equipment quantity", "Ekipman miktarı"), type: "number" },
   ];
   const machineColumns = [
     { header: copy("Machine", "Makine"), key: "machine", render: (row) => row.name, value: (row) => row.name },
