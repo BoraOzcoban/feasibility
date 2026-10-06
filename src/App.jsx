@@ -3571,6 +3571,16 @@ function App() {
     return columns;
   };
 
+  // "1.2fr" becomes "minmax(144px, 1.2fr)" so a column never shrinks until its
+  // header breaks letter by letter; the table scrolls sideways instead.
+  const getReadableGridTrack = (track) => {
+    const match = /^([\d.]+)fr$/.exec(String(track).trim());
+    if (!match) return { minWidth: 120, track };
+    const fraction = Number(match[1]);
+    const minWidth = Math.round(Math.min(240, Math.max(96, fraction * 120)));
+    return { minWidth, track: `minmax(${minWidth}px, ${fraction}fr)` };
+  };
+
   const getVisibleTableGridTemplate = (tableId, columns, gridTemplateColumns, includeRowActions = true) => {
     const control = tableControls[tableId] || {};
     const hiddenColumns = new Set(getHiddenTableColumns(control));
@@ -3581,47 +3591,15 @@ function App() {
         template: templateParts[index] || "minmax(120px, 1fr)",
       }))
       .filter((item) => !hiddenColumns.has(item.key))
-      .map((item) => item.template);
+      .map((item) => getReadableGridTrack(item.template).track);
 
-    return [...visibleTemplateParts, ...(includeRowActions ? ["40px"] : [])].join(" ");
+    return [...visibleTemplateParts, ...(includeRowActions ? ["72px"] : [])].join(" ");
   };
 
-  const hideTableColumn = (tableId, columns, key) => {
-    setTableControls((current) => {
-      const control = current[tableId] || {};
-      const hiddenColumns = getHiddenTableColumns(control);
-      const visibleColumnCount = columns.filter((column, index) => !hiddenColumns.includes(getTableColumnKey(column, index))).length;
-
-      if (hiddenColumns.includes(key) || visibleColumnCount <= 1) {
-        return current;
-      }
-
-      return {
-        ...current,
-        [tableId]: {
-          ...control,
-          direction: control.sortKey === key ? undefined : control.direction,
-          hiddenColumns: [...hiddenColumns, key],
-          sortKey: control.sortKey === key ? undefined : control.sortKey,
-        },
-      };
-    });
-  };
-
-  const hideTableRow = (tableId, rowKey) => {
-    setTableControls((current) => {
-      const control = current[tableId] || {};
-      const hiddenRows = getHiddenTableRows(control);
-      if (hiddenRows.includes(rowKey)) return current;
-
-      return {
-        ...current,
-        [tableId]: {
-          ...control,
-          hiddenRows: [...hiddenRows, rowKey],
-        },
-      };
-    });
+  const getTableMinWidth = (columns, gridTemplateColumns, includeRowActions) => {
+    const templateParts = splitGridTemplateColumns(gridTemplateColumns);
+    const columnsWidth = columns.reduce((total, _column, index) => total + getReadableGridTrack(templateParts[index] || "1fr").minWidth, 0);
+    return columnsWidth + (includeRowActions ? 72 : 0) + (columns.length * 10) + 20;
   };
 
   const resetTableHiding = (tableId) => {
@@ -3715,16 +3693,16 @@ function App() {
     );
   };
 
-  const renderSortableTableHead = (tableId, columns, gridTemplateColumns) => {
+  const renderSortableTableHead = (tableId, columns, gridTemplateColumns, hasRowActions = false, minWidth = undefined) => {
     const control = tableControls[tableId] || {};
     const hiddenColumns = new Set(getHiddenTableColumns(control));
     const visibleColumns = columns
       .map((column, index) => ({ column, index, key: getTableColumnKey(column, index) }))
       .filter((item) => !hiddenColumns.has(item.key));
-    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns);
+    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns, hasRowActions);
 
     return (
-      <div className="operation-data-row operation-data-head sortable-table-head" style={{ gridTemplateColumns: visibleGridTemplateColumns }}>
+      <div className="operation-data-row operation-data-head sortable-table-head" style={{ gridTemplateColumns: visibleGridTemplateColumns, minWidth }}>
         {visibleColumns.map(({ column, index, key }) => {
           const active = control.sortKey === key;
 
@@ -3739,19 +3717,10 @@ function App() {
                 <span>{column.header}</span>
                 {column.sortable !== false && <small className="sort-indicator" aria-hidden="true">{getTableSortIndicator(control, key)}</small>}
               </button>
-              <button
-                type="button"
-                className="table-hide-button"
-                disabled={visibleColumns.length <= 1}
-                aria-label={`${copy("Hide column", "Kolonu gizle")}: ${normalizeTableValue(column.header)}`}
-                onClick={() => hideTableColumn(tableId, columns, key)}
-              >
-                ◉
-              </button>
             </div>
           );
         })}
-        <span className="table-row-action-head" aria-hidden="true">−</span>
+        {hasRowActions && <span className="table-row-action-head" aria-hidden="true" />}
       </div>
     );
   };
@@ -3769,14 +3738,16 @@ function App() {
   }) => {
     const visibleRows = getSortableTableRows(tableId, rows, columns, getRowKey);
     const visibleColumns = getVisibleTableColumns(tableId, columns);
-    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns);
+    const hasRowActions = Boolean(onDeleteRow);
+    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns, hasRowActions);
+    const minWidth = getTableMinWidth(visibleColumns, gridTemplateColumns, hasRowActions);
     const displayRows = visibleRows.length ? visibleRows : [{ id: "empty" }];
 
     return (
       <>
         {renderTableToolbar(tableId, rows, visibleRows)}
         <div className="operation-data-table">
-          {renderSortableTableHead(tableId, columns, gridTemplateColumns)}
+          {renderSortableTableHead(tableId, columns, gridTemplateColumns, hasRowActions, minWidth)}
           {displayRows.map((row) => {
             const isEmpty = row.id === "empty";
             const rowKey = isEmpty ? `${tableId}-empty` : getRowKey(row);
@@ -3786,7 +3757,7 @@ function App() {
                 role={useButtonRows && !isEmpty ? "button" : undefined}
                 tabIndex={useButtonRows && !isEmpty ? 0 : undefined}
                 className={`operation-data-row${useButtonRows ? " operation-data-button-row" : ""}${isEmpty ? " table-empty-row" : ""}`}
-                style={{ gridTemplateColumns: visibleGridTemplateColumns }}
+                style={{ gridTemplateColumns: visibleGridTemplateColumns, minWidth }}
                 key={rowKey}
                 onClick={useButtonRows ? () => {
                   if (!isEmpty && onRowClick) onRowClick(row);
@@ -3804,13 +3775,14 @@ function App() {
                   <>
                     {visibleColumns.map((column) => {
                       const originalIndex = columns.indexOf(column);
+                      const text = normalizeTableValue(getTableCellValue(column, row));
                       return (
-                        <span key={getTableColumnKey(column, originalIndex)}>
-                          {column.render ? column.render(row) : normalizeTableValue(getTableCellValue(column, row))}
+                        <span className="operation-data-cell" key={getTableColumnKey(column, originalIndex)} title={text || undefined}>
+                          {column.render ? column.render(row) : text}
                         </span>
                       );
                     })}
-                    {onDeleteRow ? (
+                    {onDeleteRow && (
                       <button
                         type="button"
                         className="table-delete-button"
@@ -3822,18 +3794,6 @@ function App() {
                         }}
                       >
                         {copy("Delete", "Sil")}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="table-hide-button row-hide-button"
-                        aria-label={copy("Hide row", "Satırı gizle")}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          hideTableRow(tableId, String(rowKey));
-                        }}
-                      >
-                        ◉
                       </button>
                     )}
                   </>
@@ -3863,7 +3823,7 @@ function App() {
       .map((column, index) => ({ column, index, key: getTableColumnKey(column, index) }))
       .filter((item) => !hiddenColumns.has(item.key));
     const visibleRows = getSortableTableRows(tableId, rows, columns, getRowKey);
-    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns);
+    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns, false);
 
     return (
       <>
@@ -3884,19 +3844,9 @@ function App() {
                     <span>{column.header}</span>
                     {column.sortable !== false && <small className="sort-indicator" aria-hidden="true">{getTableSortIndicator(control, key)}</small>}
                   </button>
-                  <button
-                    type="button"
-                    className="table-hide-button"
-                    disabled={visibleColumns.length <= 1}
-                    aria-label={`${copy("Hide column", "Kolonu gizle")}: ${normalizeTableValue(column.header)}`}
-                    onClick={() => hideTableColumn(tableId, columns, key)}
-                  >
-                    ◉
-                  </button>
                 </div>
               );
             })}
-            <span className="table-row-action-head" aria-hidden="true">−</span>
           </div>
           {(visibleRows.length ? visibleRows : [{ id: "empty" }]).map((row) => (
             <div className={`${rowClassName}${row.id === "empty" ? " table-empty-row" : ""}`} style={{ gridTemplateColumns: visibleGridTemplateColumns }} key={row.id === "empty" ? `${tableId}-empty` : getRowKey(row)}>
@@ -3909,14 +3859,6 @@ function App() {
                     const CellTag = index === 0 && (rowClassName.includes("users-row") || rowClassName.includes("permissions-row")) ? "strong" : "span";
                     return <CellTag key={key}>{content}</CellTag>;
                   })}
-                  <button
-                    type="button"
-                    className="table-hide-button row-hide-button"
-                    aria-label={copy("Hide row", "Satırı gizle")}
-                    onClick={() => hideTableRow(tableId, String(getRowKey(row)))}
-                  >
-                    ◉
-                  </button>
                 </>
               )}
             </div>
@@ -5357,7 +5299,7 @@ function App() {
             </article>
             <article className="operation-card process-summary-card">
               <span>{copy("Total Production", "Toplam Üretim")}</span>
-              <strong>{formatNumber(activePlans.reduce((total, plan) => total + (Number(plan.result?.producedQuantity) || 0), 0), 2)}</strong>
+              <strong>{formatQuantity(activePlans.reduce((total, plan) => total + (Number(plan.result?.producedQuantity) || 0), 0), activePlans[0]?.result?.productUnit)}</strong>
             </article>
             <article className="operation-card process-summary-card">
               <span>{copy("Daily Production Cost", "Günlük Üretim Maliyeti")}</span>
@@ -5379,6 +5321,9 @@ function App() {
               const materialRows = Array.isArray(result.materialRows) ? result.materialRows : [];
               const operationRows = Array.isArray(result.operationRows) ? result.operationRows : [];
               const bufferRows = Array.isArray(result.bufferRows) ? result.bufferRows : [];
+              // Plans calculated by the database function store no step or
+              // buffer rows; say so instead of showing "- / 0 min".
+              const missingFlowDetail = copy("Step detail is not stored for this plan.", "Bu planda adım ayrıntısı saklanmıyor.");
 
               return (
                 <article className="operation-card process-card" key={plan.id}>
@@ -5409,15 +5354,16 @@ function App() {
                   <div className="process-detail-grid">
                     <div>
                       <h3>{copy("Operations", "Operasyonlar")}</h3>
-                      {(operationRows.length ? operationRows : [{ operationId: "empty", operationName: "-", machineName: "-", busyMinutes: 0 }]).map((row, index) => (
+                      {operationRows.length ? operationRows.map((row, index) => (
                         <span key={row.operationId || `operation-${index}`}>
                           {row.operationName} <strong>{row.machineName || "-"} / {formatMinutesDuration(row.busyMinutes || 0)}</strong>
                         </span>
-                      ))}
+                      )) : <p className="planner-empty-state">{missingFlowDetail}</p>}
                     </div>
                     <div>
                       <h3>{copy("Buffers", "Buffer")}</h3>
-                      {(bufferRows.length ? bufferRows : [{ fromOperationName: "-", toOperationName: "-", maxWip: 0 }]).map((row, index) => (
+                      {!bufferRows.length && <p className="planner-empty-state">{missingFlowDetail}</p>}
+                      {bufferRows.map((row, index) => (
                         <span key={`${row.fromOperationName}-${row.toOperationName}-${index}`}>
                           {row.fromOperationName} -&gt; {row.toOperationName} <strong>{formatQuantity(row.maxWip, productUnit)} WIP / {formatQuantity(row.safetyStockQuantity, productUnit)} {copy("safety", "güvenli")}</strong>
                         </span>

@@ -24066,3 +24066,31 @@ body > .floating-info-tip-panel,
   background: var(--decision-risky);
   color: #ffffff;
 }
+
+/* Data tables: each column keeps a readable minimum width (set inline from
+   the grid template) and the table scrolls sideways instead of squeezing
+   headers into one letter per line. Long cells stop after three lines; the
+   full text is in the cell's title. */
+.operation-data-table {
+  /* The list card is stretched to the form's height; rows must not stretch with it. */
+  align-content: start;
+  overflow-x: auto;
+}
+
+.operation-data-table-card {
+  align-content: start;
+}
+
+.operation-data-table .sortable-heading-cell,
+.operation-data-table .sort-heading-button span {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.operation-data-table .operation-data-cell {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
