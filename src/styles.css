@@ -17738,18 +17738,6 @@ body > .floating-info-tip-panel,
   font-weight: 780;
 }
 
-.dashboard-shell .finance-model-chart .chart-area-fill {
-  opacity: 0;
-  transform: scaleX(0.04);
-  transform-box: fill-box;
-  transform-origin: left bottom;
-}
-
-.dashboard-shell .finance-model-chart .chart-draw-line {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-}
-
 .dashboard-shell .finance-model-chart .trend-line {
   filter: drop-shadow(0 10px 12px rgba(8, 12, 18, 0.14));
   stroke-width: 5.2;
@@ -17761,22 +17749,6 @@ body > .floating-info-tip-panel,
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 11;
-}
-
-.dashboard-shell .finance-model-chart .trend-point {
-  opacity: 0;
-  transform: scale(0.5);
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.dashboard-shell .finance-model-chart .chart-badge-connector {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-}
-
-.dashboard-shell .finance-model-chart .chart-value-badge {
-  opacity: 0;
 }
 
 .dashboard-shell .finance-model-chart .chart-value-badge rect {
@@ -17799,64 +17771,6 @@ body > .floating-info-tip-panel,
 .dashboard-shell .finance-model-chart .chart-value-badge.costs rect {
   fill: rgba(217, 154, 36, 0.22);
   stroke: rgba(255, 197, 112, 0.42);
-}
-
-.dashboard-shell .financial-trend-stage.is-visible .chart-area-fill {
-  animation: trendAreaReveal 950ms cubic-bezier(0.2, 0.8, 0.2, 1) 260ms forwards;
-}
-
-.dashboard-shell .financial-trend-stage.is-visible .chart-draw-line {
-  animation: trendLineDraw 1250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.dashboard-shell .financial-trend-stage.is-visible .trend-point {
-  animation-name: trendPointPop;
-  animation-duration: 360ms;
-  animation-fill-mode: forwards;
-  animation-timing-function: cubic-bezier(0.2, 0.9, 0.26, 1.28);
-}
-
-.dashboard-shell .financial-trend-stage.is-visible .chart-badge-connector {
-  animation: trendLineDraw 560ms ease 950ms forwards;
-}
-
-.dashboard-shell .financial-trend-stage.is-visible .chart-value-badge {
-  animation: trendBadgeIn 420ms ease 1080ms forwards;
-}
-
-@keyframes trendLineDraw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes trendAreaReveal {
-  to {
-    opacity: 1;
-    transform: scaleX(1);
-  }
-}
-
-@keyframes trendPointPop {
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes trendBadgeIn {
-  to {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dashboard-shell .financial-trend-stage :is(.chart-draw-line, .chart-area-fill, .trend-point, .chart-badge-connector, .chart-value-badge) {
-    animation: none !important;
-    opacity: 1 !important;
-    stroke-dashoffset: 0 !important;
-    transform: none !important;
-  }
 }
 
 .feasibility-dashboard .dashboard-assumption-strip {
@@ -24093,4 +24007,111 @@ body > .floating-info-tip-panel,
   display: -webkit-box;
   overflow: hidden;
   overflow-wrap: break-word;
+}
+
+/* Simulation: with the 250px sidebar the content area at 1440px is ~1070px,
+   so the three columns must be able to share it; below 1360px the summary
+   column moves under the other two. */
+.dashboard-shell .simulation-workspace .monte-carlo-grid {
+  grid-template-columns: minmax(240px, 0.72fr) minmax(0, 1.55fr) minmax(240px, 0.78fr);
+}
+
+@media (max-width: 1360px) {
+  .dashboard-shell .simulation-workspace .monte-carlo-grid {
+    grid-template-columns: minmax(240px, 0.82fr) minmax(0, 1.18fr);
+  }
+
+  .dashboard-shell .simulation-workspace .simulation-side {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard-shell .simulation-workspace .simulation-used-params {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 920px) {
+  .dashboard-shell .simulation-workspace .monte-carlo-grid,
+  .dashboard-shell .simulation-workspace .simulation-side {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shell .simulation-workspace .simulation-used-params {
+    grid-column: auto;
+  }
+}
+
+/* Amounts never break in the middle of a number. */
+.percentile-grid strong,
+.monte-carlo-stat strong {
+  font-size: clamp(0.95rem, 1.4vw, 1.25rem);
+  white-space: nowrap;
+}
+
+.sim-income-table strong {
+  font-size: clamp(0.85rem, 1.1vw, 1.05rem);
+  white-space: nowrap;
+}
+
+.dashboard-shell .simulation-workspace .percentile-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-shell .simulation-workspace .risk-card strong {
+  font-size: clamp(1.1rem, 2vw, 1.6rem);
+  white-space: nowrap;
+}
+
+.sim-income-table span {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* Status colours carry meaning (Hande design language): green = ready,
+   yellow = needs input. Red is reserved for "risky". */
+.dashboard-shell .reports-workspace .reports-readiness-card .schedule-row mark.status-badge.ready,
+.schedule-row mark.status-badge.ready {
+  background: color-mix(in srgb, var(--decision-feasible) 16%, #ffffff);
+  border-color: color-mix(in srgb, var(--decision-feasible) 40%, transparent);
+  color: #006b27;
+}
+
+.dashboard-shell .reports-workspace .reports-readiness-card .schedule-row mark.status-badge.needed,
+.schedule-row mark.status-badge.needed {
+  background: color-mix(in srgb, var(--decision-wait) 26%, #ffffff);
+  border-color: color-mix(in srgb, var(--decision-wait) 60%, transparent);
+  color: #6b4e00;
+}
+
+/* Up to 1024px the menu is a narrow rail; opening it lays the full menu over
+   the page instead of squeezing the content into a 120px column. */
+@media (max-width: 1024px) {
+  .dashboard-shell,
+  .dashboard-shell.sidebar-open,
+  .dashboard-shell.sidebar-collapsed {
+    grid-template-columns: var(--dashboard-sidebar-closed-width) minmax(0, 1fr);
+  }
+
+  .dashboard-shell.sidebar-open .dashboard-sidebar {
+    box-shadow: 0 0 0 100vmax rgba(5, 5, 9, 0.55);
+    width: var(--dashboard-sidebar-width);
+    z-index: 60;
+  }
+}
+
+/* Login: one solid primary button in the brand colour (Pantone 2965 C). */
+.auth-shell .auth-panel .auth-form button[type="submit"] {
+  background: #00263e;
+  border: 1px solid #00263e;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+.auth-shell .auth-panel .auth-form button[type="submit"]:hover {
+  background: #003a5d;
+}
+
+.auth-shell .auth-panel .brand-bar {
+  margin-bottom: 20px;
 }

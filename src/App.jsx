@@ -1389,7 +1389,8 @@ function App() {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [currentProfile, setCurrentProfile] = useState(null);
-  const [dashboardSidebarOpen, setDashboardSidebarOpen] = useState(true);
+  // Narrow screens start with the menu closed; it overlays the page when opened.
+  const [dashboardSidebarOpen, setDashboardSidebarOpen] = useState(() => typeof window === "undefined" || window.innerWidth > 1024);
   const [dashboardAssumptionMenu, setDashboardAssumptionMenu] = useState(null);
   const [dashboardEditorOpen, setDashboardEditorOpen] = useState(false);
   const [dashboardVisibleSections, setDashboardVisibleSections] = useState(getStoredDashboardVisibleSections);
@@ -1419,8 +1420,6 @@ function App() {
   const [financialStatus, setFinancialStatus] = useState("");
   const [financialLoading, setFinancialLoading] = useState(false);
   const [financialOverviewWidgets, setFinancialOverviewWidgets] = useState([]);
-  const [incomeExpenseChartInView, setIncomeExpenseChartInView] = useState(false);
-  const [incomeExpenseChartNode, setIncomeExpenseChartNode] = useState(null);
   const [exchangeRates, setExchangeRates] = useState(defaultExchangeRates);
   const [financeWindow, setFinanceWindow] = useState("today");
   const [financeDateRange, setFinanceDateRange] = useState({ start: "", end: "" });
@@ -1461,13 +1460,8 @@ function App() {
   const [productFormRef, productListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|product`);
   const [machineFormRef, machineListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|machine`);
   const [equipmentFormRef, equipmentListHeightStyle] = useMatchedPanelHeight(`${heightMatchKey}|equipment`);
-  const incomeExpenseChartRef = useRef(null);
   const workspaceSnapshotRef = useRef("");
   const syncSavedWorkspaceSnapshotRef = useRef(false);
-  const setIncomeExpenseChartElement = useCallback((node) => {
-    incomeExpenseChartRef.current = node;
-    setIncomeExpenseChartNode(node);
-  }, []);
 
   const editableWorkspaceSnapshot = useMemo(() => createUnsavedWorkspaceSnapshot({
     financialExtraCostForm,
@@ -1485,11 +1479,6 @@ function App() {
     simulationVariants,
   ]);
   const hasUnsavedChanges = Boolean(session && savedWorkspaceSnapshot && editableWorkspaceSnapshot !== savedWorkspaceSnapshot);
-
-  const initials = useMemo(() => {
-    const source = form.username || form.email || "A";
-    return source.slice(0, 2).toUpperCase();
-  }, [form.email, form.username]);
 
   useEffect(() => {
     const nextPath = normalizeRoutePath(window.location.pathname);
@@ -1572,33 +1561,6 @@ function App() {
       setProcessDefinitionOpen(false);
     }
   }, [path]);
-
-  useEffect(() => {
-    setIncomeExpenseChartInView(false);
-    const chartNode = incomeExpenseChartNode;
-    if (!chartNode) return undefined;
-    if (!("IntersectionObserver" in window)) {
-      setIncomeExpenseChartInView(true);
-      return undefined;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.22) {
-          setIncomeExpenseChartInView(true);
-          observer.disconnect();
-        }
-      },
-      {
-        root: null,
-        rootMargin: "0px 0px -14% 0px",
-        threshold: [0.22],
-      },
-    );
-
-    observer.observe(chartNode);
-    return () => observer.disconnect();
-  }, [incomeExpenseChartNode, path, financialHorizon]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -1778,6 +1740,7 @@ function App() {
 
     // Redirects replace the history entry so Back does not bounce into them again.
     window.history[options.replace ? "replaceState" : "pushState"]({}, "", nextPath);
+    if (window.innerWidth <= 1024) setDashboardSidebarOpen(false);
     setPath(nextPath);
     setMode(nextMode);
     setStatus("");
@@ -4611,7 +4574,7 @@ function App() {
         <section className="operations-workspace operations-modern operations-entry-page operations-resources-page">
           <div className="operations-header">
             <div>
-              <span>Operations / {copy("Resources", "Kaynak")}</span>
+              <span>{copy("Operations", "Operasyon")} / {copy("Resources", "Kaynak")}</span>
               <h1>{copy("Resources", "Kaynak")}</h1>
               <p>{copy("Add materials, semi-finished items, and services used by production and costing workflows.", "Üretim ve maliyet akışlarında kullanılan malzeme, yarı mamül ve hizmetleri ekleyin.")}</p>
             </div>
@@ -4881,7 +4844,7 @@ function App() {
         <section className="operations-workspace operations-modern operations-entry-page operations-products-page">
           <div className="operations-header">
             <div>
-              <span>Operations / {copy("Products", "Ürünler")}</span>
+              <span>{copy("Operations", "Operasyon")} / {copy("Products", "Ürünler")}</span>
               <h1>{copy("Products", "Ürünler")}</h1>
               <p>{copy("Keep the product recipe, unit, price, cycle time, and default Push/Pull rules used in process calculations.", "Süreç hesaplamalarında kullanılacak ürün reçetesini, birimini, fiyatını, çevrim süresini ve varsayılan İtme/Çekme kurallarını tutun.")}</p>
             </div>
@@ -5282,7 +5245,7 @@ function App() {
         <section className="operations-workspace operations-modern operations-entry-page operations-active-processes-page">
           <div className="operations-header">
             <div>
-              <span>Operations / {copy("Active Processes", "Mevcut Süreçler")}</span>
+              <span>{copy("Operations", "Operasyon")} / {copy("Active Processes", "Mevcut Süreçler")}</span>
               <h1>{copy("Active Processes", "Mevcut Süreçler")}</h1>
               <p>{copy("Track saved production plans and their calculated production and cost results.", "Kaydedilen üretim planlarını ve hesaplanan üretim/maliyet sonuçlarını takip edin.")}</p>
             </div>
@@ -5480,7 +5443,7 @@ function App() {
       }
 
       return (
-        <div className={`financial-trend-stage ${incomeExpenseChartInView ? "is-visible" : ""}`} ref={setIncomeExpenseChartElement} key={chartToken}>
+        <div className="financial-trend-stage" key={chartToken}>
         <svg className="trend-chart finance-model-chart" viewBox="0 0 560 280" role="img" aria-label={ariaLabel}>
           <defs>
             <linearGradient id={incomeSurfaceId} x1="0" x2="0" y1="0" y2="1">
@@ -6910,6 +6873,13 @@ function App() {
       [copy("Marketing budget", "Pazarlama bütçesi"), -marketingBudget],
       [copy("Projected net", "Projeksiyon net"), likelyOutcome.net],
     ];
+    // These three fall back to the linked plan when left at 0; show the value
+    // actually used instead of a misleading 0.
+    const linkedFieldDefaults = {
+      productionUnits: scenarioProductionUnits,
+      salesUnits: scenarioSalesUnits,
+      unitSalesPrice: scenarioUnitSalesPrice,
+    };
     const editableVariantGroups = [
       {
         fields: [
@@ -7132,19 +7102,25 @@ function App() {
               {editableVariantGroups.map((group) => (
                 <div className="parameter-group" key={group.title}>
                   <h3>{group.title}</h3>
-                  {group.fields.map(([field, label, min, max, step]) => (
-                    <label className="sim-input-row" key={field}>
-                      <span>{label}</span>
-                      <input
-                        min={min}
-                        max={max}
-                        step={step}
-                        type="number"
-                        value={parameters[field] ?? ""}
-                        onChange={(event) => updateSimulationParameter(variant.id, field, event.target.value)}
-                      />
-                    </label>
-                  ))}
+                  {group.fields.map(([field, label, min, max, step]) => {
+                    const linkedDefault = linkedFieldDefaults[field];
+                    const usesLinkedDefault = linkedDefault !== undefined && !(Number(parameters[field]) > 0);
+
+                    return (
+                      <label className="sim-input-row" key={field}>
+                        <span>{label}</span>
+                        <input
+                          min={min}
+                          max={max}
+                          step={step}
+                          type="number"
+                          placeholder={usesLinkedDefault ? `${formatNumber(linkedDefault, 2)} (${copy("from plan", "plandan")})` : undefined}
+                          value={usesLinkedDefault ? "" : (parameters[field] ?? "")}
+                          onChange={(event) => updateSimulationParameter(variant.id, field, event.target.value)}
+                        />
+                      </label>
+                    );
+                  })}
                 </div>
               ))}
             </aside>
@@ -7944,7 +7920,7 @@ function App() {
         <section className="operations-workspace operations-modern">
           <div className="operations-header">
             <div>
-              <span>Operations / {activeOperationsSubmodule.label}</span>
+              <span>{copy("Operations", "Operasyon")} / {activeOperationsSubmodule.label}</span>
               <h1>{title}</h1>
               <p>{description}</p>
             </div>
@@ -8026,7 +8002,7 @@ function App() {
         <section className="operations-workspace operations-modern operations-entry-page operations-machines-page">
           <div className="operations-header">
             <div>
-              <span>Operations / {copy("Machines & Equipment", "Makine & Ekipman")}</span>
+              <span>{copy("Operations", "Operasyon")} / {copy("Machines & Equipment", "Makine & Ekipman")}</span>
               <h1>{copy("Machines & Equipment", "Makine & Ekipman")}</h1>
               <p>{copy("Keep machines used in production plans separate from simple equipment records.", "Üretim planlarında kullanılacak makineleri sade ekipman kayıtlarından ayrı tutun.")}</p>
             </div>
@@ -10016,7 +9992,7 @@ function App() {
           <section className="operations-workspace operations-modern operations-process-page">
             <div className="operations-header">
               <div>
-                <span>Operations / {copy("Process Definition", "Süreç Tanımlama")}</span>
+                <span>{copy("Operations", "Operasyon")} / {copy("Process Definition", "Süreç Tanımlama")}</span>
                 <h1>{copy("Process Definition", "Süreç Tanımlama")}</h1>
                 <p>{copy("Build a daily process plan only after the required product, machine, and workforce records exist.", "Gerekli ürün, makine ve işgücü kayıtları oluştuktan sonra günlük süreç planını kurun.")}</p>
               </div>
@@ -10187,15 +10163,15 @@ function App() {
                     <button type="button" onClick={loadPlanningData}>{copy("Refresh", "Yenile")}</button>
                   </div>
                   {[
-                    [copy("Product record", "Ürün kaydı"), operationsWorkspace.product ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
-                    [copy("Process result", "Süreç sonucu"), activePlanResults.length ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
-                    [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
-                    [copy("Financial assumptions", "Finansal varsayımlar"), hasFinancialAssumptions ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")],
-                  ].map(([item, state]) => (
+                    [copy("Product record", "Ürün kaydı"), Boolean(operationsWorkspace.product)],
+                    [copy("Process result", "Süreç sonucu"), activePlanResults.length > 0],
+                    [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast],
+                    [copy("Financial assumptions", "Finansal varsayımlar"), hasFinancialAssumptions],
+                  ].map(([item, ready]) => (
                     <div className="schedule-row" key={item}>
                       <strong>{item}</strong>
-                      <span>{copy("Used only for export", "Sadece export için kullanılır")}</span>
-                      <mark>{state}</mark>
+                      <span>{copy("Used in the report", "Raporda kullanılır")}</span>
+                      <mark className={`status-badge ${ready ? "ready" : "needed"}`}>{ready ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</mark>
                     </div>
                   ))}
                 </article>
@@ -10463,11 +10439,13 @@ function App() {
           </div>
         </header>
 
-        <div className="avatar-zone">
-          <div className="avatar">
-            {profilePreview ? <img src={profilePreview} alt={copy("Profile preview", "Profil önizlemesi")} /> : <span>{initials}</span>}
+        {profilePreview && (
+          <div className="avatar-zone">
+            <div className="avatar">
+              <img src={profilePreview} alt={copy("Profile preview", "Profil önizlemesi")} />
+            </div>
           </div>
-        </div>
+        )}
 
         {session ? (
           <div className="signed-in">
