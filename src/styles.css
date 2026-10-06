@@ -1,3 +1,7 @@
+/* Legacy styles: kept in a cascade layer so the new design-system layers
+   (src/styles/) override them without specificity fights. Being emptied
+   page by page. */
+@layer legacy {
 :root {
   /* Decision colours from the Hande design language (Pantone 354 C, 123 C, 186 C). */
   --decision-feasible: #00b140;
@@ -19851,4 +19855,5 @@ body > .floating-info-tip-panel,
 
 .auth-shell .auth-panel .brand-bar {
   margin-bottom: 20px;
+}
 }

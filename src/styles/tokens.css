@@ -1,0 +1,86 @@
+/* Cascade order: legacy (old styles.css) < skin (new design system). */
+@layer legacy, skin;
+
+/*
+ * Design tokens (Hande design language).
+ *
+ * Colour carries meaning only where it means something: module colours mark
+ * the module, decision colours mark a decision or status, everything else is
+ * navy text on white cards over a light grey page. Pantone values are sRGB
+ * approximations; Hande has the final say.
+ */
+:root {
+  /* Brand and modules */
+  --brand: #00263e; /* 2965 C: headings, primary button, active menu */
+  --brand-hover: #003a5d;
+  --module-simulation: #00a9e0; /* 2995 C */
+  --module-finance: #009a44; /* 347 C */
+  --module-sales: #753bbd; /* 2665 C */
+  --module-operations: #ff6a13; /* 1585 C */
+
+  /* Decisions and statuses (badges only) */
+  --decision-feasible: #00b140; /* 354 C */
+  --decision-wait: #ffc72c; /* 123 C */
+  --decision-risky: #c8102e; /* 186 C */
+  --decision-feasible-ink: #006b27;
+  --decision-wait-ink: #6b4e00;
+  --decision-risky-ink: #9b0c23;
+
+  /* Neutrals */
+  --page: #ececea; /* lighter than Cool Gray 1 C so white cards still separate */
+  --surface: #ffffff;
+  --surface-muted: #f6f6f5;
+  --line: #d9d9d6; /* Cool Gray 1 C */
+  --line-strong: #b8b8b4;
+  --ink: #00263e;
+  --ink-muted: #5c5f62; /* one step darker than Cool Gray 9 C for AA contrast on white */
+  --ink-inverse: #ffffff;
+
+  /* Type: one family, six steps */
+  --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Space, radius, elevation */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(0, 38, 62, 0.08);
+  --shadow-2: 0 4px 16px rgba(0, 38, 62, 0.1);
+
+  --sidebar-width: 248px;
+  --sidebar-rail-width: 72px;
+}
+
+:root[data-theme="dark"] {
+  --brand: #4fb3e8;
+  --brand-hover: #7cc8f0;
+  --page: #0e1a22;
+  --surface: #15242e;
+  --surface-muted: #1b2c37;
+  --line: #2a3c48;
+  --line-strong: #3b5160;
+  --ink: #e9eef1;
+  --ink-muted: #a3b1ba;
+  --ink-inverse: #0e1a22;
+  --decision-feasible-ink: #7fe0a3;
+  --decision-wait-ink: #ffd76a;
+  --decision-risky-ink: #ff8a9b;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
