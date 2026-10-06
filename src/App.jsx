@@ -16,6 +16,7 @@ import { useAuth } from "./hooks/useAuth";
 import { withTryOperationWorkspace } from "./lib/exchangeRates";
 import { normalizeRoutePath } from "./lib/routes";
 import { getNavigation } from "./lib/navigation";
+import { workspaceSections } from "./lib/unsavedChanges";
 
 function App() {
   const navigate = useNavigate();
@@ -52,9 +53,9 @@ function App() {
   const [dashboardSidebarOpen, setDashboardSidebarOpen] = useState(
     () => typeof window === "undefined" || window.innerWidth > 1024,
   );
-  // Bumped after a load or save; useUnsavedChanges then records the snapshot of
-  // the state that load or save produced as the saved one.
-  const [workspaceCleanRequest, setWorkspaceCleanRequest] = useState(0);
+  // A counter per workspace section, bumped after that section loads or saves;
+  // useUnsavedChanges then records the section's state as saved.
+  const [workspaceCleanRequests, setWorkspaceCleanRequests] = useState({});
 
   const { dashboardModules, financialSubmodules, operationsSubmodules } = getNavigation(copy);
   const {
@@ -218,7 +219,7 @@ function App() {
       session,
       simulationLoading,
       simulationVariants,
-      workspaceCleanRequest,
+      workspaceCleanRequests,
     });
   const {
     activePlanResults,
@@ -290,8 +291,13 @@ function App() {
     loadPlanningData();
   }, [session]);
 
-  function markWorkspaceSnapshotClean() {
-    setWorkspaceCleanRequest((count) => count + 1);
+  // With no sections named, every section is recorded.
+  function markWorkspaceSnapshotClean(...sections) {
+    setWorkspaceCleanRequests((current) => {
+      const next = { ...current };
+      for (const section of sections.length ? sections : workspaceSections) next[section] = (next[section] || 0) + 1;
+      return next;
+    });
   }
 
   // `force` skips the unsaved-changes guard, for moves the user just asked

@@ -442,7 +442,7 @@ export function useOperations({ copy, labels, loadFinancialData, markWorkspaceSn
         }));
         setOperationPlanResult(null);
       }
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("operations");
     } catch (error) {
       setOperationsStatus(
         `${copy("Operations data could not be loaded:", "Operasyon verisi yüklenemedi:")} ${error.message}`,
@@ -546,7 +546,7 @@ export function useOperations({ copy, labels, loadFinancialData, markWorkspaceSn
       await loadOperationsData();
       await loadFinancialData();
       setOperationsStatus(copy("Resource plan was saved and calculated.", "Kaynak planı kaydedildi ve hesaplandı."));
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("operations");
       return true;
     } catch (error) {
       setOperationsStatus(error.message);
@@ -623,7 +623,7 @@ export function useOperations({ copy, labels, loadFinancialData, markWorkspaceSn
       setOperationForms((current) => ({ ...current, [entity]: emptyOperationForms[entity] }));
       await loadOperationsData();
       setOperationsStatus(copy("Operations record was saved.", "Operasyon kaydı kaydedildi."));
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("operations");
       return true;
     } catch (error) {
       setOperationsStatus(error.message);

@@ -4,7 +4,12 @@ import { useBlocker } from "react-router";
 import { toFiniteNumber } from "../lib/feasibilityModel";
 import { emptyOperationForms } from "../lib/operationsService";
 import { normalizeRoutePath } from "../lib/routes";
-import { createUnsavedWorkspaceSnapshot } from "../lib/unsavedChanges";
+import {
+  createUnsavedWorkspaceSnapshots,
+  findUnsavedSections,
+  recordSavedSections,
+  workspaceSections,
+} from "../lib/unsavedChanges";
 
 export function useUnsavedChanges({
   activeSimulationVariant,
@@ -31,17 +36,19 @@ export function useUnsavedChanges({
   session,
   simulationLoading,
   simulationVariants,
-  workspaceCleanRequest,
+  workspaceCleanRequests,
 }) {
-  const [savedWorkspaceSnapshot, setSavedWorkspaceSnapshot] = useState("");
+  // Per section: the state last loaded or saved. See lib/unsavedChanges.js.
+  const [savedSnapshots, setSavedSnapshots] = useState({});
 
   const [promptState, setPromptState] = useState({ message: "", saving: false });
 
-  const workspaceSnapshotRef = useRef("");
+  const workspaceSnapshotRef = useRef({});
+  const handledCleanRequests = useRef({});
 
-  const editableWorkspaceSnapshot = useMemo(
+  const editableSnapshots = useMemo(
     () =>
-      createUnsavedWorkspaceSnapshot({
+      createUnsavedWorkspaceSnapshots({
         financialExtraCostForm,
         financialSettingsForm,
         operationForms,
@@ -52,9 +59,7 @@ export function useUnsavedChanges({
     [financialExtraCostForm, financialSettingsForm, operationForms, operationPlan, salesStrategy, simulationVariants],
   );
 
-  const hasUnsavedChanges = Boolean(
-    session && savedWorkspaceSnapshot && editableWorkspaceSnapshot !== savedWorkspaceSnapshot,
-  );
+  const hasUnsavedChanges = Boolean(session) && findUnsavedSections(savedSnapshots, editableSnapshots).length > 0;
 
   // Holds any move to another page, including Back and Forward, while there
   // are unsaved edits. The prompt is open for as long as a move is held.
@@ -67,29 +72,37 @@ export function useUnsavedChanges({
   const unsavedPrompt = { ...promptState, open: blocker.state === "blocked" };
 
   useEffect(() => {
-    workspaceSnapshotRef.current = editableWorkspaceSnapshot;
-  }, [editableWorkspaceSnapshot]);
+    workspaceSnapshotRef.current = editableSnapshots;
+  }, [editableSnapshots]);
 
+  // Records the sections a load or save asked for, as they are after that load or save.
   useEffect(() => {
-    if (workspaceCleanRequest) setSavedWorkspaceSnapshot(workspaceSnapshotRef.current);
-  }, [workspaceCleanRequest]);
+    const sections = workspaceSections.filter(
+      (section) => workspaceCleanRequests[section] !== handledCleanRequests.current[section],
+    );
+    handledCleanRequests.current = workspaceCleanRequests;
+    if (sections.length) {
+      setSavedSnapshots((current) => recordSavedSections(current, workspaceSnapshotRef.current, sections));
+    }
+  }, [workspaceCleanRequests]);
 
+  // A section with nothing recorded (not loaded yet, or its load failed) is
+  // recorded as it is whenever nothing is loading, so its edits count from then on.
   useEffect(() => {
     if (!session) {
-      setSavedWorkspaceSnapshot("");
+      setSavedSnapshots({});
       return;
     }
-
-    if (savedWorkspaceSnapshot) return;
     if (operationsLoading || financialLoading || salesLoading || simulationLoading) return;
 
-    setSavedWorkspaceSnapshot(editableWorkspaceSnapshot);
+    const unrecorded = workspaceSections.filter((section) => savedSnapshots[section] === undefined);
+    if (unrecorded.length) setSavedSnapshots((current) => recordSavedSections(current, editableSnapshots, unrecorded));
   }, [
-    editableWorkspaceSnapshot,
+    editableSnapshots,
     financialLoading,
     operationsLoading,
     salesLoading,
-    savedWorkspaceSnapshot,
+    savedSnapshots,
     session,
     simulationLoading,
   ]);
@@ -123,6 +136,16 @@ export function useUnsavedChanges({
     );
   }
 
+  // The section the current page edits; the save handlers record their own
+  // section too, this only covers a page whose edits needed no save call.
+  function getCurrentSections() {
+    if (routePath === "/sales-strategy") return ["sales"];
+    if (isSimulationRoute) return ["simulation"];
+    if (isOperationsRoute) return ["operations"];
+    if (isFinancialRoute) return ["financial"];
+    return [];
+  }
+
   async function saveCurrentWorkspaceChanges() {
     if (routePath === "/sales-strategy") {
       return handleSaveSalesStrategy();
@@ -147,7 +170,7 @@ export function useUnsavedChanges({
         return true;
       }
 
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("operations");
       return true;
     }
 
@@ -203,12 +226,12 @@ export function useUnsavedChanges({
       return;
     }
 
-    markWorkspaceSnapshotClean();
+    markWorkspaceSnapshotClean(...getCurrentSections());
     continuePendingNavigation();
   }
 
   function handleLeaveWithoutSaving() {
-    setSavedWorkspaceSnapshot(editableWorkspaceSnapshot);
+    setSavedSnapshots((current) => recordSavedSections(current, editableSnapshots));
     continuePendingNavigation();
   }
 

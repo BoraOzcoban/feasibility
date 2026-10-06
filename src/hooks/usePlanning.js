@@ -327,7 +327,7 @@ export function usePlanning({
 
       setSalesStrategy(nextSalesStrategy);
       setSimulationVariants(nextSimulationVariants);
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("sales", "simulation");
     } catch (error) {
       setSalesStatus(`${copy("Planning data could not be loaded:", "Planlama verisi yüklenemedi:")} ${error.message}`);
       setSimulationStatus(
@@ -365,7 +365,7 @@ export function usePlanning({
       await saveSalesStrategy(supabase, currentProfile.company_id, salesStrategy);
       await loadPlanningData();
       setSalesStatus(copy("Sales strategy was saved.", "Satış stratejisi kaydedildi."));
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("sales");
       return true;
     } catch (error) {
       setSalesStatus(error.message);
@@ -394,7 +394,7 @@ export function usePlanning({
       await saveSimulationVariant(supabase, currentProfile.company_id, variant);
       await loadPlanningData();
       setSimulationStatus(copy("Simulation variant was saved.", "Simülasyon varyantı kaydedildi."));
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("simulation");
       return true;
     } catch (error) {
       setSimulationStatus(error.message);

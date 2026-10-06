@@ -175,7 +175,7 @@ export function useFinancialModel({ copy, currentProfile, labels, markWorkspaceS
         ...nextSettings,
         loanRows: loanRowsForForm,
       });
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("financial");
     } catch (error) {
       setFinancialStatus(
         `${copy("Financial model could not be loaded:", "Finansal model yüklenemedi:")} ${error.message}`,
@@ -201,7 +201,7 @@ export function useFinancialModel({ copy, currentProfile, labels, markWorkspaceS
       await loadFinancialData();
       // After the reload, which clears the status line.
       setFinancialStatus(copy("Financial assumptions were saved.", "Finansal varsayımlar kaydedildi."));
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("financial");
       return true;
     } catch (error) {
       setFinancialStatus(error.message);
@@ -242,7 +242,7 @@ export function useFinancialModel({ copy, currentProfile, labels, markWorkspaceS
       setFinancialExtraCostForm(emptyFinancialExtraCostForm);
       await loadFinancialData();
       setFinancialStatus(copy("Extra financial cost was saved.", "Ek finansal gider kaydedildi."));
-      markWorkspaceSnapshotClean();
+      markWorkspaceSnapshotClean("financial");
       return true;
     } catch (error) {
       setFinancialStatus(error.message);
