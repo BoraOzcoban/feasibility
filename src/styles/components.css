@@ -108,6 +108,11 @@
     padding: var(--space-5);
   }
 
+  .card > button,
+  .card > form > button {
+    justify-self: start;
+  }
+
   .card-header {
     align-items: flex-start;
     display: flex;

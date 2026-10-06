@@ -78,6 +78,11 @@
     color: inherit;
   }
 
+  /* Spacing comes from the layout (gap), not from element margins. */
+  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(h1, h2, h3, h4, p) {
+    margin: 0;
+  }
+
   /* ---------- Type: 12 / 14 / 16 / 20 / 24 / 32 ---------- */
   :where(.dashboard-shell, .unsaved-changes-backdrop) :where(h1) {
     font-size: var(--text-2xl);

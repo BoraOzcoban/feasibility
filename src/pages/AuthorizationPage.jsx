@@ -28,22 +28,26 @@ export default function AuthorizationPage() {
   return (
     <DashboardLayout activePage="authorization">
       <section className="page authorization-page">
-        <div className="authorization-heading">
-          <span>{labels.dashboard}</span>
-          <h1>{labels.authorizationPage}</h1>
-          <p>{authorizationAccess.read ? labels.authorizationCopy : labels.authorizationLockedCopy}</p>
+        <div className="page-header">
+          <div>
+            <span>{labels.dashboard}</span>
+            <h1>{labels.authorizationPage}</h1>
+            <p>{authorizationAccess.read ? labels.authorizationCopy : labels.authorizationLockedCopy}</p>
+          </div>
         </div>
 
         {!authorizationAccess.read ? (
-          <div className="authorization-locked">
+          <div className="card">
             <strong>{labels.authorizationLocked}</strong>
             <p>{labels.authorizationLockedCopy}</p>
           </div>
         ) : (
           <>
-            <div className="authorization-tabs" role="tablist" aria-label={labels.authorizationPage}>
+            <div className="segmented tab-row" role="tablist" aria-label={labels.authorizationPage}>
               <button
                 type="button"
+                role="tab"
+                aria-selected={authorizationTab === "roles"}
                 className={authorizationTab === "roles" ? "active" : ""}
                 onClick={() => setAuthorizationTab("roles")}
               >
@@ -51,6 +55,8 @@ export default function AuthorizationPage() {
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={authorizationTab === "users"}
                 className={authorizationTab === "users" ? "active" : ""}
                 onClick={() => setAuthorizationTab("users")}
               >
@@ -59,8 +65,8 @@ export default function AuthorizationPage() {
             </div>
 
             {authorizationTab === "users" ? (
-              <div className="authorization-grid user-definition-grid">
-                <form className="authorization-card user-definition-form" onSubmit={handleCreateManagedUser}>
+              <div className="two-up">
+                <form className="card" onSubmit={handleCreateManagedUser}>
                   <h2>{labels.userDefinition}</h2>
                   <p>{labels.userDefinitionCopy}</p>
                   <label>
@@ -93,7 +99,7 @@ export default function AuthorizationPage() {
                       onChange={(event) => updateManagedUserForm("password", event.target.value)}
                     />
                   </label>
-                  <div className="user-definition-fields">
+                  <div className="form-grid">
                     <label>
                       <span>{labels.phoneNumber}</span>
                       <input
@@ -137,19 +143,19 @@ export default function AuthorizationPage() {
                     </label>
                   </div>
                   <button
-                    className="submit-button"
+                    className="primary"
                     disabled={!authorizationAccess.write || authorizationLoading}
                     type="submit"
                   >
                     {authorizationLoading ? "..." : labels.createManagedUser}
                   </button>
-                  <p className="authorization-note">
+                  <p className="planner-empty-state">
                     {authorizationAccess.write ? labels.writeAccess : labels.readOnlyMode}
                   </p>
                 </form>
 
-                <div className="authorization-card users-card">
-                  <div className="permissions-header">
+                <div className="card">
+                  <div className="card-header">
                     <h2>{labels.managedUsers}</h2>
                     {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
                   </div>
@@ -157,8 +163,8 @@ export default function AuthorizationPage() {
                 </div>
               </div>
             ) : (
-              <div className="authorization-grid">
-                <form className="authorization-card role-form" onSubmit={handleCreateRole}>
+              <div className="two-up">
+                <form className="card" onSubmit={handleCreateRole}>
                   <h2>{labels.newRole}</h2>
                   <label>
                     <span>{labels.roleName}</span>
@@ -177,19 +183,19 @@ export default function AuthorizationPage() {
                     />
                   </label>
                   <button
-                    className="submit-button"
+                    className="primary"
                     disabled={!authorizationAccess.write || authorizationLoading}
                     type="submit"
                   >
                     {labels.createRole}
                   </button>
-                  <p className="authorization-note">
+                  <p className="planner-empty-state">
                     {authorizationAccess.write ? labels.writeAccess : labels.readOnlyMode}
                   </p>
                 </form>
 
-                <div className="authorization-card permissions-card">
-                  <div className="permissions-header">
+                <div className="card">
+                  <div className="card-header">
                     <h2>{labels.permissions}</h2>
                     {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
                   </div>

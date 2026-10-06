@@ -991,21 +991,6 @@ textarea:focus-visible {
   width: min(88vw, 1120px);
 }
 
-.persona-avatar {
-  align-self: center;
-  display: block;
-  height: 160px;
-  justify-self: center;
-  overflow: visible;
-  width: 160px;
-}
-
-.avatar-card-bg {
-  fill: #e8f0ec;
-  stroke: rgba(16, 43, 50, 0.12);
-  stroke-width: 2;
-}
-
 .persona-card h3 {
   color: var(--color-heading);
   font-size: 1.14rem;
@@ -2417,156 +2402,9 @@ textarea:focus-visible {
   font-weight: 800;
 }
 
-.authorization-page {
-  display: grid;
-  gap: 24px;
-  padding: 64px 32px;
-}
-
-.authorization-heading {
-  display: grid;
-  gap: 14px;
-  max-width: 840px;
-}
-
-.authorization-heading span,
-.authorization-note {
-  color: var(--color-teal);
-  font-size: 0.85rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.authorization-heading h1 {
-  color: var(--color-heading);
-  font-size: clamp(2.4rem, 5vw, 4.5rem);
-  line-height: 1;
-  margin: 0;
-}
-
-.authorization-heading p,
-.authorization-card p,
-.authorization-locked p {
-  color: var(--color-muted);
-  font-size: 1rem;
-  line-height: 1.7;
-  margin: 0;
-}
-
-.authorization-tabs {
-  background: rgba(229, 236, 231, 0.84);
-  border-radius: 8px;
-  display: inline-grid;
-  gap: 4px;
-  grid-template-columns: repeat(2, minmax(160px, 1fr));
-  justify-self: start;
-  padding: 4px;
-}
-
-.authorization-tabs button {
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  color: var(--color-muted);
-  cursor: pointer;
-  font-weight: 800;
-  min-height: 42px;
-  padding: 0 14px;
-}
-
-.authorization-tabs button.active {
-  background: var(--color-surface);
-  box-shadow: 0 5px 18px rgba(16, 43, 50, 0.1);
-  color: var(--color-heading);
-}
-
-.authorization-grid {
-  align-items: start;
-  display: grid;
-  gap: 20px;
-  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
-}
-
-.authorization-card,
-.authorization-locked {
-  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  box-shadow: var(--shadow-soft);
-  display: grid;
-  gap: 16px;
-  padding: 22px;
-}
-
-.authorization-card h2,
-.authorization-locked strong {
-  color: var(--color-heading);
-  font-size: 1.15rem;
-  margin: 0;
-}
-
-.role-form label,
-.user-definition-form label {
-  color: var(--color-muted);
-  display: grid;
-  font-size: 0.86rem;
-  gap: 6px;
-}
-
-.role-form input,
-.user-definition-form input,
-.user-definition-form select {
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  color: var(--color-ink);
-  min-height: 44px;
-  outline: none;
-  padding: 0 12px;
-  width: 100%;
-}
-
-.role-form input:focus,
-.user-definition-form input:focus,
-.user-definition-form select:focus {
-  border-color: var(--color-teal);
-  box-shadow: 0 0 0 4px rgba(24, 117, 101, 0.14);
-}
-
-.role-form input:disabled,
-.user-definition-form input:disabled,
-.user-definition-form select:disabled,
 .permission-check input:disabled {
   cursor: not-allowed;
   opacity: 0.62;
-}
-
-.user-definition-grid {
-  grid-template-columns: minmax(280px, 440px) minmax(0, 1fr);
-}
-
-.user-definition-fields {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.permissions-card,
-.users-card {
-  overflow: auto;
-}
-
-.permissions-header {
-  align-items: center;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-}
-
-.permissions-header span {
-  color: var(--color-teal);
-  font-size: 0.85rem;
-  font-weight: 800;
 }
 
 .permission-check {
@@ -2695,11 +2533,6 @@ textarea:focus-visible {
     width: 82vw;
   }
 
-  .persona-avatar {
-    height: 138px;
-    width: 138px;
-  }
-
   .who-orbit {
     aspect-ratio: 1 / 1;
     min-height: 0;
@@ -2768,20 +2601,6 @@ textarea:focus-visible {
 
   .sales-table {
     overflow-x: auto;
-  }
-
-  .authorization-page {
-    padding: 48px 18px;
-  }
-
-  .authorization-tabs,
-  .authorization-grid {
-    grid-template-columns: 1fr;
-    width: 100%;
-  }
-
-  .user-definition-fields {
-    grid-template-columns: 1fr;
   }
 
   .brand-bar,
@@ -3470,15 +3289,6 @@ textarea:focus-visible {
   color: rgba(255, 229, 236, 0.88);
 }
 
-.persona-avatar {
-  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.22));
-}
-
-.avatar-card-bg {
-  fill: rgba(255, 255, 255, 0.92);
-  stroke: rgba(255, 255, 255, 0.48);
-}
-
 .reference-logo-card {
   background: #ffffff;
   border: 1px solid rgba(8, 9, 16, 0.07);
@@ -3858,25 +3668,15 @@ textarea:focus-visible {
   color: rgba(255, 255, 255, 0.86);
 }
 
-.authorization-page {
-  background:
-    radial-gradient(circle at 86% 0%, rgba(255, 90, 138, 0.18), transparent 24rem),
-    radial-gradient(circle at 12% 8%, rgba(37, 184, 255, 0.14), transparent 25rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 36rem);
-  min-height: 100vh;
-}
-
 .operation-card-heading span,
 .sales-card-heading span,
-.sales-command-copy > span,
-.authorization-heading span {
+.sales-command-copy > span {
   color: var(--app-violet);
   letter-spacing: 0;
 }
 
 .sales-command-hero,
-.sales-header,
-.authorization-heading {
+.sales-header {
   background:
     radial-gradient(circle at 86% 14%, rgba(255, 90, 138, 0.32), transparent 23rem),
     radial-gradient(circle at 16% 88%, rgba(37, 184, 255, 0.18), transparent 21rem),
@@ -3889,13 +3689,11 @@ textarea:focus-visible {
   position: relative;
 }
 
-.sales-header,
-.authorization-heading {
+.sales-header {
   padding: 28px;
 }
 
-.sales-header::after,
-.authorization-heading::after {
+.sales-header::after {
   background:
     linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
@@ -3907,8 +3705,7 @@ textarea:focus-visible {
   position: absolute;
 }
 
-.sales-header > *,
-.authorization-heading > * {
+.sales-header > * {
   position: relative;
   z-index: 1;
 }
@@ -3922,8 +3719,7 @@ textarea:focus-visible {
 }
 
 .sales-command-copy > span,
-.sales-header span,
-.authorization-heading span {
+.sales-header span {
   color: rgba(255, 218, 229, 0.92);
 }
 
@@ -4130,18 +3926,9 @@ textarea:focus-visible {
   color: rgba(255, 255, 255, 0.86);
 }
 
-.authorization-card,
-.authorization-locked {
-  min-width: 0;
-}
-
 /* Financial modelling contrast hardening. */
 
 /* Module grouping and hierarchy layer. */
-
-.dashboard-shell .authorization-page {
-  --module-accent: var(--app-pink);
-}
 
 .dashboard-shell :is(
   .dashboard-section-group,
@@ -4799,7 +4586,6 @@ textarea:focus-visible {
 }
 
 /* Printable report (Reports > PDF). Plain, light and readable on paper. */
-
 
 /* Beats the financial workspace's generic ".scenario-row button" styling. */
 
