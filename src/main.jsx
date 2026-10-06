@@ -2,7 +2,6 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import "./styles/tokens.css";
-import "./styles.css";
 import "./styles/base.css";
 import "./styles/shell.css";
 import "./styles/components.css";
@@ -11,7 +10,7 @@ import "./styles/sales.css";
 import "./styles/finance.css";
 import "./styles/simulation.css";
 import "./styles/reports.css";
-import "./styles/skin.css";
+import "./styles/auth.css";
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {

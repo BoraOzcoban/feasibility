@@ -15,7 +15,6 @@ export default function AuthPage() {
     labels,
     loading,
     mode,
-    profilePreview,
     session,
     setConfirmPassword,
     setShowConfirmPassword,
@@ -49,14 +48,6 @@ export default function AuthPage() {
             <ThemeToggle />
           </div>
         </header>
-
-        {profilePreview && (
-          <div className="avatar-zone">
-            <div className="avatar">
-              <img src={profilePreview} alt={copy("Profile preview", "Profil önizlemesi")} />
-            </div>
-          </div>
-        )}
 
         {session ? (
           <div className="signed-in">
@@ -107,7 +98,7 @@ export default function AuthPage() {
                 </button>
               </div>
             </label>
-            <button className="submit-button" disabled={loading} type="submit">
+            <button disabled={loading} type="submit">
               {loading ? "..." : labels.resetPassword}
             </button>
           </form>
@@ -152,7 +143,7 @@ export default function AuthPage() {
               </button>
             </div>
 
-            <button className="submit-button" disabled={loading} type="submit">
+            <button disabled={loading} type="submit">
               {loading ? "..." : labels.submitLogin}
             </button>
           </form>

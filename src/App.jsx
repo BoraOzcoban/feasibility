@@ -37,7 +37,6 @@ import ReportsPage from "./pages/ReportsPage";
 import ProcessDefinitionPage from "./pages/ProcessDefinitionPage";
 import OperationsOverviewPage from "./pages/OperationsOverviewPage";
 import DashboardPage from "./pages/DashboardPage";
-import LandingPage from "./pages/LandingPage";
 import PrintableReportPage from "./pages/PrintableReportPage";
 import FinancialModellingPage from "./pages/FinancialModellingPage";
 import SimulationPage from "./pages/SimulationPage";
@@ -72,7 +71,6 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [theme, setTheme] = useState("light");
-  const [profilePreview, setProfilePreview] = useState("");
   const [session, setSession] = useState(null);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
@@ -283,10 +281,16 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    // Signed-in users on /login or on a URL no page handles (such as the
-    // removed /product-plus pages) go to the dashboard instead of the login form.
-    if (session && path !== "/" && mode !== "reset") {
-      if (path === "/login" || !isSignedInRoute(normalizeRoutePath(path))) goTo("/dashboard", "login", { replace: true });
+    // The app opens on the login screen; the marketing page lives outside the
+    // app. Signed-in users on /, /login or a URL no page handles (such as the
+    // removed /product-plus pages) go to the dashboard.
+    if (mode === "reset") return;
+    if (session) {
+      if (path === "/" || path === "/login" || !isSignedInRoute(normalizeRoutePath(path))) {
+        goTo("/dashboard", "login", { replace: true });
+      }
+    } else if (path === "/") {
+      goTo("/login", "login", { replace: true });
     }
   }, [session, path, mode]);
 
@@ -396,10 +400,6 @@ function App() {
     setPath(nextPath);
     setMode(nextMode);
     setStatus("");
-  }
-
-  function handleUseAtera() {
-    goTo(session ? "/dashboard" : "/login", "login");
   }
 
   function updateField(field, value) {
@@ -1673,7 +1673,6 @@ function App() {
       if (profileError) throw profileError;
 
       setCurrentProfile(profile);
-      setProfilePreview(profile?.profile_picture_url ? await resolveProfilePicturePreview(profile.profile_picture_url) : "");
       if (profile?.language && ["en", "tr"].includes(profile.language)) {
         setForm((current) => ({ ...current, language: profile.language }));
       }
@@ -1854,22 +1853,6 @@ function App() {
     }
   }
 
-  async function resolveProfilePicturePreview(storageValue) {
-    if (!storageValue || !supabase) return "";
-    if (/^https?:\/\//i.test(storageValue)) return storageValue;
-
-    const { data, error } = await supabase.storage
-      .from("profile-pictures")
-      .createSignedUrl(storageValue, 60 * 60);
-
-    if (error) {
-      console.warn("Profile picture preview could not be signed.", error);
-      return "";
-    }
-
-    return data?.signedUrl || "";
-  }
-
   async function handleLogin(event) {
     event.preventDefault();
     setStatus("");
@@ -1891,11 +1874,10 @@ function App() {
       // Admins can read every profile in their company, so filter to our own.
       const { data: userProfile } = await supabase
         .from("profiles")
-        .select("profile_picture_url, language, theme")
+        .select("language, theme")
         .eq("id", signInData.user.id)
         .maybeSingle();
 
-      setProfilePreview(userProfile?.profile_picture_url ? await resolveProfilePicturePreview(userProfile.profile_picture_url) : "");
       if (userProfile?.language && ["en", "tr"].includes(userProfile.language)) {
         setForm((current) => ({ ...current, language: userProfile.language }));
       }
@@ -1971,45 +1953,6 @@ function App() {
     await supabase.auth.signOut();
     goTo("/login", "login");
   }
-
-  const references = [
-    { name: copy("Production Planning", "Üretim Planlama"), mark: "PP", tone: "teal" },
-    { name: copy("Feasibility Model", "Fizibilite Modeli"), mark: "FM", tone: "cyan" },
-    { name: copy("Cash Scenario", "Nakit Senaryosu"), mark: "CS", tone: "amber" },
-    { name: copy("Sales Route", "Satış Rotası"), mark: "SR", tone: "green" },
-    { name: copy("Risk Review", "Risk Analizi"), mark: "RR", tone: "clay" },
-  ];
-
-  const personas = [
-    {
-      avatarType: "planning",
-      title: labels.farmerPersona,
-      need: labels.farmerNeed,
-      benefit: labels.farmerBenefit,
-      difference: labels.farmerDifference,
-    },
-    {
-      avatarType: "production",
-      title: labels.factoryOwnerPersona,
-      need: labels.factoryOwnerNeed,
-      benefit: labels.factoryOwnerBenefit,
-      difference: labels.factoryOwnerDifference,
-    },
-    {
-      avatarType: "finance",
-      title: labels.entrepreneurPersona,
-      need: labels.entrepreneurNeed,
-      benefit: labels.entrepreneurBenefit,
-      difference: labels.entrepreneurDifference,
-    },
-    {
-      avatarType: "operations",
-      title: labels.exporterPersona,
-      need: labels.exporterNeed,
-      benefit: labels.exporterBenefit,
-      difference: labels.exporterDifference,
-    },
-  ];
 
   const dashboardModules = [
     { key: "operations", path: "/operations", label: copy("Operations", "Operasyon"), category: copy("Production", "Üretim"), tone: "operations" },
@@ -2558,7 +2501,6 @@ function App() {
     handleSaveOperationRecord,
     handleSaveSalesStrategy,
     handleSaveUnsavedAndContinue,
-    handleUseAtera,
     hasFinancialAssumptions,
     hasFinancialSourceData,
     hasOperationData,
@@ -2585,11 +2527,8 @@ function App() {
     permissionTableColumns,
     permissionTableRows,
     persistSimulationVariant,
-    personas,
     processDefinitionOpen,
-    profilePreview,
     profiles,
-    references,
     removeFinancialLoanRow,
     removeProductMaterialRow,
     removeProductProcessRow,
@@ -2653,10 +2592,6 @@ function App() {
   );
 
   function renderRoute() {
-    if (path === "/") {
-      return <LandingPage />;
-    }
-
     if (session && routePath.startsWith("/reports/print/")) {
       return <PrintableReportPage packKey={routePath.split("/")[3]} />;
     }

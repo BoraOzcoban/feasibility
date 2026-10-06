@@ -1,5 +1,5 @@
-/* Cascade order: legacy (old styles.css) < skin (new design system). */
-@layer legacy, skin;
+/* All app styles live in one cascade layer, declared here first. */
+@layer skin;
 
 /*
  * Design tokens (Hande design language).

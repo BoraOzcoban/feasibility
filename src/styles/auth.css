@@ -1,0 +1,116 @@
+/*
+ * Login, password reset and the runtime error screen: one centred card on
+ * the light page.
+ */
+@layer skin {
+  .auth-shell {
+    background: var(--page);
+    display: grid;
+    min-height: 100vh;
+    padding: var(--space-5) var(--space-4);
+    place-items: center;
+  }
+
+  :is(.auth-panel, .auth-card) {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-2);
+    display: grid;
+    gap: var(--space-5);
+    padding: var(--space-6);
+    width: min(420px, 100%);
+  }
+
+  .brand-bar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    justify-content: space-between;
+  }
+
+  .brand-mark {
+    align-items: center;
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  .brand-mark img {
+    height: 36px;
+    width: 36px;
+  }
+
+  .brand-mark strong {
+    display: block;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+  }
+
+  .brand-mark span {
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+  }
+
+  .auth-controls {
+    align-items: center;
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .auth-form {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .auth-form > label {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .auth-form > label > span:first-child {
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+  }
+
+  .password-field {
+    display: grid;
+    gap: var(--space-2);
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .password-field input {
+    width: 100%;
+  }
+
+  .password-toggle {
+    font-size: var(--text-xs);
+    padding: 0 var(--space-3);
+  }
+
+  .form-options {
+    align-items: center;
+    color: var(--ink-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--text-xs);
+    gap: var(--space-2);
+    justify-content: space-between;
+  }
+
+  .form-options .link-button {
+    font-size: var(--text-xs);
+    padding: 0;
+  }
+
+  .auth-form button[type="submit"] {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .signed-in {
+    display: grid;
+    gap: var(--space-3);
+  }
+}

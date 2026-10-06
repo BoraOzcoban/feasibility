@@ -1,120 +1,88 @@
 /*
- * Element defaults for the signed-in app: page, type scale, form controls and
- * the button kinds (default, primary, link). :where() keeps them at zero
- * specificity so any class rule overrides them. The scope also covers the
- * dialogs that are portalled to <body>.
+ * Element defaults: page, type scale, form controls and the button kinds
+ * (default, primary, link). :where() keeps them at zero specificity so any
+ * class rule overrides them.
  */
 @layer skin {
+  :where(*, *::before, *::after) {
+    box-sizing: border-box;
+  }
+
+  :where(html) {
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  :where(button, input, select, textarea) {
+    font: inherit;
+  }
+
   :where(html, body) {
     background: var(--page);
     color: var(--ink);
     font-family: var(--font);
   }
 
-  :where(.dashboard-shell, .unsaved-changes-backdrop) {
-    color: var(--ink);
-    font-family: var(--font);
+  :where(body) {
     font-size: var(--text-sm);
+    margin: 0;
+    min-height: 100vh;
+    min-width: 320px;
   }
 
-  :where(.dashboard-shell) {
-    background: var(--page);
-  }
-
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(*) {
+  :where(*) {
     -webkit-text-fill-color: currentColor;
     backdrop-filter: none;
     background-image: none;
     text-shadow: none;
   }
 
-  :where(.dashboard-shell, .unsaved-changes-backdrop)::before,
-  :where(.dashboard-shell, .unsaved-changes-backdrop)::after {
-    content: none;
+  /* Containers and text take the colour of the card they sit on. */
+  :where(section, article, div, aside, header, nav, form, details, ul, ol, table, thead, tbody, tr, figure, fieldset) {
+    color: inherit;
   }
 
-  /* Containers and text take the colour of the card they sit on. */
-  :where(.dashboard-shell, .unsaved-changes-backdrop)
-    :where(
-      section,
-      article,
-      div,
-      aside,
-      header,
-      nav,
-      form,
-      details,
-      ul,
-      ol,
-      table,
-      thead,
-      tbody,
-      tr,
-      figure,
-      fieldset,
-      a,
-      h1,
-      h2,
-      h3,
-      h4,
-      h5,
-      p,
-      span,
-      strong,
-      small,
-      b,
-      em,
-      label,
-      li,
-      dt,
-      dd,
-      th,
-      td,
-      legend,
-      summary,
-      figcaption,
-      mark
-    ) {
+  :where(a, h1, h2, h3, h4, h5, p, span, strong, small, b, em, label, li, dt, dd, th, td, legend, summary, mark) {
     color: inherit;
   }
 
   /* Spacing comes from the layout (gap), not from element margins. */
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(h1, h2, h3, h4, p) {
+  :where(h1, h2, h3, h4, p) {
     margin: 0;
   }
 
   /* ---------- Type: 12 / 14 / 16 / 20 / 24 / 32 ---------- */
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(h1) {
+  :where(h1) {
     font-size: var(--text-2xl);
     font-weight: var(--weight-bold);
     letter-spacing: -0.01em;
     line-height: 1.2;
   }
 
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(h2) {
+  :where(h2) {
     font-size: var(--text-lg);
     font-weight: var(--weight-semibold);
     line-height: 1.3;
   }
 
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(h3) {
+  :where(h3) {
     font-size: var(--text-md);
     font-weight: var(--weight-semibold);
     line-height: 1.35;
   }
 
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(p, li, td, th, dd, label) {
+  :where(p, li, td, th, dd, label) {
     font-size: var(--text-sm);
     line-height: 1.5;
   }
 
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(small) {
+  :where(small) {
     color: var(--ink-muted);
     font-size: var(--text-xs);
   }
 
   /* ---------- Form controls ---------- */
-  :where(.dashboard-shell) :where(input, select, textarea) {
+  :where(input, select, textarea) {
     background: var(--surface);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius-sm);
@@ -126,40 +94,45 @@
     padding: 6px 10px;
   }
 
-  :where(.dashboard-shell) :where(input, select, textarea):focus-visible {
+  :where(input, select, textarea):focus-visible {
     border-color: var(--brand);
     outline: 2px solid color-mix(in srgb, var(--brand) 25%, transparent);
     outline-offset: 0;
   }
 
-  :where(.dashboard-shell) :where(input[type="checkbox"], input[type="radio"]) {
+  :where(input[type="checkbox"], input[type="radio"]) {
     min-height: 0;
     padding: 0;
     width: auto;
   }
 
   /* A label that wraps a control is a stacked field: caption, control, hint. */
-  :where(.dashboard-shell label:has(> :is(input:not([type="checkbox"], [type="radio"]), select, textarea))) {
+  :where(label:has(> :is(input:not([type="checkbox"], [type="radio"]), select, textarea))) {
     align-content: start;
     display: grid;
     gap: var(--space-1);
     min-width: 0;
   }
 
-  :where(
-    .dashboard-shell label:has(> :is(input:not([type="checkbox"], [type="radio"]), select, textarea)) > span:first-child
-  ) {
+  :where(label:has(> :is(input:not([type="checkbox"], [type="radio"]), select, textarea)) > span:first-child) {
     color: var(--ink-muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-semibold);
   }
 
-  :where(.dashboard-shell) :where(label) > :where(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+  :where(label:has(> :is(input[type="checkbox"], input[type="radio"]))) {
+    align-items: center;
+    cursor: pointer;
+    display: inline-flex;
+    gap: var(--space-2);
+  }
+
+  :where(label) > :where(input:not([type="checkbox"], [type="radio"]), select, textarea) {
     width: 100%;
   }
 
   /* ---------- Buttons ---------- */
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(button) {
+  :where(button) {
     background: var(--surface);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius-sm);
@@ -174,39 +147,31 @@
     transform: none;
   }
 
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(button):hover:not(:disabled) {
+  :where(button):hover:not(:disabled) {
     background: var(--surface-muted);
   }
 
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(button):focus-visible {
+  :where(button):focus-visible {
     outline: 2px solid var(--brand);
     outline-offset: 2px;
   }
 
-  :where(.dashboard-shell, .unsaved-changes-backdrop) :where(button:disabled) {
+  :where(button:disabled) {
     cursor: not-allowed;
     opacity: 0.55;
   }
 
-  :is(.dashboard-shell, .unsaved-changes-backdrop)
-    :is(button.primary, button[type="submit"], .submit-button, .planner-save-button, .app-command-button.primary) {
+  :is(button.primary, button[type="submit"]) {
     background: var(--brand);
     border-color: var(--brand);
     color: var(--ink-inverse);
   }
 
-  :is(.dashboard-shell, .unsaved-changes-backdrop)
-    :is(
-      button.primary,
-      button[type="submit"],
-      .submit-button,
-      .planner-save-button,
-      .app-command-button.primary
-    ):hover:not(:disabled) {
+  :is(button.primary, button[type="submit"]):hover:not(:disabled) {
     background: var(--brand-hover);
   }
 
-  :is(.dashboard-shell, .unsaved-changes-backdrop) .link-button {
+  .link-button {
     background: transparent;
     border: 0;
     color: var(--ink-muted);
@@ -215,7 +180,7 @@
     text-align: left;
   }
 
-  :is(.dashboard-shell, .unsaved-changes-backdrop) .link-button:hover:not(:disabled) {
+  .link-button:hover:not(:disabled) {
     background: transparent;
     color: var(--brand);
     text-decoration: underline;
