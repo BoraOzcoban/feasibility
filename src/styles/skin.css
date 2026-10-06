@@ -1,0 +1,381 @@
+/*
+ * App skin (Sprint 4). Lives in the "skin" cascade layer, above "legacy"
+ * (the old styles.css), so these rules win over every legacy rule that is
+ * not !important, whatever its specificity. Element-level defaults use
+ * :where() so that any class rule here still overrides them.
+ *
+ * Rules: light grey page, white cards, navy text, no gradients, glows or
+ * blur; colour only for module accents and decision/status badges.
+ */
+@layer skin {
+/* ---------- Base ---------- */
+:where(html, body) {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+:where(.dashboard-shell) {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+}
+
+:where(.dashboard-shell) :where(*) {
+  backdrop-filter: none;
+  background-image: none;
+  text-shadow: none;
+}
+
+:where(.dashboard-shell) :where(h1, h2, h3, h4, h5, p, span, strong, small, b, em, label, li, dt, dd, th, td, legend, summary, figcaption, mark) {
+  color: inherit;
+}
+
+:where(.dashboard-shell) :where(h1) {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+:where(.dashboard-shell) :where(h2) {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+}
+
+:where(.dashboard-shell) :where(h3) {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  line-height: 1.35;
+}
+
+:where(.dashboard-shell) :where(p, li, td, th, dd, label) {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+:where(.dashboard-shell) :where(small) {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+:where(.dashboard-shell)::before,
+:where(.dashboard-shell)::after {
+  content: none;
+}
+
+/* ---------- Form controls ---------- */
+:where(.dashboard-shell) :where(input, select, textarea) {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  min-height: 36px;
+  padding: 6px 10px;
+}
+
+:where(.dashboard-shell) :where(input, select, textarea):focus-visible {
+  border-color: var(--brand);
+  outline: 2px solid color-mix(in srgb, var(--brand) 25%, transparent);
+  outline-offset: 0;
+}
+
+:where(.dashboard-shell) :where(input[type="checkbox"], input[type="radio"]) {
+  min-height: 0;
+  padding: 0;
+}
+
+/* ---------- Buttons ---------- */
+:where(.dashboard-shell) :where(button) {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  transform: none;
+}
+
+:where(.dashboard-shell) :where(button):hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+:where(.dashboard-shell) :where(button:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.dashboard-shell :is(button.primary, button[type="submit"], .submit-button, .planner-save-button, .app-command-button.primary) {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--ink-inverse);
+}
+
+.dashboard-shell :is(button.primary, button[type="submit"], .submit-button, .planner-save-button, .app-command-button.primary):hover:not(:disabled) {
+  background: var(--brand-hover);
+}
+
+/* ---------- Shell: sidebar ---------- */
+.dashboard-sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  box-shadow: none;
+  color: var(--ink);
+}
+
+.dashboard-sidebar :is(.dashboard-brand-block, .dashboard-controls, .sync-status-card) {
+  background: transparent;
+  border-color: var(--line);
+  box-shadow: none;
+  color: var(--ink);
+}
+
+.dashboard-nav-item {
+  background: transparent;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  box-shadow: none;
+  color: var(--ink);
+}
+
+.dashboard-nav-item:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+.dashboard-nav-item.active {
+  background: var(--surface-muted);
+  border-left-color: var(--brand);
+}
+
+.dashboard-nav-item.operations.active { border-left-color: var(--module-operations); }
+.dashboard-nav-item.sales.active { border-left-color: var(--module-sales); }
+.dashboard-nav-item.finance.active { border-left-color: var(--module-finance); }
+.dashboard-nav-item.decision.active { border-left-color: var(--module-simulation); }
+
+.dashboard-nav-item::before,
+.dashboard-nav-item::after {
+  content: none;
+}
+
+.dashboard-nav-category {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+}
+
+.dashboard-subnav :is(button, .simulation-subnav-item) {
+  background: transparent;
+  border: 0;
+  color: var(--ink-muted);
+  font-weight: var(--weight-medium);
+}
+
+.dashboard-subnav :is(button, .simulation-subnav-item).active {
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.dashboard-sidebar-toggle {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+}
+
+/* ---------- Page headers ---------- */
+.dashboard-shell :is(.operations-header, .financial-header, .simulation-header, .reports-header, .sales-header) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--ink);
+  padding: 0 0 var(--space-5);
+}
+
+.dashboard-shell :is(.operations-header, .financial-header, .simulation-header, .reports-header, .sales-header)::before,
+.dashboard-shell :is(.operations-header, .financial-header, .simulation-header, .reports-header, .sales-header)::after {
+  content: none;
+}
+
+.dashboard-shell :is(.operations-header, .financial-header, .simulation-header, .reports-header, .sales-header) > div > span {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell :is(.operations-header, .financial-header, .simulation-header, .reports-header, .sales-header) h1 {
+  font-size: var(--text-2xl);
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.dashboard-shell :is(.operations-header, .financial-header, .simulation-header, .reports-header, .sales-header) p {
+  color: var(--ink-muted);
+  font-size: var(--text-md);
+  max-width: 72ch;
+}
+
+/* ---------- Cards ---------- */
+.dashboard-shell :is(
+  .operation-card, .process-summary-card, .simulation-card, .financial-card, .command-card, .sales-card,
+  .reports-card, .authorization-card, .financial-panel, .financial-input-section, .resource-definition-card,
+  .operation-data-table-card, .operations-record-list-card, .process-card, .process-step-card, .sales-edit-card,
+  .sales-stat-card, .sales-forecast-card, .sales-decision-card, .sales-signal-card, .simulation-signal-card,
+  .risk-card, .scenario-card, .sensitivity-card, .reports-selected-card, .reports-readiness-card,
+  .finance-metric-card, .financial-feasibility-card, .financial-decision-card, .financial-quick-card,
+  .executive-metric-card, .module-rollup-card, .monte-carlo-stat, .percentile-outcome, .users-card
+) {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  color: var(--ink);
+}
+
+.dashboard-shell :is(
+  .operation-card, .process-summary-card, .simulation-card, .financial-card, .command-card, .sales-card,
+  .reports-card, .authorization-card, .financial-panel, .financial-input-section, .resource-definition-card,
+  .operation-data-table-card, .operations-record-list-card, .process-card, .process-step-card, .sales-edit-card,
+  .sales-stat-card, .sales-forecast-card, .sales-decision-card, .sales-signal-card, .simulation-signal-card,
+  .risk-card, .scenario-card, .sensitivity-card, .reports-selected-card, .reports-readiness-card,
+  .finance-metric-card, .financial-feasibility-card, .financial-decision-card, .financial-quick-card,
+  .executive-metric-card, .module-rollup-card, .monte-carlo-stat, .percentile-outcome, .users-card
+)::before {
+  content: none;
+}
+
+  /* Gradient text (background-clip: text) needs a real fill once the
+     gradient backgrounds are gone. */
+  :where(.dashboard-shell) :where(*) {
+    -webkit-text-fill-color: currentColor;
+  }
+
+  /* Containers take the text colour of the card they sit on. */
+  :where(.dashboard-shell) :where(section, article, div, aside, header, nav, form, details, ul, ol, table, thead, tbody, tr, figure, fieldset, a) {
+    color: inherit;
+  }
+
+  /* ---------- Hero / summary panels become plain cards ---------- */
+  .dashboard-shell :is(
+    .executive-brief, .executive-readiness-card, .dashboard-assumption-strip, .command-topbar,
+    .sales-command-hero, .simulation-command-hero, .simulation-confidence-panel, .reports-header-panel,
+    .authorization-heading, .simulation-variant-strip, .financial-loan-hero, .decision-kpi
+  ) {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    color: var(--ink);
+  }
+
+  .dashboard-shell :is(.executive-brief, .sales-command-hero, .simulation-command-hero, .command-topbar, .dashboard-assumption-strip)::before,
+  .dashboard-shell :is(.executive-brief, .sales-command-hero, .simulation-command-hero, .command-topbar, .dashboard-assumption-strip)::after {
+    content: none;
+  }
+
+  .dashboard-shell .decision-kpi {
+    border-left: 4px solid var(--decision-feasible);
+    box-shadow: none;
+  }
+
+  .dashboard-shell .decision-kpi.failed {
+    border-left-color: var(--decision-wait);
+  }
+
+  .dashboard-shell :is(.decision-kpi span, .decision-kpi small) {
+    color: var(--ink-muted);
+  }
+
+  /* ---------- Info tips ---------- */
+  .info-tip > button,
+  .info-tip .info-tip-icon {
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-pill);
+    color: var(--ink-muted);
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: var(--weight-bold);
+    height: 18px;
+    justify-content: center;
+    min-height: 18px;
+    padding: 0;
+    width: 18px;
+  }
+
+  .info-tip > button:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+  }
+
+  /* ---------- Data tables ---------- */
+  .operation-data-table {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+  }
+
+  .operation-data-table .operation-data-row {
+    background: var(--surface);
+    border-color: var(--line);
+    color: var(--ink);
+  }
+
+  .operation-data-table .operation-data-head {
+    background: var(--surface-muted);
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-muted);
+  }
+
+  .operation-data-table .operation-data-head .sort-heading-button {
+    background: transparent;
+    border: 0;
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+    letter-spacing: 0.03em;
+    padding: 0;
+    text-transform: uppercase;
+  }
+
+  .operation-data-table .operation-data-button-row:hover {
+    background: var(--surface-muted);
+  }
+
+  /* ---------- Charts: light surfaces, muted axes ---------- */
+  .dashboard-shell :is(.financial-trend-stage, .simulation-chart-stage, .finance-model-chart, .monte-chart) {
+    background: var(--surface);
+    border-color: var(--line);
+    box-shadow: none;
+  }
+
+  .dashboard-shell :is(.chart-tick, .chart-tick-x, .chart-tick-y, .chart-axis-label) {
+    fill: var(--ink-muted);
+  }
+
+  .dashboard-shell .chart-grid {
+    stroke: var(--line);
+  }
+
+  .dashboard-shell .chart-axis {
+    stroke: var(--line-strong);
+  }
+
+  .dashboard-shell .chart-value-badge text {
+    fill: var(--ink);
+  }
+
+  .dashboard-shell .chart-value-badge-label {
+    fill: var(--ink-muted);
+  }
+}
