@@ -3,20 +3,11 @@ import { Navigate, Outlet, createBrowserRouter, redirect } from "react-router";
 import App from "../App";
 import { useAppContext } from "./AppContext";
 import { RouteErrorScreen } from "./ErrorScreen";
-import ActiveProcessesPage from "../pages/ActiveProcessesPage";
 import AuthPage from "../pages/AuthPage";
-import AuthorizationPage from "../pages/AuthorizationPage";
-import DashboardPage from "../pages/DashboardPage";
-import FinancialModellingPage from "../pages/FinancialModellingPage";
-import MachinesEquipmentPage from "../pages/MachinesEquipmentPage";
-import OperationsOverviewPage from "../pages/OperationsOverviewPage";
-import PrintableReportPage from "../pages/PrintableReportPage";
-import ProcessDefinitionPage from "../pages/ProcessDefinitionPage";
-import ProductsPage from "../pages/ProductsPage";
-import ReportsPage from "../pages/ReportsPage";
-import ResourcesPage from "../pages/ResourcesPage";
-import SalesStrategyPage from "../pages/SalesStrategyPage";
-import SimulationPage from "../pages/SimulationPage";
+
+// Each page is its own chunk, fetched the first time one of its URLs opens.
+// The login form ships with the app so a signed-out visitor waits for nothing.
+const lazyPage = (load) => ({ lazy: { Component: async () => (await load()).default } });
 
 // Redirects that do not depend on data run as loaders, before anything renders.
 const redirectTo = (path) => () => redirect(path);
@@ -44,7 +35,7 @@ function LoginRoute() {
 // the current situation once that load has finished.
 function SimulationRoute() {
   const { activeSimulationVariant, planningLoaded } = useAppContext();
-  if (activeSimulationVariant) return <SimulationPage />;
+  if (activeSimulationVariant) return <Outlet />;
   return planningLoaded ? <RedirectTo path="/simulation/current-situation" /> : null;
 }
 
@@ -65,21 +56,25 @@ const legacyRoutes = [
 ];
 
 const signedInRoutes = [
-  { path: "dashboard", Component: DashboardPage },
-  { path: "operations", Component: OperationsOverviewPage },
-  { path: "operations/resources", Component: ResourcesPage },
-  { path: "operations/products", Component: ProductsPage },
-  { path: "operations/machines-equipment", Component: MachinesEquipmentPage },
-  { path: "operations/data-entry", Component: ProcessDefinitionPage },
-  { path: "operations/active-processes", Component: ActiveProcessesPage },
-  { path: "sales-strategy", Component: SalesStrategyPage },
-  { path: "financial-modelling/girdiler", Component: FinancialModellingPage },
-  { path: "financial-modelling/krediler", Component: FinancialModellingPage },
-  { path: "financial-modelling/analiz", Component: FinancialModellingPage },
-  { path: "simulation/:variantId", Component: SimulationRoute },
-  { path: "reports", Component: ReportsPage },
-  { path: "reports/print/:packKey", Component: PrintableReportPage },
-  { path: "authorization", Component: AuthorizationPage },
+  { path: "dashboard", ...lazyPage(() => import("../pages/DashboardPage")) },
+  { path: "operations", ...lazyPage(() => import("../pages/OperationsOverviewPage")) },
+  { path: "operations/resources", ...lazyPage(() => import("../pages/ResourcesPage")) },
+  { path: "operations/products", ...lazyPage(() => import("../pages/ProductsPage")) },
+  { path: "operations/machines-equipment", ...lazyPage(() => import("../pages/MachinesEquipmentPage")) },
+  { path: "operations/data-entry", ...lazyPage(() => import("../pages/ProcessDefinitionPage")) },
+  { path: "operations/active-processes", ...lazyPage(() => import("../pages/ActiveProcessesPage")) },
+  { path: "sales-strategy", ...lazyPage(() => import("../pages/SalesStrategyPage")) },
+  { path: "financial-modelling/girdiler", ...lazyPage(() => import("../pages/FinancialModellingPage")) },
+  { path: "financial-modelling/krediler", ...lazyPage(() => import("../pages/FinancialModellingPage")) },
+  { path: "financial-modelling/analiz", ...lazyPage(() => import("../pages/FinancialModellingPage")) },
+  {
+    path: "simulation/:variantId",
+    Component: SimulationRoute,
+    children: [{ index: true, ...lazyPage(() => import("../pages/SimulationPage")) }],
+  },
+  { path: "reports", ...lazyPage(() => import("../pages/ReportsPage")) },
+  { path: "reports/print/:packKey", ...lazyPage(() => import("../pages/PrintableReportPage")) },
+  { path: "authorization", ...lazyPage(() => import("../pages/AuthorizationPage")) },
 ];
 
 export const router = createBrowserRouter([

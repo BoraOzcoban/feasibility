@@ -9,6 +9,15 @@ export default defineConfig({
         if (warning.code === "MODULE_LEVEL_DIRECTIVE") return;
         warn(warning);
       },
+      output: {
+        // Libraries change less often than the app, so they get their own
+        // files and stay cached across releases.
+        manualChunks(id) {
+          if (/node_modules\/(react|react-dom|react-router|scheduler)\//.test(id)) return "react";
+          if (/node_modules\/(@supabase|iceberg-js)\//.test(id)) return "supabase";
+          return undefined;
+        },
+      },
     },
   },
   server: {
