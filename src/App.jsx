@@ -6,13 +6,8 @@ import {
   defaultFinancialSettings,
   emptyFinancialExtraCostForm,
   emptyFinancialModel,
-  financialLoanCurrencyOptions,
-  generalFinancialAssumptionFields,
-  inflationRevaluationFinancialFields,
   loadFinancialModel,
-  optionalMacroFinancialSettingFields,
   requiredFinancialSettingFields,
-  valuationFinancialSettingFields,
   deleteFinancialExtraCost,
   saveFinancialExtraCost,
   saveFinancialModelSettings,
@@ -20,43 +15,52 @@ import {
 import {
   asObjectArray,
   buildFinancialFeasibilityModel,
-  calculatePlanDailyCost,
-  convertMoneyToTry,
   buildSensitivityTable,
   defaultExchangeRates,
   evaluateFeasibilityDecision,
-  getBaseMonthlySalesUnits,
   getFinancialLoanRows,
-  getMonthStart,
-  getMonthlyProductProductionMap,
-  getOperationProductMap,
-  getOptionalPositiveNumber,
   getPlanProductId,
-  getProjectedChannelSalesUnits,
   getProjectionMonthCount,
-  getSalesExpectationInputMultipliers,
-  getSalesExpectationMultipliers,
   getSalesForecastForMonth,
   getSalesMultiplierPeriod,
   getTodayDateInputValue,
   hasUsableExchangeRates,
-  normalizeCurrencyCode,
-  parseDateInput,
   toFiniteNumber,
 } from "./lib/feasibilityModel";
 import { calculateCurrentPlanResult, getCurrentOperationPlans, hasViablePlanResult } from "./lib/operationsCalculations";
 import { deleteOperationRecord, emptyOperationForms, emptyOperationPlan, emptyPlanRows, getRecordInUseCounts, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
 import { deleteSimulationVariantRecord, emptySalesStrategy, emptySimulationVariant, loadSalesStrategy, loadSimulationVariants, saveSalesStrategy, saveSimulationVariant } from "./lib/planningService";
-import { buildFeasibilityReport, buildReportSheets, getStatementLayout, reportPackSections } from "./lib/reportExport";
+import { buildFeasibilityReport, buildReportSheets } from "./lib/reportExport";
 import logoUrl from "./assets/atera-logo.svg";
-import { buildWorkforceRowsFromOperationRows, emptyForm, emptyManagedUserForm, emptyRoleForm, isAdminRole, normalizeSimulationAlgorithm, operationCurrencyOptions, simulationAlgorithms } from "./lib/appDefaults";
-import { formatCurrencyAmount, formatCycleTime, formatLira, formatMinutesDuration, formatMonthLabel, formatNumber, formatOperationMoney, formatQuantity, formatTrendAxisAmount, getCycleTimeInputFromMinutes, getCycleTimeMinutes, normalizeCycleTimeUnit } from "./lib/format";
+import { AppContext } from "./app/AppContext";
+import OperationPlanner from "./components/OperationPlanner";
+import PrintableReportPage from "./pages/PrintableReportPage";
+import FinancialModellingPage from "./pages/FinancialModellingPage";
+import SimulationPage from "./pages/SimulationPage";
+import SalesStrategyPage from "./pages/SalesStrategyPage";
+import MachinesEquipmentPage from "./pages/MachinesEquipmentPage";
+import ProductsPage from "./pages/ProductsPage";
+import ResourcesPage from "./pages/ResourcesPage";
+import ActiveProcessesPage from "./pages/ActiveProcessesPage";
+import {
+  buildWorkforceRowsFromOperationRows,
+  emptyForm,
+  emptyManagedUserForm,
+  emptyRoleForm,
+  isAdminRole,
+} from "./lib/appDefaults";
+import {
+  formatLira,
+  formatNumber,
+  formatQuantity,
+  getCycleTimeMinutes,
+  normalizeCycleTimeUnit,
+} from "./lib/format";
 import { useMatchedPanelHeight } from "./hooks/useMatchedPanelHeight";
 import { normalizeGlossaryText } from "./lib/glossary";
 import { GlossaryTip, InfoTip } from "./components/InfoTip";
 import { cloneDashboardVisibleSections, cloneSalesVisibleSections, createUnsavedWorkspaceSnapshot, dashboardStorageKey, getStoredDashboardVisibleSections, getStoredSalesVisibleSections, normalizeDashboardVisibleSections, normalizeSalesVisibleSections, salesStrategyStorageKey } from "./lib/uiPreferences";
 import { fetchExchangeRates, isMissingExchangeRatesTableError, loadLatestExchangeRatesFromSupabase, saveExchangeRatesToSupabase, withTryOperationWorkspace } from "./lib/exchangeRates";
-import { buildFinancialLoanPaymentCalendar, buildIncomeExpenseTrendChart } from "./lib/charts";
 import { text } from "./i18n/text";
 import { PersonaAvatar } from "./components/PersonaAvatar";
 import { isSignedInRoute, normalizeRoutePath } from "./lib/routes";
@@ -2448,632 +2452,6 @@ function App() {
     );
   };
 
-  function renderOperationPlanner() {
-    const result = operationPlanResult
-      ? calculateCurrentPlanResult({ input: operationPlan, result: operationPlanResult }, operationsWorkspaceForFinance, { optimize: false })
-      : null;
-    const latestProcess = asObjectArray(operationsWorkspace.activePlans)[0] || operationsWorkspace.latestPlan;
-    const latestProcessName = latestProcess?.plan_name || latestProcess?.input?.planName || result?.planName || "";
-    const operationRows = asObjectArray(operationPlan.operationRows);
-    const workforceRows = asObjectArray(operationPlan.workforceRows);
-    const selectedProduct = operationsWorkspace.products.find((product) => product.id === operationPlan.productId);
-    const selectedProductFlowDefaults = getProductFlowDefaults(selectedProduct);
-    const selectedProductMaterials = asObjectArray(selectedProduct?.material_rows);
-    const planDailyCost = result ? calculatePlanDailyCost(result, operationsWorkspaceForFinance, financialSettingsForm) : null;
-    const flowStrategyLabels = {
-      batch: copy("Push system", "İtme sistemi"),
-      flow: copy("Pull system", "Çekme sistemi"),
-      parallel: copy("Pull system", "Çekme sistemi"),
-      pull: copy("Pull system", "Çekme sistemi"),
-      push: copy("Push system", "İtme sistemi"),
-    };
-    const infoLabel = (label, info) => (
-      <span className="label-with-info">
-        {label}
-        <InfoTip label={`${label} ${copy("info", "bilgi")}`} text={info} />
-      </span>
-    );
-    const resultSummaryColumns = [
-      { header: copy("Category", "Kategori"), key: "category", render: (row) => row.group, value: (row) => row.group },
-      { header: copy("Metric", "Metrik"), key: "metric", render: (row) => (row.info ? infoLabel(row.label, row.info) : row.label), value: (row) => row.label },
-      { header: copy("Value", "Değer"), key: "value", render: (row) => row.value, value: (row) => row.value },
-    ];
-    const resultTableRows = result ? [
-      {
-        id: "product",
-        group: copy("Plan", "Plan"),
-        label: copy("Product", "Ürün"),
-        value: result.productName || "-",
-      },
-      {
-        id: "unit-price",
-        group: copy("Plan", "Plan"),
-        label: copy("Unit Price", "Birim Fiyat"),
-        value: `${formatOperationMoney(result.productPrice, result.productPriceCurrency, exchangeRates, 2)} / ${result.productUnit || copy("pcs", "adet")}`,
-      },
-      {
-        id: "quantity",
-        group: copy("Plan", "Plan"),
-        label: copy("Quantity to Produce", "Üretilecek Miktar"),
-        value: `${formatQuantity(result.producedQuantity, result.productUnit)} ${result.productUnit || copy("pcs", "adet")}`,
-      },
-      {
-        id: "strategy",
-        group: copy("Plan", "Plan"),
-        label: copy("Strategy", "Strateji"),
-        value: flowStrategyLabels[result.flowStrategy] || result.flowStrategy || "-",
-        info: copy("Pull responds to customer or downstream demand and automatically protects the line with safety stock. Push produces from the plan or forecast and uses no safety stock.", "Çekme müşteri veya sonraki proses talebine yanıt verir ve hattı otomatik güvenli stokla korur. İtme plan veya tahmine göre üretir ve güvenli stok kullanmaz."),
-      },
-      {
-        id: "transfer-batch",
-        group: copy("Plan", "Plan"),
-        label: copy("Transfer Batch", "Transfer batch"),
-        value: result.transferBatchSize ? formatQuantity(result.transferBatchSize, result.productUnit) : "-",
-        info: copy("In Pull, this is the replenishment lot moved by downstream demand. In Push, the planned production quantity is sent forward as one lot.", "Çekme sisteminde sonraki proses talebiyle ikmal edilen transfer lotudur. İtme sisteminde planlanan üretim miktarı tek lot olarak ileri gönderilir."),
-      },
-      {
-        id: "recommended-batch",
-        group: copy("Plan", "Plan"),
-        label: copy("Best batch size", "En iyi batch"),
-        value: result.optimization?.recommendedBatchSize ? formatQuantity(result.optimization.recommendedBatchSize, result.productUnit) : "-",
-        info: copy("Recommended transfer batch size from the optimizer, based on total time plus waiting, inventory, delay, and capacity-loss costs.", "Toplam süre, bekleme, stok, gecikme ve kapasite kaybı maliyetlerine göre optimizasyonun önerdiği transfer batch boyutudur."),
-      },
-      {
-        id: "safety-stock",
-        group: copy("Production system", "Üretim sistemi"),
-        label: copy("Safety Stock", "Güvenli stok"),
-        value: result.safetyStockEnabled
-          ? `${formatQuantity(result.safetyStockQuantity, result.productUnit)} ${copy("max / buffer", "maks / buffer")} · ${formatQuantity(result.totalSafetyStockQuantity, result.productUnit)} ${copy("total", "toplam")} ${result.productUnit || copy("pcs", "adet")}`
-          : copy("Not used", "Kullanılmaz"),
-        info: copy("Pull automatically calculates at least enough intermediate safety stock to prevent downstream material starvation. Push always keeps this at zero.", "Çekme sistemi sonraki prosesin malzemesiz kalmasını önleyecek en düşük ara güvenli stoku otomatik hesaplar. İtme sisteminde bu değer her zaman sıfırdır."),
-      },
-      {
-        id: "stockout-wait",
-        group: copy("Production system", "Üretim sistemi"),
-        label: copy("Material starvation wait", "Stok bekleme süresi"),
-        value: `${formatNumber(result.stockoutWaitTimeHours, 2)} ${copy("hours", "saat")}`,
-        info: copy("Time a station cannot run because input stock has not arrived. Pull safety stock keeps this at zero; Push can show waiting.", "Girdi stoku gelmediği için istasyonun çalışamadığı süredir. Çekme güvenli stoku bunu sıfırda tutar; İtme sisteminde bekleme oluşabilir."),
-      },
-      {
-        id: "production-time",
-        group: copy("Production system", "Üretim sistemi"),
-        label: copy("Production Time", "Toplam üretim süresi"),
-        value: result.totalProductionTimeMinutes ? formatMinutesDuration(result.totalProductionTimeMinutes) : "-",
-        info: copy("The simulated time from the first operation start until the last batch finishes the final operation.", "İlk operasyonun başlamasından son batch'in son operasyonu bitirmesine kadar simüle edilen süredir."),
-      },
-      {
-        id: "cycle-time",
-        group: copy("Production system", "Üretim sistemi"),
-        label: copy("Cycle Time", "Çevrim Süresi"),
-        value: formatCycleTime(result.cycleTimeMinutes, selectedProduct?.cycle_time_unit || "minute"),
-      },
-      {
-        id: "effective-cycle",
-        group: copy("Production system", "Üretim sistemi"),
-        label: copy("Effective Cycle", "Efektif çevrim"),
-        value: result.effectiveCycleTimeMinutes ? formatMinutesDuration(result.effectiveCycleTimeMinutes) : "-",
-        info: copy("Average elapsed production time per finished unit after flow, waiting, setup, and bottlenecks are included.", "Akış, bekleme, setup ve darboğazlar dahil edildikten sonra biten ürün başına ortalama geçen üretim süresidir."),
-      },
-      {
-        id: "bottleneck",
-        group: copy("Production system", "Üretim sistemi"),
-        label: copy("Bottleneck", "Darboğaz"),
-        value: result.bottleneck?.operationName || "-",
-        info: copy("The operation with the highest total busy time. It limits the line and is usually the first place to improve capacity.", "Toplam meşgul süresi en yüksek operasyondur. Hattı sınırlar ve kapasite iyileştirmesinde genellikle ilk bakılacak yerdir."),
-      },
-      {
-        id: "max-wip",
-        group: copy("Production system", "Üretim sistemi"),
-        label: copy("Max WIP", "Maks WIP"),
-        value: formatQuantity(result.maxWipQuantity, result.productUnit),
-        info: copy("Maximum intermediate inventory in a process buffer, including Pull safety stock. Push has no starting safety stock.", "Proses tamponundaki, Çekme güvenli stoku dahil maksimum ara stoktur. İtme sisteminde başlangıç güvenli stoku yoktur."),
-      },
-      {
-        id: "machine-hours",
-        group: copy("Capacity", "Kapasite"),
-        label: copy("Machine Hours", "Makine Saati"),
-        value: `${formatNumber(result.machineHoursUsed, 1)} ${copy("hours", "saat")}`,
-      },
-      {
-        id: "workforce-hours",
-        group: copy("Capacity", "Kapasite"),
-        label: copy("Workforce Hours", "İşgücü Saati"),
-        value: `${formatNumber(result.workforceHoursUsed, 1)} ${copy("hours", "saat")}`,
-      },
-      {
-        id: "machine-value",
-        group: copy("Capacity", "Kapasite"),
-        label: copy("Selected Machine Value", "Seçili Makine Değeri"),
-        value: formatLira(result.selectedMachineValue),
-      },
-      {
-        id: "idle-time",
-        group: copy("Capacity", "Kapasite"),
-        label: copy("Idle Time", "Boşta süre"),
-        value: `${formatNumber(result.totalIdleTimeHours, 2)} ${copy("hours", "saat")}`,
-        info: copy("Machine time that remains unused while the simulated line is constrained by another operation or demand timing.", "Simüle edilen hat başka bir operasyon veya talep zamanlaması tarafından sınırlandığında kullanılmadan kalan makine süresidir."),
-      },
-      {
-        id: "energy",
-        group: copy("Cost", "Maliyet"),
-        label: copy("Electricity Consumption", "Elektrik Tüketimi"),
-        value: `${formatNumber(result.energyConsumptionKwh, 2)} kWh`,
-      },
-      {
-        id: "material-cost",
-        group: copy("Cost", "Maliyet"),
-        label: copy("Material / Unit", "Malzeme / Birim"),
-        value: planDailyCost ? formatLira(planDailyCost.unit.material, 2) : "-",
-      },
-      {
-        id: "workforce-cost",
-        group: copy("Cost", "Maliyet"),
-        label: copy("Labor / Unit", "İşçilik / Birim"),
-        value: planDailyCost ? formatLira(planDailyCost.unit.labor, 2) : "-",
-      },
-      {
-        id: "daily-cost",
-        group: copy("Cost", "Maliyet"),
-        label: copy("Daily Production Cost", "Günlük Üretim Maliyeti"),
-        value: planDailyCost ? formatLira(planDailyCost.daily.total) : "-",
-        info: copy("Recipe materials, workforce hours and machine energy priced with the current records and the electricity price from financial inputs.", "Reçete malzemeleri, işgücü saatleri ve makine enerjisi; güncel kayıtlar ve finans girdilerindeki elektrik fiyatıyla hesaplanır."),
-      },
-      {
-        id: "waiting-cost",
-        group: copy("Cost", "Maliyet"),
-        label: copy("Waiting Cost", "Bekleme maliyeti"),
-        value: formatLira(result.waitingCost),
-        info: copy("Cost of machine queue time plus material-starvation waiting. Pull safety stock removes the starvation part; Push can incur it.", "Makine kuyruğu ile stok yetersizliği beklemesinin maliyetidir. Çekme güvenli stoku stok beklemesi kısmını kaldırır; İtme sisteminde bu maliyet oluşabilir."),
-      },
-      {
-        id: "inventory-cost",
-        group: copy("Cost", "Maliyet"),
-        label: copy("Inventory Cost", "Stok maliyeti"),
-        value: formatLira(result.inventoryCost),
-        info: copy("Cost generated by WIP held in buffers. It uses unit-hours, so both quantity and time in buffer matter.", "Buffer'da tutulan WIP nedeniyle oluşan maliyettir. Birim-saat mantığıyla çalışır; yani hem miktar hem de buffer'da kalma süresi önemlidir."),
-      },
-      {
-        id: "delay-capacity",
-        group: copy("Cost", "Maliyet"),
-        label: copy("Delay / Capacity Loss", "Gecikme / kapasite kaybı"),
-        value: formatLira(toFiniteNumber(result.delayCost) + toFiniteNumber(result.capacityLossCost)),
-        info: copy("Combined penalty for exceeding available production time and leaving machine capacity idle because of line imbalance.", "Kullanılabilir üretim süresini aşma ve hat dengesizliği yüzünden makine kapasitesinin boş kalması için birleşik cezadır."),
-      },
-      {
-        id: "objective-score",
-        group: copy("Cost", "Maliyet"),
-        label: copy("Objective Score", "Amaç skoru"),
-        value: formatNumber(result.objectiveScore, 2),
-        info: copy("Optimizer score: total production minutes plus waiting, inventory, delay, and capacity-loss costs. Lower is better.", "Optimizasyon skoru: toplam üretim dakikası ile bekleme, stok, gecikme ve kapasite kaybı maliyetlerinin toplamı. Düşük olması daha iyidir."),
-      },
-    ] : [];
-
-    const processWorkforceRows = buildWorkforceRowsFromOperationRows(operationRows);
-    const activeWorkforceRows = processWorkforceRows.length ? processWorkforceRows : workforceRows;
-    const showProcessSteps = Boolean(processDefinitionOpen && selectedProduct);
-    const hasProductProcessTemplate = getProductProcessRows(selectedProduct).length > 0;
-    const recipeHasPositiveQuantity = selectedProductMaterials.some((row) => toFiniteNumber(row.quantity_per_unit ?? row.quantityPerUnit) > 0);
-    const selectedProductRecipeLabel = selectedProductMaterials.length
-      ? `${formatNumber(selectedProductMaterials.length)} ${copy("materials", "malzeme")}`
-      : copy("No recipe", "Reçete yok");
-    const getSelectedRecipeMaterial = (materialId) => selectedProductMaterials.find((row) => getRecipeMaterialId(row) === materialId);
-    const handleProcessProductChange = (productId) => {
-      const product = operationsWorkspace.products.find((item) => item.id === productId);
-
-      setProcessDefinitionOpen(false);
-      setOperationPlan((current) => ({
-        ...current,
-        ...getProductFlowDefaults(product),
-        operationRows: buildProductOperationRows(product),
-        productId: product?.id || "",
-        productName: product?.name || "",
-      }));
-      setOperationPlanResult(null);
-    };
-    const handleOpenProcessSteps = () => {
-      if (!selectedProduct) return;
-      if (!hasProductProcessTemplate) {
-        setOperationsStatus(copy(
-          "This product has no process template. Define its ordered processes on the Products screen first.",
-          "Bu ürünün süreç şablonu yok. Önce Ürünler ekranında sıralı süreçlerini tanımlayın.",
-        ));
-        setProcessDefinitionOpen(false);
-        return;
-      }
-
-      setOperationPlan((current) => ({
-        ...current,
-        operationRows: buildProductOperationRows(selectedProduct),
-        productName: selectedProduct.name || "",
-      }));
-      setProcessDefinitionOpen(true);
-    };
-
-    return (
-      <section
-        className={`operation-planner process-definition-builder ${showProcessSteps ? "is-open" : "is-closed"}`}
-        aria-label={copy("Process definition", "Süreç tanımlama")}
-      >
-        <form className="operation-card planner-input-card process-definition-form" onSubmit={handleSaveOperationPlan}>
-          <section className={`process-product-gate ${showProcessSteps ? "open" : ""}`}>
-            <div className="process-product-copy">
-              <span>{copy("Product", "Ürün")}</span>
-              <h2>{copy("What product will be produced?", "Hangi ürün üretilecek?")}</h2>
-            </div>
-            <div className="process-product-controls">
-              <label>
-                <span>{copy("Product to produce", "Üretilecek ürün")}</span>
-                <select value={operationPlan.productId || ""} onChange={(event) => handleProcessProductChange(event.target.value)}>
-                  <option value="">{copy("Select product", "Ürün seç")}</option>
-                  {operationsWorkspace.products.map((product) => (
-                    <option value={product.id} key={product.id}>{product.name}</option>
-                  ))}
-                </select>
-              </label>
-              <button type="button" className="process-open-button" disabled={!selectedProduct || !hasProductProcessTemplate} onClick={handleOpenProcessSteps}>
-                {showProcessSteps ? copy("Refresh defined processes", "Tanımlı süreçleri yenile") : copy("View defined processes", "Tanımlı süreçleri görüntüle")}
-              </button>
-            </div>
-            {selectedProduct && (
-              <div className="process-product-selected" aria-label={copy("Selected product summary", "Seçili ürün özeti")}>
-                <span>
-                  {copy("Unit price", "Birim fiyat")}
-                  <strong>{formatOperationMoney(selectedProduct.price, selectedProduct.price_currency, exchangeRates, 2)}</strong>
-                </span>
-                <span>
-                  {copy("Recipe", "Reçete")}
-                  <strong>{selectedProductRecipeLabel}</strong>
-                </span>
-                <span>
-                  {copy("Default system", "Varsayılan sistem")}
-                  <strong>{flowStrategyLabels[selectedProductFlowDefaults.flowStrategy]}</strong>
-                </span>
-              </div>
-            )}
-            {selectedProduct && !hasProductProcessTemplate && (
-              <p className="planner-empty-state process-recipe-warning">
-                {copy(
-                  "Define and save this product's ordered processes on the Products screen before process planning.",
-                  "Süreç planlamadan önce Ürünler ekranında bu ürünün sıralı süreçlerini tanımlayıp kaydedin.",
-                )}
-              </p>
-            )}
-          </section>
-
-          {showProcessSteps && (
-            <>
-              <div className="process-run-settings">
-                <label>
-                  <span>{copy("Plan name", "Plan adı")}</span>
-                  <input
-                    type="text"
-                    value={operationPlan.planName ?? ""}
-                    onChange={(event) => updateOperationPlan("planName", event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>
-                    {operationPlan.flowStrategy === "push"
-                      ? copy("Planned production quantity", "Planlanan üretim adedi")
-                      : copy("Customer / downstream demand", "Müşteri / sonraki proses talebi")}
-                  </span>
-                  <input
-                    min="0"
-                    step="1"
-                    type="number"
-                    value={operationPlan.targetQuantity ?? ""}
-                    onChange={(event) => updateOperationPlan("targetQuantity", event.target.value)}
-                  />
-                  <small>{selectedProduct.unit || copy("units", "adet")}</small>
-                </label>
-              </div>
-
-              {!recipeHasPositiveQuantity && (
-                <p className="planner-empty-state process-recipe-warning">
-                  {copy("This product needs a positive saved recipe before calculation.", "Hesaplama için bu ürünün pozitif miktarlı kayıtlı reçetesi olmalı.")}
-                </p>
-              )}
-
-              <section className="process-step-workspace" aria-label={copy("Process steps", "Süreç adımları")}>
-                <div className="process-step-toolbar">
-                  <div>
-                    <span>{copy("Required processes", "Gerekli süreçler")}</span>
-                    <strong>{formatNumber(operationRows.length)} {copy("process boxes", "süreç kutusu")}</strong>
-                  </div>
-                  <small>{copy("Locked to the product template", "Ürün şablonuna bağlı ve kilitli")}</small>
-                </div>
-
-                <fieldset className="process-step-list process-step-list-locked" disabled>
-                  {operationRows.length ? operationRows.map((row, index) => {
-                    const selectedMachine = operationsWorkspace.machines.find((machine) => machine.id === row.machineId);
-                    const selectedMaterial = getSelectedRecipeMaterial(row.materialId);
-
-                    return (
-                      <article className="process-step-card" key={row.operationId || `operation-${index}`}>
-                        <div className="process-step-card-header">
-                          <div className="process-step-index">{formatNumber(index + 1, 0)}</div>
-                          <div>
-                            <span>{copy("Process", "Süreç")}</span>
-                            <strong>{row.operationName || `${copy("Process", "Süreç")} ${index + 1}`}</strong>
-                            <small>{selectedMachine?.name || copy("Machine not selected", "Makine seçilmedi")}</small>
-                          </div>
-                          <small>{copy("Defined on Products", "Ürünler ekranında tanımlandı")}</small>
-                        </div>
-
-                        <div className="process-step-grid">
-                          <label>
-                            <span>{copy("Process name", "Süreç adı")}</span>
-                            <input
-                              type="text"
-                              value={row.operationName || ""}
-                              onChange={(event) => updateOperationPlanRow("operationRows", index, "operationName", event.target.value)}
-                            />
-                          </label>
-                          <label>
-                            <span>{copy("Machine", "Makine")}</span>
-                            <select value={row.machineId || ""} onChange={(event) => updateOperationPlanRow("operationRows", index, "machineId", event.target.value)}>
-                              <option value="">{copy("Select machine", "Makine seç")}</option>
-                              {operationsWorkspace.machines.map((machine) => (
-                                <option value={machine.id} key={machine.id}>{machine.name}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label>
-                            <span>{copy("Min / unit", "Dk / birim")}</span>
-                            <input
-                              min="0.0001"
-                              step="0.01"
-                              type="number"
-                              value={row.processTimeMinutes ?? ""}
-                              onChange={(event) => updateOperationPlanRow("operationRows", index, "processTimeMinutes", event.target.value)}
-                            />
-                          </label>
-                          <label>
-                            <span>{copy("Machine hours", "Makine saati")}</span>
-                            <input
-                              min="0"
-                              step="0.25"
-                              type="number"
-                              value={row.dailyHours ?? ""}
-                              onChange={(event) => updateOperationPlanRow("operationRows", index, "dailyHours", event.target.value)}
-                            />
-                          </label>
-                          <label>
-                            <span>{copy("Material", "Malzeme")}</span>
-                            <select
-                              disabled={!selectedProductMaterials.length}
-                              value={row.materialId || ""}
-                              onChange={(event) => {
-                                const materialRow = getSelectedRecipeMaterial(event.target.value);
-                                updateOperationPlanRowFields("operationRows", index, {
-                                  materialId: event.target.value,
-                                  materialQuantityPerUnit: materialRow?.quantity_per_unit ?? materialRow?.quantityPerUnit ?? row.materialQuantityPerUnit ?? "",
-                                });
-                              }}
-                            >
-                              <option value="">{copy("Select material", "Malzeme seç")}</option>
-                              {selectedProductMaterials.map((materialRow, materialIndex) => {
-                                const materialId = getRecipeMaterialId(materialRow);
-                                return (
-                                  <option value={materialId} key={materialId || `material-${materialIndex}`}>
-                                    {materialRow.material?.name || materialRow.name || `${copy("Material", "Malzeme")} ${materialIndex + 1}`}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </label>
-                          <label>
-                            <span>{copy("Recipe qty", "Reçete miktarı")}</span>
-                            <input
-                              min="0"
-                              step="0.0001"
-                              type="number"
-                              value={row.materialQuantityPerUnit ?? ""}
-                              onChange={(event) => updateOperationPlanRow("operationRows", index, "materialQuantityPerUnit", event.target.value)}
-                            />
-                            <small>{selectedMaterial?.material?.unit || selectedMaterial?.unit || ""}</small>
-                          </label>
-                          <label>
-                            <span>{copy("Equipment", "Ekipman")}</span>
-                            <select value={row.equipmentId || ""} onChange={(event) => updateOperationPlanRow("operationRows", index, "equipmentId", event.target.value)}>
-                              <option value="">{copy("Optional", "Opsiyonel")}</option>
-                              {operationsWorkspace.equipment.map((equipment) => (
-                                <option value={equipment.id} key={equipment.id}>{equipment.name}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label>
-                            <span>{copy("Crew role", "Ekip rolü")}</span>
-                            <select value={row.workforceId || ""} onChange={(event) => updateOperationPlanRow("operationRows", index, "workforceId", event.target.value)}>
-                              <option value="">{copy("Select role", "Rol seç")}</option>
-                              {operationsWorkspace.workforce.map((workforce) => (
-                                <option value={workforce.id} key={workforce.id}>{workforce.role_name}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label>
-                            <span>{copy("People", "Kişi")}</span>
-                            <input
-                              min="0"
-                              step="1"
-                              type="number"
-                              value={row.peopleAssigned ?? ""}
-                              onChange={(event) => updateOperationPlanRow("operationRows", index, "peopleAssigned", event.target.value)}
-                            />
-                          </label>
-                          <label>
-                            <span>{copy("Crew hours", "Ekip saati")}</span>
-                            <input
-                              min="0"
-                              step="0.25"
-                              type="number"
-                              value={row.workforceDailyHours ?? ""}
-                              onChange={(event) => updateOperationPlanRow("operationRows", index, "workforceDailyHours", event.target.value)}
-                            />
-                          </label>
-                        </div>
-
-                        <details className="process-step-advanced">
-                          <summary>{copy("Advanced timing", "İleri zamanlama")}</summary>
-                          <div className="process-step-grid compact">
-                            <label>
-                              <span>{copy("Capacity", "Kapasite")}</span>
-                              <input
-                                min="1"
-                                step="1"
-                                type="number"
-                                value={row.capacity ?? ""}
-                                onChange={(event) => updateOperationPlanRow("operationRows", index, "capacity", event.target.value)}
-                              />
-                            </label>
-                            <label>
-                              <span>{copy("Setup min", "Setup dk")}</span>
-                              <input
-                                min="0"
-                                step="0.1"
-                                type="number"
-                                value={row.setupMinutes ?? ""}
-                                onChange={(event) => updateOperationPlanRow("operationRows", index, "setupMinutes", event.target.value)}
-                              />
-                            </label>
-                            <label>
-                              <span>{copy("Speed", "Hız")}</span>
-                              <input
-                                min="0.0001"
-                                step="0.01"
-                                type="number"
-                                value={row.speedMultiplier ?? ""}
-                                onChange={(event) => updateOperationPlanRow("operationRows", index, "speedMultiplier", event.target.value)}
-                              />
-                            </label>
-                          </div>
-                        </details>
-                      </article>
-                    );
-                  }) : (
-                    <p className="planner-empty-state">{copy("This product has no saved process template.", "Bu ürünün kayıtlı süreç şablonu yok.")}</p>
-                  )}
-                </fieldset>
-              </section>
-
-              <details className="process-advanced-options process-accordion">
-                <summary className="process-accordion-summary">
-                  <div>
-                    <span>{copy("Push / Pull and optimization", "İtme / Çekme ve optimizasyon")}</span>
-                    <p>{copy("Demand logic, replenishment lot, safety stock, buffer, and optional cost weights.", "Talep mantığı, ikmal lotu, güvenli stok, buffer ve opsiyonel maliyet ağırlıkları.")}</p>
-                  </div>
-                  <small>{flowStrategyLabels[operationPlan.flowStrategy] || flowStrategyLabels.pull}</small>
-                </summary>
-                <div className="process-accordion-body">
-                  <div className="planner-fields compact-planner-fields process-compact-options">
-                    <label>
-                      <span>{copy("Production system", "Üretim sistemi")}</span>
-                      <div>
-                        <select value={normalizeFlowStrategy(operationPlan.flowStrategy)} onChange={(event) => updateOperationPlan("flowStrategy", event.target.value)}>
-                          <option value="pull">{flowStrategyLabels.pull}</option>
-                          <option value="push">{flowStrategyLabels.push}</option>
-                        </select>
-                      </div>
-                      <small>
-                        {operationPlan.flowStrategy === "push"
-                          ? copy("Plan/forecast driven; no safety stock.", "Plan/tahmin odaklıdır; güvenli stok kullanılmaz.")
-                          : copy("Demand driven; safety stock prevents material starvation.", "Talep odaklıdır; güvenli stok malzeme beklemesini önler.")}
-                      </small>
-                    </label>
-                    <label>
-                      <span>{copy("Pull replenishment lot", "Çekme ikmal lotu")}</span>
-                      <div>
-                        <input disabled={operationPlan.flowStrategy === "push"} min="1" step="1" type="number" value={operationPlan.batchSize ?? ""} onChange={(event) => updateOperationPlan("batchSize", event.target.value)} />
-                      </div>
-                    </label>
-                    <label>
-                      <span>{copy("Minimum transfer", "Minimum transfer")}</span>
-                      <div>
-                        <input disabled={operationPlan.flowStrategy === "push"} min="1" step="1" type="number" value={operationPlan.minimumTransferQuantity ?? ""} onChange={(event) => updateOperationPlan("minimumTransferQuantity", event.target.value)} />
-                      </div>
-                    </label>
-                    <label>
-                      <span>{copy("Minimum safety stock", "Minimum güvenli stok")}</span>
-                      <div>
-                        <input disabled={operationPlan.flowStrategy === "push"} min="0" step="1" type="number" value={operationPlan.flowStrategy === "push" ? 0 : (operationPlan.safetyStockQuantity ?? "")} onChange={(event) => updateOperationPlan("safetyStockQuantity", event.target.value)} />
-                      </div>
-                      <small>{copy("Pull raises this automatically if more stock is needed to keep every station running.", "Çekme, tüm istasyonları çalışır tutmak için gerekirse bu miktarı otomatik yükseltir.")}</small>
-                    </label>
-                    <label>
-                      <span>{copy("Max buffer", "Maks buffer")}</span>
-                      <div>
-                        <input min="0" step="1" type="number" value={operationPlan.bufferMaxQuantity ?? ""} onChange={(event) => updateOperationPlan("bufferMaxQuantity", event.target.value)} />
-                      </div>
-                    </label>
-                    <label>
-                      <span>{copy("Waiting cost / hour", "Bekleme maliyeti / saat")}</span>
-                      <div>
-                        <input min="0" step="0.01" type="number" value={operationPlan.waitingCostPerHour ?? ""} onChange={(event) => updateOperationPlan("waitingCostPerHour", event.target.value)} />
-                      </div>
-                    </label>
-                    <label>
-                      <span>{copy("Inventory cost / unit-hour", "Stok maliyeti / birim-saat")}</span>
-                      <div>
-                        <input min="0" step="0.01" type="number" value={operationPlan.inventoryCostPerUnitHour ?? ""} onChange={(event) => updateOperationPlan("inventoryCostPerUnitHour", event.target.value)} />
-                      </div>
-                    </label>
-                    <label>
-                      <span>{copy("Delay cost / hour", "Gecikme maliyeti / saat")}</span>
-                      <div>
-                        <input min="0" step="0.01" type="number" value={operationPlan.delayCostPerHour ?? ""} onChange={(event) => updateOperationPlan("delayCostPerHour", event.target.value)} />
-                      </div>
-                    </label>
-                    <label>
-                      <span>{copy("Capacity loss / hour", "Kapasite kaybı / saat")}</span>
-                      <div>
-                        <input min="0" step="0.01" type="number" value={operationPlan.capacityLossCostPerHour ?? ""} onChange={(event) => updateOperationPlan("capacityLossCostPerHour", event.target.value)} />
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </details>
-
-              <div className="process-save-panel">
-                <div>
-                  <span>{copy("Final checkpoint", "Son kontrol")}</span>
-                  <strong>{copy("Calculate this production process", "Bu üretim sürecini hesapla")}</strong>
-                  <p>{`${formatNumber(operationRows.length)} ${copy("processes", "süreç")} / ${formatNumber(activeWorkforceRows.length)} ${copy("crew roles", "ekip rolü")}`}</p>
-                </div>
-                <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
-                  {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Calculate and Save", "Hesapla ve Kaydet")}
-                </button>
-              </div>
-            </>
-          )}
-
-          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
-        </form>
-
-        {showProcessSteps && result && (
-          <article className="operation-card planner-result-card process-definition-result">
-            <div className="operation-card-heading">
-              <div>
-                <span>{latestProcessName || copy("Result", "Sonuç")}</span>
-                <h2>{copy("Production system and cost summary", "Üretim sistemi ve maliyet özeti")}</h2>
-              </div>
-              <mark className="ok">{`${formatNumber(result.energyConsumptionKwh, 2)} kWh`}</mark>
-            </div>
-            {renderSimpleSortableGrid({
-              columns: resultSummaryColumns,
-              gridTemplateColumns: "0.72fr 1.15fr 1fr",
-              headClassName: "process-result-table-head",
-              rowClassName: "process-result-table-row",
-              rows: resultTableRows,
-              tableClassName: "process-result-table",
-              tableId: "process-result-summary",
-            })}
-          </article>
-        )}
-      </section>
-    );
-
-  }
-
   function renderOperationRecordForm(entity, fields, options = {}) {
     const formClassName = [
       "operation-card operation-data-form operations-record-form-card",
@@ -3144,3502 +2522,6 @@ function App() {
           {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save", "Kaydet")}
         </button>
       </form>
-    );
-  }
-
-  function renderResourcesPage() {
-    const unitOptions = ["kg", "gr", "mg", "adet", "metre", "litre", "ml"];
-    const resourceCurrencyCount = new Set([
-      ...operationsWorkspace.materials.map((material) => material.price_currency || "TRY"),
-      ...operationsWorkspace.workforce.map((workforce) => workforce.hourly_cost_currency || "TRY"),
-    ]).size;
-    const pricedMaterialCount = operationsWorkspace.materials.filter((material) => toFiniteNumber(material.price_per_unit) > 0).length;
-    const materialColumns = [
-      { header: copy("Material", "Malzeme"), key: "material", render: (row) => row.name, value: (row) => row.name },
-      { header: copy("Group", "Grup"), key: "group", render: (row) => row.material_group || copy("General", "Genel"), value: (row) => row.material_group || copy("General", "Genel") },
-      { header: copy("Unit", "Birim"), key: "unit", render: (row) => row.unit, value: (row) => row.unit },
-      {
-        header: copy("Unit price", "Birim fiyat"),
-        key: "unit-price",
-        render: (row) => formatOperationMoney(row.price_per_unit, row.price_currency, exchangeRates, 2),
-        sortValue: (row) => toFiniteNumber(row.price_per_unit),
-        filterValue: (row) => `${row.price_per_unit} ${formatOperationMoney(row.price_per_unit, row.price_currency, exchangeRates, 2)}`,
-      },
-      { header: copy("Currency", "Para birimi"), key: "currency", render: (row) => row.price_currency || "TRY", value: (row) => row.price_currency || "TRY" },
-    ];
-    const workforceColumns = [
-      { header: copy("Role", "Rol"), key: "role", render: (row) => row.role_name, value: (row) => row.role_name },
-      {
-        header: copy("Hourly cost", "Saatlik maliyet"),
-        key: "hourly-cost",
-        render: (row) => `${formatOperationMoney(row.hourly_cost, row.hourly_cost_currency, exchangeRates, 2)} / ${copy("hour", "saat")}`,
-        sortValue: (row) => toFiniteNumber(row.hourly_cost),
-        filterValue: (row) => `${row.hourly_cost} ${formatOperationMoney(row.hourly_cost, row.hourly_cost_currency, exchangeRates, 2)}`,
-      },
-      { header: copy("Currency", "Para birimi"), key: "currency", render: (row) => row.hourly_cost_currency || "TRY", value: (row) => row.hourly_cost_currency || "TRY" },
-    ];
-
-    return renderDashboardLayout(
-      "operations/resources",
-        <section className="operations-workspace operations-modern operations-entry-page operations-resources-page">
-          <div className="operations-header">
-            <div>
-              <span>{copy("Operations", "Operasyon")} / {copy("Resources", "Kaynak")}</span>
-              <h1>{copy("Resources", "Kaynak")}</h1>
-              <p>{copy("Add materials, semi-finished items, and services used by production and costing workflows.", "Üretim ve maliyet akışlarında kullanılan malzeme, yarı mamül ve hizmetleri ekleyin.")}</p>
-            </div>
-            <div className="operations-actions">
-              <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
-            </div>
-          </div>
-
-          <div className="process-summary-grid operations-entry-summary">
-            <article className="operation-card process-summary-card">
-              <span>{copy("Materials", "Malzemeler")}</span>
-              <strong>{formatNumber(operationsWorkspace.materials.length)}</strong>
-              <small>{copy("priced production inputs", "fiyatlı üretim girdileri")}: {formatNumber(pricedMaterialCount)}</small>
-            </article>
-            <article className="operation-card process-summary-card">
-              <span>{copy("Workforce roles", "İşgücü rolleri")}</span>
-              <strong>{formatNumber(operationsWorkspace.workforce.length)}</strong>
-              <small>{copy("available for process plans", "süreç planlarına hazır")}</small>
-            </article>
-            <article className="operation-card process-summary-card">
-              <span>{copy("Currencies", "Para birimleri")}</span>
-              <strong>{formatNumber(resourceCurrencyCount)}</strong>
-              <small>{copy("converted in financial analysis", "finans analizinde çevrilir")}</small>
-            </article>
-          </div>
-
-          <div className="resource-definition-grid">
-            <form ref={materialFormRef} className="operation-card operation-data-form resource-definition-card operations-record-form-card operations-material-form-card" onSubmit={(event) => handleSaveOperationRecord("material", event)}>
-              <div className="operation-card-heading">
-                <div>
-                  <span>{copy("Add material", "Malzeme ekle")}</span>
-                  <h2>{copy("Material", "Malzeme")}</h2>
-                </div>
-              </div>
-              <div className="operation-data-fields">
-                <label>
-                  <span>{copy("Material name", "Malzeme adı")}</span>
-                  <input required type="text" value={operationForms.material.name} onChange={(event) => updateOperationForm("material", "name", event.target.value)} />
-                </label>
-                <label>
-                  <span>{copy("Material group", "Malzeme grubu")}</span>
-                  <input
-                    placeholder={copy("e.g. Beverage", "örn. İçecek")}
-                    required
-                    type="text"
-                    value={operationForms.material.materialGroup}
-                    onChange={(event) => updateOperationForm("material", "materialGroup", event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>{copy("Unit", "Birim")}</span>
-                  <select value={operationForms.material.unit} onChange={(event) => updateOperationForm("material", "unit", event.target.value)}>
-                    {unitOptions.map((unit) => <option value={unit} key={unit}>{unit}</option>)}
-                  </select>
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Unit price", "Birim fiyat")}
-                    <InfoTip
-                      label={copy("Material unit price info", "Malzeme birim fiyat bilgisi")}
-                      text={copy(
-                        "Material cost is unit price x required quantity. If the price is USD/EUR, financial analysis first converts it to TRY with the current rate.",
-                        "Malzeme maliyeti birim fiyat x gereken miktar olarak hesaplanır. Fiyat USD/EUR ise finansal analiz önce güncel kurla TL'ye çevirir.",
-                      )}
-                    />
-                  </span>
-                  <input min="0" step="0.01" type="number" value={operationForms.material.pricePerUnit} onChange={(event) => updateOperationForm("material", "pricePerUnit", event.target.value)} />
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Currency", "Para birimi")}
-                    <InfoTip
-                      label={copy("Material currency info", "Malzeme para birimi bilgisi")}
-                      text={copy("TRY stays as entered. USD and EUR are multiplied by their TRY rates before cost and feasibility calculations.", "TL girildiği gibi kalır. USD ve EUR, maliyet ve fizibilite hesaplarından önce ilgili TL kuru ile çarpılır.")}
-                    />
-                  </span>
-                  <select value={operationForms.material.priceCurrency} onChange={(event) => updateOperationForm("material", "priceCurrency", event.target.value)}>
-                    {operationCurrencyOptions.map((currency) => <option value={currency} key={currency}>{currency}</option>)}
-                  </select>
-                </label>
-              </div>
-              <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
-                {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Add Material", "Malzeme Ekle")}
-              </button>
-            </form>
-
-            <article className="operation-card resource-definition-card operation-data-table-card operations-record-list-card operations-material-list-card" style={materialListHeightStyle}>
-              <div className="operation-card-heading">
-                <h2>{copy("Materials", "Malzemeler")}</h2>
-                <span>{operationsWorkspace.materials.length} {copy("records", "kayıt")}</span>
-              </div>
-              {renderSortableDataTable({
-                columns: materialColumns,
-                gridTemplateColumns: "1.2fr 0.8fr 0.6fr 0.9fr 0.7fr",
-                onRowClick: (material) => copyOperationRecordToForm("material", material),
-                onDeleteRow: (row) => handleDeleteOperationRecord("material", row),
-                rows: operationsWorkspace.materials,
-                tableId: "materials",
-                useButtonRows: true,
-              })}
-            </article>
-
-            <form ref={workforceFormRef} className="operation-card operation-data-form resource-definition-card operations-record-form-card operations-workforce-form-card" onSubmit={(event) => handleSaveOperationRecord("workforce", event)}>
-              <div className="operation-card-heading">
-                <div>
-                  <span>{copy("Add human resource", "İnsan kaynağı ekle")}</span>
-                  <h2>{copy("Human Resources", "İnsan Kaynağı")}</h2>
-                </div>
-              </div>
-              <div className="operation-data-fields">
-                <label>
-                  <span>{copy("Role", "Rol")}</span>
-                  <input type="text" value={operationForms.workforce.roleName} onChange={(event) => updateOperationForm("workforce", "roleName", event.target.value)} />
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Hourly cost", "Saatlik maliyet")}
-                    <InfoTip
-                      label={copy("Hourly cost info", "Saatlik maliyet bilgisi")}
-                      text={copy("Workforce cost is hourly cost x assigned people x daily hours. It then rolls into daily and monthly production cost.", "İşçilik maliyeti saatlik maliyet x atanmış kişi x günlük saat olarak hesaplanır. Sonra günlük ve aylık üretim maliyetine girer.")}
-                    />
-                  </span>
-                  <input min="0" step="1" type="number" value={operationForms.workforce.hourlyCost} onChange={(event) => updateOperationForm("workforce", "hourlyCost", event.target.value)} />
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Currency", "Para birimi")}
-                    <InfoTip
-                      label={copy("Workforce currency info", "İşçilik para birimi bilgisi")}
-                      text={copy("Select the currency used for hourly cost. USD/EUR are converted to TRY for financial outputs.", "Saatlik maliyetin para birimini seçin. USD/EUR finans çıktılarında TL'ye çevrilir.")}
-                    />
-                  </span>
-                  <select value={operationForms.workforce.hourlyCostCurrency} onChange={(event) => updateOperationForm("workforce", "hourlyCostCurrency", event.target.value)}>
-                    {operationCurrencyOptions.map((currency) => <option value={currency} key={currency}>{currency}</option>)}
-                  </select>
-                </label>
-              </div>
-              <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
-                {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Add Human Resource", "İnsan Kaynağı Ekle")}
-              </button>
-            </form>
-
-            <article className="operation-card resource-definition-card operation-data-table-card operations-record-list-card operations-workforce-list-card" style={workforceListHeightStyle}>
-              <div className="operation-card-heading">
-                <h2>{copy("Human Resources", "İnsan Kaynağı")}</h2>
-                <span>{operationsWorkspace.workforce.length} {copy("records", "kayıt")}</span>
-              </div>
-              {renderSortableDataTable({
-                columns: workforceColumns,
-                gridTemplateColumns: "1.2fr 0.9fr 0.7fr",
-                onRowClick: (workforce) => copyOperationRecordToForm("workforce", workforce),
-                onDeleteRow: (row) => handleDeleteOperationRecord("workforce", row),
-                rows: operationsWorkspace.workforce,
-                tableId: "workforce",
-                useButtonRows: true,
-              })}
-            </article>
-
-            <article className="operation-card resource-definition-card resource-guidance-card">
-              <div className="operation-card-heading">
-                <div>
-                  <span>{copy("Semi-finished items", "Yarı mamüller")}</span>
-                  <h2>{copy("Use a material record for now", "Şimdilik malzeme kaydı kullanın")}</h2>
-                </div>
-              </div>
-              <p className="planner-empty-state">
-                {copy(
-                  "Semi-finished recipe nesting is not persisted yet. Add the semi-finished item as a material with a real unit price, then use it in the product recipe.",
-                  "Yarı mamül reçete kırılımı henüz kalıcı değil. Yarı mamülü gerçek birim fiyatıyla malzeme olarak ekleyin, sonra ürün reçetesinde kullanın.",
-                )}
-              </p>
-            </article>
-
-            <article className="operation-card resource-definition-card resource-guidance-card">
-              <div className="operation-card-heading">
-                <div>
-                  <span>{copy("Services", "Hizmetler")}</span>
-                  <h2>{copy("Persist service cost in finance", "Hizmet maliyetini finansta kaydedin")}</h2>
-                </div>
-                <button type="button" onClick={() => goTo("/financial-modelling/girdiler", "login")}>
-                  {copy("Open Financial Inputs", "Finans Girdilerini Aç")}
-                </button>
-              </div>
-              <p className="planner-empty-state">
-                {copy(
-                  "Service costs affect feasibility through optional financial expenses. Add them as initial or recurring expense rows so they are included in the model.",
-                  "Hizmet maliyetleri fizibiliteyi opsiyonel finans giderleri üzerinden etkiler. Modele dahil olması için başlangıç veya tekrarlayan gider satırı olarak ekleyin.",
-                )}
-              </p>
-            </article>
-          </div>
-          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
-        </section>,
-    );
-  }
-
-  function renderProductDataPage() {
-    const productMaterialRows = operationForms.product.materialRows || [];
-    const productProcessRows = operationForms.product.processRows || [];
-    const productsWithRecipe = operationsWorkspace.products.filter((product) => asObjectArray(product.material_rows).length > 0).length;
-    const productsWithProcesses = operationsWorkspace.products.filter((product) => getProductProcessRows(product).length > 0).length;
-    const productRecipeLinkCount = operationsWorkspace.products.reduce((total, product) => total + asObjectArray(product.material_rows).length, 0);
-    const pricedProductCount = operationsWorkspace.products.filter((product) => toFiniteNumber(product.price) > 0).length;
-    const productFlowStrategyLabels = {
-      pull: copy("Pull system", "Çekme sistemi"),
-      push: copy("Push system", "İtme sistemi"),
-    };
-    const getProductRecipeSummary = (product) => (
-      (product.material_rows || []).map((row) => `${[row.material?.material_group, row.material?.name].filter(Boolean).join(" / ") || "-"}: ${formatNumber(row.quantity_per_unit, 4)} ${row.material?.unit || ""}`).join(", ") || "-"
-    );
-    const getProductProcessSummary = (product) => (
-      getProductProcessRows(product).map((row, index) => `${index + 1}. ${row.operationName}`).join(" → ") || "-"
-    );
-    const getProductFlowSummary = (product) => {
-      const flowDefaults = getProductFlowDefaults(product);
-      return flowDefaults.flowStrategy === "pull"
-        ? `${productFlowStrategyLabels.pull} / ${copy("lot", "lot")} ${formatNumber(flowDefaults.batchSize, 0)} / ${copy("safety", "güvenli")} ${formatNumber(flowDefaults.safetyStockQuantity, 0)}`
-        : `${productFlowStrategyLabels.push} / ${copy("no safety stock", "güvenli stok yok")}`;
-    };
-    const productColumns = [
-      { header: copy("Product", "Ürün"), key: "product", render: (row) => row.name, value: (row) => row.name },
-      { header: copy("Unit", "Birim"), key: "unit", render: (row) => row.unit || "adet", value: (row) => row.unit || "adet" },
-      {
-        header: copy("Price", "Fiyat"),
-        key: "price",
-        render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates, 2),
-        sortValue: (row) => toFiniteNumber(row.price),
-        filterValue: (row) => `${row.price} ${row.price_currency || "TRY"} ${formatOperationMoney(row.price, row.price_currency, exchangeRates, 2)}`,
-      },
-      {
-        header: copy("Cycle", "Çevrim"),
-        key: "cycle",
-        render: (row) => formatCycleTime(row.cycle_time_minutes || 1, row.cycle_time_unit || "minute"),
-        sortValue: (row) => toFiniteNumber(row.cycle_time_minutes || 1),
-      },
-      { header: copy("Push / Pull defaults", "İtme / Çekme varsayılanı"), key: "flow", render: getProductFlowSummary, value: getProductFlowSummary },
-      { header: copy("Process order", "Süreç sırası"), key: "processes", render: getProductProcessSummary, value: getProductProcessSummary },
-      { header: copy("Materials", "Malzemeler"), key: "materials", render: getProductRecipeSummary, value: getProductRecipeSummary },
-    ];
-    const copyProductToForm = (product) => {
-      const flowDefaults = getProductFlowDefaults(product);
-
-      setOperationForms((current) => ({
-        ...current,
-        product: {
-          ...getCycleTimeInputFromMinutes(product.cycle_time_minutes || 1, product.cycle_time_unit || "minute"),
-          defaultBatchSize: flowDefaults.batchSize,
-          defaultFlowStrategy: flowDefaults.flowStrategy,
-          defaultSafetyStockQuantity: flowDefaults.safetyStockQuantity,
-          id: product.id,
-          materialRows: (product.material_rows || []).map((row) => ({
-            materialId: row.material_id,
-            quantityPerUnit: row.quantity_per_unit,
-          })),
-          processRows: getProductProcessRows(product),
-          minimumTransferQuantity: flowDefaults.minimumTransferQuantity,
-          name: product.name || "",
-          price: product.price || 0,
-          priceCurrency: product.price_currency || "TRY",
-          unit: product.unit || "adet",
-        },
-      }));
-    };
-
-    return renderDashboardLayout(
-      `operations/${activeOperationsSubmodule.key}`,
-        <section className="operations-workspace operations-modern operations-entry-page operations-products-page">
-          <div className="operations-header">
-            <div>
-              <span>{copy("Operations", "Operasyon")} / {copy("Products", "Ürünler")}</span>
-              <h1>{copy("Products", "Ürünler")}</h1>
-              <p>{copy("Keep the product recipe, unit, price, cycle time, and default Push/Pull rules used in process calculations.", "Süreç hesaplamalarında kullanılacak ürün reçetesini, birimini, fiyatını, çevrim süresini ve varsayılan İtme/Çekme kurallarını tutun.")}</p>
-            </div>
-            <div className="operations-actions">
-              <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
-            </div>
-          </div>
-
-          <div className="process-summary-grid operations-entry-summary">
-            <article className="operation-card process-summary-card">
-              <span>{copy("Products", "Ürünler")}</span>
-              <strong>{formatNumber(operationsWorkspace.products.length)}</strong>
-              <small>{copy("priced", "fiyatlı")}: {formatNumber(pricedProductCount)}</small>
-            </article>
-            <article className="operation-card process-summary-card">
-              <span>{copy("Recipes", "Reçeteler")}</span>
-              <strong>{formatNumber(productsWithRecipe)}</strong>
-              <small>{formatNumber(productRecipeLinkCount)} {copy("material links", "malzeme bağlantısı")}</small>
-            </article>
-            <article className="operation-card process-summary-card">
-              <span>{copy("Process templates", "Süreç şablonları")}</span>
-              <strong>{formatNumber(productsWithProcesses)}</strong>
-              <small>{copy("products ready for planning", "planlamaya hazır ürün")}</small>
-            </article>
-          </div>
-
-          <div className="operation-data-grid">
-            <form ref={productFormRef} className="operation-card operation-data-form operations-product-form-card" onSubmit={(event) => handleSaveOperationRecord("product", event)}>
-              <div className="operation-card-heading">
-                <div>
-                  <span>{copy("Product definition", "Ürün tanımı")}</span>
-                  <h2>{copy("Commercial and production defaults", "Ticari ve üretim varsayılanları")}</h2>
-                </div>
-              </div>
-              <div className="operation-data-fields">
-                <label>
-                  <span>{copy("Product name", "Ürün adı")}</span>
-                  <input
-                    type="text"
-                    value={operationForms.product.name}
-                    onChange={(event) => updateOperationForm("product", "name", event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>{copy("Unit", "Birim")}</span>
-                  <select
-                    value={operationForms.product.unit}
-                    onChange={(event) => updateOperationForm("product", "unit", event.target.value)}
-                  >
-                    {["adet", "kg", "gr", "mg", "metre", "litre", "ml"].map((unit) => (
-                      <option value={unit} key={unit}>{unit}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Price", "Fiyat")}
-                    <InfoTip
-                      label={copy("Product price info", "Ürün fiyatı bilgisi")}
-                      text={copy("Sales revenue uses this product price x sold units, then applies channel discounts, commissions, and collection timing.", "Satış cirosu bu ürün fiyatı x satılan adet ile başlar; sonra kanal indirimi, komisyonu ve tahsilat zamanlaması uygulanır.")}
-                    />
-                  </span>
-                  <input
-                    min="0"
-                    step="0.01"
-                    type="number"
-                    value={operationForms.product.price}
-                    onChange={(event) => updateOperationForm("product", "price", event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Currency", "Para birimi")}
-                    <InfoTip
-                      label={copy("Product currency info", "Ürün para birimi bilgisi")}
-                      text={copy("Choose the currency for the sales price. Financial analysis converts USD/EUR product prices to TRY before revenue calculations.", "Satış fiyatının para birimini seçin. Finansal analiz USD/EUR ürün fiyatlarını ciro hesaplarından önce TL'ye çevirir.")}
-                    />
-                  </span>
-                  <select
-                    value={operationForms.product.priceCurrency}
-                    onChange={(event) => updateOperationForm("product", "priceCurrency", event.target.value)}
-                  >
-                    {operationCurrencyOptions.map((currency) => (
-                      <option value={currency} key={currency}>{currency}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Cycle time", "Çevrim süresi")}
-                    <InfoTip
-                      label={copy("Cycle time info", "Çevrim süresi bilgisi")}
-                      text={copy("Cycle time defines how long one unit takes. Capacity is roughly available machine minutes divided by cycle time.", "Çevrim süresi bir ürünün ne kadar sürdüğünü belirtir. Kapasite kabaca kullanılabilir makine dakikası / çevrim süresi olarak hesaplanır.")}
-                    />
-                  </span>
-                  <div className="cycle-time-control">
-                    <input
-                      min="0.0001"
-                      step="0.01"
-                      type="number"
-                      value={operationForms.product.cycleTimeValue}
-                      onChange={(event) => updateOperationForm("product", "cycleTimeValue", event.target.value)}
-                    />
-                    <select
-                      aria-label={copy("Cycle time unit", "Çevrim süresi birimi")}
-                      value={operationForms.product.cycleTimeUnit}
-                      onChange={(event) => updateOperationForm("product", "cycleTimeUnit", event.target.value)}
-                    >
-                      <option value="minute">{copy("Minute", "Dakika")}</option>
-                      <option value="hour">{copy("Hour", "Saat")}</option>
-                      <option value="day">{copy("Day", "Gün")}</option>
-                    </select>
-                  </div>
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Default production system", "Varsayılan üretim sistemi")}
-                    <InfoTip
-                      label={copy("Default flow strategy info", "Varsayılan akış stratejisi bilgisi")}
-                      text={copy("Pull starts from downstream demand and maintains safety stock. Push starts from the production plan and maintains none.", "Çekme sonraki proses talebiyle başlar ve güvenli stok tutar. İtme üretim planıyla başlar ve güvenli stok tutmaz.")}
-                    />
-                  </span>
-                  <select
-                    value={operationForms.product.defaultFlowStrategy}
-                    onChange={(event) => updateOperationForm("product", "defaultFlowStrategy", event.target.value)}
-                  >
-                    <option value="pull">{productFlowStrategyLabels.pull}</option>
-                    <option value="push">{productFlowStrategyLabels.push}</option>
-                  </select>
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Default Pull replenishment lot", "Varsayılan Çekme ikmal lotu")}
-                    <InfoTip
-                      label={copy("Default batch size info", "Varsayılan batch boyutu bilgisi")}
-                      text={copy("The normal replenishment lot triggered by downstream demand in Pull mode.", "Çekme modunda sonraki proses talebiyle tetiklenen normal ikmal lotudur.")}
-                    />
-                  </span>
-                  <input
-                    min="1"
-                    step="1"
-                    disabled={operationForms.product.defaultFlowStrategy === "push"}
-                    type="number"
-                    value={operationForms.product.defaultBatchSize}
-                    onChange={(event) => updateOperationForm("product", "defaultBatchSize", event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Minimum transfer", "Minimum transfer")}
-                    <InfoTip
-                      label={copy("Minimum transfer info", "Minimum transfer bilgisi")}
-                      text={copy("Smallest accepted quantity that can move to the next operation for this product.", "Bu ürün için sonraki operasyona aktarılabilecek kabul edilen en küçük miktar.")}
-                    />
-                  </span>
-                  <input
-                    min="1"
-                    step="1"
-                    disabled={operationForms.product.defaultFlowStrategy === "push"}
-                    type="number"
-                    value={operationForms.product.minimumTransferQuantity}
-                    onChange={(event) => updateOperationForm("product", "minimumTransferQuantity", event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span className="label-with-info">
-                    {copy("Minimum Pull safety stock", "Minimum Çekme güvenli stoku")}
-                    <InfoTip
-                      label={copy("Default safety stock info", "Varsayılan güvenli stok bilgisi")}
-                      text={copy("The minimum intermediate stock to reserve in Pull. The scheduler automatically raises it when needed to eliminate material starvation.", "Çekme sisteminde ayrılacak minimum ara stoktur. Planlayıcı malzeme beklemesini sıfırlamak için gerektiğinde otomatik yükseltir.")}
-                    />
-                  </span>
-                  <input
-                    disabled={operationForms.product.defaultFlowStrategy === "push"}
-                    min="0"
-                    step="1"
-                    type="number"
-                    value={operationForms.product.defaultFlowStrategy === "push" ? 0 : operationForms.product.defaultSafetyStockQuantity}
-                    onChange={(event) => updateOperationForm("product", "defaultSafetyStockQuantity", event.target.value)}
-                  />
-                </label>
-              </div>
-
-              <div className="resource-section">
-                <div className="resource-section-header">
-                  <div>
-                    <span>{copy("Required materials", "Gerekli malzemeler")}</span>
-                    <p>{copy("Enter the materials and quantities required to produce one product unit.", "Bir ürün birimi üretmek için gereken malzemeleri ve miktarları girin.")}</p>
-                  </div>
-                  <button type="button" onClick={addProductMaterialRow}>{copy("Add Material", "Malzeme Ekle")}</button>
-                </div>
-                <div className="resource-row-list">
-                  {productMaterialRows.length ? productMaterialRows.map((row, index) => {
-                    const selectedMaterial = operationsWorkspace.materials.find((material) => material.id === row.materialId);
-
-                    return (
-                      <div className="resource-row-grid material-plan-row" key={`product-material-${index}`}>
-                        <label>
-                          <span>{copy("Material", "Malzeme")}</span>
-                          <select value={row.materialId || ""} onChange={(event) => updateProductMaterialRow(index, "materialId", event.target.value)}>
-                            <option value="">{copy("Select material", "Malzeme seç")}</option>
-                            {operationsWorkspace.materials.map((material) => (
-                              <option value={material.id} key={material.id}>
-                                {material.material_group ? `${material.material_group} / ${material.name}` : material.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          <span>{copy("Quantity per unit", "Birim başına miktar")}</span>
-                          <input
-                            min="0"
-                            step="0.0001"
-                            type="number"
-                            value={row.quantityPerUnit ?? ""}
-                            onChange={(event) => updateProductMaterialRow(index, "quantityPerUnit", event.target.value)}
-                          />
-                        </label>
-                        <div className="resource-row-meta">
-                          <strong>{selectedMaterial?.unit || "-"}</strong>
-                          <small>{selectedMaterial ? `${selectedMaterial.material_group || copy("General", "Genel")} · ${formatOperationMoney(selectedMaterial.price_per_unit, selectedMaterial.price_currency, exchangeRates, 2)} / ${selectedMaterial.unit}` : copy("No record selected", "Kayıt seçilmedi")}</small>
-                        </div>
-                        <button type="button" className="resource-remove-button" onClick={() => removeProductMaterialRow(index)}>
-                          {copy("Delete", "Sil")}
-                        </button>
-                      </div>
-                    );
-                  }) : (
-                    <p className="planner-empty-state">{copy("No recipe materials yet. Add materials on Material Definitions first, then connect them to the product here.", "Henüz reçete malzemesi yok. Önce Malzeme Tanımları ekranında malzeme ekleyin, sonra buradan ürüne bağlayın.")}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="resource-section product-process-template-section">
-                <div className="resource-section-header">
-                  <div>
-                    <span>{copy("Ordered process template", "Sıralı süreç şablonu")}</span>
-                    <p>{copy(
-                      "Define every process and its order here. Process Definition will use this template without allowing changes.",
-                      "Tüm süreçleri ve sıralarını burada tanımlayın. Süreç Tanımlama bu şablonu değişikliğe izin vermeden kullanır.",
-                    )}</p>
-                  </div>
-                  <button type="button" onClick={addProductProcessRow}>{copy("Add Process", "Süreç Ekle")}</button>
-                </div>
-
-                <div className="process-step-list">
-                  {productProcessRows.length ? productProcessRows.map((row, index) => {
-                    const recipeMaterial = productMaterialRows.find((materialRow) => materialRow.materialId === row.materialId);
-                    const selectedMaterial = operationsWorkspace.materials.find((material) => material.id === row.materialId);
-
-                    return (
-                      <article className="process-step-card" key={`product-process-${index}`}>
-                        <div className="process-step-card-header">
-                          <div className="process-step-index">{formatNumber(index + 1, 0)}</div>
-                          <div>
-                            <span>{copy("Process order", "Süreç sırası")}</span>
-                            <strong>{row.operationName || `${copy("Process", "Süreç")} ${index + 1}`}</strong>
-                            <small>{copy("Saved as part of the product", "Ürünün parçası olarak kaydedilir")}</small>
-                          </div>
-                          <div className="resource-row-actions">
-                            <button type="button" disabled={index === 0} onClick={() => moveProductProcessRow(index, -1)} aria-label={copy("Move process up", "Süreci yukarı taşı")}>↑</button>
-                            <button type="button" disabled={index === productProcessRows.length - 1} onClick={() => moveProductProcessRow(index, 1)} aria-label={copy("Move process down", "Süreci aşağı taşı")}>↓</button>
-                            <button type="button" className="resource-remove-button" onClick={() => removeProductProcessRow(index)}>{copy("Delete", "Sil")}</button>
-                          </div>
-                        </div>
-
-                        <div className="process-step-grid">
-                          <label>
-                            <span>{copy("Process name", "Süreç adı")}</span>
-                            <input type="text" value={row.operationName || ""} onChange={(event) => updateProductProcessRow(index, "operationName", event.target.value)} />
-                          </label>
-                          <label>
-                            <span>{copy("Machine", "Makine")}</span>
-                            <select value={row.machineId || ""} onChange={(event) => updateProductProcessRow(index, "machineId", event.target.value)}>
-                              <option value="">{copy("Select machine", "Makine seç")}</option>
-                              {operationsWorkspace.machines.map((machine) => <option value={machine.id} key={machine.id}>{machine.name}</option>)}
-                            </select>
-                          </label>
-                          <label>
-                            <span>{copy("Min / unit", "Dk / birim")}</span>
-                            <input min="0.0001" step="0.01" type="number" value={row.processTimeMinutes ?? ""} onChange={(event) => updateProductProcessRow(index, "processTimeMinutes", event.target.value)} />
-                          </label>
-                          <label>
-                            <span>{copy("Machine hours", "Makine saati")}</span>
-                            <input min="0" step="0.25" type="number" value={row.dailyHours ?? ""} onChange={(event) => updateProductProcessRow(index, "dailyHours", event.target.value)} />
-                          </label>
-                          <label>
-                            <span>{copy("Recipe material", "Reçete malzemesi")}</span>
-                            <select
-                              value={row.materialId || ""}
-                              onChange={(event) => {
-                                const materialRow = productMaterialRows.find((item) => item.materialId === event.target.value);
-                                updateProductProcessRowFields(index, {
-                                  materialId: event.target.value,
-                                  materialQuantityPerUnit: materialRow?.quantityPerUnit ?? 0,
-                                });
-                              }}
-                            >
-                              <option value="">{copy("Optional", "Opsiyonel")}</option>
-                              {productMaterialRows.map((materialRow, materialIndex) => {
-                                const material = operationsWorkspace.materials.find((item) => item.id === materialRow.materialId);
-                                const materialLabel = material
-                                  ? [material.material_group, material.name].filter(Boolean).join(" / ")
-                                  : copy("Unnamed material", "İsimsiz malzeme");
-                                return <option value={materialRow.materialId} key={materialRow.materialId || `recipe-material-${materialIndex}`}>{materialLabel}</option>;
-                              })}
-                            </select>
-                          </label>
-                          <label>
-                            <span>{copy("Recipe qty", "Reçete miktarı")}</span>
-                            <input min="0" step="0.0001" type="number" value={row.materialQuantityPerUnit ?? recipeMaterial?.quantityPerUnit ?? ""} onChange={(event) => updateProductProcessRow(index, "materialQuantityPerUnit", event.target.value)} />
-                            <small>{selectedMaterial?.unit || ""}</small>
-                          </label>
-                          <label>
-                            <span>{copy("Equipment", "Ekipman")}</span>
-                            <select value={row.equipmentId || ""} onChange={(event) => updateProductProcessRow(index, "equipmentId", event.target.value)}>
-                              <option value="">{copy("Optional", "Opsiyonel")}</option>
-                              {operationsWorkspace.equipment.map((equipment) => <option value={equipment.id} key={equipment.id}>{equipment.name}</option>)}
-                            </select>
-                          </label>
-                          <label>
-                            <span>{copy("Crew role", "Ekip rolü")}</span>
-                            <select value={row.workforceId || ""} onChange={(event) => updateProductProcessRow(index, "workforceId", event.target.value)}>
-                              <option value="">{copy("Optional", "Opsiyonel")}</option>
-                              {operationsWorkspace.workforce.map((workforce) => <option value={workforce.id} key={workforce.id}>{workforce.role_name}</option>)}
-                            </select>
-                          </label>
-                          <label>
-                            <span>{copy("People", "Kişi")}</span>
-                            <input min="0" step="1" type="number" value={row.peopleAssigned ?? ""} onChange={(event) => updateProductProcessRow(index, "peopleAssigned", event.target.value)} />
-                          </label>
-                          <label>
-                            <span>{copy("Crew hours", "Ekip saati")}</span>
-                            <input min="0" step="0.25" type="number" value={row.workforceDailyHours ?? ""} onChange={(event) => updateProductProcessRow(index, "workforceDailyHours", event.target.value)} />
-                          </label>
-                          <label>
-                            <span>{copy("Capacity", "Kapasite")}</span>
-                            <input min="1" step="1" type="number" value={row.capacity ?? ""} onChange={(event) => updateProductProcessRow(index, "capacity", event.target.value)} />
-                          </label>
-                          <label>
-                            <span>{copy("Setup min", "Setup dk")}</span>
-                            <input min="0" step="0.1" type="number" value={row.setupMinutes ?? ""} onChange={(event) => updateProductProcessRow(index, "setupMinutes", event.target.value)} />
-                          </label>
-                          <label>
-                            <span>{copy("Speed", "Hız")}</span>
-                            <input min="0.0001" step="0.01" type="number" value={row.speedMultiplier ?? ""} onChange={(event) => updateProductProcessRow(index, "speedMultiplier", event.target.value)} />
-                          </label>
-                        </div>
-                      </article>
-                    );
-                  }) : (
-                    <p className="planner-empty-state">{copy(
-                      "No process template yet. Add the first process; products cannot be saved without one.",
-                      "Henüz süreç şablonu yok. İlk süreci ekleyin; ürün en az bir süreç olmadan kaydedilemez.",
-                    )}</p>
-                  )}
-                </div>
-              </div>
-
-              <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
-                {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save", "Kaydet")}
-              </button>
-            </form>
-
-            <article className="operation-card operation-data-table-card operations-product-list-card" style={productListHeightStyle}>
-              <div className="operation-card-heading">
-                <h2>{copy("Records", "Kayıtlar")}</h2>
-                <span>{operationsWorkspace.products.length} {copy("records", "kayıt")}</span>
-              </div>
-              {renderSortableDataTable({
-                columns: productColumns,
-                gridTemplateColumns: "1.1fr 0.5fr 0.7fr 0.7fr 0.9fr 1.6fr 1.3fr",
-                onRowClick: copyProductToForm,
-                onDeleteRow: (row) => handleDeleteOperationRecord("product", row),
-                rows: operationsWorkspace.products,
-                tableId: "products",
-                useButtonRows: true,
-              })}
-            </article>
-          </div>
-          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
-        </section>,
-    );
-  }
-
-  function renderActiveProcessesPage() {
-    const activePlans = getCurrentOperationPlans(operationsWorkspaceForFinance);
-    const processStrategyLabels = {
-      batch: copy("Push system", "İtme sistemi"),
-      flow: copy("Pull system", "Çekme sistemi"),
-      parallel: copy("Pull system", "Çekme sistemi"),
-      pull: copy("Pull system", "Çekme sistemi"),
-      push: copy("Push system", "İtme sistemi"),
-    };
-
-    return renderDashboardLayout(
-      `operations/${activeOperationsSubmodule.key}`,
-        <section className="operations-workspace operations-modern operations-entry-page operations-active-processes-page">
-          <div className="operations-header">
-            <div>
-              <span>{copy("Operations", "Operasyon")} / {copy("Active Processes", "Mevcut Süreçler")}</span>
-              <h1>{copy("Active Processes", "Mevcut Süreçler")}</h1>
-              <p>{copy("Track saved production plans and their calculated production and cost results.", "Kaydedilen üretim planlarını ve hesaplanan üretim/maliyet sonuçlarını takip edin.")}</p>
-            </div>
-            <div className="operations-actions">
-              <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
-              <button type="button" className="operations-refresh-button" onClick={() => goTo("/operations/data-entry", "login")}>{copy("New Plan", "Yeni Plan")}</button>
-            </div>
-          </div>
-
-          <div className="process-summary-grid">
-            <article className="operation-card process-summary-card">
-              <span>{copy("Active Plan", "Aktif Plan")}</span>
-              <strong>{activePlans.length}</strong>
-            </article>
-            <article className="operation-card process-summary-card">
-              <span>{copy("Total Production", "Toplam Üretim")}</span>
-              <strong>{formatQuantity(activePlans.reduce((total, plan) => total + (Number(plan.result?.producedQuantity) || 0), 0), activePlans[0]?.result?.productUnit)}</strong>
-            </article>
-            <article className="operation-card process-summary-card">
-              <span>{copy("Daily Production Cost", "Günlük Üretim Maliyeti")}</span>
-              <strong>{activePlans.length
-                ? formatLira(activePlans.reduce(
-                    (total, plan) => total + calculatePlanDailyCost(plan.result, operationsWorkspaceForFinance, financialSettingsForm).daily.total,
-                    0,
-                  ))
-                : "-"}</strong>
-            </article>
-          </div>
-
-          <div className="process-list">
-            {activePlans.length ? activePlans.map((plan) => {
-              const result = plan.result || {};
-              const productName = plan.product?.name || result.productName || plan.input?.productName || "-";
-              const productUnit = result.productUnit || plan.product?.unit || copy("pcs", "adet");
-              const machineRows = Array.isArray(result.machineRows) ? result.machineRows : [];
-              const materialRows = Array.isArray(result.materialRows) ? result.materialRows : [];
-              const operationRows = Array.isArray(result.operationRows) ? result.operationRows : [];
-              const bufferRows = Array.isArray(result.bufferRows) ? result.bufferRows : [];
-              // Plans calculated by the database function store no step or
-              // buffer rows; say so instead of showing "- / 0 min".
-              const missingFlowDetail = copy("Step detail is not stored for this plan.", "Bu planda adım ayrıntısı saklanmıyor.");
-
-              return (
-                <article className="operation-card process-card" key={plan.id}>
-                  <div className="operation-card-heading">
-                    <div>
-                      <span>{new Date(plan.created_at).toLocaleString(locale)}</span>
-                      <h2>{plan.plan_name || copy("Daily production plan", "Günlük üretim planı")}</h2>
-                    </div>
-                    <mark className="ok">{copy("Active", "Aktif")}</mark>
-                  </div>
-
-                  <div className="process-metrics">
-                    <span>{copy("Product", "Ürün")} <strong>{productName}</strong></span>
-                    <span>{copy("Quantity to Produce", "Üretilecek Miktar")} <strong>{formatQuantity(result.producedQuantity, productUnit)} {productUnit}</strong></span>
-                    <span>{copy("Cycle", "Çevrim")} <strong>{formatCycleTime(result.cycleTimeMinutes, plan.product?.cycle_time_unit || "minute")}</strong></span>
-                    <span>{copy("Production Time", "Toplam süre")} <strong>{result.totalProductionTimeMinutes ? formatMinutesDuration(result.totalProductionTimeMinutes) : "-"}</strong></span>
-                    <span>{copy("Strategy", "Strateji")} <strong>{processStrategyLabels[result.flowStrategy] || result.flowStrategy || "-"}</strong></span>
-                    <span>{copy("Batch / Transfer", "Batch / Transfer")} <strong>{result.transferBatchSize ? formatQuantity(result.transferBatchSize, productUnit) : "-"}</strong></span>
-                    <span>{copy("Safety Stock", "Güvenli stok")} <strong>{result.safetyStockEnabled || normalizeFlowStrategy(result.flowStrategy) === "pull" ? `${formatQuantity(result.safetyStockQuantity, productUnit)} ${copy("max / buffer", "maks / buffer")}` : copy("Not used", "Kullanılmaz")}</strong></span>
-                    <span>{copy("Stock Wait", "Stok bekleme")} <strong>{formatNumber(result.stockoutWaitTimeHours, 2)} {copy("hours", "saat")}</strong></span>
-                    <span>{copy("Max WIP", "Maks WIP")} <strong>{formatQuantity(result.maxWipQuantity, productUnit)}</strong></span>
-                    <span>{copy("Bottleneck", "Darboğaz")} <strong>{result.bottleneck?.operationName || "-"}</strong></span>
-                    <span>{copy("Main Machine Hours", "Ana Makine Saati")} <strong>{formatNumber(result.primaryMachineDailyHours, 2)} {copy("hours", "saat")}</strong></span>
-                    <span>{copy("Energy", "Enerji")} <strong>{formatNumber(result.energyConsumptionKwh, 2)} kWh</strong></span>
-                    <span>{copy("Daily Cost", "Günlük Maliyet")} <strong>{formatLira(calculatePlanDailyCost(result, operationsWorkspaceForFinance, financialSettingsForm).daily.total)}</strong></span>
-                  </div>
-
-                  <div className="process-detail-grid">
-                    <div>
-                      <h3>{copy("Operations", "Operasyonlar")}</h3>
-                      {operationRows.length ? operationRows.map((row, index) => (
-                        <span key={row.operationId || `operation-${index}`}>
-                          {row.operationName} <strong>{row.machineName || "-"} / {formatMinutesDuration(row.busyMinutes || 0)}</strong>
-                        </span>
-                      )) : <p className="planner-empty-state">{missingFlowDetail}</p>}
-                    </div>
-                    <div>
-                      <h3>{copy("Buffers", "Buffer")}</h3>
-                      {!bufferRows.length && <p className="planner-empty-state">{missingFlowDetail}</p>}
-                      {bufferRows.map((row, index) => (
-                        <span key={`${row.fromOperationName}-${row.toOperationName}-${index}`}>
-                          {row.fromOperationName} -&gt; {row.toOperationName} <strong>{formatQuantity(row.maxWip, productUnit)} WIP / {formatQuantity(row.safetyStockQuantity, productUnit)} {copy("safety", "güvenli")}</strong>
-                        </span>
-                      ))}
-                    </div>
-                    <div>
-                      <h3>{copy("Machines", "Makineler")}</h3>
-                      {(machineRows.length ? machineRows : [{ machineId: "empty", name: "-", dailyHours: 0 }]).map((row) => (
-                        <span key={row.machineId}>
-                          {row.name} <strong>{formatNumber(row.dailyHours, 2)} {copy("hours", "saat")}{Number.isFinite(Number(row.utilizationPercent)) ? ` / ${formatNumber(row.utilizationPercent, 1)}%` : ""}</strong>
-                        </span>
-                      ))}
-                    </div>
-                    <div>
-                      <h3>{copy("Material Usage", "Malzeme Kullanımı")}</h3>
-                      {(materialRows.length ? materialRows : [{ materialId: "empty", name: "-", dailyQuantity: 0, unit: "" }]).map((row) => (
-                        <span key={row.materialId}>
-                          {row.name} <strong>{formatNumber(row.dailyQuantity, 4)} {row.unit || ""}</strong>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </article>
-              );
-            }) : (
-              <article className="operation-card process-card">
-                <p className="planner-empty-state">{copy("No production plans saved yet. Save a plan from the process definition screen and it will appear here.", "Henüz kaydedilmiş üretim planı yok. Süreç tanımlama ekranından plan kaydedince burada görünecek.")}</p>
-              </article>
-            )}
-          </div>
-
-          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
-        </section>,
-    );
-  }
-
-  function renderFinancialModellingPage() {
-    const model = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, financialHorizon);
-    const statementProjectionModel = financialHorizon === "5y"
-      ? model
-      : buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, "5y");
-    const summary = model.summary || emptyFinancialModel.summary;
-    const incomeExpenseTrendChart = buildIncomeExpenseTrendChart(model.trendRows || []);
-    const currentFinancialPage = activeFinancialSubmodule || financialSubmodules[0];
-    const investmentTotal = (summary.machinePurchaseCost || 0) + (summary.equipmentPurchaseCost || 0) + (summary.extraInitialCost || 0) + (summary.workingCapitalRequirement || 0);
-    const formatMonth = (month) => (month ? `${month}. ${copy("month", "ay")}` : "-");
-    const financialRowLabels = {
-      electricityCost: copy("Electricity", "Elektrik"),
-      equipmentPurchase: copy("Equipment investment", "Ekipman yatırımı"),
-      extraInitialCost: copy("Initial extra costs", "Başlangıç ek giderleri"),
-      incomeTax: copy("Income tax", "Gelir vergisi"),
-      investmentGrant: copy("Investment grant / subsidy", "Yatırım / hibe"),
-      loanAmount: copy("Loan financing", "Kredi finansmanı"),
-      loanInterest: copy("Loan interest", "Kredi faizi"),
-      loanPaymentTotal: copy("Loan payments", "Kredi ödemeleri"),
-      machinePurchase: copy("Machine investment", "Makine yatırımı"),
-      materialCost: copy("Raw materials and packaging", "Hammadde ve paketleme"),
-      otherProductionCost: copy("Depreciation, maintenance and mold", "Amortisman, bakım ve kalıp"),
-      recurringExtraCost: copy("Recurring overhead", "Tekrarlayan genel gider"),
-      salesRevenue: copy("Sales revenue from monthly forecast", "Aylık tahminden satış geliri"),
-      vatPayable: copy("VAT payable", "Ödenecek KDV"),
-      workforceCost: copy("Salaries and labor", "Maaş ve işçilik"),
-      workingCapital: copy("Working capital requirement", "İşletme sermayesi ihtiyacı"),
-      writeOffCost: copy("Spoilage, returns and expired write-off", "Bozulma, iade ve SKT fireleri"),
-    };
-    const getFinancialRowLabel = (row) => financialRowLabels[row.id] || row.label;
-    const renderIncomeExpenseTrendSvg = (ariaLabel) => {
-      const revenuePoints = incomeExpenseTrendChart.revenuePoints || [];
-      const costPoints = incomeExpenseTrendChart.costPoints || [];
-      const latestRevenuePoint = revenuePoints[revenuePoints.length - 1];
-      const latestCostPoint = costPoints[costPoints.length - 1];
-      const chartToken = [
-        "income-expense",
-        financialHorizon,
-        revenuePoints.length,
-        Math.round(latestRevenuePoint?.value || 0),
-        Math.round(latestCostPoint?.value || 0),
-      ].join("-");
-      const incomeSurfaceId = `${chartToken}-income-surface`;
-      const expenseSurfaceId = `${chartToken}-expense-surface`;
-      const incomeStrokeId = `${chartToken}-income-stroke`;
-      const expenseStrokeId = `${chartToken}-expense-stroke`;
-      const trendGlowId = `${chartToken}-soft-glow`;
-      const badgeHeight = 34;
-      const badgeMinGap = 8;
-      const badgeTop = 36;
-      const badgeBottom = 200;
-      const badgeX = 454;
-      const clampBadgeY = (value) => Math.min(badgeBottom, Math.max(badgeTop, value));
-      let revenueBadgeY = latestRevenuePoint ? clampBadgeY(latestRevenuePoint.y - (badgeHeight / 2)) : 0;
-      let costBadgeY = latestCostPoint ? clampBadgeY(latestCostPoint.y - (badgeHeight / 2)) : 0;
-
-      if (latestRevenuePoint && latestCostPoint && Math.abs(revenueBadgeY - costBadgeY) < badgeHeight + badgeMinGap) {
-        const midpoint = clampBadgeY(((revenueBadgeY + costBadgeY) / 2) - (badgeHeight / 2));
-        const revenueIsAbove = latestRevenuePoint.y <= latestCostPoint.y;
-
-        revenueBadgeY = revenueIsAbove ? midpoint : midpoint + badgeHeight + badgeMinGap;
-        costBadgeY = revenueIsAbove ? midpoint + badgeHeight + badgeMinGap : midpoint;
-
-        const lowestBadgeY = Math.max(revenueBadgeY, costBadgeY);
-        const highestBadgeY = Math.min(revenueBadgeY, costBadgeY);
-
-        if (lowestBadgeY > badgeBottom) {
-          const overflow = lowestBadgeY - badgeBottom;
-          revenueBadgeY -= overflow;
-          costBadgeY -= overflow;
-        }
-
-        if (highestBadgeY < badgeTop) {
-          const underflow = badgeTop - highestBadgeY;
-          revenueBadgeY += underflow;
-          costBadgeY += underflow;
-        }
-      }
-
-      return (
-        <div className="financial-trend-stage" key={chartToken}>
-        <svg className="trend-chart finance-model-chart" viewBox="0 0 560 280" role="img" aria-label={ariaLabel}>
-          <defs>
-            <linearGradient id={incomeSurfaceId} x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-cyan)" stopOpacity="0.34" />
-              <stop offset="70%" stopColor="var(--color-teal)" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="var(--color-cyan)" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id={expenseSurfaceId} x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-amber)" stopOpacity="0.3" />
-              <stop offset="72%" stopColor="var(--color-clay)" stopOpacity="0.07" />
-              <stop offset="100%" stopColor="var(--color-amber)" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id={incomeStrokeId} x1={incomeExpenseTrendChart.plot.left} x2={incomeExpenseTrendChart.plot.right} y1="0" y2="0" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="var(--color-teal)" />
-              <stop offset="45%" stopColor="var(--color-cyan)" />
-              <stop offset="100%" stopColor="#7c5cff" />
-            </linearGradient>
-            <linearGradient id={expenseStrokeId} x1={incomeExpenseTrendChart.plot.left} x2={incomeExpenseTrendChart.plot.right} y1="0" y2="0" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#d99a24" />
-              <stop offset="52%" stopColor="var(--color-amber)" />
-              <stop offset="100%" stopColor="#ff5a8a" />
-            </linearGradient>
-            <filter id={trendGlowId} x="-20%" y="-35%" width="140%" height="170%">
-              <feGaussianBlur stdDeviation="3.2" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          <rect className="chart-panel" x="50" y="20" width="490" height="224" rx="18" />
-          <text className="axis-label axis-label-y chart-axis-title" x={incomeExpenseTrendChart.plot.left} y="18">{copy("Amount (TRY)", "Tutar (TRY)")}</text>
-          <text className="axis-label axis-label-x" x="260" y="266">{copy("Date", "Tarih")}</text>
-          <path className="chart-grid" d={incomeExpenseTrendChart.gridPath} />
-          {incomeExpenseTrendChart.xTicks.map((tick) => (
-            <line className="chart-x-guide" x1={tick.x} x2={tick.x} y1={incomeExpenseTrendChart.plot.top} y2={incomeExpenseTrendChart.plot.bottom} key={`guide-${tick.x}`} />
-          ))}
-          <path className="chart-axis" d={incomeExpenseTrendChart.axisPath} />
-          {incomeExpenseTrendChart.yTicks.map((tick) => (
-            <text className="chart-tick chart-tick-y" x={incomeExpenseTrendChart.plot.left - 8} y={tick.y + 4} textAnchor="end" key={tick.value}>
-              {tick.label}
-            </text>
-          ))}
-          {incomeExpenseTrendChart.xTicks.map((tick) => (
-            <text className="chart-tick chart-tick-x" x={tick.x} y="235" textAnchor="middle" key={`${tick.x}-${tick.label}`}>
-              {tick.label}
-            </text>
-          ))}
-          {incomeExpenseTrendChart.revenueAreaPath && <path className="trend-area sales chart-area-fill" d={incomeExpenseTrendChart.revenueAreaPath} style={{ fill: `url(#${incomeSurfaceId})` }} />}
-          {incomeExpenseTrendChart.costAreaPath && <path className="trend-area costs chart-area-fill" d={incomeExpenseTrendChart.costAreaPath} style={{ fill: `url(#${expenseSurfaceId})` }} />}
-          <line className="chart-badge-rail" x1="448" x2="448" y1="34" y2="218" />
-          {incomeExpenseTrendChart.revenuePath && <path className="trend-line-glow sales chart-draw-line" d={incomeExpenseTrendChart.revenuePath} filter={`url(#${trendGlowId})`} pathLength="1" style={{ stroke: `url(#${incomeStrokeId})` }} />}
-          {incomeExpenseTrendChart.costPath && <path className="trend-line-glow costs chart-draw-line" d={incomeExpenseTrendChart.costPath} filter={`url(#${trendGlowId})`} pathLength="1" style={{ stroke: `url(#${expenseStrokeId})` }} />}
-          {incomeExpenseTrendChart.revenuePath && <path className="trend-line sales chart-draw-line" d={incomeExpenseTrendChart.revenuePath} pathLength="1" style={{ stroke: `url(#${incomeStrokeId})` }} />}
-          {incomeExpenseTrendChart.costPath && <path className="trend-line costs chart-draw-line" d={incomeExpenseTrendChart.costPath} pathLength="1" style={{ stroke: `url(#${expenseStrokeId})` }} />}
-          {revenuePoints.map((point, index) => (
-            <circle className="trend-point sales" cx={point.x} cy={point.y} r={index === revenuePoints.length - 1 ? 4.8 : 3.2} style={{ animationDelay: `${760 + (index * 36)}ms` }} key={`sales-${index}`} />
-          ))}
-          {costPoints.map((point, index) => (
-            <circle className="trend-point costs" cx={point.x} cy={point.y} r={index === costPoints.length - 1 ? 4.8 : 3.2} style={{ animationDelay: `${820 + (index * 36)}ms` }} key={`cost-${index}`} />
-          ))}
-          {latestRevenuePoint && (
-            <>
-              <path className="chart-badge-connector sales" d={`M${latestRevenuePoint.x + 7} ${latestRevenuePoint.y} C${latestRevenuePoint.x + 28} ${latestRevenuePoint.y}, ${badgeX - 18} ${revenueBadgeY + 17}, ${badgeX} ${revenueBadgeY + 17}`} pathLength="1" />
-              <g className="chart-value-badge sales" transform={`translate(${badgeX} ${revenueBadgeY})`}>
-                <rect width="86" height={badgeHeight} rx="8" />
-                <text className="chart-value-badge-label" x="12" y="13">{copy("Income", "Gelir")}</text>
-                <text className="chart-value-badge-amount" x="12" y="27">{formatTrendAxisAmount(latestRevenuePoint.value)}</text>
-              </g>
-            </>
-          )}
-          {latestCostPoint && (
-            <>
-              <path className="chart-badge-connector costs" d={`M${latestCostPoint.x + 7} ${latestCostPoint.y} C${latestCostPoint.x + 28} ${latestCostPoint.y}, ${badgeX - 18} ${costBadgeY + 17}, ${badgeX} ${costBadgeY + 17}`} pathLength="1" />
-              <g className="chart-value-badge costs" transform={`translate(${badgeX} ${costBadgeY})`}>
-                <rect width="86" height={badgeHeight} rx="8" />
-                <text className="chart-value-badge-label" x="12" y="13">{copy("Expense", "Gider")}</text>
-                <text className="chart-value-badge-amount" x="12" y="27">{formatTrendAxisAmount(latestCostPoint.value)}</text>
-              </g>
-            </>
-          )}
-        </svg>
-        </div>
-      );
-    };
-    const financialPageMeta = {
-      inputs: {
-        description: copy("Enter financial assumptions and extra costs used by the feasibility model.", "Fizibilite modelinde kullanılacak finansal varsayımları ve ek giderleri girin."),
-        title: copy("Inputs", "Girdiler"),
-      },
-      overview: {
-        description: copy("Review all financial rows and the income-expense projection. Add only the widgets you want to keep on your saved screen.", "Tüm finansal satırları ve gelir-gider projeksiyonunu inceleyin. Kayıtlı ekranınızda tutmak istediğiniz widgetları ayrıca ekleyin."),
-        title: copy("Cost & Return Analysis", "Maliyet & Getiri Analizi"),
-      },
-      loans: {
-        description: copy("Add financing loans separately from optional expenses. Each loan needs its own amount, annual interest, and term.", "Finansman kredilerini opsiyonel giderlerden ayrı girin. Her kredinin tutarı, yıllık faizi ve vadesi ayrı olmalıdır."),
-        title: copy("Loans", "Krediler"),
-      },
-    }[currentFinancialPage.key];
-    const costBreakdownRows = (model.costStructure || []).filter((item) => toFiniteNumber(item.amount) > 0);
-    const investmentBreakdownRows = [
-      { amount: summary.machinePurchaseCost, id: "machinePurchase", label: copy("Machine investment", "Makine yatırımı") },
-      { amount: summary.equipmentPurchaseCost, id: "equipmentPurchase", label: copy("Equipment investment", "Ekipman yatırımı") },
-      { amount: summary.extraInitialCost, id: "extraInitialCost", label: copy("Initial extra costs", "Başlangıç ek giderleri") },
-      { amount: summary.workingCapitalRequirement, id: "workingCapital", label: copy("Working capital requirement", "İşletme sermayesi ihtiyacı") },
-    ].filter((item) => toFiniteNumber(item.amount) > 0);
-    const returnBreakdownRows = [
-      { amount: summary.salesRevenue, id: "salesRevenue", label: copy("Sales revenue", "Satış geliri"), tone: "income" },
-      { amount: summary.netIncome, id: "netIncome", label: copy("Net income", "Net kazanç"), tone: "net" },
-      { amount: summary.totalCashFlow, id: "cashFlow", label: copy("Total cash flow", "Toplam nakit akışı"), tone: "cash" },
-    ];
-    const maxCostBreakdownAmount = Math.max(1, ...costBreakdownRows.map((item) => toFiniteNumber(item.amount)));
-    const maxInvestmentBreakdownAmount = Math.max(1, ...investmentBreakdownRows.map((item) => toFiniteNumber(item.amount)));
-    const maxReturnBreakdownAmount = Math.max(1, ...returnBreakdownRows.map((item) => Math.abs(toFiniteNumber(item.amount))));
-    const renderBreakdownBars = (rows, maxAmount, emptyLabel, tone = "cost") => (
-      <div className="financial-bar-list">
-        {(rows.length ? rows : [{ amount: 0, id: "empty", label: emptyLabel, tone }]).map((item) => {
-          const amount = toFiniteNumber(item.amount);
-          const width = item.id === "empty" ? 0 : Math.max(4, Math.min(100, (Math.abs(amount) / maxAmount) * 100));
-
-          return (
-            <div className={`financial-bar-row ${item.tone || tone}`} key={item.id || item.label}>
-              <div>
-                <span>{getFinancialRowLabel(item)}</span>
-                <strong>{item.id === "empty" ? "-" : formatLira(amount)}</strong>
-              </div>
-              <i style={{ width: `${width}%` }} />
-            </div>
-          );
-        })}
-      </div>
-    );
-    const financialInputConfig = {
-      cogsInflationAnnualPercent: { label: copy("COGS inflation % / year", "SMM enflasyonu (% yıllık)"), min: "0", step: "0.01" },
-      discountRateAnnualPercent: { info: copy("The yearly return you would expect from this money elsewhere, used to discount future cash flows for net present value. For TRY projects, the policy rate plus a risk premium is a common starting point.", "Bu parayı başka yerde değerlendirseniz bekleyeceğiniz yıllık getiri; net bugünkü değer hesabında gelecekteki nakit akışlarını indirgemek için kullanılır. TL projelerde politika faizi + risk primi yaygın bir başlangıç noktasıdır."), label: copy("Discount rate % / year", "İskonto oranı (% yıllık)"), min: "0", step: "0.01" },
-      electricityPricePerKwh: { label: copy("Electricity kWh price", "Elektrik kWh fiyatı"), min: "0", step: "0.0001" },
-      expenseVatRate: { label: copy("Average expense VAT %", "Ortalama gider KDV oranı (%)"), min: "0", step: "0.01" },
-      incomeTaxRate: { label: copy("Corporate tax %", "Kurumlar vergisi oranı"), min: "0", step: "0.01" },
-      increaseFrequency: {
-        label: copy("Increase frequency", "Artış sıklığı"),
-        options: [
-          ["monthly", copy("Monthly", "Aylık")],
-          ["quarterly", copy("Quarterly", "3 Ayda Bir")],
-          ["semiannual", copy("Every 6 months", "6 Ayda Bir")],
-          ["annual", copy("Annual", "Yıllık")],
-        ],
-        type: "select",
-      },
-      initialCash: { info: copy("Cash available at the start of the model. Loans and grants are added separately, so do not include them here unless they are already in the bank.", "Model başlangıcındaki hazır nakit. Krediler ve hibeler ayrıca eklenir; bankada hazır değilse burada tekrar yazmayın."), label: copy("Initial cash", "Başlangıç nakdi"), min: "0", step: "1000" },
-      initialCapacityUnits: { label: copy("Initial capacity (month 1)", "Başlangıç kapasitesi (Ay 1)"), min: "0", step: "1" },
-      investmentGrantAmount: { info: copy("Non-loan funding that enters cash as support. It reduces required own cash but does not create monthly repayments.", "Kredi olmayan destek/hibe/yatırım girişi. Gerekli öz kaynağı azaltır ama aylık ödeme oluşturmaz."), label: copy("Investment / grant to receive", "Alınacak yatırım / hibe"), min: "0", step: "1000" },
-      monthlyCurrencyIncreasePercent: { info: copy("Applied as a monthly multiplier to currency-sensitive material costs. Example: 2% means next month is cost x 1.02 before other inflation assumptions.", "Dövize hassas malzeme maliyetlerine aylık çarpan olarak uygulanır. Örn. %2, sonraki ay diğer enflasyon varsayımlarından önce maliyet x 1,02 demektir."), label: copy("Monthly FX increase %", "Aylık döviz artışı %"), min: "0", step: "0.01" },
-      monthlyEnergyPriceIncreasePercent: { info: copy("Raises electricity cost month by month. If left at zero, the model falls back to the general monthly inflation assumption.", "Elektrik maliyetini aylık artırır. Sıfır kalırsa model genel aylık enflasyon varsayımını kullanır."), label: copy("Monthly energy price increase %", "Aylık enerji fiyat artışı %"), min: "0", step: "0.01" },
-      monthlyInflationPercent: { info: copy("General monthly cost pressure used for overheads and fallback cost increases. It compounds over the selected projection horizon.", "Genel aylık maliyet baskısıdır; genel giderlerde ve yedek maliyet artışlarında kullanılır. Seçilen projeksiyon dönemi boyunca bileşik işler."), label: copy("Monthly inflation %", "Aylık enflasyon %"), min: "0", step: "0.01" },
-      monthlyWageIncreasePercent: { label: copy("Monthly wage increase %", "Aylık ücret artışı %"), min: "0", step: "0.01" },
-      opexInflationAnnualPercent: { label: copy("OpEx inflation % / year", "OpEx enflasyonu (% yıllık)"), min: "0", step: "0.01" },
-      priceIncreaseAnnualPercent: { label: copy("Price increase policy % / year", "Fiyat artış politikası (% yıllık)"), min: "0", step: "0.01" },
-      rawMaterialBufferMonths: { label: copy("Material buffer months", "Malzeme tampon ay"), min: "0", step: "0.1" },
-      rawMaterialStockDays: { info: copy("Extra days of material held before sale. More stock days increase working capital need.", "Satıştan önce elde tutulan ek hammadde günü. Gün arttıkça işletme sermayesi ihtiyacı yükselir."), label: copy("Raw material stock holding days", "Hammadde stok tutma süresi (gün)"), min: "0", step: "1" },
-      receivablesCollectionDays: { info: copy("Average delay before sales cash is collected. 45 days means revenue usually enters cash roughly two model months later.", "Satış nakdinin ortalama tahsil gecikmesi. 45 gün, cironun nakde yaklaşık iki model ayı sonra girmesi demektir."), label: copy("Receivables collection days", "Alacak tahsil süresi (gün)"), min: "0", step: "1" },
-      rentBufferMonths: { label: copy("Rent buffer months", "Kira tampon ay"), min: "0", step: "0.1" },
-      salaryBufferMonths: { label: copy("Salary buffer months", "Maaş tampon ay"), min: "0", step: "0.1" },
-      salesVatRate: { label: copy("Average sales VAT %", "Ortalama satış KDV oranı (%)"), min: "0", step: "0.01" },
-      supplierPaymentDays: { label: copy("Supplier payment days", "Tedarikçi ödeme süresi (gün)"), min: "0", step: "1" },
-      taxPaymentDelayMonths: { label: copy("Tax payment delay months", "Vergi ödeme gecikmesi (ay)"), min: "0", step: "1" },
-      workingDaysPerMonth: { info: copy("Daily production and daily costs are multiplied by this number to create monthly production capacity and monthly operating cost.", "Günlük üretim ve günlük maliyetler bu değerle çarpılarak aylık kapasite ve aylık operasyon maliyeti hesaplanır."), label: copy("Working days / month", "Aylık çalışma günü"), min: "1", step: "1" },
-    };
-    const renderFinancialField = (field, isRequired) => {
-      const config = financialInputConfig[field];
-
-      return (
-        <label className={isRequired ? "required-financial-field" : "optional-financial-field"} key={field}>
-          <span>
-            <span className="label-with-info">
-              {config.label}
-              {config.info && <InfoTip label={`${config.label} ${copy("info", "bilgi")}`} text={config.info} />}
-            </span>
-            <small>{isRequired ? copy("Required", "Zorunlu") : copy("Optional", "Opsiyonel")}</small>
-          </span>
-          {config.type === "select" ? (
-            <select
-              aria-required={isRequired}
-              required={isRequired}
-              value={financialSettingsForm[field] ?? ""}
-              onChange={(event) => setFinancialSettingsForm((current) => ({ ...current, [field]: event.target.value }))}
-            >
-              {config.options.map(([value, label]) => (
-                <option value={value} key={value}>{label}</option>
-              ))}
-            </select>
-          ) : (
-            <input
-              aria-required={isRequired}
-              min={config.min}
-              required={isRequired}
-              step={config.step}
-              type="number"
-              value={financialSettingsForm[field] ?? ""}
-              onChange={(event) => setFinancialSettingsForm((current) => ({ ...current, [field]: event.target.value }))}
-            />
-          )}
-        </label>
-      );
-    };
-    const renderExchangeRatePanel = () => (
-      <details className="financial-input-section exchange-rate-section progressive-input-box">
-        <summary className="financial-input-section-heading progressive-section-summary">
-          <div>
-            <span className="heading-with-info">
-              {copy("TCMB FX rates", "TCMB döviz kurları")}
-              <InfoTip
-                label={copy("FX rate calculation info", "Döviz kuru hesaplama bilgisi")}
-                text={copy(
-                  "USD/EUR amounts are converted to TRY with amount x current USD/TRY or EUR/TRY. TRY amounts stay unchanged.",
-                  "USD/EUR tutarlar TL'ye tutar x güncel USD/TRY veya EUR/TRY olarak çevrilir. TL tutarlar aynen kalır.",
-                )}
-              />
-            </span>
-            <p>
-              {exchangeRates.status === "loading"
-                ? copy("USD/TRY and EUR/TRY are being refreshed from TCMB.", "USD/TRY ve EUR/TRY TCMB'den yenileniyor.")
-                : exchangeRates.error
-                  ? `${copy("Rates could not be refreshed:", "Kurlar yenilenemedi:")} ${exchangeRates.error}`
-                : exchangeRates.status === "ready"
-                    ? `${copy("Rates loaded from", "Kurlar şu kaynaktan alındı")}: ${exchangeRates.sourceDetail || exchangeRates.source}. ${copy("Operations prices entered in USD/EUR are converted to TRY in financial analysis.", "Operasyon tarafında USD/EUR girilen fiyatlar finansal analizde TL'ye çevrilir.")}`
-                    : copy("The last saved rates appear here first. Click fetch prices to refresh USD/TRY and EUR/TRY from TCMB and save them.", "Önce son kaydedilen kurlar burada görünür. USD/TRY ve EUR/TRY değerlerini TCMB'den yenileyip kaydetmek için fiyatları çek butonuna basın.")}
-            </p>
-          </div>
-          <div className="exchange-rate-actions">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                handleFetchExchangeRates();
-              }}
-              disabled={exchangeRates.status === "loading"}
-            >
-              {exchangeRates.status === "loading" ? copy("Fetching...", "Çekiliyor...") : copy("Fetch Prices", "Fiyatları Çek")}
-            </button>
-            <strong>{exchangeRates.status === "ready" ? exchangeRates.source : exchangeRates.status === "loading" ? copy("Loading", "Yükleniyor") : copy("Manual", "Manuel")}</strong>
-          </div>
-        </summary>
-        <div className="exchange-rate-grid">
-          {[
-            ["USD", exchangeRates.USD],
-            ["EUR", exchangeRates.EUR],
-          ].map(([currency, rate]) => (
-            <article className="exchange-rate-card" key={currency}>
-              <span>{currency}/TRY</span>
-              <strong>{rate && rate !== 1 ? formatLira(rate, 4) : "-"}</strong>
-              <small>{exchangeRates.updatedAt ? new Date(exchangeRates.updatedAt).toLocaleString(locale) : copy("Waiting for saved or fetched rate", "Kayıtlı veya çekilmiş kur bekleniyor")}</small>
-            </article>
-          ))}
-        </div>
-      </details>
-    );
-    const renderFinancialInputs = () => (
-      <div className="financial-controls finance-input-panel">
-        <form className="financial-assumption-form" onSubmit={handleSaveFinancialSettings}>
-          {renderExchangeRatePanel()}
-
-          <details className="financial-input-section progressive-input-box">
-            <summary className="financial-input-section-heading progressive-section-summary">
-              <div>
-                <span>{copy("Required inputs", "Zorunlu girdiler")}</span>
-                <p>{copy("These assumptions must be present for the financial model to be saved.", "Finansal modelin kaydedilmesi için bu varsayımlar girilmelidir.")}</p>
-              </div>
-            </summary>
-            <div className="financial-input-grid">
-              {requiredFinancialSettingFields.map((field) => renderFinancialField(field, true))}
-            </div>
-          </details>
-
-          <details className="financial-input-section general-financial-assumptions progressive-input-box">
-            <summary className="financial-input-section-heading progressive-section-summary">
-              <div>
-                <span>{copy("General financial assumptions", "Genel finansal varsayımlar")}</span>
-                <p>{copy("Grant, tax, VAT, collection, supplier payment, stock holding and starting capacity assumptions.", "Yatırım/hibe, vergi, KDV, tahsilat, tedarikçi ödeme, stok tutma ve başlangıç kapasitesi varsayımları.")}</p>
-              </div>
-            </summary>
-            <div className="financial-input-grid">
-              {generalFinancialAssumptionFields.map((field) => renderFinancialField(field, true))}
-            </div>
-          </details>
-
-          <details className="financial-input-section optional-macro-section progressive-input-box">
-            <summary className="financial-input-section-heading progressive-section-summary">
-              <div>
-                <span>{copy("Optional macro assumptions", "Opsiyonel makro varsayımlar")}</span>
-                <p>{copy("These percentages can inflate material, wage, energy and overhead projections month by month. Leave empty or zero to ignore.", "Bu yüzdeler malzeme, ücret, enerji ve genel gider projeksiyonlarını aylık artırabilir. Dikkate almak istemiyorsanız boş veya sıfır bırakın.")}</p>
-              </div>
-            </summary>
-            <div className="financial-input-grid">
-              {optionalMacroFinancialSettingFields.map((field) => renderFinancialField(field, false))}
-            </div>
-          </details>
-
-          <details className="financial-input-section inflation-revaluation-section progressive-input-box">
-            <summary className="financial-input-section-heading progressive-section-summary">
-              <div>
-                <span>{copy("Inflation and revaluation", "Enflasyon ve yeniden değerleme")}</span>
-                <p>{copy("Annual COGS, OpEx and price increase policies. Frequency controls how annual increases step through the projection.", "Yıllık SMM, OpEx ve fiyat artışı politikaları. Artış sıklığı yıllık artışların projeksiyona nasıl dağıtılacağını belirler.")}</p>
-              </div>
-            </summary>
-            <div className="financial-input-grid">
-              {inflationRevaluationFinancialFields.map((field) => renderFinancialField(field, true))}
-            </div>
-          </details>
-
-          <details className="financial-input-section valuation-section progressive-input-box">
-            <summary className="financial-input-section-heading progressive-section-summary">
-              <div>
-                <span>{copy("Investment valuation", "Yatırım değerlemesi")}</span>
-                <p>{copy("Discount rate for net present value. Leave empty to use 30% a year.", "Net bugünkü değer için iskonto oranı. Boş bırakırsanız yıllık %30 kullanılır.")}</p>
-              </div>
-            </summary>
-            <div className="financial-input-grid">
-              {valuationFinancialSettingFields.map((field) => renderFinancialField(field, false))}
-            </div>
-          </details>
-
-          <button type="submit" disabled={financialLoading}>{copy("Save Assumptions", "Varsayımları Kaydet")}</button>
-        </form>
-
-        <form className="financial-extra-cost-form" onSubmit={handleSaveFinancialExtraCost}>
-          <div className="financial-input-section-heading">
-            <div>
-              <span>{copy("Optional expense", "Opsiyonel gider")}</span>
-              <p>{copy("Add one-off or recurring costs without breaking the main assumption grid.", "Ana varsayım gridini bozmadan tek seferlik veya tekrarlayan gider ekleyin.")}</p>
-            </div>
-          </div>
-          <div className="financial-extra-cost-fields">
-            <label>
-              <span>{copy("Optional expense name", "Opsiyonel gider adı")}</span>
-              <input
-                type="text"
-                value={financialExtraCostForm.name}
-                onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, name: event.target.value }))}
-              />
-            </label>
-            <label>
-              <span>{copy("Type", "Tip")}</span>
-              <select
-                value={financialExtraCostForm.costType}
-                onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, costType: event.target.value }))}
-              >
-                <option value="initial">{copy("Initial", "Başlangıç")}</option>
-                <option value="recurring">{copy("Recurring", "Tekrarlayan")}</option>
-              </select>
-            </label>
-            <label>
-              <span>{copy("Amount", "Tutar")}</span>
-              <input
-                min="0"
-                step="0.01"
-                type="number"
-                value={financialExtraCostForm.amount}
-                onChange={(event) => setFinancialExtraCostForm((current) => ({ ...current, amount: event.target.value }))}
-              />
-            </label>
-            <button type="submit" disabled={financialLoading}>{copy("Add Optional Expense", "Opsiyonel Gider Ekle")}</button>
-          </div>
-        </form>
-      </div>
-    );
-    const financialLoanRows = Array.isArray(financialSettingsForm.loanRows) ? financialSettingsForm.loanRows : [];
-    const calculatedLoanRows = getFinancialLoanRows(financialSettingsForm);
-    const longestLoanTerm = calculatedLoanRows.reduce((longestTerm, loan) => Math.max(longestTerm, loan.loanTermMonths), 0);
-    const longestGracePeriod = calculatedLoanRows.reduce((longestGrace, loan) => Math.max(longestGrace, loan.gracePeriodMonths), 0);
-    const getLoanCurrencyTotals = (selector) => {
-      const totals = calculatedLoanRows.reduce((groupedTotals, loan) => {
-        const currency = normalizeCurrencyCode(loan.currency);
-        groupedTotals.set(currency, (groupedTotals.get(currency) || 0) + Math.max(0, selector(loan)));
-        return groupedTotals;
-      }, new Map());
-
-      return Array.from(totals.entries())
-        .map(([currency, amount]) => ({ amount, currency }))
-        .sort((first, second) => {
-          const firstIndex = financialLoanCurrencyOptions.indexOf(first.currency);
-          const secondIndex = financialLoanCurrencyOptions.indexOf(second.currency);
-          return (firstIndex === -1 ? 999 : firstIndex) - (secondIndex === -1 ? 999 : secondIndex)
-            || first.currency.localeCompare(second.currency);
-        });
-    };
-    const formatLoanCurrencyTotals = (totals) => (
-      totals.length
-        ? totals.map((total) => formatCurrencyAmount(total.amount, total.currency)).join(" / ")
-        : "-"
-    );
-    const loanAmountTotals = getLoanCurrencyTotals((loan) => loan.amount);
-    const monthlyLoanPaymentTotals = getLoanCurrencyTotals((loan) => loan.monthlyPayment);
-    const estimatedLoanInterestTotals = getLoanCurrencyTotals((loan) => (
-      Math.max(0, (loan.monthlyPayment * loan.repaymentTermMonths) - loan.amount)
-    ));
-    const totalLoanAmountTry = calculatedLoanRows.reduce((total, loan) => (
-      total + convertMoneyToTry(loan.amount, loan.currency, exchangeRates)
-    ), 0);
-    const totalMonthlyLoanPaymentTry = calculatedLoanRows.reduce((total, loan) => (
-      total + convertMoneyToTry(loan.monthlyPayment, loan.currency, exchangeRates)
-    ), 0);
-    const estimatedLoanInterestTry = calculatedLoanRows.reduce((total, loan) => (
-      total + convertMoneyToTry(Math.max(0, (loan.monthlyPayment * loan.repaymentTermMonths) - loan.amount), loan.currency, exchangeRates)
-    ), 0);
-    const hasForeignCurrencyLoan = calculatedLoanRows.some((loan) => normalizeCurrencyCode(loan.currency) !== "TRY");
-    const canConvertLoanCurrencies = !hasForeignCurrencyLoan || hasUsableExchangeRates(exchangeRates);
-    const loanTryDetail = canConvertLoanCurrencies
-      ? copy("TRY + USD x USD/TRY + EUR x EUR/TRY", "TL + USD x USD/TRY + EUR x EUR/TRY")
-      : exchangeRates.status === "loading"
-        ? copy("FX rates are loading", "kurlar yükleniyor")
-        : copy("USD/EUR rate needed", "USD/EUR kuru gerekli");
-    const formatLoanTryTotal = (value) => canConvertLoanCurrencies
-      ? formatLira(value)
-      : copy("FX rate needed", "Kur gerekli");
-    const loanPaymentCalendar = buildFinancialLoanPaymentCalendar(calculatedLoanRows);
-    const renderFinancialLoanPaymentCalendar = () => (
-      <section className="financial-input-section optional financial-loan-calendar-section">
-        <div className="financial-input-section-heading">
-          <div>
-            <span>{copy("Payment calendar", "Ödeme takvimi")}</span>
-            <p>{copy("Months start from the current month. Colored cells show which loan has a payment in that month and the required amount.", "Aylar içinde bulunduğunuz aydan başlar. Renkli hücreler o ay hangi kredinin ödemesi olduğunu ve gereken tutarı gösterir.")}</p>
-          </div>
-          <strong>{loanPaymentCalendar.months.length} {copy("mo", "ay")}</strong>
-        </div>
-        <div className="financial-loan-calendar-scroll">
-          <div
-            className="financial-loan-calendar-grid"
-            style={{ gridTemplateColumns: `minmax(122px, 0.72fr) repeat(${loanPaymentCalendar.months.length}, minmax(64px, 1fr))` }}
-          >
-            <div className="loan-calendar-cell loan-calendar-corner">{copy("Loan", "Kredi")}</div>
-            {loanPaymentCalendar.months.map((month) => (
-              <div className="loan-calendar-cell loan-calendar-month" key={month.key}>
-                <strong>{month.label}</strong>
-              </div>
-            ))}
-
-            {loanPaymentCalendar.rows.length ? loanPaymentCalendar.rows.map((row, rowIndex) => (
-              <React.Fragment key={row.loan.id || `calendar-loan-${rowIndex}`}>
-                <div className="loan-calendar-cell loan-calendar-loan">
-                  <strong>{row.loan.name || `${copy("Loan", "Kredi")} ${rowIndex + 1}`}</strong>
-                  <span>{row.loan.currency} / {formatCurrencyAmount(row.loan.amount, row.loan.currency)}</span>
-                </div>
-                {row.payments.map((payment) => (
-                  <div className="loan-calendar-cell loan-calendar-payment-cell" key={`${row.loan.id}-${payment.monthKey}`}>
-                    {payment.isActive && (
-                      <div className={`loan-calendar-payment tone-${row.tone}`}>
-                        <strong>{formatCurrencyAmount(payment.amount, row.loan.currency)}</strong>
-                        <span>{row.loan.name || `${copy("Loan", "Kredi")} ${rowIndex + 1}`}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </React.Fragment>
-            )) : (
-              <>
-                <div className="loan-calendar-cell loan-calendar-loan">
-                  <strong>{copy("No loan", "Kredi yok")}</strong>
-                  <span>{copy("Add a loan to see payments.", "Ödemeleri görmek için kredi ekleyin.")}</span>
-                </div>
-                {loanPaymentCalendar.months.map((month) => (
-                  <div className="loan-calendar-cell loan-calendar-payment-cell" key={`empty-${month.key}`} />
-                ))}
-              </>
-            )}
-
-            <div className="loan-calendar-cell loan-calendar-total-label">
-              <strong>{copy("Monthly total", "Aylık toplam")}</strong>
-            </div>
-            {loanPaymentCalendar.months.map((month) => (
-              <div className="loan-calendar-cell loan-calendar-total" key={`total-${month.key}`}>
-                {month.totals.length ? month.totals.map((total) => (
-                  <span key={total.currency}>{formatCurrencyAmount(total.amount, total.currency)}</span>
-                )) : <span>-</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    );
-    const renderFinancialLoans = () => (
-      <form className="financial-loan-form" onSubmit={handleSaveFinancialSettings}>
-        <section className="financial-loan-hero">
-          <div>
-            <span>{copy("Financing plan", "Finansman planı")}</span>
-            <h2>{copy("Loans", "Krediler")}</h2>
-            <p>{copy("Add each loan separately, including its no-payment grace period. The feasibility model starts cash payments after the grace months.", "Her krediyi ayrı ekleyin; ilk kaç ay ödeme olmayacağını belirtin. Fizibilite modeli nakit ödemeleri ödemesiz aylar bittikten sonra başlatır.")}</p>
-          </div>
-          <button type="button" onClick={addFinancialLoanRow}>{copy("Add Loan", "Kredi Ekle")}</button>
-        </section>
-
-        <section className="financial-loan-summary-grid">
-          {[
-            [copy("Total loan", "Toplam kredi"), formatLoanCurrencyTotals(loanAmountTotals), copy("by currency", "döviz bazında")],
-            [copy("Total loan in TRY", "TL bazlı toplam kredi"), formatLoanTryTotal(totalLoanAmountTry), loanTryDetail],
-            [copy("Monthly payment", "Aylık ödeme"), formatLoanCurrencyTotals(monthlyLoanPaymentTotals), copy("after grace periods", "ödemesiz aylar sonrası")],
-            [copy("Monthly payment in TRY", "TL bazlı aylık ödeme"), formatLoanTryTotal(totalMonthlyLoanPaymentTry), loanTryDetail],
-            [copy("Longest term", "En uzun vade"), `${formatNumber(longestLoanTerm)} ${copy("mo", "ay")}`, copy("including grace", "ödemesiz ay dahil")],
-            [copy("Longest grace", "En uzun ödemesiz"), `${formatNumber(longestGracePeriod)} ${copy("mo", "ay")}`, copy("no cash payment", "nakit ödeme yok")],
-            [copy("Estimated interest", "Tahmini faiz"), formatLoanCurrencyTotals(estimatedLoanInterestTotals), copy("based on current terms", "mevcut koşullara göre")],
-            [copy("Estimated interest in TRY", "TL bazlı tahmini faiz"), formatLoanTryTotal(estimatedLoanInterestTry), loanTryDetail],
-          ].map(([label, value, detail]) => (
-            <article className="financial-loan-summary-card" key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
-              <small>{detail}</small>
-            </article>
-          ))}
-        </section>
-
-        <section className="financial-loan-currency-section" aria-label={copy("Loan currency breakdown", "Kredi döviz kırılımı")}>
-          {(loanAmountTotals.length ? loanAmountTotals : [{ amount: 0, currency: "TRY" }]).map((total) => {
-            const monthlyTotal = monthlyLoanPaymentTotals.find((item) => item.currency === total.currency)?.amount || 0;
-            const loanCount = calculatedLoanRows.filter((loan) => normalizeCurrencyCode(loan.currency) === total.currency).length;
-
-            return (
-              <article className="financial-loan-currency-card" key={total.currency}>
-                <span>{total.currency}</span>
-                <strong>{total.amount ? formatCurrencyAmount(total.amount, total.currency) : "-"}</strong>
-                <small>
-                  {loanCount ? `${formatNumber(loanCount)} ${copy("loan", "kredi")} / ${formatCurrencyAmount(monthlyTotal, total.currency)} ${copy("monthly", "aylık")}` : copy("No loan yet", "Henüz kredi yok")}
-                </small>
-              </article>
-            );
-          })}
-        </section>
-
-        <details className="financial-input-section optional financial-loan-section progressive-input-box">
-          <summary className="financial-input-section-heading progressive-section-summary">
-            <div>
-              <span>{copy("Loan records", "Kredi kayıtları")}</span>
-              <p>{copy("Every loan row must include amount, annual interest, grace period, and term. Leave this page empty if there is no loan.", "Her kredi satırında tutar, yıllık faiz, ödemesiz ay ve vade girilmelidir. Kredi yoksa bu sayfayı boş bırakabilirsiniz.")}</p>
-            </div>
-            <strong>{financialLoanRows.length}</strong>
-          </summary>
-          <div className="financial-loan-list">
-            {financialLoanRows.length ? financialLoanRows.map((loan, index) => {
-              const calculatedLoan = calculatedLoanRows.find((row) => row.id === loan.id) || calculatedLoanRows[index] || {};
-
-              return (
-                <details className="financial-loan-card progressive-input-box financial-loan-record-box" key={loan.id || `loan-${index}`}>
-                  <summary className="financial-loan-card-heading progressive-section-summary">
-                    <div>
-                      <span>{loan.name?.trim() || `${copy("Loan", "Kredi")} ${index + 1}`}</span>
-                      <h3>{formatCurrencyAmount(toFiniteNumber(loan.amount), loan.currency)}</h3>
-                    </div>
-                    <button
-                      type="button"
-                      className="resource-remove-button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        removeFinancialLoanRow(index);
-                      }}
-                    >
-                      x
-                    </button>
-                  </summary>
-                  <div className="financial-loan-row">
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Loan name", "Kredi adı")}
-                        <small>{copy("Optional", "Opsiyonel")}</small>
-                      </span>
-                      <input
-                        type="text"
-                        value={loan.name ?? ""}
-                        onChange={(event) => updateFinancialLoanRow(index, "name", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Currency", "Döviz")}
-                        <small>{copy("Required", "Zorunlu")}</small>
-                      </span>
-                      <select
-                        required
-                        value={normalizeCurrencyCode(loan.currency)}
-                        onChange={(event) => updateFinancialLoanRow(index, "currency", event.target.value)}
-                      >
-                        {financialLoanCurrencyOptions.map((currency) => (
-                          <option value={currency} key={currency}>{currency}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Received date", "Alınma tarihi")}
-                        <small>{copy("Required", "Zorunlu")}</small>
-                      </span>
-                      <input
-                        required
-                        type="date"
-                        value={loan.receivedDate || loan.received_date || getTodayDateInputValue()}
-                        onChange={(event) => updateFinancialLoanRow(index, "receivedDate", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Loan amount", "Kredi tutarı")}
-                        <small>{copy("Required", "Zorunlu")}</small>
-                      </span>
-                      <input
-                        min="0.01"
-                        required
-                        step="1000"
-                        type="number"
-                        value={loan.amount ?? ""}
-                        onChange={(event) => updateFinancialLoanRow(index, "amount", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Annual interest %", "Yıllık faiz %")}
-                        <small>{copy("Required", "Zorunlu")}</small>
-                      </span>
-                      <input
-                        min="0"
-                        required
-                        step="0.01"
-                        type="number"
-                        value={loan.annualInterestRate ?? ""}
-                        onChange={(event) => updateFinancialLoanRow(index, "annualInterestRate", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Grace period months", "Ödemesiz ay")}
-                        <small>{copy("Required", "Zorunlu")}</small>
-                      </span>
-                      <input
-                        min="0"
-                        required
-                        step="1"
-                        type="number"
-                        value={loan.gracePeriodMonths ?? 0}
-                        onChange={(event) => updateFinancialLoanRow(index, "gracePeriodMonths", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Loan term months", "Kredi vadesi ay")}
-                        <small>{copy("Required", "Zorunlu")}</small>
-                      </span>
-                      <input
-                        min="1"
-                        required
-                        step="1"
-                        type="number"
-                        value={loan.loanTermMonths ?? ""}
-                        onChange={(event) => updateFinancialLoanRow(index, "loanTermMonths", event.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <div className="financial-loan-card-metrics">
-                    <span>{copy("Payment starts", "Ödeme başlangıcı")}<strong>{calculatedLoan.paymentStartDate ? formatMonthLabel(parseDateInput(calculatedLoan.paymentStartDate)) : "-"}</strong></span>
-                    <span>{copy("Payment ends", "Ödeme bitişi")}<strong>{calculatedLoan.paymentEndDate ? formatMonthLabel(parseDateInput(calculatedLoan.paymentEndDate)) : "-"}</strong></span>
-                    <span>{copy("Repayment term", "Ödeme vadesi")}<strong>{formatNumber(calculatedLoan.repaymentTermMonths || 0)} {copy("mo", "ay")}</strong></span>
-                    <span>{copy("Monthly payment", "Aylık ödeme")}<strong>{formatCurrencyAmount(calculatedLoan.monthlyPayment || 0, calculatedLoan.currency)}</strong></span>
-                  </div>
-                </details>
-              );
-            }) : (
-              <p className="planner-empty-state loan-empty-state">{copy("No loan added. The model will use zero loan.", "Kredi eklenmedi. Model sıfır kredi kullanacak.")}</p>
-            )}
-          </div>
-        </details>
-        {renderFinancialLoanPaymentCalendar()}
-        <div className="financial-loan-actions">
-          <button type="button" onClick={addFinancialLoanRow}>{copy("Add Loan", "Kredi Ekle")}</button>
-          <button type="submit" disabled={financialLoading}>{copy("Save Loans", "Kredileri Kaydet")}</button>
-        </div>
-      </form>
-    );
-    const renderFinancialTrendCard = () => (
-      <article className="financial-card financial-overview-wide financial-trend-card">
-        <div className="financial-card-heading">
-          <h2>{copy("Income and Expense Projection", "Gelir ve Gider Projeksiyonu")}</h2>
-          <div className="mini-tabs">
-            {[
-              ["6m", copy("6 Months", "6 Ay")],
-              ["1y", copy("1 Year", "1 Yıl")],
-              ["5y", copy("5 Years", "5 Yıl")],
-            ].map(([value, label]) => (
-              <button
-                type="button"
-                className={financialHorizon === value ? "active" : ""}
-                onClick={() => {
-                  setFinancialHorizon(value);
-                  loadFinancialData(value);
-                }}
-                key={value}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="chart-legend" aria-label={copy("Chart color legend", "Grafik renk açıklaması")}>
-          <span className="legend-sales">{copy("Income", "Gelir")}</span>
-          <span className="legend-costs">{copy("Expense", "Gider")}</span>
-        </div>
-        {renderIncomeExpenseTrendSvg(copy("Income and expense projection chart", "Gelir ve gider projeksiyon grafiği"))}
-      </article>
-    );
-    const statementProjectionRows = statementProjectionModel.trendRows || [];
-    const projectionPeriodMonths = financialStatementPeriod === "monthly" ? 1 : financialStatementPeriod === "yearly" ? 12 : 3;
-    const projectionPeriodCount = financialStatementPeriod === "monthly" ? 24 : financialStatementPeriod === "yearly" ? 5 : 4;
-    const projectionPeriodCountLabel = financialStatementPeriod === "monthly"
-      ? copy("24 months", "24 ay")
-      : financialStatementPeriod === "yearly"
-        ? copy("5 years", "5 yıl")
-        : copy("4 quarters", "4 çeyrek");
-    const formatProjectionDate = (date) => new Intl.DateTimeFormat(document.documentElement.lang === "tr" ? "tr-TR" : "en-US", {
-      month: "short",
-      year: "numeric",
-    }).format(date);
-    const getProjectionDateAtOffset = (offset) => {
-      const date = getMonthStart(new Date());
-      date.setMonth(date.getMonth() + offset);
-      return date;
-    };
-    const getProjectionRangeLabel = (startOffset, monthSpan) => {
-      const startDate = getProjectionDateAtOffset(startOffset);
-      const endDate = getProjectionDateAtOffset(startOffset + Math.max(0, monthSpan - 1));
-      return `${formatProjectionDate(startDate)} - ${formatProjectionDate(endDate)}`;
-    };
-    const buildProjectionPeriod = (index) => {
-      const startIndex = index * projectionPeriodMonths;
-      const periodRows = statementProjectionRows.slice(startIndex, startIndex + projectionPeriodMonths);
-      const sum = (key) => periodRows.reduce((total, row) => total + toFiniteNumber(row[key]), 0);
-      const firstRow = periodRows[0] || {};
-      const lastRow = periodRows[periodRows.length - 1] || {};
-      const salesRevenue = sum("salesRevenue");
-      const materialCost = sum("materialCost");
-      const workforceCost = sum("workforceCost");
-      const electricityCost = sum("electricityCost");
-      const otherProductionCost = sum("otherProductionCost");
-      const writeOffCost = sum("writeOffCost");
-      const grossProfit =
-        salesRevenue -
-        materialCost -
-        workforceCost -
-        electricityCost -
-        otherProductionCost -
-        writeOffCost;
-      const netIncome = sum("netIncome");
-      const sellingCost = sum("sellingCost");
-      const overheadCost = sum("overheadCost");
-
-      return {
-        cashFlow: sum("cashFlow"),
-        equity: toFiniteNumber(lastRow.equity),
-        fixedAssets: toFiniteNumber(lastRow.fixedAssets),
-        inventoryValue: toFiniteNumber(lastRow.inventoryValue),
-        loanBalance: toFiniteNumber(lastRow.loanBalance),
-        operatingProfit: grossProfit - sellingCost - overheadCost,
-        otherLiabilities: toFiniteNumber(lastRow.payables) + toFiniteNumber(lastRow.vatDue) + toFiniteNumber(lastRow.taxPayable),
-        otherAssets: toFiniteNumber(lastRow.receivables) + toFiniteNumber(lastRow.vatCredit),
-        overheadCost,
-        sellingCost,
-        totalAssets: toFiniteNumber(lastRow.totalAssets),
-        totalLiabilitiesAndEquity: toFiniteNumber(lastRow.totalLiabilitiesAndEquity),
-        endingCash: toFiniteNumber(lastRow.cashBalance),
-        grossMargin: salesRevenue ? (grossProfit / salesRevenue) * 100 : 0,
-        grossProfit,
-        incomeTax: sum("incomeTax"),
-        label: financialStatementPeriod === "monthly"
-          ? `${copy("Month", "Ay")} ${index + 1}`
-          : financialStatementPeriod === "yearly"
-            ? copy(`Year ${index + 1}`, `Yıl ${index + 1}`)
-            : copy(`Q${index + 1}`, `Ç${index + 1}`),
-        loanInterest: sum("loanInterest"),
-        materialCost,
-        netIncome,
-        otherProductionCost,
-        netMargin: salesRevenue ? (netIncome / salesRevenue) * 100 : 0,
-        netSoldUnits: sum("netSoldUnits"),
-        periodRows,
-        inventoryUnits: toFiniteNumber(lastRow.inventoryUnits),
-        producedUnits: sum("producedUnits"),
-        rangeLabel: getProjectionRangeLabel(startIndex, projectionPeriodMonths),
-        salesRevenue,
-        startingCash: toFiniteNumber(firstRow.cashBalance) - toFiniteNumber(firstRow.cashFlow),
-        totalCost: sum("totalCost"),
-        vatPayable: sum("vatPayable"),
-        writeOffCost,
-        workforceCost,
-        electricityCost,
-      };
-    };
-    const financialStatementPeriods = Array.from({ length: projectionPeriodCount }, (_, index) => buildProjectionPeriod(index));
-    const statementPeriodColumnWidth = financialStatementPeriod === "monthly" ? 116 : 132;
-    const statementGridTemplate = `minmax(240px, 1.22fr) repeat(${financialStatementPeriods.length}, minmax(${statementPeriodColumnWidth}px, 1fr))`;
-    const statementGridMinWidth = `${260 + (financialStatementPeriods.length * statementPeriodColumnWidth)}px`;
-    const projectionRows = [
-      { id: "income-section", section: copy("Income Statement", "Gelir Tablosu") },
-      { detail: copy("From channel sales forecast", "Kanal satış tahmininden"), emphasis: true, format: "money", id: "salesRevenue", label: copy("Net Sales", "Net Satışlar"), tone: "income", value: (period) => period.salesRevenue },
-      { detail: copy("Material input cost", "Malzeme girdi maliyeti"), format: "money", id: "materialCost", label: copy("Materials", "Malzemeler"), tone: "cost", value: (period) => period.materialCost },
-      { detail: copy("Labor and salary cost", "İşçilik ve maaş maliyeti"), format: "money", id: "workforceCost", label: copy("Labor", "İşçilik"), tone: "cost", value: (period) => period.workforceCost },
-      { detail: copy("Energy cost from operations", "Operasyonlardan gelen enerji maliyeti"), format: "money", id: "electricityCost", label: copy("Energy", "Enerji"), tone: "cost", value: (period) => period.electricityCost },
-      { detail: copy("Machines and equipment, straight-line, non-cash", "Makine ve ekipman, doğrusal, nakit dışı"), format: "money", id: "otherProductionCost", label: copy("Depreciation", "Amortisman"), tone: "cost", value: (period) => period.otherProductionCost },
-      { detail: copy("Cost of returned units", "İade edilen ürünlerin maliyeti"), format: "money", id: "writeOffCost", label: copy("Returns Write-off", "İade Maliyeti"), tone: "cost", value: (period) => period.writeOffCost },
-      { detail: copy("Net sales minus cost of units sold", "Net satışlardan satılan ürünlerin maliyeti düşülmüş hali"), emphasis: true, format: "money", id: "grossProfit", label: copy("Gross Profit", "Brüt Kâr"), signed: true, value: (period) => period.grossProfit },
-      { detail: copy("Channel commission, acquisition cost and campaigns", "Kanal komisyonu, müşteri edinme ve kampanyalar"), format: "money", id: "sellingCost", label: copy("Selling Expenses", "Satış ve Pazarlama Giderleri"), tone: "cost", value: (period) => period.sellingCost },
-      { detail: copy("Recurring overhead and one-off start-up costs", "Tekrarlayan genel giderler ve tek seferlik başlangıç giderleri"), format: "money", id: "overheadCost", label: copy("Overhead", "Genel Giderler"), tone: "cost", value: (period) => period.overheadCost },
-      { detail: copy("Before interest and tax", "Faiz ve vergi öncesi"), emphasis: true, format: "money", id: "operatingProfit", label: copy("Operating Profit", "Faaliyet Kârı"), signed: true, value: (period) => period.operatingProfit },
-      { detail: copy("Interest accrued from active loans", "Aktif kredilerden işleyen faiz"), format: "money", id: "loanInterest", label: copy("Loan Interest", "Kredi Faizi"), tone: "cost", value: (period) => period.loanInterest },
-      { detail: copy("Annual profit after losses carried forward", "Devreden zararlar mahsup edilmiş yıllık kâr üzerinden"), format: "money", id: "incomeTax", label: copy("Income Tax", "Gelir Vergisi"), tone: "tax", value: (period) => period.incomeTax },
-      { detail: copy("All cost lines carried by the model", "Modelin taşıdığı tüm maliyet satırları"), emphasis: true, format: "money", id: "totalCost", label: copy("Total Expenses", "Toplam Giderler"), tone: "cost", value: (period) => period.totalCost },
-      { detail: copy("After all operating, financing and tax costs", "Tüm operasyon, finansman ve vergi maliyetlerinden sonra"), emphasis: true, format: "money", id: "netIncome", label: copy("Net Profit", "Net Kâr"), signed: true, value: (period) => period.netIncome },
-      { detail: copy("Net profit divided by net sales", "Net kârın net satışlara oranı"), format: "percent", id: "netMargin", label: copy("Net Profit Margin", "Net Kâr Marjı"), signed: true, value: (period) => period.netMargin },
-      { id: "cash-section", section: copy("Cash Flow", "Nakit Akışı") },
-      { detail: copy("Cash at the start of the period", "Dönem başındaki nakit"), format: "money", id: "startingCash", label: copy("Starting Cash", "Dönem Başı Nakit"), signed: true, value: (period) => period.startingCash },
-      { detail: copy("Net movement inside the period", "Dönem içi net hareket"), emphasis: true, format: "money", id: "cashFlow", label: copy("Net Cash Flow", "Net Nakit Akışı"), signed: true, value: (period) => period.cashFlow },
-      { detail: copy("Cash left after the period closes", "Dönem kapandıktan sonra kalan nakit"), emphasis: true, format: "money", id: "endingCash", label: copy("Ending Cash", "Dönem Sonu Nakit"), signed: true, value: (period) => period.endingCash },
-      { detail: copy("Output VAT minus input VAT, paid the following month", "Hesaplanan KDV eksi indirilecek KDV, ertesi ay ödenir"), format: "money", id: "vatPayable", label: copy("VAT Payable", "Ödenecek KDV"), tone: "tax", value: (period) => period.vatPayable },
-      { id: "balance-section", section: copy("Balance Sheet (period end)", "Bilanço (dönem sonu)") },
-      { detail: copy("Customer receivables and VAT credit", "Müşteri alacakları ve devreden KDV"), format: "money", id: "otherAssets", label: copy("Receivables", "Alacaklar"), value: (period) => period.otherAssets },
-      { detail: copy("Finished goods and raw material stock at cost", "Mamul ve hammadde stoku, maliyet bedeliyle"), format: "money", id: "inventoryValue", label: copy("Inventory", "Stoklar"), value: (period) => period.inventoryValue },
-      { detail: copy("Machines and equipment after depreciation", "Amortisman sonrası makine ve ekipman"), format: "money", id: "fixedAssets", label: copy("Fixed Assets", "Duran Varlıklar"), value: (period) => period.fixedAssets },
-      { detail: copy("Cash, receivables, inventory and fixed assets", "Nakit, alacak, stok ve duran varlıklar"), emphasis: true, format: "money", id: "totalAssets", label: copy("Total Assets", "Toplam Aktif"), value: (period) => period.totalAssets },
-      { detail: copy("Supplier, VAT and income tax payables", "Tedarikçi, KDV ve gelir vergisi borçları"), format: "money", id: "otherLiabilities", label: copy("Payables", "Kısa Vadeli Borçlar"), value: (period) => period.otherLiabilities },
-      { detail: copy("Outstanding loan principal", "Kalan kredi anaparası"), format: "money", id: "loanBalance", label: copy("Loans", "Krediler"), value: (period) => period.loanBalance },
-      { detail: copy("Paid-in capital, grants and retained earnings", "Sermaye, hibe ve birikmiş kâr"), format: "money", id: "equity", label: copy("Equity", "Özkaynak"), signed: true, value: (period) => period.equity },
-      { detail: copy("Must equal total assets", "Toplam aktife eşit olmalı"), emphasis: true, format: "money", id: "totalLiabilitiesAndEquity", label: copy("Total Liabilities and Equity", "Toplam Pasif"), value: (period) => period.totalLiabilitiesAndEquity },
-      { id: "operations-section", section: copy("Operating Volume", "Operasyon Hacmi") },
-      { detail: copy("Units produced by active process plans", "Aktif süreç planlarıyla üretilen adet"), format: "number", id: "producedUnits", label: copy("Produced Units", "Üretilen Adet"), value: (period) => period.producedUnits },
-      { detail: copy("Units sold after returns", "İadeler sonrası satılan adet"), format: "number", id: "netSoldUnits", label: copy("Net Sold Units", "Net Satılan Adet"), value: (period) => period.netSoldUnits },
-      { detail: copy("Finished goods left at period end", "Dönem sonunda kalan mamul"), format: "number", id: "inventoryUnits", label: copy("Units in Stock", "Stoktaki Adet"), value: (period) => period.inventoryUnits },
-    ];
-    const formatProjectionValue = (row, period) => {
-      const value = toFiniteNumber(row.value(period));
-      if (row.format === "percent") return `${formatNumber(value, 1)}%`;
-      if (row.format === "number") return formatNumber(value);
-      return formatLira(value);
-    };
-    const getProjectionValueTone = (row, period) => {
-      if (!row.signed) return row.tone || "";
-      return toFiniteNumber(row.value(period)) >= 0 ? "positive" : "negative";
-    };
-    const renderOverviewFinancialRows = () => (
-      <article className="financial-card income-card financial-overview-wide">
-        <div className="financial-card-heading">
-          <div>
-            <h2>{copy("Financial Statement", "Finansal Tablo")}</h2>
-            <p>{financialStatementPeriod === "monthly"
-              ? copy("Forward projection view for the next 24 months.", "Önümüzdeki 24 ay için projeksiyon görünümü.")
-              : financialStatementPeriod === "yearly"
-                ? copy("Five-year income statement, cash flow and balance sheet.", "5 yıllık gelir tablosu, nakit akışı ve bilanço.")
-                : copy("Forward projection view for the next four quarters.", "Önümüzdeki dört çeyrek için projeksiyon görünümü.")}</p>
-          </div>
-          <div className="financial-statement-controls">
-            <span className="financial-row-count">{projectionPeriodCountLabel}</span>
-            <div className="financial-statement-toggle" role="group" aria-label={copy("Statement period", "Tablo dönemi")}>
-              {[
-                ["monthly", copy("Monthly", "Aylık")],
-                ["quarterly", copy("Quarterly", "Çeyreklik")],
-                ["yearly", copy("Yearly", "Yıllık")],
-              ].map(([value, label]) => (
-                <button
-                  type="button"
-                  className={financialStatementPeriod === value ? "active" : ""}
-                  onClick={() => setFinancialStatementPeriod(value)}
-                  key={value}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="financial-statement financial-projection-statement">
-          <div className="financial-projection-scroll">
-            <div className="financial-projection-row financial-projection-head" style={{ gridTemplateColumns: statementGridTemplate, minWidth: statementGridMinWidth }}>
-              <span>{copy("Line Item", "Kalem")}</span>
-              {financialStatementPeriods.map((period) => (
-                <span key={period.label}>
-                  <strong>{period.label}</strong>
-                  <small>{period.rangeLabel}</small>
-                </span>
-              ))}
-            </div>
-            {projectionRows.map((row) => row.section ? (
-              <div className="financial-projection-row financial-projection-section" style={{ gridTemplateColumns: statementGridTemplate, minWidth: statementGridMinWidth }} key={row.id}>
-                <strong>{row.section}</strong>
-                {financialStatementPeriods.map((period) => <span key={`${row.id}-${period.label}`} />)}
-              </div>
-            ) : (
-              <div className={`financial-projection-row financial-projection-line ${row.emphasis ? "emphasis" : ""}`} style={{ gridTemplateColumns: statementGridTemplate, minWidth: statementGridMinWidth }} key={row.id}>
-                <div>
-                  <strong>{row.label}</strong>
-                  <small>{row.detail}</small>
-                </div>
-                {financialStatementPeriods.map((period) => (
-                  <b className={getProjectionValueTone(row, period)} key={`${row.id}-${period.label}`}>
-                    {formatProjectionValue(row, period)}
-                  </b>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      </article>
-    );
-    const renderWidgetMetric = (label, value, detail) => (
-      <div className="financial-widget-metric">
-        <span className="label-with-info">{label}<GlossaryTip language={form.language} term={label} /></span>
-        <strong>{value}</strong>
-        <small>{detail}</small>
-      </div>
-    );
-    const renderWidgetScenarioList = (rows, emptyLabel) => (
-      <div className="scenario-list">
-        {(rows.length ? rows : [{ id: "empty", name: emptyLabel, costType: "-", amount: 0 }]).map((item) => (
-          <div className="scenario-row" key={item.id || item.name}>
-            <div>
-              <strong>{item.name || getFinancialRowLabel(item)}</strong>
-              <span>{item.costType === "initial" ? copy("Initial expense", "Başlangıç gideri") : item.costType === "recurring" ? copy("Recurring expense", "Tekrarlayan gider") : item.costType || "-"}</span>
-            </div>
-            <strong>{item.id === "empty" ? "-" : formatLira(item.amount)}</strong>
-          </div>
-        ))}
-      </div>
-    );
-    const financialWidgetCatalog = [
-      {
-        detail: copy("Liquidity after current inputs", "Mevcut girdilerle likidite"),
-        id: "cashRunway",
-        render: () => renderWidgetMetric(copy("Cash Runway", "Nakit Dayanma"), `${formatNumber(summary.cashRunwayMonths)} ${copy("months", "ay")}`, copy("Uses initial cash, loans and monthly cash flow", "Başlangıç nakdi, krediler ve aylık nakit akışını kullanır")),
-        title: copy("Cash Runway", "Nakit Dayanma"),
-      },
-      {
-        detail: copy("First profitable operating month", "İlk kârlı operasyon ayı"),
-        id: "breakEven",
-        render: () => renderWidgetMetric(copy("Break-even", "Başa Baş"), formatMonth(summary.breakEvenMonth), copy("Revenue minus operating cost and taxes", "Gelir eksi operasyon maliyeti ve vergiler")),
-        title: copy("Break-even", "Başa Baş"),
-      },
-      {
-        detail: copy("Investment recovery estimate", "Yatırım geri dönüş tahmini"),
-        id: "payback",
-        render: () => renderWidgetMetric(copy("Payback", "Geri Dönüş"), formatMonth(summary.paybackMonth), copy("Investment, working capital and loan effect included", "Yatırım, işletme sermayesi ve kredi etkisi dahil")),
-        title: copy("Payback", "Geri Dönüş"),
-      },
-      {
-        detail: copy("Break-even sales volume", "Başa baş satış hacmi"),
-        id: "requiredSales",
-        render: () => renderWidgetMetric(copy("Required Monthly Sales", "Gerekli Aylık Satış"), formatNumber(summary.requiredMonthlySalesVolume), copy("Based on contribution per unit", "Birim katkı payına göre")),
-        title: copy("Required Sales", "Gerekli Satış"),
-      },
-      {
-        detail: copy("Forecast not sold", "Satışa dönüşmeyen tahmin"),
-        id: "inventoryRisk",
-        render: () => renderWidgetMetric(copy("Unsold Inventory", "Satılmayan Stok"), `${formatNumber(summary.unsoldInventoryUnits)} ${copy("units", "adet")}`, copy("Production above channel sales plan", "Kanal satış planını aşan üretim")),
-        title: copy("Inventory Risk", "Stok Riski"),
-      },
-      {
-        detail: copy("Spoilage and return write-off", "Fire ve iade maliyeti"),
-        id: "writeOff",
-        render: () => renderWidgetMetric(copy("Write-off Value", "Fire / İade Değeri"), formatLira(summary.expiredWriteOffCost), copy("Sales strategy return and spoilage inputs", "Satış stratejisi iade ve fire girdileri")),
-        title: copy("Write-off", "Fire / İade"),
-      },
-      {
-        detail: copy("VAT and income tax", "KDV ve gelir vergisi"),
-        id: "taxLoad",
-        render: () => renderWidgetMetric(copy("Tax Load", "Vergi Yükü"), formatLira(summary.vatPayable + summary.incomeTax), copy("Tax inputs from financial assumptions", "Finansal varsayımlardan gelen vergi girdileri")),
-        title: copy("Tax Load", "Vergi Yükü"),
-      },
-      {
-        detail: copy("Loan payment impact", "Kredi ödeme etkisi"),
-        id: "loanSummary",
-        render: () => (
-          <div className="financial-widget-pair">
-            {renderWidgetMetric(copy("Monthly Payment", "Aylık Ödeme"), formatLira(summary.loanPayment), copy("Current active installments", "Mevcut aktif taksitler"))}
-            {renderWidgetMetric(copy("Total Loan", "Toplam Kredi"), formatLira(summary.loanAmount), copy("Saved in Loans page", "Krediler sayfasında kayıtlı"))}
-          </div>
-        ),
-        title: copy("Loan Summary", "Kredi Özeti"),
-      },
-      {
-        detail: copy("Operations and input cost mix", "Operasyon ve girdi maliyet karması"),
-        id: "costTypes",
-        render: () => renderBreakdownBars(costBreakdownRows, maxCostBreakdownAmount, copy("No cost data yet", "Henüz maliyet verisi yok"), "cost"),
-        title: copy("Cost Types", "Maliyet Türleri"),
-      },
-      {
-        detail: copy("Revenue, net and cash return", "Gelir, net ve nakit getiri"),
-        id: "returnTypes",
-        render: () => renderBreakdownBars(returnBreakdownRows, maxReturnBreakdownAmount, copy("No return data yet", "Henüz getiri verisi yok"), "income"),
-        title: copy("Return Types", "Getiri Türleri"),
-      },
-      {
-        detail: copy("Machine, equipment and working capital", "Makine, ekipman ve işletme sermayesi"),
-        id: "investmentBreakdown",
-        render: () => renderBreakdownBars(investmentBreakdownRows, maxInvestmentBreakdownAmount, copy("No investment data yet", "Henüz yatırım verisi yok"), "investment"),
-        title: copy("Investment Breakdown", "Yatırım Kırılımı"),
-      },
-      {
-        detail: copy("User-entered optional expenses", "Kullanıcının girdiği opsiyonel giderler"),
-        id: "optionalExpenses",
-        render: () => renderWidgetScenarioList(model.extraCosts || [], copy("No optional expense yet", "Henüz opsiyonel gider yok")),
-        title: copy("Optional Expenses", "Opsiyonel Giderler"),
-      },
-    ];
-    const selectedFinancialWidgets = financialOverviewWidgets
-      .map((widgetId) => financialWidgetCatalog.find((widget) => widget.id === widgetId))
-      .filter(Boolean);
-    const renderOverviewWidget = (widget) => (
-      <article className="financial-card financial-widget-card" key={widget.id}>
-        <div className="financial-card-heading">
-          <div>
-            <h2>{widget.title}</h2>
-            <p>{widget.detail}</p>
-          </div>
-          <button type="button" className="widget-remove-button" onClick={() => toggleFinancialOverviewWidget(widget.id)}>
-            x
-          </button>
-        </div>
-        {widget.render()}
-      </article>
-    );
-    const renderWidgetSelector = () => (
-      <article className="financial-card financial-widget-selector">
-        <div className="financial-card-heading">
-          <div>
-            <h2>{copy("Add widgets to this screen", "Bu ekrana widget ekle")}</h2>
-            <p>{copy("Default view stays focused on financial rows and the projection chart. Pick the metrics you want to keep on your saved screen.", "Varsayılan görünüm finansal satırlar ve projeksiyon grafiğine odaklı kalır. Kayıtlı ekranında görmek istediğin metrikleri seç.")}</p>
-          </div>
-          <button type="button" className="primary" onClick={saveFinancialOverviewScreen} disabled={financialLoading}>
-            {copy("Save Screen", "Ekranı Kaydet")}
-          </button>
-        </div>
-        <div className="financial-widget-picker">
-          {financialWidgetCatalog.map((widget) => {
-            const isSelected = financialOverviewWidgets.includes(widget.id);
-
-            return (
-              <button
-                type="button"
-                className={isSelected ? "selected" : ""}
-                onClick={() => toggleFinancialOverviewWidget(widget.id)}
-                key={widget.id}
-              >
-                <strong>{widget.title}</strong>
-                <span>{widget.detail}</span>
-              </button>
-            );
-          })}
-        </div>
-      </article>
-    );
-    const overviewMonthCount = Math.max(1, getProjectionMonthCount(financialHorizon));
-    const overviewHasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
-    const overviewIsDecisionReady = Boolean(summary.planCount && overviewHasSalesForecast && financialModel.settingsSaved);
-    const overviewMonthlyRevenue = toFiniteNumber(summary.salesRevenue) / overviewMonthCount;
-    const overviewMonthlyCost = toFiniteNumber(summary.totalCost) / overviewMonthCount;
-    const overviewMonthlyNet = toFiniteNumber(summary.netIncome) / overviewMonthCount;
-    const overviewProductionCost =
-      toFiniteNumber(summary.materialCost) +
-      toFiniteNumber(summary.workforceCost) +
-      toFiniteNumber(summary.electricityCost) +
-      toFiniteNumber(summary.otherProductionCost) +
-      toFiniteNumber(summary.expiredWriteOffCost);
-    const overviewTaxAndFinanceCost = toFiniteNumber(summary.vatPayable) + toFiniteNumber(summary.incomeTax) + toFiniteNumber(summary.loanInterest);
-    const overviewInvestmentBase = Math.max(0, investmentTotal);
-    const overviewRoiPercent = overviewInvestmentBase ? (toFiniteNumber(summary.netIncome) / overviewInvestmentBase) * 100 : 0;
-    const overviewMarginPercent = summary.salesRevenue ? (toFiniteNumber(summary.netIncome) / toFiniteNumber(summary.salesRevenue)) * 100 : 0;
-    const overviewCashRunwayLimit = Math.min(overviewMonthCount, 6);
-    const overviewDecisionMetrics = [
-      {
-        detail: copy("Average of the selected projection horizon", "Seçili projeksiyon ufkunun aylık ortalaması"),
-        label: copy("Monthly net", "Aylık net"),
-        tone: overviewMonthlyNet >= 0 ? "good" : "risk",
-        value: overviewIsDecisionReady ? formatLira(overviewMonthlyNet) : "-",
-      },
-      {
-        detail: copy("Revenue after channel effects", "Kanal etkilerinden sonra gelir"),
-        label: copy("Monthly revenue", "Aylık ciro"),
-        tone: "neutral",
-        value: overviewIsDecisionReady ? formatLira(overviewMonthlyRevenue) : "-",
-      },
-      {
-        detail: copy("First month where cash turns negative", "Nakit negatifleşene kadar geçen süre"),
-        label: copy("Cash runway", "Nakit dayanma"),
-        tone: summary.cashRunwayMonths >= overviewCashRunwayLimit ? "good" : "risk",
-        value: overviewIsDecisionReady ? `${formatNumber(summary.cashRunwayMonths)} ${copy("mo", "ay")}` : "-",
-      },
-      {
-        detail: copy("Net income divided by investment base", "Net kazancın yatırım tabanına oranı"),
-        label: copy("ROI", "Yatırım getirisi"),
-        tone: overviewRoiPercent >= 0 ? "good" : "risk",
-        value: overviewIsDecisionReady && overviewInvestmentBase ? `${formatNumber(overviewRoiPercent, 1)}%` : "-",
-      },
-    ];
-    const overviewMoneyFlowRows = [
-      {
-        amount: summary.salesRevenue,
-        detail: copy("Product-linked channel forecast", "Ürüne bağlı kanal tahmini"),
-        label: copy("Sales revenue", "Satış geliri"),
-        tone: "income",
-      },
-      {
-        amount: -overviewProductionCost,
-        detail: copy("Material, labor, energy, write-off", "Malzeme, işçilik, enerji, fire/iade"),
-        label: copy("Production cost", "Üretim maliyeti"),
-        tone: "cost",
-      },
-      {
-        amount: -toFiniteNumber(summary.extraRecurringCost),
-        detail: copy("Recurring optional expenses", "Tekrarlayan opsiyonel giderler"),
-        label: copy("Overhead", "Genel gider"),
-        tone: "cost",
-      },
-      {
-        amount: -overviewTaxAndFinanceCost,
-        detail: copy("VAT, income tax and loan interest", "KDV, gelir vergisi ve kredi faizi"),
-        label: copy("Tax and finance", "Vergi ve finansman"),
-        tone: "cost",
-      },
-      {
-        amount: summary.netIncome,
-        detail: copy("Revenue minus tracked costs", "Gelir eksi takip edilen maliyetler"),
-        label: copy("Net return", "Net getiri"),
-        tone: "net",
-      },
-    ];
-    const overviewCostBreakdownRows = [
-      { amount: overviewProductionCost, id: "productionCost", label: copy("Production cost", "Üretim maliyeti"), tone: "cost" },
-      { amount: summary.extraRecurringCost, id: "recurringExtraCost", label: copy("Recurring overhead", "Tekrarlayan genel gider"), tone: "cost" },
-      { amount: overviewTaxAndFinanceCost, id: "taxFinance", label: copy("Tax and finance", "Vergi ve finansman"), tone: "cost" },
-      { amount: summary.machinePurchaseCost + summary.equipmentPurchaseCost + summary.extraInitialCost, id: "initialInvestment", label: copy("Initial investment", "Başlangıç yatırımı"), tone: "investment" },
-      { amount: summary.workingCapitalRequirement, id: "workingCapital", label: copy("Working capital", "İşletme sermayesi"), tone: "investment" },
-    ].filter((item) => toFiniteNumber(item.amount) > 0);
-    const overviewMaxCostBreakdownAmount = Math.max(1, ...overviewCostBreakdownRows.map((item) => toFiniteNumber(item.amount)));
-
-    if (currentFinancialPage.key === "inputs") {
-      return renderDashboardLayout(
-        `financial-modelling/${currentFinancialPage.key}`,
-          <section className="financial-workspace">
-            <div className="financial-header">
-              <div>
-                <span>{currentFinancialPage.group} / {copy("Financial assumptions", "Finansal varsayımlar")}</span>
-                <h1>{financialPageMeta.title}</h1>
-                <p>{financialPageMeta.description}</p>
-              </div>
-              <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
-                {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
-              </button>
-            </div>
-
-            {renderFinancialInputs()}
-            {financialStatus && <p className="status-message">{financialStatus}</p>}
-
-            <div className="financial-grid">
-              <article className="financial-card scenario-card">
-                <div className="financial-card-heading"><h2>{copy("Saved Optional Expenses", "Kayıtlı Opsiyonel Giderler")}</h2></div>
-                <div className="scenario-list">
-                  {(model.extraCosts?.length ? model.extraCosts : [{ id: "empty", name: copy("No extra cost yet", "Henüz ek gider yok"), costType: "-", amount: 0 }]).map((cost) => (
-                    <div className={`scenario-row${cost.id === "empty" ? "" : " has-row-action"}`} key={cost.id}>
-                      <div>
-                        <strong>{cost.name}</strong>
-                        <span>{cost.costType === "initial" ? copy("Initial expense", "Başlangıç gideri") : cost.costType === "recurring" ? copy("Recurring expense", "Tekrarlayan gider") : "-"}</span>
-                      </div>
-                      <strong>{cost.id === "empty" ? "-" : formatLira(cost.amount)}</strong>
-                      {cost.id !== "empty" && (
-                        <button type="button" className="table-delete-button" onClick={() => handleDeleteFinancialExtraCost(cost)}>
-                          {copy("Delete", "Sil")}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </article>
-            </div>
-          </section>,
-      );
-    }
-
-    if (currentFinancialPage.key === "loans") {
-      return renderDashboardLayout(
-        `financial-modelling/${currentFinancialPage.key}`,
-          <section className="financial-workspace">
-            <div className="financial-header">
-              <div>
-                <span>{currentFinancialPage.group} / {copy("Financing inputs", "Finansman girdileri")}</span>
-                <h1>{financialPageMeta.title}</h1>
-                <p>{financialPageMeta.description}</p>
-              </div>
-              <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
-                {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
-              </button>
-            </div>
-
-            {financialStatus && <p className="status-message">{financialStatus}</p>}
-
-            <div className="finance-metric-grid">
-              {[
-                [copy("Loan Count", "Kredi Sayısı"), formatNumber(financialLoanRows.length), copy("separate financing records", "ayrı finansman kaydı")],
-                [copy("Total Loan Amount", "Toplam Kredi Tutarı"), formatLoanCurrencyTotals(loanAmountTotals), copy("by loan currency", "kredi dövizine göre")],
-                [copy("Total Loan in TRY", "TL Bazlı Toplam Kredi"), formatLoanTryTotal(totalLoanAmountTry), loanTryDetail],
-                [copy("Monthly Loan Payment", "Aylık Kredi Ödemesi"), formatLoanCurrencyTotals(monthlyLoanPaymentTotals), copy("sum of active installments", "aktif taksitlerin toplamı")],
-                [copy("Monthly Payment in TRY", "TL Bazlı Aylık Ödeme"), formatLoanTryTotal(totalMonthlyLoanPaymentTry), loanTryDetail],
-                [copy("Longest Term", "En Uzun Vade"), longestLoanTerm ? `${formatNumber(longestLoanTerm)} ${copy("months", "ay")}` : "-", copy("used for repayment schedule", "ödeme planında kullanılır")],
-              ].map(([label, value, detail]) => (
-                <article className="finance-metric-card" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                  <small>{detail}</small>
-                </article>
-              ))}
-            </div>
-
-            {renderFinancialLoans()}
-          </section>,
-      );
-    }
-
-    // Overview is the last financial page; legacy detail URLs redirect here.
-    return renderDashboardLayout(
-      `financial-modelling/${currentFinancialPage.key}`,
-        <section className="financial-workspace">
-          <div className="financial-header">
-            <div>
-              <span>{currentFinancialPage.group} / {copy("Model connected to Operations data", "Operasyon verisine bağlı model")}</span>
-              <h1>{financialPageMeta.title}</h1>
-              <p>{financialPageMeta.description}</p>
-            </div>
-            <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
-              {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
-            </button>
-          </div>
-
-          {financialStatus && <p className="status-message">{financialStatus}</p>}
-
-          <div className="financial-overview-grid financial-overview-primary">
-            {renderOverviewFinancialRows()}
-            {renderFinancialTrendCard()}
-          </div>
-
-          <div className="financial-decision-metrics">
-            {overviewDecisionMetrics.map((metric) => (
-              <article className={`financial-decision-card ${metric.tone}`} key={metric.label}>
-                <span className="label-with-info">{metric.label}<GlossaryTip language={form.language} term={metric.label} /></span>
-                <strong>{metric.value}</strong>
-                <small>{metric.detail}</small>
-              </article>
-            ))}
-          </div>
-
-          <div className="financial-overview-layout financial-overview-two-up">
-            <article className="financial-panel financial-flow-panel">
-              <div className="financial-panel-heading">
-                <div>
-                  <span>{copy("Money flow", "Para akışı")}</span>
-                  <h2>{copy("From sales to net return", "Satıştan net getiriye")}</h2>
-                </div>
-                <strong>{overviewIsDecisionReady ? `${formatNumber(overviewMarginPercent, 1)}%` : "-"}</strong>
-              </div>
-              <div className="financial-flow-grid">
-                {overviewMoneyFlowRows.map((row) => (
-                  <div className={`financial-flow-card ${row.tone}`} key={row.label}>
-                    <span>{row.label}</span>
-                    <strong>{overviewIsDecisionReady ? formatLira(row.amount) : "-"}</strong>
-                    <small>{row.detail}</small>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="financial-panel financial-breakdown-panel">
-              <div className="financial-panel-heading">
-                <div>
-                  <span>{copy("Cost pressure", "Maliyet baskısı")}</span>
-                  <h2>{copy("Largest cash needs", "En büyük nakit ihtiyaçları")}</h2>
-                </div>
-                <strong>{overviewIsDecisionReady ? formatLira(overviewMonthlyCost) : "-"}</strong>
-              </div>
-              {renderBreakdownBars(
-                overviewCostBreakdownRows,
-                overviewMaxCostBreakdownAmount,
-                copy("No cost data yet", "Henüz maliyet verisi yok"),
-                "cost",
-              )}
-            </article>
-          </div>
-
-          <div className="financial-quick-grid">
-            {[
-              [copy("Produced / Sold", "Üretilen / Satılan"), overviewIsDecisionReady ? `${formatNumber(summary.totalProduced)} / ${formatNumber(summary.netSoldUnits)}` : "-", copy("selected horizon units", "seçili ufuk adedi")],
-              [copy("Unsold Inventory", "Satılmayan Stok"), overviewIsDecisionReady ? `${formatNumber(summary.unsoldInventoryUnits)} ${copy("units", "adet")}` : "-", copy("production above sales", "satışı aşan üretim")],
-              [copy("Required Cash", "Gerekli Nakit"), overviewIsDecisionReady ? formatLira(summary.initialCashRequired) : "-", copy("after initial loan and grant", "başlangıç kredi ve hibe sonrası")],
-              [copy("Payback", "Geri Dönüş"), overviewIsDecisionReady ? formatMonth(summary.paybackMonth) : "-", copy("investment recovery month", "yatırımın geri dönüş ayı")],
-            ].map(([label, value, detail]) => (
-              <article className="financial-quick-card" key={label}>
-                <span className="label-with-info">{label}<GlossaryTip language={form.language} term={label} /></span>
-                <strong>{value}</strong>
-                <small>{detail}</small>
-              </article>
-            ))}
-          </div>
-
-          {selectedFinancialWidgets.length > 0 && (
-            <div className="financial-widget-grid">
-              {selectedFinancialWidgets.map(renderOverviewWidget)}
-            </div>
-          )}
-
-          {renderWidgetSelector()}
-        </section>,
-    );
-  }
-
-  function renderSimulationPage() {
-    const variant = activeSimulationVariant || simulationVariants[0];
-    const parameters = variant.parameters || {};
-    const numberParam = (field) => Number(parameters[field]) || 0;
-    const positiveParam = (field, fallback = 0) => {
-      const value = Number(parameters[field]);
-      return Number.isFinite(value) && value > 0 ? value : fallback;
-    };
-    const finiteParam = (field, fallback = 0) => {
-      const value = Number(parameters[field]);
-      return Number.isFinite(value) ? value : fallback;
-    };
-    const linkedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, financialHorizon);
-    const linkedSummary = linkedFinancialModel.summary || emptyFinancialModel.summary;
-    const defaultHorizonMonths = Math.max(1, getProjectionMonthCount(financialHorizon));
-    const timeHorizonMonths = Math.max(1, Math.round(positiveParam("timeHorizonMonths", defaultHorizonMonths)));
-    const productMap = getOperationProductMap(operationsWorkspaceForFinance);
-    const firstChannelProduct = salesStrategy.channels.map((channel) => productMap.get(channel.productId) || channel.product).find(Boolean);
-    // The linked model covers the financial horizon; turn its totals into
-    // monthly values before applying the variant's own horizon.
-    const defaultSalesUnits = Math.round(
-      toFiniteNumber(linkedSummary.netSoldUnits) / defaultHorizonMonths ||
-      getSalesForecastForMonth(salesStrategy, 0),
-    );
-    const defaultUnitSalesPrice = toFiniteNumber(
-      linkedSummary.averageNetPrice,
-      toFiniteNumber(firstChannelProduct?.price, toFiniteNumber(operationsWorkspaceForFinance.product?.price, toFiniteNumber(operationsWorkspaceForFinance.products[0]?.price))),
-    );
-    const scenarioSalesUnits = Math.max(0, positiveParam("salesUnits", defaultSalesUnits));
-    const scenarioUnitSalesPrice = Math.max(0, positiveParam("unitSalesPrice", defaultUnitSalesPrice));
-    const scenarioProductionUnits = Math.max(
-      scenarioSalesUnits,
-      positiveParam("productionUnits", Math.round(toFiniteNumber(linkedSummary.totalProduced) / defaultHorizonMonths) || scenarioSalesUnits),
-    );
-    const discountPercent = Math.min(100, Math.max(0, finiteParam("discountPercent", 0)));
-    const returnRatePercent = Math.min(100, Math.max(0, finiteParam("returnRatePercent", 0)));
-    const spoilagePercent = Math.min(100, Math.max(0, finiteParam("spoilagePercent", 0)));
-    const discountRate = discountPercent / 100;
-    const returnRate = returnRatePercent / 100;
-    const spoilageRate = spoilagePercent / 100;
-    const netSellableUnits = scenarioSalesUnits * Math.max(0, 1 - returnRate - spoilageRate);
-    const scenarioMonthlyRevenue = netSellableUnits * scenarioUnitSalesPrice * Math.max(0, 1 - discountRate);
-    const scenarioRevenueTotal = scenarioMonthlyRevenue * timeHorizonMonths;
-    const unitProductionCost = Math.max(0, toFiniteNumber(linkedSummary.unitProductionCost));
-    const scenarioProductionCost = scenarioProductionUnits * unitProductionCost * timeHorizonMonths;
-    const baseRevenue = scenarioRevenueTotal || positiveParam("baseRevenue", toFiniteNumber(linkedSummary.salesRevenue));
-    const priceEffect = numberParam("priceChange") / 100;
-    const demandEffect = numberParam("demandChange") / 100;
-    const campaignEffect = numberParam("campaignLift") / 100;
-    const efficiencyEffect = numberParam("productionEfficiency") / 100;
-    const competitorDrag = numberParam("competitorPressure") / 100;
-    const simulationAlgorithm = normalizeSimulationAlgorithm(parameters.simulationAlgorithm);
-    const simulationAlgorithmOptions = [
-      [simulationAlgorithms.withTendency, copy("Apply assumption changes", "Varsayım değişikliklerini uygula")],
-      [simulationAlgorithms.withoutTendency, copy("Base plan only", "Yalnız baz plan")],
-    ];
-    const simulationAlgorithmLabel = simulationAlgorithmOptions.find(([value]) => value === simulationAlgorithm)?.[1] || simulationAlgorithmOptions[0][1];
-    const volatility = numberParam("volatility") / 100;
-    const costVolatility = numberParam("costVolatility") / 100;
-    const fixedCost = Math.max(0, positiveParam("fixedCost", (toFiniteNumber(linkedSummary.extraRecurringCost) / defaultHorizonMonths) * timeHorizonMonths));
-    const marketingBudget = Math.max(0, finiteParam("marketingBudget", 0)) * timeHorizonMonths;
-    const derivedVariableCostRatio = baseRevenue ? Math.min(95, (scenarioProductionCost / baseRevenue) * 100) : 0;
-    const variableCostRatio = Math.min(0.95, Math.max(0, finiteParam("variableCostRatio", derivedVariableCostRatio) / 100));
-    const tendencyEffect = demandEffect + priceEffect + campaignEffect + efficiencyEffect * 0.42 - competitorDrag * 0.55;
-    const appliedTendencyEffect = simulationAlgorithm === simulationAlgorithms.withoutTendency ? 0 : tendencyEffect;
-    const trendAdjustedRevenue = baseRevenue * Math.max(0, 1 + appliedTendencyEffect);
-    const projectedVariableCost = scenarioProductionCost || (trendAdjustedRevenue * Math.min(variableCostRatio + costVolatility * 0.22, 0.92));
-    const outcomeSpread = trendAdjustedRevenue * Math.max(volatility + costVolatility * 0.65 + competitorDrag * 0.35, 0.08);
-    const contributionPerUnit = Math.max(0, (scenarioUnitSalesPrice * Math.max(0, 1 - discountRate)) - unitProductionCost);
-    const buildOutcome = (key, shiftLabel, label, tone, multiplier) => {
-      const revenue = trendAdjustedRevenue + outcomeSpread * multiplier;
-      const variableCost = projectedVariableCost * (revenue / Math.max(trendAdjustedRevenue, 1));
-      const tailCost = outcomeSpread * (multiplier < 0 ? Math.abs(multiplier) * 0.45 : -multiplier * 0.18);
-      const cost = variableCost + fixedCost + marketingBudget + tailCost;
-      const net = revenue - cost;
-      return {
-        breakEvenUnits: Math.max(0, Math.round((fixedCost + marketingBudget) / Math.max(contributionPerUnit, 1))),
-        cost,
-        key,
-        label,
-        net,
-        revenue,
-        shiftLabel,
-        tone,
-      };
-    };
-    // Deterministic scenarios: base revenue shifted by a fixed share of the
-    // volatility spread. These are sensitivity cases, not probabilities.
-    const scenarioShiftLabel = (multiplier) => {
-      const shift = trendAdjustedRevenue ? (outcomeSpread * multiplier) / trendAdjustedRevenue : 0;
-      if (Math.abs(shift) < 0.0005) return copy("Base revenue", "Baz gelir");
-      return `${copy("Revenue", "Gelir")} ${shift > 0 ? "+" : "−"}%${formatNumber(Math.abs(shift) * 100, 1)}`;
-    };
-    const outcomes = [
-      buildOutcome("worst", scenarioShiftLabel(-1.32), copy("Pessimistic", "Kötümser"), "danger", -1.32),
-      buildOutcome("bad", scenarioShiftLabel(-0.72), copy("Cautious", "Temkinli"), "bad", -0.72),
-      buildOutcome("likely", scenarioShiftLabel(0), copy("Base case", "Baz senaryo"), "likely", 0),
-      buildOutcome("good", scenarioShiftLabel(0.78), copy("Optimistic", "İyimser"), "good", 0.78),
-    ];
-    const netUnitPrice = scenarioUnitSalesPrice * Math.max(0, 1 - discountRate);
-    const breakEvenFixedCost = fixedCost + marketingBudget;
-    const breakEvenVolume = contributionPerUnit > 0 ? breakEvenFixedCost / contributionPerUnit : null;
-    const projectedVolume = scenarioSalesUnits * timeHorizonMonths;
-    const chartVolumeMax = Math.max(1, projectedVolume * 1.2, (breakEvenVolume || 0) * 1.5);
-    const chartMoneyMax = Math.max(1, netUnitPrice * chartVolumeMax, breakEvenFixedCost + (unitProductionCost * chartVolumeMax));
-    const chartX = (volume) => 50 + ((volume / chartVolumeMax) * 520);
-    const chartY = (money) => 240 - ((money / chartMoneyMax) * 198);
-    const likelyOutcome = outcomes.find((outcome) => outcome.key === "likely");
-    const maxRevenue = Math.max(...outcomes.map((outcome) => outcome.revenue), 1);
-    const maxNetAbs = Math.max(...outcomes.map((outcome) => Math.abs(outcome.net)), 1);
-    const incomeRows = [
-      [copy("Sales revenue", "Satış geliri"), likelyOutcome.revenue],
-      [copy("Production cost", "Üretim maliyeti"), -projectedVariableCost],
-      [copy("Fixed cost", "Sabit gider"), -fixedCost],
-      [copy("Marketing budget", "Pazarlama bütçesi"), -marketingBudget],
-      [copy("Projected net", "Projeksiyon net"), likelyOutcome.net],
-    ];
-    // These three fall back to the linked plan when left at 0; show the value
-    // actually used instead of a misleading 0.
-    const linkedFieldDefaults = {
-      productionUnits: scenarioProductionUnits,
-      salesUnits: scenarioSalesUnits,
-      unitSalesPrice: scenarioUnitSalesPrice,
-    };
-    const editableVariantGroups = [
-      {
-        fields: [
-          ["salesUnits", copy("Monthly sales units", "Aylık satış adedi"), 0, 100000000, 1],
-          ["unitSalesPrice", copy("Unit sales price", "Birim satış fiyatı"), 0, 100000000, 0.01],
-          ["productionUnits", copy("Monthly production units", "Aylık üretim adedi"), 0, 100000000, 1],
-        ],
-        title: copy("Product and sales", "Ürün ve satış"),
-      },
-      {
-        fields: [
-          ["discountPercent", copy("Discount (%)", "İndirim (%)"), 0, 100, 0.1],
-          ["returnRatePercent", copy("Returns (%)", "İade (%)"), 0, 100, 0.1],
-          ["spoilagePercent", copy("Spoilage (%)", "Fire (%)"), 0, 100, 0.1],
-          ["marketingBudget", copy("Monthly marketing budget", "Aylık pazarlama bütçesi"), 0, 20000000, 50000],
-        ],
-        title: copy("Sales conditions", "Satış koşulları"),
-      },
-    ];
-    const visibleAssumptions = [
-      [copy("Product", "Ürün"), firstChannelProduct?.name || operationsWorkspace.product?.name || "-"],
-      [copy("Algorithm", "Algoritma"), simulationAlgorithmLabel],
-      [copy("Monthly sales", "Aylık satış"), `${formatNumber(scenarioSalesUnits)} ${copy("units", "adet")}`],
-      [copy("Net sellable units", "Net satılabilir adet"), `${formatNumber(netSellableUnits)} ${copy("units", "adet")}`],
-      [copy("Unit price", "Birim fiyat"), formatLira(scenarioUnitSalesPrice, 2)],
-      [copy("Unit production cost", "Birim üretim maliyeti"), unitProductionCost ? formatLira(unitProductionCost, 2) : "-"],
-      [copy("Projection horizon", "Projeksiyon ufku"), `${formatNumber(timeHorizonMonths)} ${copy("months", "ay")}`],
-    ];
-    const simulationHasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
-    const simulationSourceReady = Boolean(toFiniteNumber(linkedSummary.planCount) && simulationHasSalesForecast && financialModel.settingsSaved);
-    const positiveOutcomeCount = outcomes.filter((outcome) => outcome.net > 0).length;
-    const simulationConfidencePercent = Math.round((positiveOutcomeCount / outcomes.length) * 100);
-    const simulationReadinessItems = [
-      { done: toFiniteNumber(linkedSummary.planCount) > 0, label: copy("Operations", "Operasyon"), path: "/operations/data-entry" },
-      { done: simulationHasSalesForecast, label: copy("Sales", "Satış"), path: "/sales-strategy" },
-      { done: financialModel.settingsSaved, label: copy("Finance", "Finans"), path: "/financial-modelling/analiz" },
-      { done: scenarioSalesUnits > 0 && scenarioUnitSalesPrice > 0, label: copy("Variant", "Varyant"), path: variant.path || `/simulation/${variant.id}` },
-    ];
-    const simulationReadinessPercent = Math.round((simulationReadinessItems.filter((item) => item.done).length / simulationReadinessItems.length) * 100);
-    const simulationWorstNet = outcomes[0].net;
-    const simulationDownsideGap = likelyOutcome.net - simulationWorstNet;
-    const simulationUpsideGap = outcomes[3].net - likelyOutcome.net;
-    const simulationRiskTone = !simulationSourceReady
-      ? "amber"
-      : likelyOutcome.net <= 0
-        ? "clay"
-        : simulationWorstNet < 0
-          ? "amber"
-          : "teal";
-    const simulationHeadline = !simulationSourceReady
-      ? copy("Connect the source data before trusting the scenario", "Senaryoya güvenmeden önce kaynak veriyi bağlayın")
-      : simulationRiskTone === "teal"
-        ? copy("The upside holds across the tested range", "Test edilen aralıkta yukarı potansiyel korunuyor")
-        : simulationRiskTone === "amber"
-          ? copy("Profitable base case, visible downside", "Kârlı baz senaryo, görünür aşağı risk")
-          : copy("Scenario needs margin repair", "Senaryonun marj onarımına ihtiyacı var");
-    const simulationBrief = !simulationSourceReady
-      ? copy(
-          "Simulation is most useful after Operations, Sales and Finance data are saved. Missing inputs are marked on the right.",
-          "Simülasyon; Operations, Satış ve Finans verisi kaydedildikten sonra en anlamlı hale gelir. Eksik girdiler sağda işaretli.",
-        )
-      : copy(
-          `Base-case net is ${formatLira(likelyOutcome.net)}, the pessimistic case is ${formatLira(simulationWorstNet)}, and ${positiveOutcomeCount} of ${outcomes.length} scenarios stay positive.`,
-          `Baz senaryo net ${formatLira(likelyOutcome.net)}, kötümser senaryo ${formatLira(simulationWorstNet)}; ${outcomes.length} senaryonun ${positiveOutcomeCount} tanesi pozitif kalıyor.`,
-        );
-    const simulationSignalRows = [
-      {
-        detail: copy(`${positiveOutcomeCount}/${outcomes.length} scenarios with positive net`, `${outcomes.length} senaryonun ${positiveOutcomeCount} tanesi pozitif`),
-        label: copy("Positive scenarios", "Pozitif senaryolar"),
-        tone: positiveOutcomeCount >= 3 ? "good" : positiveOutcomeCount >= 2 ? "watch" : "risk",
-        value: `${simulationConfidencePercent}%`,
-      },
-      {
-        detail: copy("base case minus pessimistic", "baz eksi kötümser"),
-        label: copy("Downside gap", "Aşağı fark"),
-        tone: simulationWorstNet >= 0 ? "good" : "risk",
-        value: formatLira(simulationDownsideGap),
-      },
-      {
-        detail: copy("optimistic minus base case", "iyimser eksi baz"),
-        label: copy("Upside room", "Yukarı alan"),
-        tone: "good",
-        value: formatLira(simulationUpsideGap),
-      },
-      {
-        detail: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("assumption changes ignored", "varsayım değişiklikleri yok sayılıyor") : copy("assumption changes applied", "varsayım değişiklikleri uygulanıyor"),
-        label: copy("Mode", "Mod"),
-        tone: "neutral",
-        value: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("Base", "Baz") : copy("Adjusted", "Ayarlı"),
-      },
-    ];
-    return renderDashboardLayout(
-      `simulation/${variant.id}`,
-        <section className="simulation-workspace monte-carlo-workspace">
-          <div className="simulation-header">
-            <div>
-              <span>{dashboardCompanyName} / {copy("Scenario Analysis", "Senaryo Analizi")}</span>
-              <h1>{variant.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : variant.name}</h1>
-              <p>{copy("Variants are saved with simple product and sales assumptions. Outputs are recalculated from the saved operations, sales, and financial data available now.", "Varyantlar basit ürün ve satış varsayımlarıyla kaydedilir. Çıktılar kayıtlı operasyon, satış ve finans verilerinden yeniden hesaplanır.")}</p>
-            </div>
-            <div className="simulation-header-actions">
-              <button type="button" onClick={loadPlanningData} disabled={simulationLoading}>
-                {copy("Refresh Data", "Verileri Yenile")}
-              </button>
-              <button type="button" onClick={() => persistSimulationVariant(variant)} disabled={simulationLoading}>
-                {simulationLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Variant", "Varyantı Kaydet")}
-              </button>
-              <button type="button" className="primary" onClick={addSimulationVariant}>{copy("Add Variant", "Varyant Ekle")}</button>
-            </div>
-          </div>
-
-          {simulationStatus && <p className="status-message">{simulationStatus}</p>}
-
-          <div className="simulation-variant-strip" role="tablist" aria-label={copy("Simulation variants", "Simülasyon varyantları")}>
-            {simulationVariants.map((item) => (
-              <div className={variant.id === item.id ? "simulation-variant-pill active" : "simulation-variant-pill"} key={item.id}>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={variant.id === item.id}
-                  onClick={() => goTo(item.path, "login")}
-                >
-                  {item.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : item.name || item.label}
-                </button>
-                {item.id !== "current-situation" && (
-                  <button
-                    type="button"
-                    className="variant-delete-button"
-                    aria-label={copy("Delete variant", "Varyantı sil")}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      deleteSimulationVariant(item.id);
-                    }}
-                  >
-                    x
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <section className={`simulation-command-hero ${simulationRiskTone}`}>
-            <div className="simulation-command-copy">
-              <span>{copy("Scenario command center", "Senaryo komuta merkezi")}</span>
-              <h2>{simulationHeadline}</h2>
-              <p>{simulationBrief}</p>
-              <div className="simulation-command-actions">
-                <button type="button" className="primary" onClick={() => persistSimulationVariant(variant)} disabled={simulationLoading}>
-                  {simulationLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Variant", "Varyantı Kaydet")}
-                </button>
-                <button type="button" className="secondary" onClick={() => goTo("/financial-modelling/analiz", "login")}>
-                  {copy("Open finance model", "Finans modelini aç")}
-                </button>
-              </div>
-            </div>
-            <div className="simulation-confidence-panel" aria-label={copy("Simulation readiness", "Simülasyon hazırlığı")}>
-              <div className="readiness-ring" style={{ "--readiness": `${simulationReadinessPercent}%` }}>
-                <strong>{simulationReadinessPercent}%</strong>
-                <span>{copy("Ready", "Hazır")}</span>
-              </div>
-              <div className="simulation-source-list">
-                {simulationReadinessItems.map((item) => (
-                  <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
-                    <span>{item.label}</span>
-                    <strong>{item.done ? copy("Done", "Tamam") : copy("Needed", "Gerekli")}</strong>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <div className="simulation-signal-grid" aria-label={copy("Scenario risk signals", "Senaryo risk sinyalleri")}>
-            {simulationSignalRows.map((signal) => (
-              <article className={`simulation-signal-card ${signal.tone}`} key={signal.label}>
-                <span>{signal.label}</span>
-                <strong>{signal.value}</strong>
-                <small>{signal.detail}</small>
-              </article>
-            ))}
-          </div>
-
-          <div className="monte-carlo-summary">
-            {[
-              [copy("Base-case net", "Baz senaryo net"), formatLira(likelyOutcome.net), scenarioShiftLabel(0)],
-              [copy("Break-even point", "Başa baş noktası"), `${formatNumber(likelyOutcome.breakEvenUnits)} ${copy("units", "adet")}`, copy("current price basis", "mevcut fiyat bazlı")],
-              [copy("Pessimistic net", "Kötümser net"), formatLira(outcomes[0].net), outcomes[0].shiftLabel],
-              [copy("Revenue range", "Gelir aralığı"), `${formatLira(outcomes[1].revenue)} - ${formatLira(outcomes[3].revenue)}`, copy("cautious to optimistic", "temkinliden iyimsere")],
-            ].map(([label, value, detail]) => (
-              <article className="monte-carlo-stat" key={label}>
-                <span className="label-with-info">{label}<GlossaryTip language={form.language} term={label} /></span>
-                <strong>{value}</strong>
-                <small>{detail}</small>
-              </article>
-            ))}
-          </div>
-
-          <div className="monte-carlo-grid">
-            <aside className="simulation-card simulation-parameter-panel">
-              <div className="simulation-card-heading">
-                <div>
-                  <span>{copy("Variant setup", "Varyant kurulumu")}</span>
-                  <h2>{copy("Algorithm and sales assumptions", "Algoritma ve satış varsayımları")}</h2>
-                </div>
-              </div>
-              <label className="simulation-name-field">
-                <span>{copy("Variant name", "Varyant adı")}</span>
-                <input value={variant.name} onChange={(event) => updateSimulationVariant(variant.id, "name", event.target.value)} />
-              </label>
-              <label className="simulation-name-field">
-                <span>{copy("Simulation algorithm", "Simülasyon algoritması")}</span>
-                <select
-                  value={simulationAlgorithm}
-                  onChange={(event) => updateSimulationParameter(variant.id, "simulationAlgorithm", event.target.value)}
-                >
-                  {simulationAlgorithmOptions.map(([value, label]) => (
-                    <option value={value} key={value}>{label}</option>
-                  ))}
-                </select>
-              </label>
-              {editableVariantGroups.map((group) => (
-                <div className="parameter-group" key={group.title}>
-                  <h3>{group.title}</h3>
-                  {group.fields.map(([field, label, min, max, step]) => {
-                    const linkedDefault = linkedFieldDefaults[field];
-                    const usesLinkedDefault = linkedDefault !== undefined && !(Number(parameters[field]) > 0);
-
-                    return (
-                      <label className="sim-input-row" key={field}>
-                        <span>{label}</span>
-                        <input
-                          min={min}
-                          max={max}
-                          step={step}
-                          type="number"
-                          placeholder={usesLinkedDefault ? `${formatNumber(linkedDefault, 2)} (${copy("from plan", "plandan")})` : undefined}
-                          value={usesLinkedDefault ? "" : (parameters[field] ?? "")}
-                          onChange={(event) => updateSimulationParameter(variant.id, field, event.target.value)}
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-              ))}
-            </aside>
-
-            <main className="monte-carlo-main">
-              <article className="simulation-card percentile-card">
-                <div className="simulation-card-heading">
-                  <div>
-                    <span>{copy("Sensitivity scenarios", "Duyarlılık senaryoları")}</span>
-                    <h2>{copy("Pessimistic, cautious, base and optimistic cases", "Kötümser, temkinli, baz ve iyimser senaryolar")}</h2>
-                    <p>{copy("Each case shifts base revenue by a fixed share of the volatility you enter (at least 8%). They show sensitivity, not probability.", "Her senaryo baz geliri, girdiğiniz oynaklığın (en az %8) sabit bir katı kadar kaydırır. Olasılık değil, duyarlılık gösterir.")}</p>
-                  </div>
-                </div>
-                <div className="percentile-grid">
-                  {outcomes.map((outcome) => (
-                    <article className={`percentile-outcome ${outcome.tone}`} key={outcome.key}>
-                      <span>{outcome.shiftLabel}</span>
-                      <h3>{outcome.label}</h3>
-                      <strong>{formatLira(outcome.net)}</strong>
-                      <p>{copy("Revenue", "Gelir")}: {formatLira(outcome.revenue)}</p>
-                      <p>{copy("Break-even", "Başa baş")}: {formatNumber(outcome.breakEvenUnits)} {copy("units", "adet")}</p>
-                    </article>
-                  ))}
-                </div>
-              </article>
-
-              <article className="simulation-card monte-chart-card simulation-trend-card">
-                <div className="simulation-card-heading">
-                  <div>
-                    <span>{copy("Break-even graph", "Başa baş grafiği")}</span>
-                    <h2>{copy("Revenue, cost and break-even estimate", "Gelir, gider ve başa baş tahmini")}</h2>
-                  </div>
-                </div>
-                <div className="simulation-chart-stage">
-                  <svg className="monte-chart break-even-chart" viewBox="0 0 620 280" role="img" aria-label={copy("Break-even chart", "Başa baş grafiği")}>
-                    <path className="chart-grid" d="M42 40 H580 M42 90 H580 M42 140 H580 M42 190 H580 M42 240 H580" />
-                    <path className="chart-axis" d="M42 28 V240 H585" />
-                    <path className="break-even-cost" d={`M${chartX(0)} ${chartY(breakEvenFixedCost)} L${chartX(chartVolumeMax)} ${chartY(breakEvenFixedCost + (unitProductionCost * chartVolumeMax))}`} />
-                    <path className="break-even-revenue" d={`M${chartX(0)} ${chartY(0)} L${chartX(chartVolumeMax)} ${chartY(netUnitPrice * chartVolumeMax)}`} />
-                    {breakEvenVolume !== null && breakEvenVolume <= chartVolumeMax ? (
-                      <>
-                        <line className="break-even-marker" x1={chartX(breakEvenVolume)} x2={chartX(breakEvenVolume)} y1="42" y2="240" />
-                        <text className="chart-tick" x={chartX(breakEvenVolume) + 8} y="68">{copy("Break-even", "Başa baş")}: {formatNumber(breakEvenVolume)} {copy("units", "adet")}</text>
-                      </>
-                    ) : (
-                      <text className="chart-tick" x="60" y="68">{copy("No break-even: price does not cover unit cost", "Başa baş yok: fiyat birim maliyeti karşılamıyor")}</text>
-                    )}
-                    <text className="chart-tick" x="48" y="262">{copy("Units over the horizon", "Ufuk boyunca adet")}</text>
-                    <text className="chart-tick chart-tick-end" x="570" y="262" textAnchor="end">{copy("Projected sales", "Projeksiyon satış")}: {formatNumber(projectedVolume)}</text>
-                  </svg>
-                </div>
-                <div className="chart-legend">
-                  <span className="legend-sales">{copy("Revenue", "Gelir")}</span>
-                  <span className="legend-costs">{copy("Cost", "Gider")}</span>
-                  <span className="legend-net">{copy("Break-even point", "Başa baş noktası")}</span>
-                </div>
-              </article>
-
-              <article className="simulation-card income-simulation-card simulation-trend-card">
-                <div className="simulation-card-heading">
-                  <div>
-                    <span>{copy("Income statement", "Gelir gider tablosu")}</span>
-                    <h2>{copy("Projected gelir gider table and graph", "Projeksiyon gelir gider tablosu ve grafiği")}</h2>
-                  </div>
-                </div>
-                <div className="sim-income-layout">
-                  <div className="sim-income-table">
-                    {incomeRows.map(([label, value]) => (
-                      <div key={label}>
-                        <span>{label}</span>
-                        <strong>{formatLira(value)}</strong>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="simulation-chart-stage">
-                    <svg className="monte-chart income-bars-chart" viewBox="0 0 520 250" aria-hidden="true">
-                      <path className="chart-grid" d="M34 35 H500 M34 85 H500 M34 135 H500 M34 185 H500" />
-                      {incomeRows.map(([label, value], index) => {
-                        const height = Math.max(14, (Math.abs(value) / Math.max(maxRevenue, maxNetAbs)) * 165);
-                        const x = 58 + index * 88;
-                        const y = value >= 0 ? 202 - height : 202;
-                        return (
-                          <React.Fragment key={label}>
-                            <rect className={value >= 0 ? "income-positive" : "income-negative"} x={x} y={y} width="46" height={height} rx="6" />
-                            <text className="chart-tick" x={x - 8} y="230">{index + 1}</text>
-                          </React.Fragment>
-                        );
-                      })}
-                      <path className="chart-axis" d="M34 22 V202 H500" />
-                    </svg>
-                  </div>
-                </div>
-              </article>
-            </main>
-
-            <aside className="simulation-side">
-              <article className="simulation-card simulation-used-params">
-                <div className="simulation-card-heading">
-                  <div>
-                    <span>{copy("Scenario summary", "Senaryo özeti")}</span>
-                    <h2>{copy("Visible assumptions", "Görünen varsayımlar")}</h2>
-                  </div>
-                </div>
-                <div className="used-parameter-list">
-                  {visibleAssumptions.map(([label, value]) => (
-                    <span key={label}>{label}<strong>{value}</strong></span>
-                  ))}
-                </div>
-              </article>
-
-              <article className="simulation-card risk-card">
-                <h2>{copy("Pessimistic scenario", "Kötümser senaryo")}</h2>
-                <p>{copy("The pessimistic case is shown separately: if it is negative, check margin, cash and break-even timing before committing capital.", "Kötümser senaryo ayrıca gösterilir: negatifse sermaye bağlamadan önce marjı, nakdi ve başa baş zamanlamasını kontrol edin.")}</p>
-                <strong>{formatLira(outcomes[0].net)}</strong>
-              </article>
-            </aside>
-          </div>
-
-          {hasFinancialSourceData && (
-            <article className="simulation-card sensitivity-card">
-              <div className="simulation-card-heading">
-                <div>
-                  <span>{copy("Sensitivity", "Duyarlılık")}</span>
-                  <h2>{copy("What if one assumption is wrong?", "Bir varsayım tutmazsa ne olur?")}</h2>
-                </div>
-              </div>
-              <p>{copy("Each row re-runs the full 5-year model (tax, VAT, stock and loans) with one lever moved and everything else kept as planned.", "Her satır, tek bir kaldıraç değiştirilip diğer her şey plandaki gibi tutularak tam 5 yıllık modeli (vergi, KDV, stok ve krediler) yeniden çalıştırır.")}</p>
-              <div className="sensitivity-table-wrap">
-                {renderSensitivityTable(buildSensitivityTable(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance), "sensitivity-table")}
-              </div>
-            </article>
-          )}
-        </section>,
-    );
-  }
-
-  function renderSalesStrategyPage() {
-    const monthlyMultipliers = getSalesExpectationMultipliers(salesStrategy);
-    const multiplierPeriod = getSalesMultiplierPeriod(salesStrategy);
-    const multiplierInputs = getSalesExpectationInputMultipliers(salesStrategy);
-    const workingDaysPerMonth = Math.max(1, toFiniteNumber(financialSettingsForm.workingDaysPerMonth, 22));
-    const monthlyProductionByProduct = getMonthlyProductProductionMap(operationsWorkspace, workingDaysPerMonth);
-    const productMap = getOperationProductMap(operationsWorkspace);
-    const baseMonthlySalesUnits = getBaseMonthlySalesUnits(salesStrategy);
-    const expectedAnnualSalesUnits = monthlyMultipliers.reduce((total, _multiplier, index) => total + getSalesForecastForMonth(salesStrategy, index), 0);
-    const averageMultiplier = monthlyMultipliers.reduce((total, multiplier) => total + multiplier, 0) / Math.max(monthlyMultipliers.length, 1);
-    const totalCampaignBudget = salesStrategy.campaigns.reduce((total, campaign) => total + (Number(campaign.budget) || 0), 0);
-    const getProductAvailability = (productId) => {
-      const monthlyProduced = Math.max(0, monthlyProductionByProduct.get(productId) || 0);
-      const plannedSales = salesStrategy.channels.reduce((total, channel) => (
-        channel.productId === productId ? total + Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) : total
-      ), 0);
-
-      return {
-        monthlyProduced,
-        plannedSales,
-        remaining: monthlyProduced - plannedSales,
-      };
-    };
-    const totalReadyUnits = operationsWorkspace.products.reduce((total, product) => total + Math.max(0, getProductAvailability(product.id).remaining), 0);
-    const totalMonthlyCommission = salesStrategy.channels.reduce((total, channel) => {
-      const product = productMap.get(channel.productId) || channel.product || {};
-      const productPriceTry = getOptionalPositiveNumber(channel.unitSalesPrice) ?? convertMoneyToTry(product.price, product.price_currency, exchangeRates);
-      const grossRevenue = Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) * Math.max(0, productPriceTry);
-      return total + (grossRevenue * Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100);
-    }, 0);
-    const activeProductCount = new Set(salesStrategy.channels.map((channel) => channel.productId).filter(Boolean)).size;
-    const salesReadinessItems = [
-      { done: operationsWorkspace.products.length > 0, label: copy("Products", "Ürünler"), path: "/operations/products" },
-      { done: salesStrategy.channels.some((channel) => channel.name && channel.productId), label: copy("Channels", "Kanallar"), path: "/sales-strategy" },
-      { done: salesStrategy.channels.some((channel) => toFiniteNumber(channel.monthlySalesUnits) > 0), label: copy("Quantities", "Adetler"), path: "/sales-strategy" },
-      { done: salesStrategy.campaigns.some((campaign) => campaign.name && toFiniteNumber(campaign.budget) > 0), label: copy("Campaigns", "Kampanyalar"), path: "/sales-strategy" },
-    ];
-    const salesReadyCount = salesReadinessItems.filter((item) => item.done).length;
-    const salesReadinessPercent = Math.round((salesReadyCount / Math.max(salesReadinessItems.length, 1)) * 100);
-    const salesForecastPreview = Array.from({ length: 12 }, (_, monthIndex) => {
-      const channels = salesStrategy.channels.map((channel, channelIndex) => ({
-        id: channel.id || `channel-${channelIndex}`,
-        name: channel.name?.trim() || `${copy("Channel", "Kanal")} ${channelIndex + 1}`,
-        units: getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy),
-      }));
-      const totalUnits = channels.reduce((total, channel) => total + channel.units, 0);
-
-      return {
-        channels,
-        label: `${copy("Month", "Ay")} ${monthIndex + 1}`,
-        value: totalUnits,
-      };
-    });
-    const maxSalesForecastPreview = Math.max(1, ...salesForecastPreview.map((item) => item.value));
-    const salesStrategyTone = salesReadinessPercent >= 75 ? "teal" : salesReadinessPercent >= 50 ? "amber" : "clay";
-    const salesChannelTypeOptions = salesStrategy.channelTypes?.length ? salesStrategy.channelTypes : [
-      { averageCommissionPercent: 0, averageCustomerAcquisitionRate: 18, descriptionEn: "Direct sales owned by the company.", descriptionTr: "Şirketin doğrudan yönettiği satış.", id: "direct", nameEn: "Direct sales", nameTr: "Direkt satış" },
-      { averageCommissionPercent: 8, averageCustomerAcquisitionRate: 8, descriptionEn: "Digital storefront or online flow.", descriptionTr: "Dijital mağaza veya online akış.", id: "online", nameEn: "Online", nameTr: "Online" },
-      { averageCommissionPercent: 20, averageCustomerAcquisitionRate: 5, descriptionEn: "Retail shelf or store channel.", descriptionTr: "Perakende raf veya mağaza kanalı.", id: "retail", nameEn: "Retail", nameTr: "Perakende" },
-      { averageCommissionPercent: 25, averageCustomerAcquisitionRate: 4, descriptionEn: "Distributor-led sales route.", descriptionTr: "Distribütör üzerinden satış rotası.", id: "distributor", nameEn: "Distributor", nameTr: "Distribütör" },
-      { averageCommissionPercent: 15, averageCustomerAcquisitionRate: 7, descriptionEn: "Marketplace platform channel.", descriptionTr: "Pazaryeri platform kanalı.", id: "marketplace", nameEn: "Marketplace", nameTr: "Pazaryeri" },
-    ];
-    const campaignTypeOptions = salesStrategy.campaignTypes?.length ? salesStrategy.campaignTypes : [
-      { averageConversionRate: 3, averageCustomerAcquisitionRate: 6, averageDurationDays: 30, descriptionEn: "Paid digital acquisition campaign.", descriptionTr: "Ücretli dijital müşteri kazanım kampanyası.", id: "digital", nameEn: "Digital advertising", nameTr: "Dijital reklam" },
-      { averageConversionRate: 2.5, averageCustomerAcquisitionRate: 5, averageDurationDays: 21, descriptionEn: "Organic and paid social campaign.", descriptionTr: "Organik ve ücretli sosyal medya kampanyası.", id: "social", nameEn: "Social media", nameTr: "Sosyal medya" },
-      { averageConversionRate: 4, averageCustomerAcquisitionRate: 7, averageDurationDays: 14, descriptionEn: "Creator or influencer-led campaign.", descriptionTr: "İçerik üretici veya influencer odaklı kampanya.", id: "influencer", nameEn: "Influencer", nameTr: "Influencer" },
-      { averageConversionRate: 5, averageCustomerAcquisitionRate: 4, averageDurationDays: 30, descriptionEn: "Trade promotion for partners.", descriptionTr: "Ticari iş ortakları için promosyon.", id: "trade", nameEn: "Trade promotion", nameTr: "Ticari promosyon" },
-      { averageConversionRate: 6, averageCustomerAcquisitionRate: 3, averageDurationDays: 7, descriptionEn: "Event, fair, or field activation.", descriptionTr: "Etkinlik, fuar veya saha aktivasyonu.", id: "event", nameEn: "Event / fair", nameTr: "Etkinlik / fuar" },
-      { averageConversionRate: 2, averageCustomerAcquisitionRate: 4, averageDurationDays: 14, descriptionEn: "Email and CRM lifecycle campaign.", descriptionTr: "E-posta ve CRM yaşam döngüsü kampanyası.", id: "email", nameEn: "Email / CRM", nameTr: "E-posta / CRM" },
-    ];
-    const getSalesTypeLabel = (type) => (form.language === "tr" ? type.nameTr || type.nameEn : type.nameEn || type.nameTr) || type.id;
-    const getSalesTypeDescription = (type) => (form.language === "tr" ? type.descriptionTr || type.descriptionEn : type.descriptionEn || type.descriptionTr) || "";
-    const getCampaignTypeLabel = (campaign) => {
-      const selectedType = campaignTypeOptions.find((type) => type.id === (campaign.typeId || "digital"));
-      return selectedType ? getSalesTypeLabel(selectedType) : "";
-    };
-    const campaignTableColumns = [
-      { header: copy("Campaign", "Kampanya"), key: "campaign", render: (row) => row.name || "", value: (row) => row.name || "" },
-      { header: copy("Type", "Tip"), key: "type", render: getCampaignTypeLabel, value: getCampaignTypeLabel },
-      { header: copy("Channel", "Kanal"), key: "channel", render: (row) => row.channel || "", value: (row) => row.channel || "" },
-      { header: copy("Budget", "Bütçe"), key: "budget", render: (row) => formatLira(toFiniteNumber(row.budget)), sortValue: (row) => toFiniteNumber(row.budget) },
-      { header: copy("Duration", "Süre"), key: "duration", render: (row) => toFiniteNumber(row.durationDays), sortValue: (row) => toFiniteNumber(row.durationDays) },
-    ];
-    const visibleCampaignRows = getSortableTableRows("sales-campaigns", salesStrategy.campaigns, campaignTableColumns);
-    const salesChannelRequiredFields = [
-      { field: "startMonth", info: copy("The first model month where this channel can sell. Earlier months contribute zero sales for this channel.", "Bu kanalın satışa başlayacağı ilk model ayı. Önceki aylar bu kanal için sıfır satış üretir."), label: copy("Start month", "Başlangıç Ayı"), min: 1, step: "1" },
-      { field: "monthlySalesUnits", info: copy("Base sales promise for the first active month. Forecast then applies growth, expectation multiplier, seasonality, traffic score, returns, and limits.", "İlk aktif ay için temel satış vaadi. Tahmin sonrasında büyüme, beklenti çarpanı, sezonsallık, trafik skoru, iadeler ve limitler uygulanır."), label: copy("First month sales (units)", "İlk Ay Satış (Adet)"), min: 0, step: "1" },
-      { field: "growthMonths1To6Percent", info: copy("Monthly growth applied after launch for elapsed months 1-6.", "Lansmandan sonra geçen 1-6. aylar için uygulanan aylık büyüme oranı."), label: copy("Growth (1-6 mo) (%)", "Büyüme (1-6 Ay) (%)"), min: 0, step: "0.01" },
-      { field: "growthMonths7To18Percent", info: copy("Monthly growth applied for elapsed months 7-18 after the channel start.", "Kanal başlangıcından sonra geçen 7-18. aylar için uygulanan aylık büyüme oranı."), label: copy("Growth (7-18 mo) (%)", "Büyüme (7-18 Ay) (%)"), min: 0, step: "0.01" },
-      { field: "growthMonths19To24Percent", info: copy("Monthly growth applied for elapsed months 19-24 after the channel start.", "Kanal başlangıcından sonra geçen 19-24. aylar için uygulanan aylık büyüme oranı."), label: copy("Growth (19-24 mo) (%)", "Büyüme (19-24 Ay) (%)"), min: 0, step: "0.01" },
-      { field: "growthYears3To5Percent", info: copy("Monthly growth used after month 24 when longer horizons are selected.", "24. aydan sonra, daha uzun projeksiyonlarda kullanılan aylık büyüme oranı."), label: copy("Year 3-5 growth (%)", "Yıl 3-5 Büyüme (%)"), min: 0, step: "0.01" },
-      { field: "collectionDays", info: copy("Average delay before channel revenue becomes cash. The model shifts cash receipts by this delay.", "Kanal cirosunun nakde dönüşme ortalama gecikmesi. Model nakit girişini bu gecikmeye göre kaydırır."), label: copy("Collection (days)", "Tahsilat (Gün)"), min: 0, step: "1" },
-      { field: "customerAcquisitionCost", label: copy("Unit marketing (CAC) TL", "Birim Pazarlama (CAC) TL"), min: 0, step: "0.01" },
-      { field: "commissionPercent", info: copy("Commission is deducted from gross channel revenue before net revenue is reported.", "Komisyon, net ciro raporlanmadan önce brüt kanal cirosundan düşülür."), label: copy("Channel commission (%)", "Kanal Komisyonu (%)"), max: 100, min: 0, step: "0.1" },
-    ];
-    const advancedChannelFields = [
-      { field: "trafficScore", info: copy("A simple demand strength multiplier. 1 keeps demand unchanged, 1.2 lifts it by 20%, 0.8 lowers it by 20%.", "Basit talep gücü çarpanı. 1 talebi değiştirmez, 1,2 %20 artırır, 0,8 %20 düşürür."), label: copy("Traffic Score", "Trafik Skoru"), min: 0, step: "0.01" },
-      { field: "unitSalesPrice", info: copy("Optional channel-specific TRY price. If empty, finance uses the selected product price.", "Opsiyonel kanala özel TL satış fiyatı. Boş bırakılırsa finans seçili ürün fiyatını kullanır."), label: copy("Channel Unit Price (TRY)", "Kanal Birim Fiyatı (TL)"), min: 0, step: "0.01" },
-      { field: "discountRatePercent", label: copy("Discount Rate (%)", "İndirim Oranı (%)"), min: 0, step: "0.01" },
-      { field: "returnRatePercent", label: copy("Return Rate (%)", "İade Oranı (%)"), min: 0, step: "0.001" },
-      { field: "capacityLimit", info: copy("Maximum units this channel can sell in a month after all multipliers are applied.", "Tüm çarpanlardan sonra bu kanalın bir ayda satabileceği maksimum adet."), label: copy("Capacity Limit", "Kapasite Limiti"), min: 0, step: "1" },
-      { field: "launchFee", label: copy("Launch Fee", "Lansman Bedeli"), min: 0, step: "0.01" },
-      { field: "moqMonthly", label: copy("MOQ Monthly", "Aylık MOQ"), min: 0, step: "1" },
-      { field: "failureProbabilityPercent", label: copy("Failure Prob. (%)", "Başarısızlık Olas. (%)"), min: 0, step: "0.001" },
-      { field: "rampUpMonths", label: copy("Ramp-Up Months", "Ramp-Up Ayı"), min: 0, step: "1" },
-    ];
-    const seasonalityMonthLabels = form.language === "tr"
-      ? ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
-      : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const normalizedSalesVisibleSections = normalizeSalesVisibleSections(salesVisibleSections);
-    const isSalesOptionalSectionVisible = (sectionId) => normalizedSalesVisibleSections.optional.includes(sectionId);
-    const salesReadoutCards = [
-      {
-        detail: copy("selected from Operations products", "Operasyon ürünlerinden seçildi"),
-        id: "productsInChannels",
-        label: copy("Products in channels", "Kanallardaki ürün"),
-        value: formatNumber(activeProductCount),
-      },
-      {
-        detail: copy("total planned marketing spend", "toplam planlanan pazarlama bütçesi"),
-        id: "campaignBudget",
-        label: copy("Campaign budget", "Kampanya bütçesi"),
-        value: formatLira(totalCampaignBudget),
-      },
-      {
-        detail: multiplierPeriod === "quarterly" ? copy("quarterly values expanded to 12 months", "çeyrek değerleri 12 aya yayıldı") : copy("across 12 months", "12 ay genelinde"),
-        id: "averageMultiplier",
-        label: copy("Average multiplier", "Ortalama çarpan"),
-        value: `${formatNumber(averageMultiplier, 2)}x`,
-      },
-      {
-        detail: copy("after planned channel quantities", "planlanan kanal adetlerinden sonra"),
-        id: "readyRemaining",
-        label: copy("Ready remaining", "Hazır kalan"),
-        value: formatNumber(totalReadyUnits),
-      },
-      {
-        detail: copy("sum of channel quantities", "kanal adetleri toplamı"),
-        id: "monthlyChannelPlan",
-        label: copy("Monthly channel plan", "Aylık kanal planı"),
-        value: formatNumber(baseMonthlySalesUnits),
-      },
-      {
-        detail: multiplierPeriod === "quarterly" ? copy("channel plan x quarterly multipliers", "kanal planı x çeyreklik çarpanlar") : copy("channel plan x monthly multipliers", "kanal planı x aylık çarpanlar"),
-        id: "expectedAnnualUnits",
-        label: copy("12M expected units", "12A beklenen adet"),
-        value: formatNumber(expectedAnnualSalesUnits),
-      },
-      {
-        detail: copy("based on product prices", "ürün fiyatlarına göre"),
-        id: "monthlyCommission",
-        label: copy("Monthly commission", "Aylık komisyon"),
-        value: formatLira(totalMonthlyCommission),
-      },
-    ];
-    const visibleSalesReadoutCards = salesReadoutCards.filter((card) => normalizedSalesVisibleSections.readout.includes(card.id));
-    const salesEditorGroups = [
-      {
-        description: copy("These sections are optional controls on the sales page.", "Bu bölümler satış sayfasındaki opsiyonel kontrol alanlarıdır."),
-        key: "optional",
-        options: [
-          {
-            detail: copy("Monthly or quarterly expectation multipliers that scale the sales forecast.", "Satış tahminini ölçekleyen aylık veya çeyreklik beklenti çarpanları."),
-            id: "expectationMultipliers",
-            label: copy("Expectation multiplier period", "Beklenti çarpanı periyodu"),
-          },
-          {
-            detail: copy("Traffic, capacity, seasonality, ramp-up, returns and channel-specific price fields.", "Trafik, kapasite, sezonsallık, ramp-up, iade ve kanala özel fiyat alanları."),
-            id: "advancedChannelParameters",
-            label: copy("Advanced channel parameters", "Gelişmiş kanal parametreleri"),
-          },
-        ],
-        title: copy("Optional sections", "Opsiyonel kısımlar"),
-      },
-      {
-        description: copy("Choose which strategy readout cards appear at the bottom of the page.", "Sayfanın altındaki strateji okumasında hangi kartların görüneceğini seçin."),
-        key: "readout",
-        options: salesReadoutCards,
-        title: copy("Strategy readout", "Strateji okuması"),
-      },
-    ];
-
-    return renderDashboardLayout(
-      "sales-strategy",
-        <section className="sales-workspace">
-          <div className="sales-header">
-            <div>
-              <span>{dashboardCompanyName} / {copy("Sales Strategy", "Satış Stratejisi")}</span>
-              <h1>{copy("Sales Strategy", "Satış Stratejisi")}</h1>
-              <p>{copy("Plan sales channels by product, monthly sales quantity, commission, campaign duration, and monthly or quarterly expectation multipliers. Financial Modelling reads these product-linked quantities directly.", "Satış kanallarını ürün, aylık satış adedi, komisyon, kampanya süresi ve aylık ya da çeyreklik beklenti çarpanlarıyla planlayın. Finansal Modelleme bu ürün bağlantılı adetleri doğrudan kullanır.")}</p>
-            </div>
-            <div className="sales-header-actions">
-              <button
-                type="button"
-                className={`sales-edit-toggle ${salesEditorOpen ? "active" : ""}`}
-                onClick={() => setSalesEditorOpen((isOpen) => !isOpen)}
-                aria-controls="sales-editor-panel"
-                aria-expanded={salesEditorOpen}
-              >
-                {salesEditorOpen ? copy("Done editing", "Düzenlemeyi bitir") : copy("Edit page", "Sayfayı düzenle")}
-              </button>
-              <button type="button" className="app-command-button" onClick={loadPlanningData} disabled={salesLoading}>
-                {copy("Refresh Data", "Verileri Yenile")}
-              </button>
-              <button type="button" className="primary app-command-button" onClick={handleSaveSalesStrategy} disabled={salesLoading}>
-                {salesLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Strategy", "Stratejiyi Kaydet")}
-              </button>
-            </div>
-          </div>
-
-          {salesStatus && <p className="status-message">{salesStatus}</p>}
-
-          {salesEditorOpen && (
-            <section id="sales-editor-panel" className="sales-editor-panel" aria-label={copy("Sales page editor", "Satış sayfası düzenleyici")}>
-              <div className="sales-editor-heading">
-                <div>
-                  <span>{copy("Sales view", "Satış görünümü")}</span>
-                  <h2>{copy("Visible optional content", "Görünecek opsiyonel içerikler")}</h2>
-                  <p>{copy("Selections are saved for this browser and do not change the saved sales data.", "Seçimler bu tarayıcıda saklanır; kayıtlı satış verisini değiştirmez.")}</p>
-                </div>
-                <div className="sales-editor-actions">
-                  <button type="button" onClick={resetSalesVisibleSections}>{copy("Reset", "Sıfırla")}</button>
-                  <button type="button" className="primary" onClick={() => setSalesEditorOpen(false)}>{copy("Done", "Bitti")}</button>
-                </div>
-              </div>
-              <div className="sales-editor-grid">
-                {salesEditorGroups.map((group) => {
-                  const visibleKeys = normalizedSalesVisibleSections[group.key] || [];
-
-                  return (
-                    <article className="sales-editor-group" key={group.key}>
-                      <div className="sales-editor-group-heading">
-                        <div>
-                          <span>{group.title}</span>
-                          <p>{group.description}</p>
-                        </div>
-                        <strong>{visibleKeys.length}/{group.options.length}</strong>
-                      </div>
-                      <div className="sales-editor-options">
-                        {group.options.map((option) => {
-                          const isSelected = visibleKeys.includes(option.id);
-
-                          return (
-                            <label className={`sales-editor-option ${isSelected ? "selected" : ""}`} key={option.id}>
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleSalesVisibleSection(group.key, option.id)}
-                              />
-                              <span>
-                                <strong>{option.label}</strong>
-                                <small>{option.detail}</small>
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          <section className={`sales-command-hero ${salesStrategyTone}`} aria-label={copy("Sales strategy readiness", "Satış stratejisi hazırlığı")}>
-            <div className="sales-command-copy">
-              <span>{copy("Strategy readiness", "Strateji hazırlığı")}</span>
-              <h2>{salesReadinessPercent >= 75 ? copy("Sales plan is model-ready", "Satış planı modele hazır") : copy("Turn channels into a usable forecast", "Kanalları kullanılabilir tahmine çevirin")}</h2>
-              <p>{copy("Connect products, channel quantities, commissions, and campaigns so finance can read a reliable sales signal.", "Finansın güvenilir satış sinyali okuyabilmesi için ürünleri, kanal adetlerini, komisyonları ve kampanyaları bağlayın.")}</p>
-              <div className="sales-readiness-list">
-                {salesReadinessItems.map((item) => (
-                  <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
-                    <span>{item.label}</span>
-                    <strong>{item.done ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</strong>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="sales-forecast-preview">
-              <div className="sales-mini-chart" aria-label={copy("12 month sales forecast preview", "12 aylık satış tahmini önizlemesi")}>
-                {salesForecastPreview.map((item) => (
-                  <button type="button" className="sales-mini-bar" style={{ "--bar-height": `${(item.value / maxSalesForecastPreview) * 100}%` }} key={item.label}>
-                    <i />
-                    <small>{item.label}</small>
-                    <span className="sales-mini-tooltip" role="tooltip">
-                      <strong>{item.label}</strong>
-                      <b>{copy("Total sales units", "Toplam satış adedi")}: {formatNumber(item.value)}</b>
-                      {item.channels.length ? item.channels.map((channel) => (
-                        <em key={channel.id}>
-                          <span>{channel.name}</span>
-                          <small>{formatNumber(channel.units)} {copy("units", "adet")}</small>
-                        </em>
-                      )) : (
-                        <em>
-                          <span>{copy("No channel", "Kanal yok")}</span>
-                          <small>{formatNumber(0)} {copy("units", "adet")}</small>
-                        </em>
-                      )}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <div className="sales-stat-grid">
-            {[
-              [copy("Monthly channel plan", "Aylık kanal planı"), formatNumber(baseMonthlySalesUnits), copy("sum of channel quantities", "kanal adetleri toplamı")],
-              [copy("12M expected units", "12A beklenen adet"), formatNumber(expectedAnnualSalesUnits), multiplierPeriod === "quarterly" ? copy("channel plan x quarterly multipliers", "kanal planı x çeyreklik çarpanlar") : copy("channel plan x monthly multipliers", "kanal planı x aylık çarpanlar")],
-              [copy("Ready to sell", "Satmaya hazır"), formatNumber(totalReadyUnits), copy("remaining after channel quantities", "kanal adetlerinden sonra kalan")],
-              [copy("Monthly commission", "Aylık komisyon"), formatLira(totalMonthlyCommission), copy("based on product prices", "ürün fiyatlarına göre")],
-            ].map(([label, value, detail]) => (
-              <article className="sales-stat-card" key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-                <small>{detail}</small>
-              </article>
-            ))}
-          </div>
-
-          <div className="sales-grid">
-            {isSalesOptionalSectionVisible("expectationMultipliers") && (
-            <details className="sales-card sales-forecast-card progressive-input-box">
-              <summary className="sales-card-heading progressive-section-summary">
-                <div>
-                  <span className="heading-with-info">
-                    {copy("Expectation multiplier period", "Beklenti çarpanı periyodu")}
-                    <InfoTip
-                      label={copy("Sales expectation multiplier info", "Satış beklenti çarpanı bilgisi")}
-                      text={copy(
-                        "A multiplier scales the channel sales forecast. Monthly mode uses each month directly: month sales = channel units x that month's multiplier. Quarterly mode repeats each quarter value for its 3 months: Q1 applies to months 1-3, Q2 to 4-6, and so on.",
-                        "Çarpan, kanal satış tahminini ölçekler. Aylık modda formül: aylık satış = kanal adedi x o ayın çarpanı. Çeyreklik modda her çeyrek değeri 3 aya yayılır: Q1 ay 1-3'e, Q2 ay 4-6'ya uygulanır.",
-                      )}
-                    />
-                  </span>
-                  <h2>{copy("Sales expectation multipliers", "Satış beklentisi çarpanları")}</h2>
-                </div>
-                <div className="sales-period-toggle" aria-label={copy("Expectation multiplier period", "Beklenti çarpanı periyodu")}>
-                  {[
-                    ["monthly", copy("Monthly", "Aylık")],
-                    ["quarterly", copy("Quarterly", "Çeyreklik")],
-                  ].map(([period, label]) => (
-                    <button
-                      className={period === multiplierPeriod ? "active" : ""}
-                      key={period}
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        updateSalesCompany("multiplierPeriod", period);
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </summary>
-              <div className="sales-forecast-grid">
-                {multiplierInputs.map((multiplier, index) => (
-                  <label key={`forecast-${index}`}>
-                    <span>{multiplierPeriod === "quarterly" ? copy("Quarter", "Çeyrek") : copy("Month", "Ay")} {index + 1}</span>
-                    <input
-                      min="0"
-                      step="0.01"
-                      type="number"
-                      value={multiplier}
-                      onChange={(event) => updateSalesForecast(index, event.target.value)}
-                    />
-                  </label>
-                ))}
-              </div>
-            </details>
-            )}
-
-            <details className="sales-card channels-card progressive-input-box">
-              <summary className="sales-card-heading progressive-section-summary">
-                <div>
-                  <span>{copy("Sales channels", "Satış kanalları")}</span>
-                  <h2>{copy("Product, monthly quantity and commission", "Ürün, aylık adet ve komisyon")}</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    addSalesItem("channels");
-                  }}
-                >{copy("Add Channel", "Kanal Ekle")}</button>
-              </summary>
-              <div className="sales-channel-grid">
-                {salesStrategy.channels.map((channel, index) => {
-                  const channelProduct = productMap.get(channel.productId) || channel.product || {};
-                  const channelType = salesChannelTypeOptions.find((type) => type.id === (channel.typeId || "direct"));
-
-                  return (
-                  <details className="sales-edit-card progressive-input-box sales-item-box" key={channel.id}>
-                    <summary className="sales-item-summary progressive-section-summary">
-                      <div>
-                        <span>{`${copy("Channel", "Kanal")} ${index + 1}`}</span>
-                        <strong>{channel.name?.trim() || copy("Unnamed channel", "Adsız kanal")}</strong>
-                        <small>{[channelProduct.name, channelType ? getSalesTypeLabel(channelType) : ""].filter(Boolean).join(" / ") || copy("No product selected", "Ürün seçilmedi")}</small>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label={copy("Delete channel", "Kanalı sil")}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          removeSalesItem("channels", channel.id);
-                        }}
-                      >
-                        -
-                      </button>
-                    </summary>
-                    <div className="sales-item-fields">
-                    <div className="sales-channel-title wide-field">
-                      <label><span>{copy("Channel name", "Kanal adı")} *</span><input required value={channel.name} onChange={(event) => updateSalesItem("channels", channel.id, "name", event.target.value)} /></label>
-                    </div>
-                    <label>
-                      <span>{copy("Channel type", "Kanal tipi")} *</span>
-                      <select required value={channel.typeId || "direct"} onChange={(event) => updateSalesItem("channels", channel.id, "typeId", event.target.value)}>
-                        {salesChannelTypeOptions.map((type) => (
-                          <option value={type.id} key={type.id}>{getSalesTypeLabel(type)}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>{copy("Product to sell", "Satılacak ürün")} *</span>
-                      <select
-                        required
-                        value={channel.productId || ""}
-                        onChange={(event) => {
-                          const product = operationsWorkspace.products.find((item) => item.id === event.target.value);
-                          setSalesStrategy((current) => ({
-                            ...current,
-                            channels: current.channels.map((item) => (
-                              item.id === channel.id
-                                ? { ...item, product: product || null, productId: product?.id || "", productName: product?.name || "" }
-                                : item
-                            )),
-                          }));
-                        }}
-                      >
-                        <option value="">{copy("Select product", "Ürün seç")}</option>
-                        {operationsWorkspace.products.map((product) => (
-                          <option value={product.id} key={product.id}>{product.name}</option>
-                        ))}
-                      </select>
-                    </label>
-                    {salesChannelRequiredFields.map((field) => (
-                      <label key={field.field}>
-                        <span className="label-with-info">
-                          {field.label} *
-                          {field.info && <InfoTip label={`${field.label} ${copy("info", "bilgi")}`} text={field.info} />}
-                        </span>
-                        <input
-                          max={field.max}
-                          min={field.min}
-                          required
-                          step={field.step}
-                          type="number"
-                          value={channel[field.field] ?? ""}
-                          onChange={(event) => updateSalesItem("channels", channel.id, field.field, event.target.value)}
-                        />
-                      </label>
-                    ))}
-                    {isSalesOptionalSectionVisible("advancedChannelParameters") && (
-                    <details
-                      className="advanced-channel-panel wide-field"
-                      open={channel.advancedOpen ?? false}
-                      onToggle={(event) => updateSalesItem("channels", channel.id, "advancedOpen", event.currentTarget.open)}
-                    >
-                      <summary>{copy("Advanced Channel Parameters", "Gelişmiş Kanal Parametreleri")}</summary>
-                      <div className="advanced-channel-grid">
-                        {advancedChannelFields.map((field) => (
-                          <label key={field.field}>
-                            <span className="label-with-info">
-                              {field.label}
-                              {field.info && <InfoTip label={`${field.label} ${copy("info", "bilgi")}`} text={field.info} />}
-                            </span>
-                            <input
-                              min={field.min}
-                              step={field.step}
-                              type="number"
-                              value={channel[field.field] ?? ""}
-                              onChange={(event) => updateSalesItem("channels", channel.id, field.field, event.target.value)}
-                            />
-                          </label>
-                        ))}
-                        <div className="seasonality-inputs">
-                          <strong>{copy("Seasonality Curve (Jan-Dec multipliers):", "Sezonluk Eğri (Oca-Ara çarpanları):")}</strong>
-                          <div>
-                            {seasonalityMonthLabels.map((month, index) => (
-                              <label key={`${channel.id}-season-${month}`}>
-                                <span>{month}</span>
-                                <input
-                                  min="0"
-                                  step="0.01"
-                                  type="number"
-                                  value={(Array.isArray(channel.seasonalityCurve) ? channel.seasonalityCurve[index] : "") ?? ""}
-                                  onChange={(event) => updateSalesChannelSeasonality(channel.id, index, event.target.value)}
-                                />
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </details>
-                    )}
-                    {(() => {
-                      const product = productMap.get(channel.productId) || channel.product || {};
-                      const availability = getProductAvailability(channel.productId);
-                      const unit = product.unit || copy("units", "adet");
-
-                      return (
-                        <div className="sales-channel-capacity wide-field">
-                          <span>{copy("Monthly produced", "Aylık üretilen")}<strong>{formatQuantity(availability.monthlyProduced, unit)} {unit}</strong></span>
-                          <span>{copy("Planned in channels", "Kanallarda planlanan")}<strong>{formatQuantity(availability.plannedSales, unit)} {unit}</strong></span>
-                          <span>{copy("Ready to sell remaining", "Satmaya hazır kalan")}<strong>{formatNumber(Math.max(0, availability.remaining), 2)} {unit}</strong></span>
-                        </div>
-                      );
-                    })()}
-                    {(() => {
-                      const selectedType = salesChannelTypeOptions.find((type) => type.id === (channel.typeId || "direct"));
-
-                      return selectedType ? (
-                        <div className="sales-type-info wide-field">
-                          <span>{copy("Avg acquisition", "Ort. müşteri kazanımı")}<strong>{formatNumber(selectedType.averageCustomerAcquisitionRate, 1)}%</strong></span>
-                          <span>{copy("Avg commission", "Ort. komisyon")}<strong>{formatNumber(selectedType.averageCommissionPercent, 1)}%</strong></span>
-                          <small>{getSalesTypeDescription(selectedType)}</small>
-                        </div>
-                      ) : null;
-                    })()}
-                    </div>
-                  </details>
-                  );
-                })}
-              </div>
-            </details>
-
-            <details className="sales-card campaigns-card progressive-input-box">
-              <summary className="sales-card-heading progressive-section-summary">
-                <div>
-                  <span>{copy("Marketing campaigns", "Pazarlama kampanyaları")}</span>
-                  <h2>{copy("Budget, campaign type, duration in days and target channel", "Bütçe, kampanya tipi, gün bazlı süre ve hedef kanal")}</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    addSalesItem("campaigns");
-                  }}
-                >{copy("Add Campaign", "Kampanya Ekle")}</button>
-              </summary>
-              {renderTableToolbar("sales-campaigns", salesStrategy.campaigns, visibleCampaignRows)}
-              <div className="sales-table">
-                <div className="sales-table-row sales-table-head campaign-row-layout sortable-table-head">
-                  {campaignTableColumns.map((column, columnIndex) => {
-                    const key = getTableColumnKey(column, columnIndex);
-                    const control = tableControls["sales-campaigns"] || {};
-                    const active = control.sortKey === key;
-
-                    return (
-                      <button
-                        type="button"
-                        className={active ? "active" : ""}
-                        key={key}
-                        onClick={() => updateTableControl("sales-campaigns", getNextTableSortPatch(control, key))}
-                      >
-                        <span>{column.header}</span>
-                        <small className="sort-indicator" aria-hidden="true">{getTableSortIndicator(control, key)}</small>
-                      </button>
-                    );
-                  })}
-                </div>
-                {(visibleCampaignRows.length ? visibleCampaignRows : [{ id: "empty" }]).map((campaign, index) => {
-                  if (campaign.id === "empty") {
-                    return (
-                      <div className="sales-table-row campaign-row-layout table-empty-row" key="sales-campaigns-empty">
-                        <span className="table-empty-cell">{copy("No matching records", "Eşleşen kayıt yok")}</span>
-                      </div>
-                    );
-                  }
-                  const selectedType = campaignTypeOptions.find((type) => type.id === (campaign.typeId || "digital"));
-
-                  return (
-                  <details className="sales-table-row campaign-row campaign-row-layout progressive-input-box sales-campaign-box" key={campaign.id}>
-                    <summary className="sales-item-summary progressive-section-summary">
-                      <div>
-                        <span>{`${copy("Campaign", "Kampanya")} ${index + 1}`}</span>
-                        <strong>{campaign.name?.trim() || copy("Unnamed campaign", "Adsız kampanya")}</strong>
-                        <small>{[selectedType ? getSalesTypeLabel(selectedType) : "", campaign.channel, formatLira(toFiniteNumber(campaign.budget))].filter(Boolean).join(" / ")}</small>
-                      </div>
-                    </summary>
-                    <div className="sales-campaign-fields campaign-row-layout">
-                    <label><input value={campaign.name} onChange={(event) => updateSalesItem("campaigns", campaign.id, "name", event.target.value)} /></label>
-                    <label>
-                      <select value={campaign.typeId || "digital"} onChange={(event) => updateSalesItem("campaigns", campaign.id, "typeId", event.target.value)}>
-                        {campaignTypeOptions.map((type) => (
-                          <option value={type.id} key={type.id}>{getSalesTypeLabel(type)}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <select value={campaign.channel || ""} onChange={(event) => updateSalesItem("campaigns", campaign.id, "channel", event.target.value)}>
-                        <option value="">{copy("Select channel", "Kanal seç")}</option>
-                        {salesStrategy.channels.map((channel) => (
-                          <option value={channel.name || channel.id} key={channel.id}>{channel.name || channel.id}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label><input min="0" step="1000" type="number" value={campaign.budget} onChange={(event) => updateSalesItem("campaigns", campaign.id, "budget", event.target.value)} /></label>
-                    <label><input min="0" step="1" type="number" value={campaign.durationDays} onChange={(event) => updateSalesItem("campaigns", campaign.id, "durationDays", event.target.value)} /></label>
-                    {(() => {
-                      return selectedType ? (
-                        <div className="sales-type-info campaign-type-info">
-                          <span>{copy("Avg acquisition", "Ort. müşteri kazanımı")}<strong>{formatNumber(selectedType.averageCustomerAcquisitionRate, 1)}%</strong></span>
-                          <span>{copy("Avg conversion", "Ort. dönüşüm")}<strong>{formatNumber(selectedType.averageConversionRate, 1)}%</strong></span>
-                          <span>{copy("Avg duration", "Ort. süre")}<strong>{formatNumber(selectedType.averageDurationDays, 0)} {copy("days", "gün")}</strong></span>
-                          <small>{getSalesTypeDescription(selectedType)}</small>
-                        </div>
-                      ) : null;
-                    })()}
-                    <textarea value={campaign.goal} onChange={(event) => updateSalesItem("campaigns", campaign.id, "goal", event.target.value)} />
-                    </div>
-                  </details>
-                  );
-                })}
-              </div>
-            </details>
-
-            {Boolean(visibleSalesReadoutCards.length) && (
-            <details className="sales-card sales-decision-card progressive-input-box">
-              <summary className="sales-card-heading progressive-section-summary">
-                <div>
-                  <span>{copy("Strategy readout", "Strateji okuması")}</span>
-                  <h2>{copy("Manual inputs translated into decision signals", "Manuel girdilerden karar sinyalleri")}</h2>
-                </div>
-              </summary>
-              <div className="sales-signal-grid">
-                {visibleSalesReadoutCards.map((card) => (
-                  <span key={card.id}>
-                    {card.label}
-                    <strong>{card.value}</strong>
-                    <small>{card.detail}</small>
-                  </span>
-                ))}
-              </div>
-            </details>
-            )}
-          </div>
-        </section>,
-    );
-  }
-
-  function renderMachinesEquipmentPage() {
-    const machineFields = [
-      { name: "name", label: copy("Machine name", "Makine adı") },
-      { info: copy("Purchase value of the selected machine. If currency is USD/EUR, financial analysis converts it to TRY using the current FX rate.", "Seçili makinenin alım değeri. Para birimi USD/EUR ise finansal analiz güncel kurla TL'ye çevirir."), name: "price", label: copy("Machine price", "Makine fiyatı"), step: "0.01", type: "number" },
-      { info: copy("Choose the currency the price is entered in. TRY stays unchanged; USD/EUR are multiplied by their TRY rates in financial outputs.", "Fiyatın girildiği para birimini seçin. TL aynen kalır; USD/EUR finans çıktılarında ilgili TL kuru ile çarpılır."), name: "priceCurrency", label: copy("Currency", "Para birimi"), options: operationCurrencyOptions, type: "select" },
-      { name: "hourlyEnergyConsumptionKwh", label: copy("Hourly energy consumption", "Saatlik enerji tüketimi"), step: "0.01", type: "number" },
-      { info: copy("How many product units this machine can process at the same time.", "Makinenin aynı anda kaç ürün işleyebildiği."), name: "concurrentCapacity", label: copy("Concurrent capacity", "Eş zamanlı kapasite"), step: "1", type: "number" },
-      { info: copy("Daily available production time used by the scheduler before delay cost starts.", "Gecikme maliyeti başlamadan önce planlayıcının kullandığı günlük çalışma süresi."), name: "availabilityHours", label: copy("Availability hours", "Çalışma saati"), step: "0.25", type: "number" },
-      { info: copy("Optional advanced risk input kept on the machine record for future reliability simulations.", "Gelecek güvenilirlik simülasyonları için makine kaydında tutulan opsiyonel risk girdisi."), name: "failureProbabilityPercent", label: copy("Failure probability %", "Arıza ihtimali %"), step: "0.01", type: "number" },
-    ];
-    const equipmentFields = [
-      { name: "name", label: copy("Equipment name", "Ekipman adı") },
-      { info: copy("Purchase value per equipment item. Quantity multiplies this value in investment cost.", "Ekipman başına alım değeri. Yatırım maliyetinde adet ile çarpılır."), name: "price", label: copy("Equipment price", "Ekipman fiyatı"), step: "0.01", type: "number" },
-      { info: copy("Choose the currency the equipment price is entered in. USD/EUR are converted to TRY in financial analysis.", "Ekipman fiyatının girildiği para birimini seçin. USD/EUR finansal analizde TL'ye çevrilir."), name: "priceCurrency", label: copy("Currency", "Para birimi"), options: operationCurrencyOptions, type: "select" },
-      { name: "quantity", label: copy("Equipment quantity", "Ekipman miktarı"), step: "1", type: "number" },
-    ];
-    const machineColumns = [
-      { header: copy("Machine", "Makine"), key: "machine", render: (row) => row.name, value: (row) => row.name },
-      { header: copy("Price", "Fiyat"), key: "price", render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates), sortValue: (row) => toFiniteNumber(row.price), filterValue: (row) => `${row.price} ${row.price_currency || "TRY"}` },
-      { header: copy("Hourly Energy", "Saatlik Enerji"), key: "energy", render: (row) => `${formatNumber(row.hourly_energy_consumption_kwh, 2)} kWh`, sortValue: (row) => toFiniteNumber(row.hourly_energy_consumption_kwh) },
-      { header: copy("Capacity", "Kapasite"), key: "capacity", render: (row) => formatNumber(row.concurrent_capacity || 1), sortValue: (row) => toFiniteNumber(row.concurrent_capacity || 1) },
-      { header: copy("Availability", "Çalışma"), key: "availability", render: (row) => `${formatNumber(row.availability_hours || 8, 2)} ${copy("hours", "saat")}`, sortValue: (row) => toFiniteNumber(row.availability_hours || 8) },
-      { header: copy("Copy", "Kopyala"), render: (row) => (
-        <button type="button" className="record-copy-button" onClick={() => copyOperationRecordToForm("machine", row)}>
-          {copy("Copy", "Kopyala")}
-        </button>
-      ), key: "copy", sortable: false },
-    ];
-    const equipmentColumns = [
-      { header: copy("Equipment", "Ekipman"), key: "equipment", render: (row) => row.name, value: (row) => row.name },
-      { header: copy("Price", "Fiyat"), key: "price", render: (row) => formatOperationMoney(row.price, row.price_currency, exchangeRates), sortValue: (row) => toFiniteNumber(row.price), filterValue: (row) => `${row.price} ${row.price_currency || "TRY"}` },
-      { header: copy("Quantity", "Miktar"), key: "quantity", render: (row) => formatNumber(row.quantity), sortValue: (row) => toFiniteNumber(row.quantity) },
-      { header: copy("Copy", "Kopyala"), render: (row) => (
-        <button type="button" className="record-copy-button" onClick={() => copyOperationRecordToForm("equipment", row)}>
-          {copy("Copy", "Kopyala")}
-        </button>
-      ), key: "copy", sortable: false },
-    ];
-    const machineInvestmentTry = operationsWorkspace.machines.reduce(
-      (total, machine) => total + convertMoneyToTry(machine.price, machine.price_currency, exchangeRates),
-      0,
-    );
-    const equipmentInvestmentTry = (operationsWorkspace.equipment || []).reduce(
-      (total, equipment) => total + convertMoneyToTry(toFiniteNumber(equipment.price) * Math.max(1, toFiniteNumber(equipment.quantity, 1)), equipment.price_currency, exchangeRates),
-      0,
-    );
-    const totalMachineHours = operationsWorkspace.machines.reduce((total, machine) => total + toFiniteNumber(machine.availability_hours, 8), 0);
-
-    return renderDashboardLayout(
-      `operations/${activeOperationsSubmodule.key}`,
-        <section className="operations-workspace operations-modern operations-entry-page operations-machines-page">
-          <div className="operations-header">
-            <div>
-              <span>{copy("Operations", "Operasyon")} / {copy("Machines & Equipment", "Makine & Ekipman")}</span>
-              <h1>{copy("Machines & Equipment", "Makine & Ekipman")}</h1>
-              <p>{copy("Keep machines used in production plans separate from simple equipment records.", "Üretim planlarında kullanılacak makineleri sade ekipman kayıtlarından ayrı tutun.")}</p>
-            </div>
-            <div className="operations-actions">
-              <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
-            </div>
-          </div>
-
-          <div className="process-summary-grid operations-entry-summary">
-            <article className="operation-card process-summary-card">
-              <span>{copy("Machines", "Makineler")}</span>
-              <strong>{formatNumber(operationsWorkspace.machines.length)}</strong>
-              <small>{formatNumber(totalMachineHours, 1)} {copy("available hours", "çalışma saati")}</small>
-            </article>
-            <article className="operation-card process-summary-card">
-              <span>{copy("Equipment", "Ekipman")}</span>
-              <strong>{formatNumber((operationsWorkspace.equipment || []).length)}</strong>
-              <small>{copy("supporting investment records", "destek yatırım kayıtları")}</small>
-            </article>
-            <article className="operation-card process-summary-card">
-              <span>{copy("Registered investment", "Kayıtlı yatırım")}</span>
-              <strong>{formatLira(machineInvestmentTry + equipmentInvestmentTry)}</strong>
-              <small>{copy("converted to TRY for finance", "finans için TL'ye çevrilir")}</small>
-            </article>
-          </div>
-
-          <div className="machine-equipment-grid">
-            <div className="operation-data-grid compact operations-record-pair operations-machine-record-pair">
-              {renderOperationRecordForm("machine", machineFields, { className: "operations-machine-form-card", formRef: machineFormRef })}
-              <article className="operation-card operation-data-table-card operations-record-list-card operations-machine-list-card" style={machineListHeightStyle}>
-                <div className="operation-card-heading">
-                  <h2>{copy("Machines", "Makineler")}</h2>
-                  <span>{operationsWorkspace.machines.length} {copy("records", "kayıt")}</span>
-                </div>
-                {renderSortableDataTable({
-                  columns: machineColumns,
-                  gridTemplateColumns: `repeat(${machineColumns.length}, minmax(120px, 1fr))`,
-                  onDeleteRow: (row) => handleDeleteOperationRecord("machine", row),
-                  rows: operationsWorkspace.machines,
-                  tableId: "machines",
-                })}
-              </article>
-            </div>
-
-            <div className="operation-data-grid compact operations-record-pair operations-equipment-record-pair">
-              {renderOperationRecordForm("equipment", equipmentFields, { className: "operations-equipment-form-card", formRef: equipmentFormRef })}
-              <article className="operation-card operation-data-table-card operations-record-list-card operations-equipment-list-card" style={equipmentListHeightStyle}>
-                <div className="operation-card-heading">
-                  <h2>{copy("Equipment", "Ekipman")}</h2>
-                  <span>{(operationsWorkspace.equipment || []).length} {copy("records", "kayıt")}</span>
-                </div>
-                {renderSortableDataTable({
-                  columns: equipmentColumns,
-                  gridTemplateColumns: `repeat(${equipmentColumns.length}, minmax(120px, 1fr))`,
-                  onDeleteRow: (row) => handleDeleteOperationRecord("equipment", row),
-                  rows: operationsWorkspace.equipment || [],
-                  tableId: "equipment",
-                })}
-              </article>
-            </div>
-          </div>
-          {operationsStatus && <p className="status-message">{operationsStatus}</p>}
-        </section>,
     );
   }
 
@@ -7509,212 +3391,6 @@ function App() {
     );
   }
 
-  function renderPrintableReport(packKey) {
-    const pack = reportTabs.find((tab) => tab.key === packKey) || reportTabs[0];
-    const sections = reportPackSections[pack.key] || reportPackSections.full;
-    const report = buildExportReport();
-    const layout = getStatementLayout(copy);
-    const has = (section) => sections.includes(section);
-    const formatKpi = (value, format) => {
-      if (format === "month") return value ? `${formatNumber(value)}. ${copy("month", "ay")}` : copy("Not reached", "Ulaşılmadı");
-      if (format === "percent") return value === null ? "-" : `%${formatNumber(value, 1)}`;
-      return formatLira(value, format === "money2" ? 2 : 0);
-    };
-    const renderStatement = (title, rows) => (
-      <section className="print-section">
-        <h2>{title}</h2>
-        <table className="print-table">
-          <thead>
-            <tr>
-              <th>{copy("TRY", "TL")}</th>
-              {report.years.map((year) => <th key={year.label}>{copy(`Year ${year.label}`, `Yıl ${year.label}`)}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr className={row.emphasis ? "emphasis" : ""} key={row.key}>
-                <td>{row.label}</td>
-                {report.years.map((year) => (
-                  <td key={year.label}>
-                    {row.format === "percent" ? `${formatNumber(year[row.key], 1)}%` : formatLira(year[row.key])}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-    );
-
-    return (
-      <main className="print-report">
-        <div className="print-toolbar">
-          <button type="button" onClick={() => goTo("/reports", "login")}>{copy("Back", "Geri")}</button>
-          <button type="button" className="primary" onClick={() => window.print()}>{copy("Print / Save as PDF", "Yazdır / PDF olarak kaydet")}</button>
-        </div>
-
-        <header className="print-cover">
-          <span>{pack.label}</span>
-          <h1>{report.companyName}</h1>
-          <p>{report.productName}</p>
-          <small>{copy("Prepared on", "Hazırlanma tarihi")} {new Date().toLocaleDateString(locale)} · {copy("5-year projection", "5 yıllık projeksiyon")}</small>
-        </header>
-
-        {has("summary") && (
-          <section className="print-section">
-            <h2>{copy("Decision", "Karar")}</h2>
-            <p className="print-verdict"><strong>{report.verdict.label}</strong> {report.verdict.copy}</p>
-            <div className="print-kpis">
-              {report.kpis.map(([label, value, format]) => (
-                <div key={label}>
-                  <span>{label}</span>
-                  <strong>{formatKpi(value, format)}</strong>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {has("sensitivity") && report.sensitivity.length > 0 && (
-          <section className="print-section">
-            <h2>{copy("Sensitivity", "Duyarlılık analizi")}</h2>
-            <p className="print-note">{copy("Full 5-year model re-run with one assumption changed at a time.", "Her seferinde tek bir varsayım değiştirilerek tam 5 yıllık model yeniden çalıştırıldı.")}</p>
-            {renderSensitivityTable(report.sensitivity, "print-table print-table-sensitivity")}
-          </section>
-        )}
-
-        {has("assumptions") && (
-          <section className="print-section">
-            <h2>{copy("Key assumptions", "Temel varsayımlar")}</h2>
-            <table className="print-table print-table-compact">
-              <tbody>
-                {report.assumptions.map(([label, value]) => (
-                  <tr key={label}><td>{label}</td><td>{formatNumber(value, 2)}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        )}
-
-        {has("income") && renderStatement(copy("Income statement", "Gelir tablosu"), layout.income)}
-        {has("cash") && renderStatement(copy("Cash flow", "Nakit akışı"), layout.cash)}
-        {has("balance") && renderStatement(copy("Balance sheet (year end)", "Bilanço (yıl sonu)"), layout.balance)}
-
-        {has("loans") && report.loans.length > 0 && (
-          <section className="print-section">
-            <h2>{copy("Loans", "Krediler")}</h2>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>{copy("Loan", "Kredi")}</th>
-                  <th>{copy("Amount", "Tutar")}</th>
-                  <th>{copy("Interest % / year", "Faiz % / yıl")}</th>
-                  <th>{copy("Term (months)", "Vade (ay)")}</th>
-                  <th>{copy("Grace (months)", "Ödemesiz (ay)")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.loans.map((loan) => (
-                  <tr key={`${loan.name}-${loan.receivedDate}`}>
-                    <td>{loan.name}</td>
-                    <td>{formatCurrencyAmount(loan.amount, loan.currency)}</td>
-                    <td>{formatNumber(loan.annualInterestRate, 2)}</td>
-                    <td>{formatNumber(loan.loanTermMonths)}</td>
-                    <td>{formatNumber(loan.gracePeriodMonths)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        )}
-
-        {has("operations") && (
-          <section className="print-section">
-            <h2>{copy("Production plans", "Üretim planları")}</h2>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>{copy("Plan", "Plan")}</th>
-                  <th>{copy("Output / day", "Çıktı / gün")}</th>
-                  <th>{copy("Material / unit", "Malzeme / birim")}</th>
-                  <th>{copy("Labour / unit", "İşçilik / birim")}</th>
-                  <th>{copy("Energy / unit", "Enerji / birim")}</th>
-                  <th>{copy("Daily cost", "Günlük maliyet")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.plans.map((plan) => (
-                  <tr key={plan.name}>
-                    <td>{plan.name}<small>{plan.product}</small></td>
-                    <td>{formatNumber(plan.dailyOutput)}{plan.dailyOutput < plan.target ? ` / ${formatNumber(plan.target)}` : ""}</td>
-                    <td>{formatLira(plan.unitMaterial, 2)}</td>
-                    <td>{formatLira(plan.unitLabor, 2)}</td>
-                    <td>{formatLira(plan.unitEnergy, 2)}</td>
-                    <td>{formatLira(plan.dailyCost)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        )}
-
-        {has("sales") && (
-          <section className="print-section">
-            <h2>{copy("Sales channels", "Satış kanalları")}</h2>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>{copy("Channel", "Kanal")}</th>
-                  <th>{copy("First month units", "İlk ay adet")}</th>
-                  <th>{copy("Unit price", "Birim fiyat")}</th>
-                  <th>{copy("Commission %", "Komisyon %")}</th>
-                  <th>{copy("Collection days", "Tahsilat günü")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.channels.map((channel) => (
-                  <tr key={channel.name}>
-                    <td>{channel.name}<small>{channel.product}</small></td>
-                    <td>{formatNumber(channel.firstMonthUnits)}</td>
-                    <td>{formatLira(channel.unitPrice, 2)}</td>
-                    <td>{formatNumber(channel.commissionPercent, 1)}</td>
-                    <td>{formatNumber(channel.collectionDays)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>{copy("Units", "Adet")}</th>
-                  {report.years.map((year) => <th key={year.label}>{copy(`Year ${year.label}`, `Yıl ${year.label}`)}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>{copy("Produced", "Üretilen")}</td>{report.years.map((year) => <td key={year.label}>{formatNumber(year.producedUnits)}</td>)}</tr>
-                <tr><td>{copy("Sold", "Satılan")}</td>{report.years.map((year) => <td key={year.label}>{formatNumber(year.netSoldUnits)}</td>)}</tr>
-                <tr><td>{copy("In stock at year end", "Yıl sonu stok")}</td>{report.years.map((year) => <td key={year.label}>{formatNumber(year.inventoryUnits)}</td>)}</tr>
-              </tbody>
-            </table>
-          </section>
-        )}
-
-        {has("risks") && report.risks.length > 0 && (
-          <section className="print-section">
-            <h2>{copy("Risks to resolve", "Çözülmesi gereken riskler")}</h2>
-            <ul className="print-risks">
-              {report.risks.map((risk) => <li key={risk.title}><strong>{risk.title}</strong> {risk.detail}</li>)}
-            </ul>
-          </section>
-        )}
-
-        <footer className="print-footer">
-          {copy("Prices and costs exclude VAT. Projections are estimates based on the assumptions entered in Atera.", "Fiyat ve maliyetler KDV hariçtir. Projeksiyonlar Atera'ya girilen varsayımlara dayanan tahminlerdir.")}
-        </footer>
-      </main>
-    );
-  }
-
   function renderDashboardLayout(activePage, children) {
     return (
       <>
@@ -7865,1172 +3541,1301 @@ function App() {
     );
   }
 
-  if (path === "/") {
-    return (
-      <main className="landing-page">
-        <header className="landing-header">
-          <button type="button" className="landing-brand" onClick={() => goTo("/", "login")}>
-            <img src={logoUrl} alt="Atera logo" />
-            <strong>Atera</strong>
-          </button>
+  const appContextValue = {
+    activeFinancialSubmodule,
+    activeOperationsSubmodule,
+    activeSimulationVariant,
+    addFinancialLoanRow,
+    addProductMaterialRow,
+    addProductProcessRow,
+    addSalesItem,
+    addSimulationVariant,
+    buildExportReport,
+    buildProductOperationRows,
+    copy,
+    copyOperationRecordToForm,
+    dashboardCompanyName,
+    deleteSimulationVariant,
+    equipmentFormRef,
+    equipmentListHeightStyle,
+    exchangeRates,
+    financialExtraCostForm,
+    financialHorizon,
+    financialLoading,
+    financialModel,
+    financialOverviewWidgets,
+    financialSettingsForModel,
+    financialSettingsForm,
+    financialStatementPeriod,
+    financialStatus,
+    financialSubmodules,
+    form,
+    getNextTableSortPatch,
+    getProductFlowDefaults,
+    getProductProcessRows,
+    getRecipeMaterialId,
+    getSortableTableRows,
+    getTableColumnKey,
+    getTableSortIndicator,
+    goTo,
+    handleDeleteFinancialExtraCost,
+    handleDeleteOperationRecord,
+    handleFetchExchangeRates,
+    handleSaveFinancialExtraCost,
+    handleSaveFinancialSettings,
+    handleSaveOperationPlan,
+    handleSaveOperationRecord,
+    handleSaveSalesStrategy,
+    hasFinancialSourceData,
+    loadFinancialData,
+    loadOperationsData,
+    loadPlanningData,
+    locale,
+    machineFormRef,
+    machineListHeightStyle,
+    materialFormRef,
+    materialListHeightStyle,
+    moveProductProcessRow,
+    normalizeFlowStrategy,
+    operationForms,
+    operationPlan,
+    operationPlanResult,
+    operationsLoading,
+    operationsStatus,
+    operationsWorkspace,
+    operationsWorkspaceForFinance,
+    persistSimulationVariant,
+    processDefinitionOpen,
+    productFormRef,
+    productListHeightStyle,
+    removeFinancialLoanRow,
+    removeProductMaterialRow,
+    removeProductProcessRow,
+    removeSalesItem,
+    renderDashboardLayout,
+    renderOperationRecordForm,
+    renderSensitivityTable,
+    renderSimpleSortableGrid,
+    renderSortableDataTable,
+    renderTableToolbar,
+    reportTabs,
+    resetSalesVisibleSections,
+    salesEditorOpen,
+    salesLoading,
+    salesStatus,
+    salesStrategy,
+    salesVisibleSections,
+    saveFinancialOverviewScreen,
+    setFinancialExtraCostForm,
+    setFinancialHorizon,
+    setFinancialSettingsForm,
+    setFinancialStatementPeriod,
+    setOperationForms,
+    setOperationPlan,
+    setOperationPlanResult,
+    setOperationsStatus,
+    setProcessDefinitionOpen,
+    setSalesEditorOpen,
+    setSalesStrategy,
+    simulationLoading,
+    simulationStatus,
+    simulationVariants,
+    tableControls,
+    toggleFinancialOverviewWidget,
+    toggleSalesVisibleSection,
+    updateFinancialLoanRow,
+    updateOperationForm,
+    updateOperationPlan,
+    updateOperationPlanRow,
+    updateOperationPlanRowFields,
+    updateProductMaterialRow,
+    updateProductProcessRow,
+    updateProductProcessRowFields,
+    updateSalesChannelSeasonality,
+    updateSalesCompany,
+    updateSalesForecast,
+    updateSalesItem,
+    updateSimulationParameter,
+    updateSimulationVariant,
+    updateTableControl,
+    workforceFormRef,
+    workforceListHeightStyle,
+  };
 
-          <nav className="landing-nav" aria-label="Landing page sections">
-            <a href="#who">{labels.who}</a>
-            <a href="#solutions">{labels.solutions}</a>
-            <a href="#references">{labels.references}</a>
-            <a href="#contact">{labels.contact}</a>
-          </nav>
+  return (
+    <AppContext.Provider value={appContextValue}>
+      {renderRoute()}
+    </AppContext.Provider>
+  );
 
-          <div className="landing-controls">
-            <label className="language-picker">
-              <span>{labels.language}</span>
-              <select value={form.language} onChange={(event) => updateField("language", event.target.value)}>
-                <option value="en">EN</option>
-                <option value="tr">TR</option>
-              </select>
-            </label>
-            <ThemeToggle />
-          </div>
-        </header>
+  function renderRoute() {
+    if (path === "/") {
+      return (
+        <main className="landing-page">
+          <header className="landing-header">
+            <button type="button" className="landing-brand" onClick={() => goTo("/", "login")}>
+              <img src={logoUrl} alt="Atera logo" />
+              <strong>Atera</strong>
+            </button>
 
-        <section className="landing-hero">
-          <div className="landing-hero-content">
-            <span className="hero-eyebrow">{copy("The operating layer behind feasible factories", "Fizibl fabrikaların arkasındaki operasyon katmanı")}</span>
-            <h1>{labels.heroTitle}</h1>
-            <p>{labels.heroCopy}</p>
-            <div className="hero-actions">
-              <button type="button" className="submit-button landing-login" onClick={handleUseAtera}>
-                {labels.goToLogin}
-              </button>
-              <a className="hero-secondary-link" href="#solutions">
-                {copy("Discover the model", "Modeli keşfet")}
-              </a>
+            <nav className="landing-nav" aria-label="Landing page sections">
+              <a href="#who">{labels.who}</a>
+              <a href="#solutions">{labels.solutions}</a>
+              <a href="#references">{labels.references}</a>
+              <a href="#contact">{labels.contact}</a>
+            </nav>
+
+            <div className="landing-controls">
+              <label className="language-picker">
+                <span>{labels.language}</span>
+                <select value={form.language} onChange={(event) => updateField("language", event.target.value)}>
+                  <option value="en">EN</option>
+                  <option value="tr">TR</option>
+                </select>
+              </label>
+              <ThemeToggle />
             </div>
-            <div className="hero-proof-strip" aria-label={copy("Atera model signals", "Atera model sinyalleri")}>
-              <span>{copy("Capacity", "Kapasite")}</span>
-              <span>{copy("Cash", "Nakit")}</span>
-              <span>{copy("Margin", "Marj")}</span>
-              <span>{copy("Delivery", "Termin")}</span>
-            </div>
-          </div>
-          <div className="landing-hero-stage" aria-hidden="true">
-            {renderAteraOrbit("hero-orbit")}
-            <div className="hero-product-card hero-product-card-main">
-              <span>{copy("Decision engine", "Karar motoru")}</span>
-              <strong>{copy("Feasibility live", "Fizibilite canlı")}</strong>
-              <div className="hero-card-bars">
-                <i />
-                <i />
-                <i />
+          </header>
+
+          <section className="landing-hero">
+            <div className="landing-hero-content">
+              <span className="hero-eyebrow">{copy("The operating layer behind feasible factories", "Fizibl fabrikaların arkasındaki operasyon katmanı")}</span>
+              <h1>{labels.heroTitle}</h1>
+              <p>{labels.heroCopy}</p>
+              <div className="hero-actions">
+                <button type="button" className="submit-button landing-login" onClick={handleUseAtera}>
+                  {labels.goToLogin}
+                </button>
+                <a className="hero-secondary-link" href="#solutions">
+                  {copy("Discover the model", "Modeli keşfet")}
+                </a>
+              </div>
+              <div className="hero-proof-strip" aria-label={copy("Atera model signals", "Atera model sinyalleri")}>
+                <span>{copy("Capacity", "Kapasite")}</span>
+                <span>{copy("Cash", "Nakit")}</span>
+                <span>{copy("Margin", "Marj")}</span>
+                <span>{copy("Delivery", "Termin")}</span>
               </div>
             </div>
-            <div className="hero-product-card hero-product-card-side">
-              <span>{copy("Scenario delta", "Senaryo farkı")}</span>
-              <strong>+18%</strong>
-            </div>
-            <div className="hero-app-chip chip-finance">FM</div>
-            <div className="hero-app-chip chip-ops">OP</div>
-          </div>
-        </section>
-
-        <section className="landing-sections" aria-label="Atera information">
-          <article id="who" className="landing-section">
-            <div className="section-kicker">
-              <span>{labels.who}</span>
-              <h2>{labels.who}</h2>
-            </div>
-            <div className="who-content">
-              <div className="who-copy-block">
-                <p>{labels.whoCopy}</p>
-                <div className="who-signal-grid" aria-label={copy("Atera decision signals", "Atera karar sinyalleri")}>
-                  <span>{copy("Capacity pressure", "Kapasite baskısı")}</span>
-                  <span>{copy("Cash exposure", "Nakit riski")}</span>
-                  <span>{copy("Margin impact", "Marj etkisi")}</span>
-                  <span>{copy("Delivery confidence", "Termin güveni")}</span>
+            <div className="landing-hero-stage" aria-hidden="true">
+              {renderAteraOrbit("hero-orbit")}
+              <div className="hero-product-card hero-product-card-main">
+                <span>{copy("Decision engine", "Karar motoru")}</span>
+                <strong>{copy("Feasibility live", "Fizibilite canlı")}</strong>
+                <div className="hero-card-bars">
+                  <i />
+                  <i />
+                  <i />
                 </div>
               </div>
-              <div className="who-visual-panel">
-                {renderAteraOrbit("who-section-orbit")}
-                <div className="who-panel-caption">
-                  <strong>{copy("Scenario command layer", "Senaryo komuta katmanı")}</strong>
-                  <span>{copy("From assumption to decision without spreadsheet fog.", "Varsayımdan karara Excel sisine girmeden.")}</span>
+              <div className="hero-product-card hero-product-card-side">
+                <span>{copy("Scenario delta", "Senaryo farkı")}</span>
+                <strong>+18%</strong>
+              </div>
+              <div className="hero-app-chip chip-finance">FM</div>
+              <div className="hero-app-chip chip-ops">OP</div>
+            </div>
+          </section>
+
+          <section className="landing-sections" aria-label="Atera information">
+            <article id="who" className="landing-section">
+              <div className="section-kicker">
+                <span>{labels.who}</span>
+                <h2>{labels.who}</h2>
+              </div>
+              <div className="who-content">
+                <div className="who-copy-block">
+                  <p>{labels.whoCopy}</p>
+                  <div className="who-signal-grid" aria-label={copy("Atera decision signals", "Atera karar sinyalleri")}>
+                    <span>{copy("Capacity pressure", "Kapasite baskısı")}</span>
+                    <span>{copy("Cash exposure", "Nakit riski")}</span>
+                    <span>{copy("Margin impact", "Marj etkisi")}</span>
+                    <span>{copy("Delivery confidence", "Termin güveni")}</span>
+                  </div>
+                </div>
+                <div className="who-visual-panel">
+                  {renderAteraOrbit("who-section-orbit")}
+                  <div className="who-panel-caption">
+                    <strong>{copy("Scenario command layer", "Senaryo komuta katmanı")}</strong>
+                    <span>{copy("From assumption to decision without spreadsheet fog.", "Varsayımdan karara Excel sisine girmeden.")}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </article>
+            </article>
 
-          <article id="solutions" className="landing-section solutions-section">
-            <div className="section-kicker">
-              <h2>{labels.solutions}</h2>
-              <p>{copy("Plan. Model. Decide. Scale.", "Planla. Modelle. Karar ver. Büyüt.")}</p>
-            </div>
-            <div className="solutions-content">
-              <p>{labels.solutionsCopy}</p>
-              <div className="solution-signal-row" aria-label={copy("Atera solution modules", "Atera çözüm modülleri")}>
-                <span>{copy("Operational planning", "Operasyon planlama")}</span>
-                <span>{copy("Financial feasibility", "Finansal fizibilite")}</span>
-                <span>{copy("Sales simulation", "Satış simülasyonu")}</span>
+            <article id="solutions" className="landing-section solutions-section">
+              <div className="section-kicker">
+                <h2>{labels.solutions}</h2>
+                <p>{copy("Plan. Model. Decide. Scale.", "Planla. Modelle. Karar ver. Büyüt.")}</p>
               </div>
-              <div className="persona-carousel" aria-label="Solution personas">
-                <div className="persona-track">
-                  {[...personas, ...personas].map((persona, index) => (
-                    <article className="persona-card" key={`${persona.title}-${index}`}>
-                      <PersonaAvatar type={persona.avatarType} title={persona.title} />
-                      <div>
-                        <h3>{persona.title}</h3>
-                        <p>{persona.need}</p>
-                        <p>{persona.benefit}</p>
-                        <p>{persona.difference}</p>
-                      </div>
-                    </article>
-                  ))}
+              <div className="solutions-content">
+                <p>{labels.solutionsCopy}</p>
+                <div className="solution-signal-row" aria-label={copy("Atera solution modules", "Atera çözüm modülleri")}>
+                  <span>{copy("Operational planning", "Operasyon planlama")}</span>
+                  <span>{copy("Financial feasibility", "Finansal fizibilite")}</span>
+                  <span>{copy("Sales simulation", "Satış simülasyonu")}</span>
                 </div>
-              </div>
-            </div>
-          </article>
-
-          <article id="references" className="landing-section references-section">
-            <div className="section-kicker">
-              <h2>{labels.references}</h2>
-              <p>{copy("One loop for the decisions that usually live apart.", "Genelde ayrı yaşayan kararlar için tek döngü.")}</p>
-            </div>
-            <div className="references-content">
-              <div className="reference-carousel" aria-label="Reference company logos">
-                <div className="reference-track">
-                  {references.length ? (
-                    [...references, ...references].map((reference, index) => (
-                      <article className={`reference-logo-card ${reference.tone}`} key={`${reference.name}-${index}`}>
-                        <div className="reference-mark">{reference.mark}</div>
-                        <strong>{reference.name}</strong>
+                <div className="persona-carousel" aria-label="Solution personas">
+                  <div className="persona-track">
+                    {[...personas, ...personas].map((persona, index) => (
+                      <article className="persona-card" key={`${persona.title}-${index}`}>
+                        <PersonaAvatar type={persona.avatarType} title={persona.title} />
+                        <div>
+                          <h3>{persona.title}</h3>
+                          <p>{persona.need}</p>
+                          <p>{persona.benefit}</p>
+                          <p>{persona.difference}</p>
+                        </div>
                       </article>
-                    ))
-                  ) : (
-                    <article className="reference-logo-card teal">
-                      <div className="reference-mark">DB</div>
-                      <strong>{copy("No reference records yet", "Henüz referans kaydı yok")}</strong>
-                    </article>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article id="references" className="landing-section references-section">
+              <div className="section-kicker">
+                <h2>{labels.references}</h2>
+                <p>{copy("One loop for the decisions that usually live apart.", "Genelde ayrı yaşayan kararlar için tek döngü.")}</p>
+              </div>
+              <div className="references-content">
+                <div className="reference-carousel" aria-label="Reference company logos">
+                  <div className="reference-track">
+                    {references.length ? (
+                      [...references, ...references].map((reference, index) => (
+                        <article className={`reference-logo-card ${reference.tone}`} key={`${reference.name}-${index}`}>
+                          <div className="reference-mark">{reference.mark}</div>
+                          <strong>{reference.name}</strong>
+                        </article>
+                      ))
+                    ) : (
+                      <article className="reference-logo-card teal">
+                        <div className="reference-mark">DB</div>
+                        <strong>{copy("No reference records yet", "Henüz referans kaydı yok")}</strong>
+                      </article>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article id="contact" className="landing-section contact-section">
+              <div>
+                <span>{labels.contact}</span>
+                <h2>{labels.contact}</h2>
+              </div>
+              <div className="contact-content">
+                <div className="contact-card">
+                  <div className="contact-card-mark" aria-hidden="true">A</div>
+                  <address className="contact-details">
+                    {labels.contactPhone && <a href={`tel:${labels.contactPhone.replaceAll(" ", "")}`}>{labels.contactPhone}</a>}
+                    <a href={`mailto:${labels.contactEmail}`}>{labels.contactEmail}</a>
+                    <span>{labels.contactLocation}</span>
+                  </address>
+                  <div className="contact-status" aria-hidden="true">
+                    <span />
+                    {copy("Open for onboarding conversations", "Onboarding görüşmeleri için açık")}
+                  </div>
+                </div>
+              </div>
+            </article>
+          </section>
+        </main>
+      );
+    }
+
+    if (session && routePath.startsWith("/reports/print/")) {
+      return <PrintableReportPage packKey={routePath.split("/")[3]} />;
+    }
+
+    if (session && routePath === "/dashboard") {
+      return renderDashboardLayout(
+        "dashboard/overview",
+          <section className="command-dashboard feasibility-dashboard" aria-label="Atera feasibility dashboard">
+            <div className="command-topbar executive-topbar">
+              <div className="command-context">
+                <strong>{dashboardCompanyName}</strong>
+                <span>{dashboardProductContext}</span>
+              </div>
+              <div className="command-live">
+                <span className="live-dot" />
+                <strong>{hasOperationData || hasSalesForecast ? copy("Workspace data loaded", "Çalışma alanı verisi yüklendi") : copy("Input needed", "Girdi gerekli")}</strong>
+              </div>
+              <div className="command-user">
+                <span>{currentProfile?.username || form.username || "Atera"}</span>
+                <small>{currentProfile?.access_level || "-"}</small>
+              </div>
+              <button
+                type="button"
+                className={`dashboard-edit-toggle ${dashboardEditorOpen ? "active" : ""}`}
+                onClick={() => setDashboardEditorOpen((isOpen) => !isOpen)}
+                aria-controls="dashboard-editor-panel"
+                aria-expanded={dashboardEditorOpen}
+              >
+                <span>{dashboardEditorOpen ? copy("Done editing", "Düzenlemeyi bitir") : copy("Edit screen", "Ekranı düzenle")}</span>
+              </button>
+              <button type="button" className="command-run-button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
+            </div>
+
+            {dashboardEditorOpen && (
+              <section id="dashboard-editor-panel" className="dashboard-editor-panel" aria-label={copy("Dashboard editor", "Dashboard düzenleyici")}>
+                <div className="dashboard-editor-heading">
+                  <div>
+                    <span>{copy("Dashboard view", "Dashboard görünümü")}</span>
+                    <h2>{copy("Visible data groups", "Görünür veri grupları")}</h2>
+                    <p>{copy("Selections are saved for this browser.", "Seçimler bu tarayıcı için saklanır.")}</p>
+                  </div>
+                  <div className="dashboard-editor-actions">
+                    <button type="button" onClick={resetDashboardVisibleSections}>{copy("Reset", "Sıfırla")}</button>
+                    <button type="button" className="primary" onClick={() => setDashboardEditorOpen(false)}>{copy("Done", "Bitti")}</button>
+                  </div>
+                </div>
+                <div className="dashboard-editor-grid">
+                  {dashboardEditorGroups.map((group) => {
+                    const visibleKeys = normalizedDashboardVisibleSections[group.key] || [];
+
+                    return (
+                      <article className="dashboard-editor-group" key={group.key}>
+                        <div className="dashboard-editor-group-heading">
+                          <div>
+                            <span>{group.title}</span>
+                            <p>{group.description}</p>
+                          </div>
+                          <strong>{visibleKeys.length}/{group.options.length}</strong>
+                        </div>
+                        {Boolean(group.fixedItems?.length) && (
+                          <div className="dashboard-editor-fixed-items">
+                            {group.fixedItems.map(([label, value]) => (
+                              <span key={label}>
+                                <small>{label}</small>
+                                <strong>{value}</strong>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="dashboard-editor-options">
+                          {group.options.map((option) => {
+                            const isSelected = visibleKeys.includes(option.id);
+
+                            return (
+                              <label className={`dashboard-editor-option ${isSelected ? "selected" : ""}`} key={option.id}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleDashboardVisibleSection(group.key, option.id)}
+                                />
+                                <span>
+                                  <strong>{option.label}</strong>
+                                  <small>{option.detail}</small>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            <section className={`dashboard-assumption-strip ${feasibilityVerdict.tone}`} aria-label={copy("Assumption snapshot", "Varsayım özeti")}>
+              <div className="dashboard-assumption-strip-heading">
+                <span>{copy("Assumption snapshot", "Varsayım özeti")}</span>
+                <h2>{copy("What this dashboard is based on", "Bu dashboard neye dayanıyor")}</h2>
+              </div>
+              <div
+                className="dashboard-assumption-strip-controls"
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setDashboardAssumptionMenu(null);
+                  }
+                }}
+              >
+                <div className={`assumption-control product-control ${dashboardAssumptionMenu === "product" ? "open" : ""}`}>
+                  <span>{copy("Product", "Ürün")}</span>
+                  <button
+                    type="button"
+                    className="assumption-select-trigger"
+                    onClick={() => setDashboardAssumptionMenu((current) => (current === "product" ? null : "product"))}
+                    disabled={!operationsWorkspace.products.length}
+                    aria-expanded={dashboardAssumptionMenu === "product"}
+                  >
+                    <strong>{dashboardProductSelectLabel}</strong>
+                    <i aria-hidden="true">⌄</i>
+                  </button>
+                  {dashboardAssumptionMenu === "product" && Boolean(operationsWorkspace.products.length) && (
+                    <div className="assumption-select-menu" role="listbox">
+                      {operationsWorkspace.products.map((product) => {
+                        const label = product.name || product.product_code || copy("Unnamed product", "İsimsiz ürün");
+                        const isSelected = product.id === dashboardSelectedProductId;
+                        return (
+                          <button
+                            type="button"
+                            className={isSelected ? "selected" : ""}
+                            onClick={() => {
+                              handleDashboardProductChange(product.id);
+                              setDashboardAssumptionMenu(null);
+                            }}
+                            role="option"
+                            aria-selected={isSelected}
+                            key={product.id}
+                          >
+                            <span>{label}</span>
+                            <small>{product.product_code || product.product_group || copy("Product", "Ürün")}</small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className={`assumption-control horizon-control ${dashboardAssumptionMenu === "horizon" ? "open" : ""}`}>
+                  <span>{copy("Projection horizon", "Projeksiyon ufku")}</span>
+                  <button
+                    type="button"
+                    className="assumption-select-trigger"
+                    onClick={() => setDashboardAssumptionMenu((current) => (current === "horizon" ? null : "horizon"))}
+                    aria-expanded={dashboardAssumptionMenu === "horizon"}
+                  >
+                    <strong>{dashboardHorizonSelectLabel}</strong>
+                    <i aria-hidden="true">⌄</i>
+                  </button>
+                  {dashboardAssumptionMenu === "horizon" && (
+                    <div className="assumption-select-menu" role="listbox">
+                      {financialHorizonOptions.map(([value, label]) => {
+                        const isSelected = value === financialHorizon;
+                        return (
+                          <button
+                            type="button"
+                            className={isSelected ? "selected" : ""}
+                            onClick={() => {
+                              loadFinancialData(value);
+                              setDashboardAssumptionMenu(null);
+                            }}
+                            role="option"
+                            aria-selected={isSelected}
+                            key={value}
+                          >
+                            <span>{label}</span>
+                            <small>{value === "6m" ? copy("Short range", "Kısa ufuk") : value === "1y" ? copy("Annual range", "Yıllık ufuk") : copy("Long range", "Uzun ufuk")}</small>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-          </article>
-
-          <article id="contact" className="landing-section contact-section">
-            <div>
-              <span>{labels.contact}</span>
-              <h2>{labels.contact}</h2>
-            </div>
-            <div className="contact-content">
-              <div className="contact-card">
-                <div className="contact-card-mark" aria-hidden="true">A</div>
-                <address className="contact-details">
-                  {labels.contactPhone && <a href={`tel:${labels.contactPhone.replaceAll(" ", "")}`}>{labels.contactPhone}</a>}
-                  <a href={`mailto:${labels.contactEmail}`}>{labels.contactEmail}</a>
-                  <span>{labels.contactLocation}</span>
-                </address>
-                <div className="contact-status" aria-hidden="true">
-                  <span />
-                  {copy("Open for onboarding conversations", "Onboarding görüşmeleri için açık")}
-                </div>
-              </div>
-            </div>
-          </article>
-        </section>
-      </main>
-    );
-  }
-
-  if (session && routePath.startsWith("/reports/print/")) {
-    return renderPrintableReport(routePath.split("/")[3]);
-  }
-
-  if (session && routePath === "/dashboard") {
-    return renderDashboardLayout(
-      "dashboard/overview",
-        <section className="command-dashboard feasibility-dashboard" aria-label="Atera feasibility dashboard">
-          <div className="command-topbar executive-topbar">
-            <div className="command-context">
-              <strong>{dashboardCompanyName}</strong>
-              <span>{dashboardProductContext}</span>
-            </div>
-            <div className="command-live">
-              <span className="live-dot" />
-              <strong>{hasOperationData || hasSalesForecast ? copy("Workspace data loaded", "Çalışma alanı verisi yüklendi") : copy("Input needed", "Girdi gerekli")}</strong>
-            </div>
-            <div className="command-user">
-              <span>{currentProfile?.username || form.username || "Atera"}</span>
-              <small>{currentProfile?.access_level || "-"}</small>
-            </div>
-            <button
-              type="button"
-              className={`dashboard-edit-toggle ${dashboardEditorOpen ? "active" : ""}`}
-              onClick={() => setDashboardEditorOpen((isOpen) => !isOpen)}
-              aria-controls="dashboard-editor-panel"
-              aria-expanded={dashboardEditorOpen}
-            >
-              <span>{dashboardEditorOpen ? copy("Done editing", "Düzenlemeyi bitir") : copy("Edit screen", "Ekranı düzenle")}</span>
-            </button>
-            <button type="button" className="command-run-button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
-          </div>
-
-          {dashboardEditorOpen && (
-            <section id="dashboard-editor-panel" className="dashboard-editor-panel" aria-label={copy("Dashboard editor", "Dashboard düzenleyici")}>
-              <div className="dashboard-editor-heading">
-                <div>
-                  <span>{copy("Dashboard view", "Dashboard görünümü")}</span>
-                  <h2>{copy("Visible data groups", "Görünür veri grupları")}</h2>
-                  <p>{copy("Selections are saved for this browser.", "Seçimler bu tarayıcı için saklanır.")}</p>
-                </div>
-                <div className="dashboard-editor-actions">
-                  <button type="button" onClick={resetDashboardVisibleSections}>{copy("Reset", "Sıfırla")}</button>
-                  <button type="button" className="primary" onClick={() => setDashboardEditorOpen(false)}>{copy("Done", "Bitti")}</button>
-                </div>
-              </div>
-              <div className="dashboard-editor-grid">
-                {dashboardEditorGroups.map((group) => {
-                  const visibleKeys = normalizedDashboardVisibleSections[group.key] || [];
-
-                  return (
-                    <article className="dashboard-editor-group" key={group.key}>
-                      <div className="dashboard-editor-group-heading">
-                        <div>
-                          <span>{group.title}</span>
-                          <p>{group.description}</p>
-                        </div>
-                        <strong>{visibleKeys.length}/{group.options.length}</strong>
-                      </div>
-                      {Boolean(group.fixedItems?.length) && (
-                        <div className="dashboard-editor-fixed-items">
-                          {group.fixedItems.map(([label, value]) => (
-                            <span key={label}>
-                              <small>{label}</small>
-                              <strong>{value}</strong>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="dashboard-editor-options">
-                        {group.options.map((option) => {
-                          const isSelected = visibleKeys.includes(option.id);
-
-                          return (
-                            <label className={`dashboard-editor-option ${isSelected ? "selected" : ""}`} key={option.id}>
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleDashboardVisibleSection(group.key, option.id)}
-                              />
-                              <span>
-                                <strong>{option.label}</strong>
-                                <small>{option.detail}</small>
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          <section className={`dashboard-assumption-strip ${feasibilityVerdict.tone}`} aria-label={copy("Assumption snapshot", "Varsayım özeti")}>
-            <div className="dashboard-assumption-strip-heading">
-              <span>{copy("Assumption snapshot", "Varsayım özeti")}</span>
-              <h2>{copy("What this dashboard is based on", "Bu dashboard neye dayanıyor")}</h2>
-            </div>
-            <div
-              className="dashboard-assumption-strip-controls"
-              onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget)) {
-                  setDashboardAssumptionMenu(null);
-                }
-              }}
-            >
-              <div className={`assumption-control product-control ${dashboardAssumptionMenu === "product" ? "open" : ""}`}>
-                <span>{copy("Product", "Ürün")}</span>
-                <button
-                  type="button"
-                  className="assumption-select-trigger"
-                  onClick={() => setDashboardAssumptionMenu((current) => (current === "product" ? null : "product"))}
-                  disabled={!operationsWorkspace.products.length}
-                  aria-expanded={dashboardAssumptionMenu === "product"}
-                >
-                  <strong>{dashboardProductSelectLabel}</strong>
-                  <i aria-hidden="true">⌄</i>
-                </button>
-                {dashboardAssumptionMenu === "product" && Boolean(operationsWorkspace.products.length) && (
-                  <div className="assumption-select-menu" role="listbox">
-                    {operationsWorkspace.products.map((product) => {
-                      const label = product.name || product.product_code || copy("Unnamed product", "İsimsiz ürün");
-                      const isSelected = product.id === dashboardSelectedProductId;
-                      return (
-                        <button
-                          type="button"
-                          className={isSelected ? "selected" : ""}
-                          onClick={() => {
-                            handleDashboardProductChange(product.id);
-                            setDashboardAssumptionMenu(null);
-                          }}
-                          role="option"
-                          aria-selected={isSelected}
-                          key={product.id}
-                        >
-                          <span>{label}</span>
-                          <small>{product.product_code || product.product_group || copy("Product", "Ürün")}</small>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              <div className={`assumption-control horizon-control ${dashboardAssumptionMenu === "horizon" ? "open" : ""}`}>
-                <span>{copy("Projection horizon", "Projeksiyon ufku")}</span>
-                <button
-                  type="button"
-                  className="assumption-select-trigger"
-                  onClick={() => setDashboardAssumptionMenu((current) => (current === "horizon" ? null : "horizon"))}
-                  aria-expanded={dashboardAssumptionMenu === "horizon"}
-                >
-                  <strong>{dashboardHorizonSelectLabel}</strong>
-                  <i aria-hidden="true">⌄</i>
-                </button>
-                {dashboardAssumptionMenu === "horizon" && (
-                  <div className="assumption-select-menu" role="listbox">
-                    {financialHorizonOptions.map(([value, label]) => {
-                      const isSelected = value === financialHorizon;
-                      return (
-                        <button
-                          type="button"
-                          className={isSelected ? "selected" : ""}
-                          onClick={() => {
-                            loadFinancialData(value);
-                            setDashboardAssumptionMenu(null);
-                          }}
-                          role="option"
-                          aria-selected={isSelected}
-                          key={value}
-                        >
-                          <span>{label}</span>
-                          <small>{value === "6m" ? copy("Short range", "Kısa ufuk") : value === "1y" ? copy("Annual range", "Yıllık ufuk") : copy("Long range", "Uzun ufuk")}</small>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="assumption-strip-list">
-              {visibleDashboardAssumptionRows.length
-                ? visibleDashboardAssumptionRows.map((row) => (
-                  <span key={row.id}>{row.label}<strong>{row.value}</strong></span>
-                ))
-                : (
-                  <span className="dashboard-empty-selection">
-                    {copy("No extra assumptions selected", "Ek varsayım alanı seçilmedi")}
-                    <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
-                  </span>
-                )}
-            </div>
-          </section>
-
-          <section className={`executive-brief ${feasibilityVerdict.tone}`} aria-label={copy("Feasibility executive brief", "Fizibilite yönetici özeti")}>
-            <div className="executive-brief-copy">
-              <span>{copy("Feasibility executive brief", "Fizibilite yönetici özeti")}</span>
-              <h1>{feasibilityVerdict.label}</h1>
-              <p>{feasibilityVerdict.copy}</p>
-              {hasFinancialSourceData && (
-                <div className="decision-kpi-grid">
-                  {decisionKpis.map((kpi) => (
-                    <article className={`decision-kpi ${kpi.ok ? "ok" : "failed"}`} key={kpi.key}>
-                      <span className="label-with-info">{kpi.label}<GlossaryTip language={form.language} term={kpi.label} /></span>
-                      <strong>{kpi.value}</strong>
-                      <small>{kpi.detail}</small>
-                    </article>
-                  ))}
-                </div>
-              )}
-              <div className="executive-brief-actions">
-                <button type="button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
-                <button type="button" className="secondary" onClick={() => goTo("/simulation/current-situation", "login")}>{copy("Test scenario", "Senaryo test et")}</button>
-                <button type="button" className="secondary" onClick={() => goTo("/reports", "login")}>{copy("Open report pack", "Rapor paketini aç")}</button>
-              </div>
-            </div>
-            <aside className="executive-readiness-card">
-              <span>{copy("Decision readiness", "Karar hazırlığı")}</span>
-              <strong className="executive-readiness-status">{feasibilityReadinessStatus}</strong>
-              <p>{copy("Core modules ready", "Hazır ana modül")}: {feasibilityReadyCount}/{feasibilityChecklist.length}</p>
-              <div className="readiness-step-list">
-                {feasibilityChecklist.map((item) => (
-                  <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
-                    <i>{item.done ? "OK" : "!"}</i>
-                    <span>{item.label}</span>
-                    <strong>{item.done ? copy("Ready", "Hazır") : copy("Data entry needed", "Veri girişi gerekiyor")}</strong>
-                  </button>
-                ))}
-              </div>
-            </aside>
-          </section>
-
-          <section className="dashboard-section-group" aria-label={copy("Business case metrics", "İş modeli metrikleri")}>
-            <div className="dashboard-section-heading">
-              <div>
-                <span>{copy("Business case", "İş modeli")}</span>
-                <h2>{copy("The numbers a business owner should see first", "İş sahibinin önce görmesi gereken sayılar")}</h2>
-              </div>
-              <strong>{periodLabel}</strong>
-            </div>
-            <div className="executive-metric-grid">
-              {visibleDashboardExecutiveMetrics.length
-                ? visibleDashboardExecutiveMetrics.map((metric) => (
-                  <article className={`command-card executive-metric-card ${metric.tone}`} key={metric.id}>
-                    <span>{metric.category}</span>
-                    <h3 className="label-with-info">{metric.label}<GlossaryTip language={form.language} term={metric.label} /></h3>
-                    <strong>{metric.value}</strong>
-                    <small>{metric.detail}</small>
-                  </article>
-                ))
-                : (
-                  <article className="command-card dashboard-empty-selection-card">
-                    <span>{copy("Business case", "İş modeli")}</span>
-                    <h3>{copy("No metrics selected", "Metrik seçilmedi")}</h3>
-                    <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
-                    <small>{copy("Open the editor to show business model numbers.", "İş modeli sayılarını göstermek için düzenleyiciyi açın.")}</small>
-                  </article>
-                )}
-            </div>
-          </section>
-
-          <section className="dashboard-two-column" aria-label={copy("Risks and next actions", "Riskler ve sonraki aksiyonlar")}>
-            <article className="command-card dashboard-risk-board">
-              <div className="card-heading">
-                <div>
-                  <span>{copy("Risk board", "Risk panosu")}</span>
-                  <h2>{copy("What can stop this project", "Bu projeyi ne durdurabilir")}</h2>
-                </div>
-              </div>
-              <div className="dashboard-risk-list">
-                {(dashboardRiskRows.length ? dashboardRiskRows : [{
-                  action: copy("Run simulation", "Simülasyon çalıştır"),
-                  detail: copy("Core feasibility data is in place. Test conservative and optimistic scenarios before committing.", "Ana fizibilite verisi hazır. Karar vermeden önce temkinli ve iyimser senaryoları test edin."),
-                  path: "/simulation/current-situation",
-                  priority: dashboardRiskPriority.controlled,
-                  severity: copy("Controlled", "Kontrollü"),
-                  tone: "teal",
-                  title: copy("No blocking risk detected", "Engelleyici risk görünmüyor"),
-                }]).map((risk) => (
-                  <button type="button" className={`dashboard-risk-row ${risk.tone}`} onClick={() => goTo(risk.path, "login")} key={risk.title}>
-                    <span>{risk.severity}</span>
-                    <strong>{risk.title}</strong>
-                    <p>{risk.detail}</p>
-                    <b>{risk.action}</b>
-                  </button>
-                ))}
-              </div>
-            </article>
-
-            <article className="command-card dashboard-action-board">
-              <div className="card-heading">
-                <div>
-                  <span>{copy("Recommended sequence", "Önerilen sıra")}</span>
-                  <h2>{copy("What to do before committing capital", "Sermaye bağlamadan önce ne yapılmalı")}</h2>
-                </div>
-              </div>
-              <div className="action-sequence">
-                {(improvementFocus.length ? improvementFocus : [
-                  copy("Run at least one conservative scenario and confirm payback, cash runway, and capacity coverage.", "En az bir temkinli senaryo çalıştırın; geri dönüş, nakit dayanma ve kapasite kapsamını doğrulayın."),
-                  copy("Export or review the report pack before discussing investment or financing.", "Yatırım veya finansman konuşmadan önce rapor paketini inceleyin."),
-                ]).map((item, index) => (
-                  <article key={item}>
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    <p>{item}</p>
-                  </article>
-                ))}
-              </div>
-            </article>
-          </section>
-
-          <section className="dashboard-section-group" aria-label={copy("Module summary", "Modül özeti")}>
-            <div className="dashboard-section-heading">
-              <div>
-                <span>{copy("Across the project", "Proje genelinde")}</span>
-                <h2>{copy("Where each source module stands", "Her kaynak modülün durumu")}</h2>
-              </div>
-            </div>
-            <div className="module-rollup-grid">
-              {dashboardModuleRollup.map((module) => (
-                <button type="button" className={`module-rollup-card ${module.tone} ${module.done ? "done" : ""}`} onClick={() => goTo(module.path, "login")} key={module.label}>
-                  <span>{module.done ? copy("Ready", "Hazır") : copy("Needs input", "Girdi gerekli")}</span>
-                  <strong>{module.label}</strong>
-                  <p>{module.detail}</p>
-                  <b>{module.action}</b>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="dashboard-financial-detail" aria-label={copy("Financial detail", "Finans detayı")}>
-            <article className="command-card dashboard-business-case">
-              <div className="card-heading">
-                <div>
-                  <span>{copy("Financial and operating detail", "Finansal ve operasyonel detay")}</span>
-                  <h2>{copy("Signals behind the verdict", "Kararın arkasındaki sinyaller")}</h2>
-                </div>
-                <button type="button" onClick={() => goTo("/financial-modelling/analiz", "login")}>{copy("Open analysis", "Analizi aç")}</button>
-              </div>
-              <div className="business-case-list">
-                {visibleDashboardFinancialDetailRows.length
-                  ? visibleDashboardFinancialDetailRows.map((row) => (
+              <div className="assumption-strip-list">
+                {visibleDashboardAssumptionRows.length
+                  ? visibleDashboardAssumptionRows.map((row) => (
                     <span key={row.id}>{row.label}<strong>{row.value}</strong></span>
                   ))
                   : (
                     <span className="dashboard-empty-selection">
-                      {copy("No detail metrics selected", "Detay metriği seçilmedi")}
+                      {copy("No extra assumptions selected", "Ek varsayım alanı seçilmedi")}
                       <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
                     </span>
                   )}
               </div>
-            </article>
-          </section>
+            </section>
 
-          <div className="dashboard-logo-row" aria-label={copy("Company and Atera logos", "Şirket ve Atera logoları")}>
-            <div className="customer-logo-mark" aria-label={copy("Company logo", "Şirket logosu")}>
-              <strong>{dashboardCompanyName.slice(0, 2).toUpperCase()}</strong>
-              <span>{dashboardCompanyName}</span>
-            </div>
-            <div className="atera-logo-mark" aria-label="Atera logo">
-              <img src={logoUrl} alt="" />
-              <span>Atera</span>
-            </div>
-          </div>
-        </section>,
-    );
-  }
-
-  if (routeRedirect) return null;
-
-  if (session && (activeModule || isOperationsRoute || isFinancialRoute || isSimulationRoute)) {
-    if (routePath === "/operations") {
-      return renderDashboardLayout(
-        "operations",
-          <section className="module-placeholder operations-overview">
-            <div>
-              <span>Operations</span>
-              <h1>{copy("Operations", "Operasyon")}</h1>
-              <p>{copy("Choose the operational workspace you want to work on: resources, products, machines, process definition, or active processes.", "Çalışmak istediğiniz operasyon alanını seçin: kaynaklar, ürünler, makineler, süreç tanımı veya mevcut süreçler.")}</p>
-            </div>
-            <div className="placeholder-grid">
-              {operationsSubmodules.map((submodule) => (
-                <article key={submodule.key}>
-                  <strong>{submodule.label}</strong>
-                  <p>
-                    {submodule.key === "resources" && copy("Define materials and workforce resources used in production plans.", "Üretim planlarında kullanılan malzeme ve iş gücü kaynaklarını tanımlayın.")}
-                    {submodule.key === "products" && copy("Create products and connect their material recipes.", "Ürünleri oluşturun ve malzeme reçetelerini bağlayın.")}
-                    {submodule.key === "machines-equipment" && copy("Manage machines and equipment before planning capacity.", "Kapasite planlamadan önce makine ve ekipmanları yönetin.")}
-                    {submodule.key === "data-entry" && copy("Build and save daily process plans for feasibility analysis.", "Fizibilite analizi için günlük süreç planları oluşturup kaydedin.")}
-                    {submodule.key === "active-processes" && copy("Review saved process plans and their latest feasibility output.", "Kayıtlı süreç planlarını ve son fizibilite çıktılarını inceleyin.")}
-                  </p>
-                  <button type="button" onClick={() => goTo(submodule.path, "login")}>
-                    {copy("Open", "Aç")}
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>,
-      );
-    }
-
-    if (activeOperationsSubmodule?.key === "data-entry") {
-      const processSetupItems = [
-        {
-          isReady: operationsWorkspace.products.length > 0,
-          label: copy("Product", "Ürün"),
-          path: "/operations/products",
-          readyCopy: copy("At least one product is defined.", "En az bir ürün tanımlı."),
-          todoCopy: copy("Create a product before defining a process.", "Süreç tanımlamadan önce ürün oluşturun."),
-        },
-        {
-          isReady: operationsWorkspace.machines.length > 0,
-          label: copy("Machine", "Makine"),
-          path: "/operations/machines-equipment",
-          readyCopy: copy("At least one machine is defined.", "En az bir makine tanımlı."),
-          todoCopy: copy("Add a machine with daily capacity inputs.", "Günlük kapasite girdileriyle bir makine ekleyin."),
-        },
-        {
-          isReady: operationsWorkspace.workforce.length > 0,
-          label: copy("Workforce", "İşgücü"),
-          path: "/operations/resources",
-          readyCopy: copy("At least one workforce role is defined.", "En az bir işgücü rolü tanımlı."),
-          todoCopy: copy("Add a workforce role and hourly cost.", "İşgücü rolü ve saatlik maliyet ekleyin."),
-        },
-      ];
-      const isProcessSetupReady = processSetupItems.every((item) => item.isReady);
-
-      return renderDashboardLayout(
-        `operations/${activeOperationsSubmodule.key}`,
-          <section className="operations-workspace operations-modern operations-process-page">
-            <div className="operations-header">
-              <div>
-                <span>{copy("Operations", "Operasyon")} / {copy("Process Definition", "Süreç Tanımlama")}</span>
-                <h1>{copy("Process Definition", "Süreç Tanımlama")}</h1>
-                <p>{copy("Build a daily process plan only after the required product, machine, and workforce records exist.", "Gerekli ürün, makine ve işgücü kayıtları oluştuktan sonra günlük süreç planını kurun.")}</p>
-              </div>
-              <div className="operations-actions">
-                <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
-              </div>
-            </div>
-            {!isProcessSetupReady ? (
-              <div className="process-setup-grid">
-                {processSetupItems.map((item) => (
-                  <article className={`operation-card process-setup-card ${item.isReady ? "ready" : "todo"}`} key={item.label}>
-                    <div>
-                      <mark>{item.isReady ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</mark>
-                      <h2>{item.label}</h2>
-                      <p>{item.isReady ? item.readyCopy : item.todoCopy}</p>
-                    </div>
-                    <button type="button" onClick={() => goTo(item.path, "login")}>
-                      {item.isReady ? copy("Review", "İncele") : copy("Add", "Ekle")}
-                    </button>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              renderOperationPlanner()
-            )}
-          </section>,
-      );
-    }
-
-    if (activeOperationsSubmodule?.key === "resources") {
-      return renderResourcesPage();
-    }
-
-    if (activeOperationsSubmodule?.key === "active-processes") {
-      return renderActiveProcessesPage();
-    }
-
-    if (activeOperationsSubmodule?.key === "machines-equipment") {
-      return renderMachinesEquipmentPage();
-    }
-
-    if (activeOperationsSubmodule?.key === "products") {
-      return renderProductDataPage();
-    }
-
-    if (activeOperationsSubmodule) {
-      return renderDashboardLayout(
-        `operations/${activeOperationsSubmodule.key}`,
-          <section className="module-placeholder">
-            <div>
-              <span>{copy("Operations placeholder", "Operasyon boş durum")}</span>
-              <h1>{activeOperationsSubmodule.label}</h1>
-              <p>{copy("This subpage is not available yet.", "Bu alt sayfa henüz hazır değil.")}</p>
-            </div>
-            <div className="placeholder-grid">
-              <article>
-                <strong>{copy("Submodule", "Alt Modül")}</strong>
-                <p>{copy("The screen structure for", "Ekran yapısı")} {activeOperationsSubmodule.label} {copy("will be developed here.", "için burada geliştirilecek.")}</p>
-              </article>
-              <article>
-                <strong>{copy("Status", "Durum")}</strong>
-                <p>{copy("For now, only frontend routing and the empty state screen are available.", "Şimdilik sadece frontend routing ve boş durum ekranı mevcut.")}</p>
-              </article>
-            </div>
-          </section>,
-      );
-    }
-
-    if (activeModule?.key === "financial-modelling" || activeFinancialSubmodule) {
-      return renderFinancialModellingPage();
-    }
-
-    if (isSimulationRoute) {
-      return renderSimulationPage();
-    }
-
-    if (activeModule?.key === "sales-strategy") {
-      return renderSalesStrategyPage();
-    }
-
-    if (activeModule.key === "reports") {
-      return renderDashboardLayout(
-        activeModule.key,
-          <section className="reports-workspace">
-            <div className="reports-header">
-              <div>
-                <span>{dashboardCompanyName} / {copy("Export center", "Export merkezi")}</span>
-                <h1>{copy("Report Downloads", "Rapor İndirme")}</h1>
-                <p>{copy("Choose a report pack and download it as PDF or XLSX. Reports are built from the current data and are not archived.", "Bir rapor paketi seçin ve PDF ya da XLSX olarak indirin. Raporlar güncel veriden üretilir, arşivlenmez.")}</p>
-              </div>
-              <div className="reports-header-panel" aria-label={copy("Download behavior", "İndirme davranışı")}>
-                <strong>{copy("Download only", "Sadece indir")}</strong>
-                <span>{copy("Not archived", "Arşivlenmez")}</span>
-              </div>
-            </div>
-
-            <div className="reports-tabs" role="tablist" aria-label={copy("Report types", "Rapor türleri")}>
-              {reportTabs.map((tab) => (
-                <button type="button" className={activeReportTab.key === tab.key ? "active" : ""} onClick={() => setReportsTab(tab.key)} key={tab.key}>{tab.label}</button>
-              ))}
-            </div>
-
-            <div className="report-stat-grid">
-              {reportStats.map(([label, value, detail]) => (
-                <article className="report-stat-card" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                  <small>{detail}</small>
-                </article>
-              ))}
-            </div>
-
-            <div className="reports-export-layout">
-              <section className="reports-pack-grid" aria-label={copy("Report packs", "Rapor paketleri")}>
-                {reportTabs.map((tab) => (
-                  <article className={`reports-pack-card ${tab.tone} ${activeReportTab.key === tab.key ? "active" : ""}`} key={tab.key}>
-                    <button type="button" onClick={() => setReportsTab(tab.key)}>
-                      <span>{copy("Report pack", "Rapor paketi")}</span>
-                      <strong>{tab.label}</strong>
-                      <small>{tab.detail}</small>
-                    </button>
-                    <div className="reports-pack-includes">
-                      {tab.includes.map((item) => <em key={item}>{item}</em>)}
-                    </div>
-                  </article>
-                ))}
-              </section>
-
-              <aside className="reports-export-panel">
-                <article className="reports-card reports-selected-card">
-                  <div className="reports-card-heading">
-                    <div>
-                      <span>{copy("Selected export", "Seçili export")}</span>
-                      <h2>{activeReportTab.label}</h2>
-                    </div>
-                  </div>
-                  <p>{activeReportTab.detail}</p>
-                  <div className="reports-selected-includes">
-                    {activeReportTab.includes.map((item) => <span key={item}>{item}</span>)}
-                  </div>
-                </article>
-
-                <article className="reports-card reports-format-card">
-                  <div className="reports-card-heading">
-                    <div>
-                      <span>{copy("Download format", "İndirme formatı")}</span>
-                      <h2>{copy("Choose file type", "Dosya türü seçin")}</h2>
-                    </div>
-                  </div>
-                  <div className="reports-format-grid">
-                    {reportFormats.map((format) => (
-                      <button type="button" onClick={() => downloadReport(activeReportTab, format)} key={format.key}>
-                        <strong>{format.label}</strong>
-                        <span>{format.note}</span>
-                        <small>{copy("Download", "İndir")}</small>
-                      </button>
+            <section className={`executive-brief ${feasibilityVerdict.tone}`} aria-label={copy("Feasibility executive brief", "Fizibilite yönetici özeti")}>
+              <div className="executive-brief-copy">
+                <span>{copy("Feasibility executive brief", "Fizibilite yönetici özeti")}</span>
+                <h1>{feasibilityVerdict.label}</h1>
+                <p>{feasibilityVerdict.copy}</p>
+                {hasFinancialSourceData && (
+                  <div className="decision-kpi-grid">
+                    {decisionKpis.map((kpi) => (
+                      <article className={`decision-kpi ${kpi.ok ? "ok" : "failed"}`} key={kpi.key}>
+                        <span className="label-with-info">{kpi.label}<GlossaryTip language={form.language} term={kpi.label} /></span>
+                        <strong>{kpi.value}</strong>
+                        <small>{kpi.detail}</small>
+                      </article>
                     ))}
                   </div>
-                  <p>{copy("PDF opens a print-ready report; choose \"Save as PDF\" in the print dialog. XLSX downloads the statements as a spreadsheet.", "PDF, yazdırmaya hazır raporu açar; yazdırma penceresinde \"PDF olarak kaydet\"i seçin. XLSX tabloları Excel dosyası olarak indirir.")}</p>
-                </article>
-
-                <article className="reports-card reports-readiness-card">
-                  <div className="reports-card-heading">
-                    <div>
-                      <span>{copy("Source readiness", "Kaynak hazırlığı")}</span>
-                      <h2>{copy("What the report can use", "Raporun kullanabileceği kaynaklar")}</h2>
-                    </div>
-                    <button type="button" onClick={loadPlanningData}>{copy("Refresh", "Yenile")}</button>
-                  </div>
-                  {[
-                    [copy("Product record", "Ürün kaydı"), Boolean(operationsWorkspace.product)],
-                    [copy("Process result", "Süreç sonucu"), activePlanResults.length > 0],
-                    [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast],
-                    [copy("Financial assumptions", "Finansal varsayımlar"), hasFinancialAssumptions],
-                  ].map(([item, ready]) => (
-                    <div className="schedule-row" key={item}>
-                      <strong>{item}</strong>
-                      <span>{copy("Used in the report", "Raporda kullanılır")}</span>
-                      <mark className={`status-badge ${ready ? "ready" : "needed"}`}>{ready ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</mark>
-                    </div>
+                )}
+                <div className="executive-brief-actions">
+                  <button type="button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
+                  <button type="button" className="secondary" onClick={() => goTo("/simulation/current-situation", "login")}>{copy("Test scenario", "Senaryo test et")}</button>
+                  <button type="button" className="secondary" onClick={() => goTo("/reports", "login")}>{copy("Open report pack", "Rapor paketini aç")}</button>
+                </div>
+              </div>
+              <aside className="executive-readiness-card">
+                <span>{copy("Decision readiness", "Karar hazırlığı")}</span>
+                <strong className="executive-readiness-status">{feasibilityReadinessStatus}</strong>
+                <p>{copy("Core modules ready", "Hazır ana modül")}: {feasibilityReadyCount}/{feasibilityChecklist.length}</p>
+                <div className="readiness-step-list">
+                  {feasibilityChecklist.map((item) => (
+                    <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
+                      <i>{item.done ? "OK" : "!"}</i>
+                      <span>{item.label}</span>
+                      <strong>{item.done ? copy("Ready", "Hazır") : copy("Data entry needed", "Veri girişi gerekiyor")}</strong>
+                    </button>
                   ))}
-                </article>
+                </div>
               </aside>
+            </section>
+
+            <section className="dashboard-section-group" aria-label={copy("Business case metrics", "İş modeli metrikleri")}>
+              <div className="dashboard-section-heading">
+                <div>
+                  <span>{copy("Business case", "İş modeli")}</span>
+                  <h2>{copy("The numbers a business owner should see first", "İş sahibinin önce görmesi gereken sayılar")}</h2>
+                </div>
+                <strong>{periodLabel}</strong>
+              </div>
+              <div className="executive-metric-grid">
+                {visibleDashboardExecutiveMetrics.length
+                  ? visibleDashboardExecutiveMetrics.map((metric) => (
+                    <article className={`command-card executive-metric-card ${metric.tone}`} key={metric.id}>
+                      <span>{metric.category}</span>
+                      <h3 className="label-with-info">{metric.label}<GlossaryTip language={form.language} term={metric.label} /></h3>
+                      <strong>{metric.value}</strong>
+                      <small>{metric.detail}</small>
+                    </article>
+                  ))
+                  : (
+                    <article className="command-card dashboard-empty-selection-card">
+                      <span>{copy("Business case", "İş modeli")}</span>
+                      <h3>{copy("No metrics selected", "Metrik seçilmedi")}</h3>
+                      <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
+                      <small>{copy("Open the editor to show business model numbers.", "İş modeli sayılarını göstermek için düzenleyiciyi açın.")}</small>
+                    </article>
+                  )}
+              </div>
+            </section>
+
+            <section className="dashboard-two-column" aria-label={copy("Risks and next actions", "Riskler ve sonraki aksiyonlar")}>
+              <article className="command-card dashboard-risk-board">
+                <div className="card-heading">
+                  <div>
+                    <span>{copy("Risk board", "Risk panosu")}</span>
+                    <h2>{copy("What can stop this project", "Bu projeyi ne durdurabilir")}</h2>
+                  </div>
+                </div>
+                <div className="dashboard-risk-list">
+                  {(dashboardRiskRows.length ? dashboardRiskRows : [{
+                    action: copy("Run simulation", "Simülasyon çalıştır"),
+                    detail: copy("Core feasibility data is in place. Test conservative and optimistic scenarios before committing.", "Ana fizibilite verisi hazır. Karar vermeden önce temkinli ve iyimser senaryoları test edin."),
+                    path: "/simulation/current-situation",
+                    priority: dashboardRiskPriority.controlled,
+                    severity: copy("Controlled", "Kontrollü"),
+                    tone: "teal",
+                    title: copy("No blocking risk detected", "Engelleyici risk görünmüyor"),
+                  }]).map((risk) => (
+                    <button type="button" className={`dashboard-risk-row ${risk.tone}`} onClick={() => goTo(risk.path, "login")} key={risk.title}>
+                      <span>{risk.severity}</span>
+                      <strong>{risk.title}</strong>
+                      <p>{risk.detail}</p>
+                      <b>{risk.action}</b>
+                    </button>
+                  ))}
+                </div>
+              </article>
+
+              <article className="command-card dashboard-action-board">
+                <div className="card-heading">
+                  <div>
+                    <span>{copy("Recommended sequence", "Önerilen sıra")}</span>
+                    <h2>{copy("What to do before committing capital", "Sermaye bağlamadan önce ne yapılmalı")}</h2>
+                  </div>
+                </div>
+                <div className="action-sequence">
+                  {(improvementFocus.length ? improvementFocus : [
+                    copy("Run at least one conservative scenario and confirm payback, cash runway, and capacity coverage.", "En az bir temkinli senaryo çalıştırın; geri dönüş, nakit dayanma ve kapasite kapsamını doğrulayın."),
+                    copy("Export or review the report pack before discussing investment or financing.", "Yatırım veya finansman konuşmadan önce rapor paketini inceleyin."),
+                  ]).map((item, index) => (
+                    <article key={item}>
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                      <p>{item}</p>
+                    </article>
+                  ))}
+                </div>
+              </article>
+            </section>
+
+            <section className="dashboard-section-group" aria-label={copy("Module summary", "Modül özeti")}>
+              <div className="dashboard-section-heading">
+                <div>
+                  <span>{copy("Across the project", "Proje genelinde")}</span>
+                  <h2>{copy("Where each source module stands", "Her kaynak modülün durumu")}</h2>
+                </div>
+              </div>
+              <div className="module-rollup-grid">
+                {dashboardModuleRollup.map((module) => (
+                  <button type="button" className={`module-rollup-card ${module.tone} ${module.done ? "done" : ""}`} onClick={() => goTo(module.path, "login")} key={module.label}>
+                    <span>{module.done ? copy("Ready", "Hazır") : copy("Needs input", "Girdi gerekli")}</span>
+                    <strong>{module.label}</strong>
+                    <p>{module.detail}</p>
+                    <b>{module.action}</b>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="dashboard-financial-detail" aria-label={copy("Financial detail", "Finans detayı")}>
+              <article className="command-card dashboard-business-case">
+                <div className="card-heading">
+                  <div>
+                    <span>{copy("Financial and operating detail", "Finansal ve operasyonel detay")}</span>
+                    <h2>{copy("Signals behind the verdict", "Kararın arkasındaki sinyaller")}</h2>
+                  </div>
+                  <button type="button" onClick={() => goTo("/financial-modelling/analiz", "login")}>{copy("Open analysis", "Analizi aç")}</button>
+                </div>
+                <div className="business-case-list">
+                  {visibleDashboardFinancialDetailRows.length
+                    ? visibleDashboardFinancialDetailRows.map((row) => (
+                      <span key={row.id}>{row.label}<strong>{row.value}</strong></span>
+                    ))
+                    : (
+                      <span className="dashboard-empty-selection">
+                        {copy("No detail metrics selected", "Detay metriği seçilmedi")}
+                        <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
+                      </span>
+                    )}
+                </div>
+              </article>
+            </section>
+
+            <div className="dashboard-logo-row" aria-label={copy("Company and Atera logos", "Şirket ve Atera logoları")}>
+              <div className="customer-logo-mark" aria-label={copy("Company logo", "Şirket logosu")}>
+                <strong>{dashboardCompanyName.slice(0, 2).toUpperCase()}</strong>
+                <span>{dashboardCompanyName}</span>
+              </div>
+              <div className="atera-logo-mark" aria-label="Atera logo">
+                <img src={logoUrl} alt="" />
+                <span>Atera</span>
+              </div>
             </div>
           </section>,
       );
     }
 
-    if (activeModule.key === "human-resources-plus") {
+    if (routeRedirect) return null;
+
+    if (session && (activeModule || isOperationsRoute || isFinancialRoute || isSimulationRoute)) {
+      if (routePath === "/operations") {
+        return renderDashboardLayout(
+          "operations",
+            <section className="module-placeholder operations-overview">
+              <div>
+                <span>Operations</span>
+                <h1>{copy("Operations", "Operasyon")}</h1>
+                <p>{copy("Choose the operational workspace you want to work on: resources, products, machines, process definition, or active processes.", "Çalışmak istediğiniz operasyon alanını seçin: kaynaklar, ürünler, makineler, süreç tanımı veya mevcut süreçler.")}</p>
+              </div>
+              <div className="placeholder-grid">
+                {operationsSubmodules.map((submodule) => (
+                  <article key={submodule.key}>
+                    <strong>{submodule.label}</strong>
+                    <p>
+                      {submodule.key === "resources" && copy("Define materials and workforce resources used in production plans.", "Üretim planlarında kullanılan malzeme ve iş gücü kaynaklarını tanımlayın.")}
+                      {submodule.key === "products" && copy("Create products and connect their material recipes.", "Ürünleri oluşturun ve malzeme reçetelerini bağlayın.")}
+                      {submodule.key === "machines-equipment" && copy("Manage machines and equipment before planning capacity.", "Kapasite planlamadan önce makine ve ekipmanları yönetin.")}
+                      {submodule.key === "data-entry" && copy("Build and save daily process plans for feasibility analysis.", "Fizibilite analizi için günlük süreç planları oluşturup kaydedin.")}
+                      {submodule.key === "active-processes" && copy("Review saved process plans and their latest feasibility output.", "Kayıtlı süreç planlarını ve son fizibilite çıktılarını inceleyin.")}
+                    </p>
+                    <button type="button" onClick={() => goTo(submodule.path, "login")}>
+                      {copy("Open", "Aç")}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>,
+        );
+      }
+
+      if (activeOperationsSubmodule?.key === "data-entry") {
+        const processSetupItems = [
+          {
+            isReady: operationsWorkspace.products.length > 0,
+            label: copy("Product", "Ürün"),
+            path: "/operations/products",
+            readyCopy: copy("At least one product is defined.", "En az bir ürün tanımlı."),
+            todoCopy: copy("Create a product before defining a process.", "Süreç tanımlamadan önce ürün oluşturun."),
+          },
+          {
+            isReady: operationsWorkspace.machines.length > 0,
+            label: copy("Machine", "Makine"),
+            path: "/operations/machines-equipment",
+            readyCopy: copy("At least one machine is defined.", "En az bir makine tanımlı."),
+            todoCopy: copy("Add a machine with daily capacity inputs.", "Günlük kapasite girdileriyle bir makine ekleyin."),
+          },
+          {
+            isReady: operationsWorkspace.workforce.length > 0,
+            label: copy("Workforce", "İşgücü"),
+            path: "/operations/resources",
+            readyCopy: copy("At least one workforce role is defined.", "En az bir işgücü rolü tanımlı."),
+            todoCopy: copy("Add a workforce role and hourly cost.", "İşgücü rolü ve saatlik maliyet ekleyin."),
+          },
+        ];
+        const isProcessSetupReady = processSetupItems.every((item) => item.isReady);
+
+        return renderDashboardLayout(
+          `operations/${activeOperationsSubmodule.key}`,
+            <section className="operations-workspace operations-modern operations-process-page">
+              <div className="operations-header">
+                <div>
+                  <span>{copy("Operations", "Operasyon")} / {copy("Process Definition", "Süreç Tanımlama")}</span>
+                  <h1>{copy("Process Definition", "Süreç Tanımlama")}</h1>
+                  <p>{copy("Build a daily process plan only after the required product, machine, and workforce records exist.", "Gerekli ürün, makine ve işgücü kayıtları oluştuktan sonra günlük süreç planını kurun.")}</p>
+                </div>
+                <div className="operations-actions">
+                  <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
+                </div>
+              </div>
+              {!isProcessSetupReady ? (
+                <div className="process-setup-grid">
+                  {processSetupItems.map((item) => (
+                    <article className={`operation-card process-setup-card ${item.isReady ? "ready" : "todo"}`} key={item.label}>
+                      <div>
+                        <mark>{item.isReady ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</mark>
+                        <h2>{item.label}</h2>
+                        <p>{item.isReady ? item.readyCopy : item.todoCopy}</p>
+                      </div>
+                      <button type="button" onClick={() => goTo(item.path, "login")}>
+                        {item.isReady ? copy("Review", "İncele") : copy("Add", "Ekle")}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <OperationPlanner />
+              )}
+            </section>,
+        );
+      }
+
+      if (activeOperationsSubmodule?.key === "resources") {
+        return <ResourcesPage />;
+      }
+
+      if (activeOperationsSubmodule?.key === "active-processes") {
+        return <ActiveProcessesPage />;
+      }
+
+      if (activeOperationsSubmodule?.key === "machines-equipment") {
+        return <MachinesEquipmentPage />;
+      }
+
+      if (activeOperationsSubmodule?.key === "products") {
+        return <ProductsPage />;
+      }
+
+      if (activeOperationsSubmodule) {
+        return renderDashboardLayout(
+          `operations/${activeOperationsSubmodule.key}`,
+            <section className="module-placeholder">
+              <div>
+                <span>{copy("Operations placeholder", "Operasyon boş durum")}</span>
+                <h1>{activeOperationsSubmodule.label}</h1>
+                <p>{copy("This subpage is not available yet.", "Bu alt sayfa henüz hazır değil.")}</p>
+              </div>
+              <div className="placeholder-grid">
+                <article>
+                  <strong>{copy("Submodule", "Alt Modül")}</strong>
+                  <p>{copy("The screen structure for", "Ekran yapısı")} {activeOperationsSubmodule.label} {copy("will be developed here.", "için burada geliştirilecek.")}</p>
+                </article>
+                <article>
+                  <strong>{copy("Status", "Durum")}</strong>
+                  <p>{copy("For now, only frontend routing and the empty state screen are available.", "Şimdilik sadece frontend routing ve boş durum ekranı mevcut.")}</p>
+                </article>
+              </div>
+            </section>,
+        );
+      }
+
+      if (activeModule?.key === "financial-modelling" || activeFinancialSubmodule) {
+        return <FinancialModellingPage />;
+      }
+
+      if (isSimulationRoute) {
+        return <SimulationPage />;
+      }
+
+      if (activeModule?.key === "sales-strategy") {
+        return <SalesStrategyPage />;
+      }
+
+      if (activeModule.key === "reports") {
+        return renderDashboardLayout(
+          activeModule.key,
+            <section className="reports-workspace">
+              <div className="reports-header">
+                <div>
+                  <span>{dashboardCompanyName} / {copy("Export center", "Export merkezi")}</span>
+                  <h1>{copy("Report Downloads", "Rapor İndirme")}</h1>
+                  <p>{copy("Choose a report pack and download it as PDF or XLSX. Reports are built from the current data and are not archived.", "Bir rapor paketi seçin ve PDF ya da XLSX olarak indirin. Raporlar güncel veriden üretilir, arşivlenmez.")}</p>
+                </div>
+                <div className="reports-header-panel" aria-label={copy("Download behavior", "İndirme davranışı")}>
+                  <strong>{copy("Download only", "Sadece indir")}</strong>
+                  <span>{copy("Not archived", "Arşivlenmez")}</span>
+                </div>
+              </div>
+
+              <div className="reports-tabs" role="tablist" aria-label={copy("Report types", "Rapor türleri")}>
+                {reportTabs.map((tab) => (
+                  <button type="button" className={activeReportTab.key === tab.key ? "active" : ""} onClick={() => setReportsTab(tab.key)} key={tab.key}>{tab.label}</button>
+                ))}
+              </div>
+
+              <div className="report-stat-grid">
+                {reportStats.map(([label, value, detail]) => (
+                  <article className="report-stat-card" key={label}>
+                    <span>{label}</span>
+                    <strong>{value}</strong>
+                    <small>{detail}</small>
+                  </article>
+                ))}
+              </div>
+
+              <div className="reports-export-layout">
+                <section className="reports-pack-grid" aria-label={copy("Report packs", "Rapor paketleri")}>
+                  {reportTabs.map((tab) => (
+                    <article className={`reports-pack-card ${tab.tone} ${activeReportTab.key === tab.key ? "active" : ""}`} key={tab.key}>
+                      <button type="button" onClick={() => setReportsTab(tab.key)}>
+                        <span>{copy("Report pack", "Rapor paketi")}</span>
+                        <strong>{tab.label}</strong>
+                        <small>{tab.detail}</small>
+                      </button>
+                      <div className="reports-pack-includes">
+                        {tab.includes.map((item) => <em key={item}>{item}</em>)}
+                      </div>
+                    </article>
+                  ))}
+                </section>
+
+                <aside className="reports-export-panel">
+                  <article className="reports-card reports-selected-card">
+                    <div className="reports-card-heading">
+                      <div>
+                        <span>{copy("Selected export", "Seçili export")}</span>
+                        <h2>{activeReportTab.label}</h2>
+                      </div>
+                    </div>
+                    <p>{activeReportTab.detail}</p>
+                    <div className="reports-selected-includes">
+                      {activeReportTab.includes.map((item) => <span key={item}>{item}</span>)}
+                    </div>
+                  </article>
+
+                  <article className="reports-card reports-format-card">
+                    <div className="reports-card-heading">
+                      <div>
+                        <span>{copy("Download format", "İndirme formatı")}</span>
+                        <h2>{copy("Choose file type", "Dosya türü seçin")}</h2>
+                      </div>
+                    </div>
+                    <div className="reports-format-grid">
+                      {reportFormats.map((format) => (
+                        <button type="button" onClick={() => downloadReport(activeReportTab, format)} key={format.key}>
+                          <strong>{format.label}</strong>
+                          <span>{format.note}</span>
+                          <small>{copy("Download", "İndir")}</small>
+                        </button>
+                      ))}
+                    </div>
+                    <p>{copy("PDF opens a print-ready report; choose \"Save as PDF\" in the print dialog. XLSX downloads the statements as a spreadsheet.", "PDF, yazdırmaya hazır raporu açar; yazdırma penceresinde \"PDF olarak kaydet\"i seçin. XLSX tabloları Excel dosyası olarak indirir.")}</p>
+                  </article>
+
+                  <article className="reports-card reports-readiness-card">
+                    <div className="reports-card-heading">
+                      <div>
+                        <span>{copy("Source readiness", "Kaynak hazırlığı")}</span>
+                        <h2>{copy("What the report can use", "Raporun kullanabileceği kaynaklar")}</h2>
+                      </div>
+                      <button type="button" onClick={loadPlanningData}>{copy("Refresh", "Yenile")}</button>
+                    </div>
+                    {[
+                      [copy("Product record", "Ürün kaydı"), Boolean(operationsWorkspace.product)],
+                      [copy("Process result", "Süreç sonucu"), activePlanResults.length > 0],
+                      [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast],
+                      [copy("Financial assumptions", "Finansal varsayımlar"), hasFinancialAssumptions],
+                    ].map(([item, ready]) => (
+                      <div className="schedule-row" key={item}>
+                        <strong>{item}</strong>
+                        <span>{copy("Used in the report", "Raporda kullanılır")}</span>
+                        <mark className={`status-badge ${ready ? "ready" : "needed"}`}>{ready ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</mark>
+                      </div>
+                    ))}
+                  </article>
+                </aside>
+              </div>
+            </section>,
+        );
+      }
+
+      if (activeModule.key === "human-resources-plus") {
+        return renderDashboardLayout(
+          activeModule.key,
+            <section className="module-placeholder">
+              <div>
+                <span>{copy("Workforce module", "İnsan kaynağı modülü")}</span>
+                <h1>{activeModule.label}</h1>
+                <p>{copy("This workspace is ready for workforce definitions, skills, labor capacity, and planning across operations.", "Bu çalışma alanı iş gücü tanımları, yetkinlikler, işçilik kapasitesi ve operasyon geneli planlama için hazırlandı.")}</p>
+              </div>
+              <div className="placeholder-grid">
+                <article>
+                  <strong>{copy("Workforce Planning", "İş Gücü Planlama")}</strong>
+                  <p>{copy("Connect roles, operators, and capacity needs to production workflows.", "Rolleri, operatörleri ve kapasite ihtiyaçlarını üretim iş akışlarına bağlayın.")}</p>
+                </article>
+                <article>
+                  <strong>{copy("Status", "Durum")}</strong>
+                  <p>{copy("Frontend routing is active; data tables and business logic can be added next.", "Frontend routing aktif; veri tabloları ve iş mantığı sonraki adımda eklenebilir.")}</p>
+                </article>
+              </div>
+            </section>,
+        );
+      }
+
       return renderDashboardLayout(
         activeModule.key,
           <section className="module-placeholder">
             <div>
-              <span>{copy("Workforce module", "İnsan kaynağı modülü")}</span>
+              <span>{copy("Module placeholder", "Modül boş durumu")}</span>
               <h1>{activeModule.label}</h1>
-              <p>{copy("This workspace is ready for workforce definitions, skills, labor capacity, and planning across operations.", "Bu çalışma alanı iş gücü tanımları, yetkinlikler, işçilik kapasitesi ve operasyon geneli planlama için hazırlandı.")}</p>
+              <p>{copy("This module is visible in the dashboard navigation and is ready for its frontend workflow.", "Bu modül dashboard navigasyonunda görünür ve frontend iş akışı için hazırdır.")}</p>
             </div>
             <div className="placeholder-grid">
               <article>
-                <strong>{copy("Workforce Planning", "İş Gücü Planlama")}</strong>
-                <p>{copy("Connect roles, operators, and capacity needs to production workflows.", "Rolleri, operatörleri ve kapasite ihtiyaçlarını üretim iş akışlarına bağlayın.")}</p>
+                <strong>{copy("Workspace", "Çalışma Alanı")}</strong>
+                <p>{copy("Empty state for upcoming tools, tables, and decision screens.", "Yakında eklenecek araçlar, tablolar ve karar ekranları için boş durum.")}</p>
               </article>
               <article>
                 <strong>{copy("Status", "Durum")}</strong>
-                <p>{copy("Frontend routing is active; data tables and business logic can be added next.", "Frontend routing aktif; veri tabloları ve iş mantığı sonraki adımda eklenebilir.")}</p>
+                <p>{copy("This module is not available yet.", "Bu modül henüz hazır değil.")}</p>
               </article>
             </div>
           </section>,
       );
     }
 
-    return renderDashboardLayout(
-      activeModule.key,
-        <section className="module-placeholder">
-          <div>
-            <span>{copy("Module placeholder", "Modül boş durumu")}</span>
-            <h1>{activeModule.label}</h1>
-            <p>{copy("This module is visible in the dashboard navigation and is ready for its frontend workflow.", "Bu modül dashboard navigasyonunda görünür ve frontend iş akışı için hazırdır.")}</p>
-          </div>
-          <div className="placeholder-grid">
-            <article>
-              <strong>{copy("Workspace", "Çalışma Alanı")}</strong>
-              <p>{copy("Empty state for upcoming tools, tables, and decision screens.", "Yakında eklenecek araçlar, tablolar ve karar ekranları için boş durum.")}</p>
-            </article>
-            <article>
-              <strong>{copy("Status", "Durum")}</strong>
-              <p>{copy("This module is not available yet.", "Bu modül henüz hazır değil.")}</p>
-            </article>
-          </div>
-        </section>,
-    );
-  }
-
-  if (session && routePath === "/authorization") {
-    return renderDashboardLayout(
-      "authorization",
-        <section className="authorization-page">
-          <div className="authorization-heading">
-            <span>{labels.dashboard}</span>
-            <h1>{labels.authorizationPage}</h1>
-            <p>{authorizationAccess.read ? labels.authorizationCopy : labels.authorizationLockedCopy}</p>
-          </div>
-
-          {!authorizationAccess.read ? (
-            <div className="authorization-locked">
-              <strong>{labels.authorizationLocked}</strong>
-              <p>{labels.authorizationLockedCopy}</p>
+    if (session && routePath === "/authorization") {
+      return renderDashboardLayout(
+        "authorization",
+          <section className="authorization-page">
+            <div className="authorization-heading">
+              <span>{labels.dashboard}</span>
+              <h1>{labels.authorizationPage}</h1>
+              <p>{authorizationAccess.read ? labels.authorizationCopy : labels.authorizationLockedCopy}</p>
             </div>
-          ) : (
-            <>
-              <div className="authorization-tabs" role="tablist" aria-label={labels.authorizationPage}>
-                <button
-                  type="button"
-                  className={authorizationTab === "roles" ? "active" : ""}
-                  onClick={() => setAuthorizationTab("roles")}
-                >
-                  {labels.roleDefinition}
-                </button>
-                <button
-                  type="button"
-                  className={authorizationTab === "users" ? "active" : ""}
-                  onClick={() => setAuthorizationTab("users")}
-                >
-                  {labels.userDefinition}
-                </button>
+
+            {!authorizationAccess.read ? (
+              <div className="authorization-locked">
+                <strong>{labels.authorizationLocked}</strong>
+                <p>{labels.authorizationLockedCopy}</p>
               </div>
+            ) : (
+              <>
+                <div className="authorization-tabs" role="tablist" aria-label={labels.authorizationPage}>
+                  <button
+                    type="button"
+                    className={authorizationTab === "roles" ? "active" : ""}
+                    onClick={() => setAuthorizationTab("roles")}
+                  >
+                    {labels.roleDefinition}
+                  </button>
+                  <button
+                    type="button"
+                    className={authorizationTab === "users" ? "active" : ""}
+                    onClick={() => setAuthorizationTab("users")}
+                  >
+                    {labels.userDefinition}
+                  </button>
+                </div>
 
-              {authorizationTab === "users" ? (
-                <div className="authorization-grid user-definition-grid">
-                  <form className="authorization-card user-definition-form" onSubmit={handleCreateManagedUser}>
-                    <h2>{labels.userDefinition}</h2>
-                    <p>{labels.userDefinitionCopy}</p>
-                    <label>
-                      <span>{labels.username}</span>
-                      <input
-                        disabled={!authorizationAccess.write || authorizationLoading}
-                        required
-                        value={managedUserForm.username}
-                        onChange={(event) => updateManagedUserForm("username", event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      <span>{labels.email}</span>
-                      <input
-                        disabled={!authorizationAccess.write || authorizationLoading}
-                        required
-                        type="email"
-                        value={managedUserForm.email}
-                        onChange={(event) => updateManagedUserForm("email", event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      <span>{labels.password}</span>
-                      <input
-                        disabled={!authorizationAccess.write || authorizationLoading}
-                        minLength="8"
-                        required
-                        type="password"
-                        value={managedUserForm.password}
-                        onChange={(event) => updateManagedUserForm("password", event.target.value)}
-                      />
-                    </label>
-                    <div className="user-definition-fields">
+                {authorizationTab === "users" ? (
+                  <div className="authorization-grid user-definition-grid">
+                    <form className="authorization-card user-definition-form" onSubmit={handleCreateManagedUser}>
+                      <h2>{labels.userDefinition}</h2>
+                      <p>{labels.userDefinitionCopy}</p>
                       <label>
-                        <span>{labels.phoneNumber}</span>
+                        <span>{labels.username}</span>
                         <input
                           disabled={!authorizationAccess.write || authorizationLoading}
-                          value={managedUserForm.phoneNumber}
-                          onChange={(event) => updateManagedUserForm("phoneNumber", event.target.value)}
+                          required
+                          value={managedUserForm.username}
+                          onChange={(event) => updateManagedUserForm("username", event.target.value)}
                         />
                       </label>
                       <label>
-                        <span>{labels.department}</span>
+                        <span>{labels.email}</span>
                         <input
                           disabled={!authorizationAccess.write || authorizationLoading}
-                          value={managedUserForm.department}
-                          onChange={(event) => updateManagedUserForm("department", event.target.value)}
+                          required
+                          type="email"
+                          value={managedUserForm.email}
+                          onChange={(event) => updateManagedUserForm("email", event.target.value)}
                         />
                       </label>
                       <label>
-                        <span>{labels.accessLevel}</span>
-                        <select
+                        <span>{labels.password}</span>
+                        <input
                           disabled={!authorizationAccess.write || authorizationLoading}
-                          value={managedUserForm.accessLevel}
-                          onChange={(event) => updateManagedUserForm("accessLevel", event.target.value)}
-                        >
-                          {editableAuthorizationRoles.map((role) => (
-                            <option value={role.name} key={role.id}>
-                              {role.name}
-                            </option>
-                          ))}
-                        </select>
+                          minLength="8"
+                          required
+                          type="password"
+                          value={managedUserForm.password}
+                          onChange={(event) => updateManagedUserForm("password", event.target.value)}
+                        />
+                      </label>
+                      <div className="user-definition-fields">
+                        <label>
+                          <span>{labels.phoneNumber}</span>
+                          <input
+                            disabled={!authorizationAccess.write || authorizationLoading}
+                            value={managedUserForm.phoneNumber}
+                            onChange={(event) => updateManagedUserForm("phoneNumber", event.target.value)}
+                          />
+                        </label>
+                        <label>
+                          <span>{labels.department}</span>
+                          <input
+                            disabled={!authorizationAccess.write || authorizationLoading}
+                            value={managedUserForm.department}
+                            onChange={(event) => updateManagedUserForm("department", event.target.value)}
+                          />
+                        </label>
+                        <label>
+                          <span>{labels.accessLevel}</span>
+                          <select
+                            disabled={!authorizationAccess.write || authorizationLoading}
+                            value={managedUserForm.accessLevel}
+                            onChange={(event) => updateManagedUserForm("accessLevel", event.target.value)}
+                          >
+                            {editableAuthorizationRoles.map((role) => (
+                              <option value={role.name} key={role.id}>
+                                {role.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span>{labels.language}</span>
+                          <select
+                            disabled={!authorizationAccess.write || authorizationLoading}
+                            value={managedUserForm.language}
+                            onChange={(event) => updateManagedUserForm("language", event.target.value)}
+                          >
+                            <option value="en">EN</option>
+                            <option value="tr">TR</option>
+                          </select>
+                        </label>
+                      </div>
+                      <button className="submit-button" disabled={!authorizationAccess.write || authorizationLoading} type="submit">
+                        {authorizationLoading ? "..." : labels.createManagedUser}
+                      </button>
+                      <p className="authorization-note">
+                        {authorizationAccess.write ? labels.writeAccess : labels.readOnlyMode}
+                      </p>
+                    </form>
+
+                    <div className="authorization-card users-card">
+                      <div className="permissions-header">
+                        <h2>{labels.managedUsers}</h2>
+                        {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
+                      </div>
+                      {renderSimpleSortableGrid({
+                        columns: userTableColumns,
+                        gridTemplateColumns: "1fr 1.4fr 1fr 0.8fr",
+                        headClassName: "users-row-head",
+                        rowClassName: "users-row",
+                        rows: profiles,
+                        tableClassName: "users-table",
+                        tableId: "authorization-users",
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="authorization-grid">
+                    <form className="authorization-card role-form" onSubmit={handleCreateRole}>
+                      <h2>{labels.newRole}</h2>
+                      <label>
+                        <span>{labels.roleName}</span>
+                        <input
+                          disabled={!authorizationAccess.write || authorizationLoading}
+                          value={roleForm.name}
+                          onChange={(event) => updateRoleForm("name", event.target.value)}
+                        />
                       </label>
                       <label>
-                        <span>{labels.language}</span>
-                        <select
+                        <span>{labels.roleDescription}</span>
+                        <input
                           disabled={!authorizationAccess.write || authorizationLoading}
-                          value={managedUserForm.language}
-                          onChange={(event) => updateManagedUserForm("language", event.target.value)}
-                        >
-                          <option value="en">EN</option>
-                          <option value="tr">TR</option>
-                        </select>
+                          value={roleForm.description}
+                          onChange={(event) => updateRoleForm("description", event.target.value)}
+                        />
                       </label>
-                    </div>
-                    <button className="submit-button" disabled={!authorizationAccess.write || authorizationLoading} type="submit">
-                      {authorizationLoading ? "..." : labels.createManagedUser}
-                    </button>
-                    <p className="authorization-note">
-                      {authorizationAccess.write ? labels.writeAccess : labels.readOnlyMode}
-                    </p>
-                  </form>
+                      <button className="submit-button" disabled={!authorizationAccess.write || authorizationLoading} type="submit">
+                        {labels.createRole}
+                      </button>
+                      <p className="authorization-note">
+                        {authorizationAccess.write ? labels.writeAccess : labels.readOnlyMode}
+                      </p>
+                    </form>
 
-                  <div className="authorization-card users-card">
-                    <div className="permissions-header">
-                      <h2>{labels.managedUsers}</h2>
-                      {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
+                    <div className="authorization-card permissions-card">
+                      <div className="permissions-header">
+                        <h2>{labels.permissions}</h2>
+                        {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
+                      </div>
+                      {renderSimpleSortableGrid({
+                        columns: permissionTableColumns,
+                        gridTemplateColumns: "1fr 1fr 0.8fr 0.8fr",
+                        headClassName: "permissions-row-head",
+                        rowClassName: "permissions-row",
+                        rows: permissionTableRows,
+                        tableClassName: "permissions-table",
+                        tableId: "authorization-permissions",
+                      })}
                     </div>
-                    {renderSimpleSortableGrid({
-                      columns: userTableColumns,
-                      gridTemplateColumns: "1fr 1.4fr 1fr 0.8fr",
-                      headClassName: "users-row-head",
-                      rowClassName: "users-row",
-                      rows: profiles,
-                      tableClassName: "users-table",
-                      tableId: "authorization-users",
-                    })}
                   </div>
-                </div>
-              ) : (
-                <div className="authorization-grid">
-                  <form className="authorization-card role-form" onSubmit={handleCreateRole}>
-                    <h2>{labels.newRole}</h2>
-                    <label>
-                      <span>{labels.roleName}</span>
-                      <input
-                        disabled={!authorizationAccess.write || authorizationLoading}
-                        value={roleForm.name}
-                        onChange={(event) => updateRoleForm("name", event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      <span>{labels.roleDescription}</span>
-                      <input
-                        disabled={!authorizationAccess.write || authorizationLoading}
-                        value={roleForm.description}
-                        onChange={(event) => updateRoleForm("description", event.target.value)}
-                      />
-                    </label>
-                    <button className="submit-button" disabled={!authorizationAccess.write || authorizationLoading} type="submit">
-                      {labels.createRole}
-                    </button>
-                    <p className="authorization-note">
-                      {authorizationAccess.write ? labels.writeAccess : labels.readOnlyMode}
-                    </p>
-                  </form>
+                )}
+              </>
+            )}
 
-                  <div className="authorization-card permissions-card">
-                    <div className="permissions-header">
-                      <h2>{labels.permissions}</h2>
-                      {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
-                    </div>
-                    {renderSimpleSortableGrid({
-                      columns: permissionTableColumns,
-                      gridTemplateColumns: "1fr 1fr 0.8fr 0.8fr",
-                      headClassName: "permissions-row-head",
-                      rowClassName: "permissions-row",
-                      rows: permissionTableRows,
-                      tableClassName: "permissions-table",
-                      tableId: "authorization-permissions",
-                    })}
-                  </div>
-                </div>
-              )}
-            </>
+            {authorizationStatus && <p className="status-message">{authorizationStatus}</p>}
+          </section>,
+      );
+    }
+
+    return (
+      <main className="auth-shell">
+        <section className="auth-panel" aria-label="Atera authentication">
+          <header className="brand-bar">
+            <div className="brand-mark">
+              <img src={logoUrl} alt="Atera logo" />
+              <div>
+                <strong>Atera</strong>
+                <span>{copy("Production feasibility", "Üretim fizibilitesi")}</span>
+              </div>
+            </div>
+
+            <div className="auth-controls">
+              <label className="language-picker">
+                <span>{labels.language}</span>
+                <select value={form.language} onChange={(event) => updateField("language", event.target.value)}>
+                  <option value="en">EN</option>
+                  <option value="tr">TR</option>
+                </select>
+              </label>
+              <ThemeToggle />
+            </div>
+          </header>
+
+          {profilePreview && (
+            <div className="avatar-zone">
+              <div className="avatar">
+                <img src={profilePreview} alt={copy("Profile preview", "Profil önizlemesi")} />
+              </div>
+            </div>
           )}
 
-          {authorizationStatus && <p className="status-message">{authorizationStatus}</p>}
-        </section>,
-    );
-  }
-
-  return (
-    <main className="auth-shell">
-      <section className="auth-panel" aria-label="Atera authentication">
-        <header className="brand-bar">
-          <div className="brand-mark">
-            <img src={logoUrl} alt="Atera logo" />
-            <div>
-              <strong>Atera</strong>
-              <span>{copy("Production feasibility", "Üretim fizibilitesi")}</span>
-            </div>
-          </div>
-
-          <div className="auth-controls">
-            <label className="language-picker">
-              <span>{labels.language}</span>
-              <select value={form.language} onChange={(event) => updateField("language", event.target.value)}>
-                <option value="en">EN</option>
-                <option value="tr">TR</option>
-              </select>
-            </label>
-            <ThemeToggle />
-          </div>
-        </header>
-
-        {profilePreview && (
-          <div className="avatar-zone">
-            <div className="avatar">
-              <img src={profilePreview} alt={copy("Profile preview", "Profil önizlemesi")} />
-            </div>
-          </div>
-        )}
-
-        {session ? (
-          <div className="signed-in">
-            <p>{labels.signedIn}</p>
-            <button type="button" onClick={handleLogout}>
-              {labels.logout}
-            </button>
-          </div>
-        ) : mode === "reset" ? (
-          <form className="auth-form" onSubmit={handleResetPassword}>
-            <label>
-              <span>{labels.resetPassword}</span>
-              <div className="password-field">
-                <input
-                  autoComplete="new-password"
-                  required
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  onChange={(event) => updateField("password", event.target.value)}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  aria-label={showPassword ? labels.hidePassword : labels.showPassword}
-                  onClick={() => setShowPassword((current) => !current)}
-                >
-                  {showPassword ? labels.hide : labels.show}
-                </button>
-              </div>
-            </label>
-            <label>
-              <span>{labels.confirmPassword}</span>
-              <div className="password-field">
-                <input
-                  autoComplete="new-password"
-                  required
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  aria-label={showConfirmPassword ? labels.hidePassword : labels.showPassword}
-                  onClick={() => setShowConfirmPassword((current) => !current)}
-                >
-                  {showConfirmPassword ? labels.hide : labels.show}
-                </button>
-              </div>
-            </label>
-            <button className="submit-button" disabled={loading} type="submit">
-              {loading ? "..." : labels.resetPassword}
-            </button>
-          </form>
-        ) : (
-          <form className="auth-form" onSubmit={handleLogin}>
-            <label>
-              <span>{labels.loginEmail}</span>
-              <input
-                autoComplete="email"
-                required
-                type="email"
-                value={form.email}
-                onChange={(event) => updateField("email", event.target.value)}
-              />
-            </label>
-
-            <label>
-              <span>{labels.password}</span>
-              <div className="password-field">
-                <input
-                  autoComplete="current-password"
-                  required
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  onChange={(event) => updateField("password", event.target.value)}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  aria-label={showPassword ? labels.hidePassword : labels.showPassword}
-                  onClick={() => setShowPassword((current) => !current)}
-                >
-                  {showPassword ? labels.hide : labels.show}
-                </button>
-              </div>
-            </label>
-
-            <div className="form-options">
-              <span>{labels.adminProvisionedAccess}</span>
-              <button type="button" className="link-button" onClick={handleForgotPassword}>
-                {labels.forgot}
+          {session ? (
+            <div className="signed-in">
+              <p>{labels.signedIn}</p>
+              <button type="button" onClick={handleLogout}>
+                {labels.logout}
               </button>
             </div>
+          ) : mode === "reset" ? (
+            <form className="auth-form" onSubmit={handleResetPassword}>
+              <label>
+                <span>{labels.resetPassword}</span>
+                <div className="password-field">
+                  <input
+                    autoComplete="new-password"
+                    required
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={(event) => updateField("password", event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    aria-label={showPassword ? labels.hidePassword : labels.showPassword}
+                    onClick={() => setShowPassword((current) => !current)}
+                  >
+                    {showPassword ? labels.hide : labels.show}
+                  </button>
+                </div>
+              </label>
+              <label>
+                <span>{labels.confirmPassword}</span>
+                <div className="password-field">
+                  <input
+                    autoComplete="new-password"
+                    required
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    aria-label={showConfirmPassword ? labels.hidePassword : labels.showPassword}
+                    onClick={() => setShowConfirmPassword((current) => !current)}
+                  >
+                    {showConfirmPassword ? labels.hide : labels.show}
+                  </button>
+                </div>
+              </label>
+              <button className="submit-button" disabled={loading} type="submit">
+                {loading ? "..." : labels.resetPassword}
+              </button>
+            </form>
+          ) : (
+            <form className="auth-form" onSubmit={handleLogin}>
+              <label>
+                <span>{labels.loginEmail}</span>
+                <input
+                  autoComplete="email"
+                  required
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => updateField("email", event.target.value)}
+                />
+              </label>
 
-            <button className="submit-button" disabled={loading} type="submit">
-              {loading ? "..." : labels.submitLogin}
-            </button>
-          </form>
-        )}
+              <label>
+                <span>{labels.password}</span>
+                <div className="password-field">
+                  <input
+                    autoComplete="current-password"
+                    required
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={(event) => updateField("password", event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    aria-label={showPassword ? labels.hidePassword : labels.showPassword}
+                    onClick={() => setShowPassword((current) => !current)}
+                  >
+                    {showPassword ? labels.hide : labels.show}
+                  </button>
+                </div>
+              </label>
 
-        {status && <p className="status-message">{status}</p>}
-      </section>
-    </main>
-  );
+              <div className="form-options">
+                <span>{labels.adminProvisionedAccess}</span>
+                <button type="button" className="link-button" onClick={handleForgotPassword}>
+                  {labels.forgot}
+                </button>
+              </div>
+
+              <button className="submit-button" disabled={loading} type="submit">
+                {loading ? "..." : labels.submitLogin}
+              </button>
+            </form>
+          )}
+
+          {status && <p className="status-message">{status}</p>}
+        </section>
+      </main>
+    );
+  }
 }
 
 export default App;
