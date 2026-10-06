@@ -25,6 +25,7 @@ import {
 import { formatCurrencyAmount, formatLira, formatMonthLabel, formatNumber, formatTrendAxisAmount } from "../lib/format";
 import { useAppContext } from "../app/AppContext";
 import DashboardLayout from "../components/DashboardLayout";
+import DataTable from "../components/DataTable";
 
 export default function FinancialModellingPage() {
   const {
@@ -36,7 +37,6 @@ export default function FinancialModellingPage() {
     financialHorizon,
     financialLoading,
     financialModel,
-    financialOverviewWidgets,
     financialSettingsForModel,
     financialSettingsForm,
     financialStatementPeriod,
@@ -52,12 +52,10 @@ export default function FinancialModellingPage() {
     operationsWorkspaceForFinance,
     removeFinancialLoanRow,
     salesStrategy,
-    saveFinancialOverviewScreen,
     setFinancialExtraCostForm,
     setFinancialHorizon,
     setFinancialSettingsForm,
     setFinancialStatementPeriod,
-    toggleFinancialOverviewWidget,
     updateFinancialLoanRow,
   } = useAppContext();
 
@@ -112,18 +110,6 @@ export default function FinancialModellingPage() {
     const costPoints = incomeExpenseTrendChart.costPoints || [];
     const latestRevenuePoint = revenuePoints[revenuePoints.length - 1];
     const latestCostPoint = costPoints[costPoints.length - 1];
-    const chartToken = [
-      "income-expense",
-      financialHorizon,
-      revenuePoints.length,
-      Math.round(latestRevenuePoint?.value || 0),
-      Math.round(latestCostPoint?.value || 0),
-    ].join("-");
-    const incomeSurfaceId = `${chartToken}-income-surface`;
-    const expenseSurfaceId = `${chartToken}-expense-surface`;
-    const incomeStrokeId = `${chartToken}-income-stroke`;
-    const expenseStrokeId = `${chartToken}-expense-stroke`;
-    const trendGlowId = `${chartToken}-soft-glow`;
     const badgeHeight = 34;
     const badgeMinGap = 8;
     const badgeTop = 36;
@@ -157,51 +143,8 @@ export default function FinancialModellingPage() {
     }
 
     return (
-      <div className="financial-trend-stage" key={chartToken}>
+      <div className="financial-trend-stage">
         <svg className="trend-chart finance-model-chart" viewBox="0 0 560 280" role="img" aria-label={ariaLabel}>
-          <defs>
-            <linearGradient id={incomeSurfaceId} x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-cyan)" stopOpacity="0.34" />
-              <stop offset="70%" stopColor="var(--color-teal)" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="var(--color-cyan)" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id={expenseSurfaceId} x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-amber)" stopOpacity="0.3" />
-              <stop offset="72%" stopColor="var(--color-clay)" stopOpacity="0.07" />
-              <stop offset="100%" stopColor="var(--color-amber)" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient
-              id={incomeStrokeId}
-              x1={incomeExpenseTrendChart.plot.left}
-              x2={incomeExpenseTrendChart.plot.right}
-              y1="0"
-              y2="0"
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop offset="0%" stopColor="var(--color-teal)" />
-              <stop offset="45%" stopColor="var(--color-cyan)" />
-              <stop offset="100%" stopColor="#7c5cff" />
-            </linearGradient>
-            <linearGradient
-              id={expenseStrokeId}
-              x1={incomeExpenseTrendChart.plot.left}
-              x2={incomeExpenseTrendChart.plot.right}
-              y1="0"
-              y2="0"
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop offset="0%" stopColor="#d99a24" />
-              <stop offset="52%" stopColor="var(--color-amber)" />
-              <stop offset="100%" stopColor="#ff5a8a" />
-            </linearGradient>
-            <filter id={trendGlowId} x="-20%" y="-35%" width="140%" height="170%">
-              <feGaussianBlur stdDeviation="3.2" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
           <rect className="chart-panel" x="50" y="20" width="490" height="224" rx="18" />
           <text className="axis-label axis-label-y chart-axis-title" x={incomeExpenseTrendChart.plot.left} y="18">
             {copy("Amount (TRY)", "Tutar (TRY)")}
@@ -244,53 +187,17 @@ export default function FinancialModellingPage() {
             </text>
           ))}
           {incomeExpenseTrendChart.revenueAreaPath && (
-            <path
-              className="trend-area sales chart-area-fill"
-              d={incomeExpenseTrendChart.revenueAreaPath}
-              style={{ fill: `url(#${incomeSurfaceId})` }}
-            />
+            <path className="trend-area sales" d={incomeExpenseTrendChart.revenueAreaPath} />
           )}
           {incomeExpenseTrendChart.costAreaPath && (
-            <path
-              className="trend-area costs chart-area-fill"
-              d={incomeExpenseTrendChart.costAreaPath}
-              style={{ fill: `url(#${expenseSurfaceId})` }}
-            />
+            <path className="trend-area costs" d={incomeExpenseTrendChart.costAreaPath} />
           )}
           <line className="chart-badge-rail" x1="448" x2="448" y1="34" y2="218" />
           {incomeExpenseTrendChart.revenuePath && (
-            <path
-              className="trend-line-glow sales chart-draw-line"
-              d={incomeExpenseTrendChart.revenuePath}
-              filter={`url(#${trendGlowId})`}
-              pathLength="1"
-              style={{ stroke: `url(#${incomeStrokeId})` }}
-            />
+            <path className="trend-line sales" d={incomeExpenseTrendChart.revenuePath} />
           )}
           {incomeExpenseTrendChart.costPath && (
-            <path
-              className="trend-line-glow costs chart-draw-line"
-              d={incomeExpenseTrendChart.costPath}
-              filter={`url(#${trendGlowId})`}
-              pathLength="1"
-              style={{ stroke: `url(#${expenseStrokeId})` }}
-            />
-          )}
-          {incomeExpenseTrendChart.revenuePath && (
-            <path
-              className="trend-line sales chart-draw-line"
-              d={incomeExpenseTrendChart.revenuePath}
-              pathLength="1"
-              style={{ stroke: `url(#${incomeStrokeId})` }}
-            />
-          )}
-          {incomeExpenseTrendChart.costPath && (
-            <path
-              className="trend-line costs chart-draw-line"
-              d={incomeExpenseTrendChart.costPath}
-              pathLength="1"
-              style={{ stroke: `url(#${expenseStrokeId})` }}
-            />
+            <path className="trend-line costs" d={incomeExpenseTrendChart.costPath} />
           )}
           {revenuePoints.map((point, index) => (
             <circle
@@ -298,7 +205,6 @@ export default function FinancialModellingPage() {
               cx={point.x}
               cy={point.y}
               r={index === revenuePoints.length - 1 ? 4.8 : 3.2}
-              style={{ animationDelay: `${760 + index * 36}ms` }}
               key={`sales-${index}`}
             />
           ))}
@@ -308,7 +214,6 @@ export default function FinancialModellingPage() {
               cx={point.x}
               cy={point.y}
               r={index === costPoints.length - 1 ? 4.8 : 3.2}
-              style={{ animationDelay: `${820 + index * 36}ms` }}
               key={`cost-${index}`}
             />
           ))}
@@ -317,7 +222,6 @@ export default function FinancialModellingPage() {
               <path
                 className="chart-badge-connector sales"
                 d={`M${latestRevenuePoint.x + 7} ${latestRevenuePoint.y} C${latestRevenuePoint.x + 28} ${latestRevenuePoint.y}, ${badgeX - 18} ${revenueBadgeY + 17}, ${badgeX} ${revenueBadgeY + 17}`}
-                pathLength="1"
               />
               <g className="chart-value-badge sales" transform={`translate(${badgeX} ${revenueBadgeY})`}>
                 <rect width="86" height={badgeHeight} rx="8" />
@@ -335,7 +239,6 @@ export default function FinancialModellingPage() {
               <path
                 className="chart-badge-connector costs"
                 d={`M${latestCostPoint.x + 7} ${latestCostPoint.y} C${latestCostPoint.x + 28} ${latestCostPoint.y}, ${badgeX - 18} ${costBadgeY + 17}, ${badgeX} ${costBadgeY + 17}`}
-                pathLength="1"
               />
               <g className="chart-value-badge costs" transform={`translate(${badgeX} ${costBadgeY})`}>
                 <rect width="86" height={badgeHeight} rx="8" />
@@ -362,8 +265,8 @@ export default function FinancialModellingPage() {
     },
     overview: {
       description: copy(
-        "Review all financial rows and the income-expense projection. Add only the widgets you want to keep on your saved screen.",
-        "Tüm finansal satırları ve gelir-gider projeksiyonunu inceleyin. Kayıtlı ekranınızda tutmak istediğiniz widgetları ayrıca ekleyin.",
+        "Income statement, cash flow and balance sheet, with the income-expense projection and the main cost drivers.",
+        "Gelir tablosu, nakit akışı ve bilanço; gelir-gider projeksiyonu ve ana maliyet kalemleriyle birlikte.",
       ),
       title: copy("Cost & Return Analysis", "Maliyet & Getiri Analizi"),
     },
@@ -375,48 +278,6 @@ export default function FinancialModellingPage() {
       title: copy("Loans", "Krediler"),
     },
   }[currentFinancialPage.key];
-  const costBreakdownRows = (model.costStructure || []).filter((item) => toFiniteNumber(item.amount) > 0);
-  const investmentBreakdownRows = [
-    {
-      amount: summary.machinePurchaseCost,
-      id: "machinePurchase",
-      label: copy("Machine investment", "Makine yatırımı"),
-    },
-    {
-      amount: summary.equipmentPurchaseCost,
-      id: "equipmentPurchase",
-      label: copy("Equipment investment", "Ekipman yatırımı"),
-    },
-    {
-      amount: summary.extraInitialCost,
-      id: "extraInitialCost",
-      label: copy("Initial extra costs", "Başlangıç ek giderleri"),
-    },
-    {
-      amount: summary.workingCapitalRequirement,
-      id: "workingCapital",
-      label: copy("Working capital requirement", "İşletme sermayesi ihtiyacı"),
-    },
-  ].filter((item) => toFiniteNumber(item.amount) > 0);
-  const returnBreakdownRows = [
-    { amount: summary.salesRevenue, id: "salesRevenue", label: copy("Sales revenue", "Satış geliri"), tone: "income" },
-    { amount: summary.netIncome, id: "netIncome", label: copy("Net income", "Net kazanç"), tone: "net" },
-    {
-      amount: summary.totalCashFlow,
-      id: "cashFlow",
-      label: copy("Total cash flow", "Toplam nakit akışı"),
-      tone: "cash",
-    },
-  ];
-  const maxCostBreakdownAmount = Math.max(1, ...costBreakdownRows.map((item) => toFiniteNumber(item.amount)));
-  const maxInvestmentBreakdownAmount = Math.max(
-    1,
-    ...investmentBreakdownRows.map((item) => toFiniteNumber(item.amount)),
-  );
-  const maxReturnBreakdownAmount = Math.max(
-    1,
-    ...returnBreakdownRows.map((item) => Math.abs(toFiniteNumber(item.amount))),
-  );
   const renderBreakdownBars = (rows, maxAmount, emptyLabel, tone = "cost") => (
     <div className="financial-bar-list">
       {(rows.length ? rows : [{ amount: 0, id: "empty", label: emptyLabel, tone }]).map((item) => {
@@ -606,10 +467,10 @@ export default function FinancialModellingPage() {
     );
   };
   const renderExchangeRatePanel = () => (
-    <details className="financial-input-section exchange-rate-section progressive-input-box">
-      <summary className="financial-input-section-heading progressive-section-summary">
+    <details className="card collapsible">
+      <summary>
         <div>
-          <span className="heading-with-info">
+          <h2 className="label-with-info">
             {copy("TCMB FX rates", "TCMB döviz kurları")}
             <InfoTip
               label={copy("FX rate calculation info", "Döviz kuru hesaplama bilgisi")}
@@ -618,7 +479,7 @@ export default function FinancialModellingPage() {
                 "USD/EUR tutarlar TL'ye tutar x güncel USD/TRY veya EUR/TRY olarak çevrilir. TL tutarlar aynen kalır.",
               )}
             />
-          </span>
+          </h2>
           <p>
             {exchangeRates.status === "loading"
               ? copy("USD/TRY and EUR/TRY are being refreshed from TCMB.", "USD/TRY ve EUR/TRY TCMB'den yenileniyor.")
@@ -632,7 +493,7 @@ export default function FinancialModellingPage() {
                     )}
           </p>
         </div>
-        <div className="exchange-rate-actions">
+        <div className="button-row">
           <button
             type="button"
             onClick={(event) => {
@@ -646,21 +507,21 @@ export default function FinancialModellingPage() {
               ? copy("Fetching...", "Çekiliyor...")
               : copy("Fetch Prices", "Fiyatları Çek")}
           </button>
-          <strong>
+          <span className="badge badge-neutral">
             {exchangeRates.status === "ready"
               ? exchangeRates.source
               : exchangeRates.status === "loading"
                 ? copy("Loading", "Yükleniyor")
                 : copy("Manual", "Manuel")}
-          </strong>
+          </span>
         </div>
       </summary>
-      <div className="exchange-rate-grid">
+      <div className="kpi-grid">
         {[
           ["USD", exchangeRates.USD],
           ["EUR", exchangeRates.EUR],
         ].map(([currency, rate]) => (
-          <article className="exchange-rate-card" key={currency}>
+          <article className="kpi" key={currency}>
             <span>{currency}/TRY</span>
             <strong>{rate && rate !== 1 ? formatLira(rate, 4) : "-"}</strong>
             <small>
@@ -674,14 +535,14 @@ export default function FinancialModellingPage() {
     </details>
   );
   const renderFinancialInputs = () => (
-    <div className="financial-controls finance-input-panel">
-      <form className="financial-assumption-form" onSubmit={handleSaveFinancialSettings}>
+    <div className="stack">
+      <form className="stack" onSubmit={handleSaveFinancialSettings}>
         {renderExchangeRatePanel()}
 
-        <details className="financial-input-section progressive-input-box">
-          <summary className="financial-input-section-heading progressive-section-summary">
+        <details className="card collapsible">
+          <summary>
             <div>
-              <span>{copy("Required inputs", "Zorunlu girdiler")}</span>
+              <h2>{copy("Required inputs", "Zorunlu girdiler")}</h2>
               <p>
                 {copy(
                   "These assumptions must be present for the financial model to be saved.",
@@ -690,15 +551,15 @@ export default function FinancialModellingPage() {
               </p>
             </div>
           </summary>
-          <div className="financial-input-grid">
+          <div className="form-grid">
             {requiredFinancialSettingFields.map((field) => renderFinancialField(field, true))}
           </div>
         </details>
 
-        <details className="financial-input-section general-financial-assumptions progressive-input-box">
-          <summary className="financial-input-section-heading progressive-section-summary">
+        <details className="card collapsible">
+          <summary>
             <div>
-              <span>{copy("General financial assumptions", "Genel finansal varsayımlar")}</span>
+              <h2>{copy("General financial assumptions", "Genel finansal varsayımlar")}</h2>
               <p>
                 {copy(
                   "Grant, tax, VAT, collection, supplier payment, stock holding and starting capacity assumptions.",
@@ -707,15 +568,15 @@ export default function FinancialModellingPage() {
               </p>
             </div>
           </summary>
-          <div className="financial-input-grid">
+          <div className="form-grid">
             {generalFinancialAssumptionFields.map((field) => renderFinancialField(field, true))}
           </div>
         </details>
 
-        <details className="financial-input-section optional-macro-section progressive-input-box">
-          <summary className="financial-input-section-heading progressive-section-summary">
+        <details className="card collapsible">
+          <summary>
             <div>
-              <span>{copy("Optional macro assumptions", "Opsiyonel makro varsayımlar")}</span>
+              <h2>{copy("Optional macro assumptions", "Opsiyonel makro varsayımlar")}</h2>
               <p>
                 {copy(
                   "These percentages can inflate material, wage, energy and overhead projections month by month. Leave empty or zero to ignore.",
@@ -724,15 +585,15 @@ export default function FinancialModellingPage() {
               </p>
             </div>
           </summary>
-          <div className="financial-input-grid">
+          <div className="form-grid">
             {optionalMacroFinancialSettingFields.map((field) => renderFinancialField(field, false))}
           </div>
         </details>
 
-        <details className="financial-input-section inflation-revaluation-section progressive-input-box">
-          <summary className="financial-input-section-heading progressive-section-summary">
+        <details className="card collapsible">
+          <summary>
             <div>
-              <span>{copy("Inflation and revaluation", "Enflasyon ve yeniden değerleme")}</span>
+              <h2>{copy("Inflation and revaluation", "Enflasyon ve yeniden değerleme")}</h2>
               <p>
                 {copy(
                   "Annual COGS, OpEx and price increase policies. Frequency controls how annual increases step through the projection.",
@@ -741,15 +602,15 @@ export default function FinancialModellingPage() {
               </p>
             </div>
           </summary>
-          <div className="financial-input-grid">
+          <div className="form-grid">
             {inflationRevaluationFinancialFields.map((field) => renderFinancialField(field, true))}
           </div>
         </details>
 
-        <details className="financial-input-section valuation-section progressive-input-box">
-          <summary className="financial-input-section-heading progressive-section-summary">
+        <details className="card collapsible">
+          <summary>
             <div>
-              <span>{copy("Investment valuation", "Yatırım değerlemesi")}</span>
+              <h2>{copy("Investment valuation", "Yatırım değerlemesi")}</h2>
               <p>
                 {copy(
                   "Discount rate for net present value. Leave empty to use 30% a year.",
@@ -758,20 +619,22 @@ export default function FinancialModellingPage() {
               </p>
             </div>
           </summary>
-          <div className="financial-input-grid">
+          <div className="form-grid">
             {valuationFinancialSettingFields.map((field) => renderFinancialField(field, false))}
           </div>
         </details>
 
-        <button type="submit" disabled={financialLoading}>
-          {copy("Save Assumptions", "Varsayımları Kaydet")}
-        </button>
+        <div className="button-row">
+          <button type="submit" disabled={financialLoading}>
+            {copy("Save Assumptions", "Varsayımları Kaydet")}
+          </button>
+        </div>
       </form>
 
-      <form className="financial-extra-cost-form" onSubmit={handleSaveFinancialExtraCost}>
-        <div className="financial-input-section-heading">
+      <form className="card" onSubmit={handleSaveFinancialExtraCost}>
+        <div className="card-header">
           <div>
-            <span>{copy("Optional expense", "Opsiyonel gider")}</span>
+            <h2>{copy("Optional expense", "Opsiyonel gider")}</h2>
             <p>
               {copy(
                 "Add one-off or recurring costs without breaking the main assumption grid.",
@@ -780,7 +643,7 @@ export default function FinancialModellingPage() {
             </p>
           </div>
         </div>
-        <div className="financial-extra-cost-fields">
+        <div className="form-grid">
           <label>
             <span>{copy("Optional expense name", "Opsiyonel gider adı")}</span>
             <input
@@ -818,6 +681,25 @@ export default function FinancialModellingPage() {
       </form>
     </div>
   );
+  const extraCostColumns = [
+    { header: copy("Expense", "Gider"), key: "name", value: (row) => row.name },
+    {
+      header: copy("Type", "Tip"),
+      key: "type",
+      value: (row) =>
+        row.costType === "initial"
+          ? copy("Initial expense", "Başlangıç gideri")
+          : row.costType === "recurring"
+            ? copy("Recurring expense", "Tekrarlayan gider")
+            : "-",
+    },
+    {
+      header: copy("Amount", "Tutar"),
+      key: "amount",
+      render: (row) => formatLira(row.amount),
+      sortValue: (row) => toFiniteNumber(row.amount),
+    },
+  ];
   const financialLoanRows = Array.isArray(financialSettingsForm.loanRows) ? financialSettingsForm.loanRows : [];
   const calculatedLoanRows = getFinancialLoanRows(financialSettingsForm);
   const longestLoanTerm = calculatedLoanRows.reduce(
@@ -882,10 +764,10 @@ export default function FinancialModellingPage() {
     canConvertLoanCurrencies ? formatLira(value) : copy("FX rate needed", "Kur gerekli");
   const loanPaymentCalendar = buildFinancialLoanPaymentCalendar(calculatedLoanRows);
   const renderFinancialLoanPaymentCalendar = () => (
-    <section className="financial-input-section optional financial-loan-calendar-section">
-      <div className="financial-input-section-heading">
+    <section className="card">
+      <div className="card-header">
         <div>
-          <span>{copy("Payment calendar", "Ödeme takvimi")}</span>
+          <h2>{copy("Payment calendar", "Ödeme takvimi")}</h2>
           <p>
             {copy(
               "Months start from the current month. Colored cells show which loan has a payment in that month and the required amount.",
@@ -893,15 +775,15 @@ export default function FinancialModellingPage() {
             )}
           </p>
         </div>
-        <strong>
+        <span className="badge badge-neutral">
           {loanPaymentCalendar.months.length} {copy("mo", "ay")}
-        </strong>
+        </span>
       </div>
-      <div className="financial-loan-calendar-scroll">
+      <div className="table-scroll">
         <div
           className="financial-loan-calendar-grid"
           style={{
-            gridTemplateColumns: `minmax(122px, 0.72fr) repeat(${loanPaymentCalendar.months.length}, minmax(64px, 1fr))`,
+            gridTemplateColumns: `200px repeat(${loanPaymentCalendar.months.length}, 112px)`,
           }}
         >
           <div className="loan-calendar-cell loan-calendar-corner">{copy("Loan", "Kredi")}</div>
@@ -966,8 +848,8 @@ export default function FinancialModellingPage() {
     </section>
   );
   const renderFinancialLoans = () => (
-    <form className="financial-loan-form" onSubmit={handleSaveFinancialSettings}>
-      <section className="financial-loan-hero">
+    <form className="stack" onSubmit={handleSaveFinancialSettings}>
+      <section className="card card-header">
         <div>
           <span>{copy("Financing plan", "Finansman planı")}</span>
           <h2>{copy("Loans", "Krediler")}</h2>
@@ -983,7 +865,7 @@ export default function FinancialModellingPage() {
         </button>
       </section>
 
-      <section className="financial-loan-summary-grid">
+      <section className="kpi-grid">
         {[
           [
             copy("Total loan", "Toplam kredi"),
@@ -1022,7 +904,7 @@ export default function FinancialModellingPage() {
             loanTryDetail,
           ],
         ].map(([label, value, detail]) => (
-          <article className="financial-loan-summary-card" key={label}>
+          <article className="card kpi" key={label}>
             <span>{label}</span>
             <strong>{value}</strong>
             <small>{detail}</small>
@@ -1030,34 +912,10 @@ export default function FinancialModellingPage() {
         ))}
       </section>
 
-      <section
-        className="financial-loan-currency-section"
-        aria-label={copy("Loan currency breakdown", "Kredi döviz kırılımı")}
-      >
-        {(loanAmountTotals.length ? loanAmountTotals : [{ amount: 0, currency: "TRY" }]).map((total) => {
-          const monthlyTotal = monthlyLoanPaymentTotals.find((item) => item.currency === total.currency)?.amount || 0;
-          const loanCount = calculatedLoanRows.filter(
-            (loan) => normalizeCurrencyCode(loan.currency) === total.currency,
-          ).length;
-
-          return (
-            <article className="financial-loan-currency-card" key={total.currency}>
-              <span>{total.currency}</span>
-              <strong>{total.amount ? formatCurrencyAmount(total.amount, total.currency) : "-"}</strong>
-              <small>
-                {loanCount
-                  ? `${formatNumber(loanCount)} ${copy("loan", "kredi")} / ${formatCurrencyAmount(monthlyTotal, total.currency)} ${copy("monthly", "aylık")}`
-                  : copy("No loan yet", "Henüz kredi yok")}
-              </small>
-            </article>
-          );
-        })}
-      </section>
-
-      <details className="financial-input-section optional financial-loan-section progressive-input-box">
-        <summary className="financial-input-section-heading progressive-section-summary">
+      <details className="card collapsible" open>
+        <summary>
           <div>
-            <span>{copy("Loan records", "Kredi kayıtları")}</span>
+            <h2>{copy("Loan records", "Kredi kayıtları")}</h2>
             <p>
               {copy(
                 "Every loan row must include amount, annual interest, grace period, and term. Leave this page empty if there is no loan.",
@@ -1065,176 +923,182 @@ export default function FinancialModellingPage() {
               )}
             </p>
           </div>
-          <strong>{financialLoanRows.length}</strong>
+          <span className="badge badge-neutral">{financialLoanRows.length}</span>
         </summary>
-        <div className="financial-loan-list">
+        <div className="item-list">
           {financialLoanRows.length ? (
             financialLoanRows.map((loan, index) => {
               const calculatedLoan =
                 calculatedLoanRows.find((row) => row.id === loan.id) || calculatedLoanRows[index] || {};
 
               return (
-                <details
-                  className="financial-loan-card progressive-input-box financial-loan-record-box"
-                  key={loan.id || `loan-${index}`}
-                >
-                  <summary className="financial-loan-card-heading progressive-section-summary">
+                <details className="list-item" key={loan.id || `loan-${index}`}>
+                  <summary>
                     <div>
-                      <span>{loan.name?.trim() || `${copy("Loan", "Kredi")} ${index + 1}`}</span>
-                      <h3>{formatCurrencyAmount(toFiniteNumber(loan.amount), loan.currency)}</h3>
+                      <span>{`${copy("Loan", "Kredi")} ${index + 1}`}</span>
+                      <strong>
+                        {loan.name?.trim() || formatCurrencyAmount(toFiniteNumber(loan.amount), loan.currency)}
+                      </strong>
+                      <small>
+                        {formatCurrencyAmount(toFiniteNumber(loan.amount), loan.currency)} ·{" "}
+                        {formatCurrencyAmount(calculatedLoan.monthlyPayment || 0, calculatedLoan.currency)}{" "}
+                        {copy("monthly", "aylık")}
+                      </small>
                     </div>
                     <button
                       type="button"
-                      className="resource-remove-button"
+                      className="table-delete-button"
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
                         removeFinancialLoanRow(index);
                       }}
                     >
-                      x
+                      {copy("Delete", "Sil")}
                     </button>
                   </summary>
-                  <div className="financial-loan-row">
-                    <label className="optional-financial-field">
+                  <div className="list-item-body">
+                    <div className="form-grid">
+                      <label className="optional-financial-field">
+                        <span>
+                          {copy("Loan name", "Kredi adı")}
+                          <small>{copy("Optional", "Opsiyonel")}</small>
+                        </span>
+                        <input
+                          type="text"
+                          value={loan.name ?? ""}
+                          onChange={(event) => updateFinancialLoanRow(index, "name", event.target.value)}
+                        />
+                      </label>
+                      <label className="optional-financial-field">
+                        <span>
+                          {copy("Currency", "Döviz")}
+                          <small>{copy("Required", "Zorunlu")}</small>
+                        </span>
+                        <select
+                          required
+                          value={normalizeCurrencyCode(loan.currency)}
+                          onChange={(event) => updateFinancialLoanRow(index, "currency", event.target.value)}
+                        >
+                          {financialLoanCurrencyOptions.map((currency) => (
+                            <option value={currency} key={currency}>
+                              {currency}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="optional-financial-field">
+                        <span>
+                          {copy("Received date", "Alınma tarihi")}
+                          <small>{copy("Required", "Zorunlu")}</small>
+                        </span>
+                        <input
+                          required
+                          type="date"
+                          value={loan.receivedDate || loan.received_date || getTodayDateInputValue()}
+                          onChange={(event) => updateFinancialLoanRow(index, "receivedDate", event.target.value)}
+                        />
+                      </label>
+                      <label className="optional-financial-field">
+                        <span>
+                          {copy("Loan amount", "Kredi tutarı")}
+                          <small>{copy("Required", "Zorunlu")}</small>
+                        </span>
+                        <input
+                          min="1"
+                          required
+                          step="any"
+                          type="number"
+                          value={loan.amount ?? ""}
+                          onChange={(event) => updateFinancialLoanRow(index, "amount", event.target.value)}
+                        />
+                      </label>
+                      <label className="optional-financial-field">
+                        <span>
+                          {copy("Annual interest %", "Yıllık faiz %")}
+                          <small>{copy("Required", "Zorunlu")}</small>
+                        </span>
+                        <input
+                          min="0"
+                          required
+                          step="0.01"
+                          type="number"
+                          value={loan.annualInterestRate ?? ""}
+                          onChange={(event) => updateFinancialLoanRow(index, "annualInterestRate", event.target.value)}
+                        />
+                      </label>
+                      <label className="optional-financial-field">
+                        <span>
+                          {copy("Grace period months", "Ödemesiz ay")}
+                          <small>{copy("Required", "Zorunlu")}</small>
+                        </span>
+                        <input
+                          min="0"
+                          required
+                          step="1"
+                          type="number"
+                          value={loan.gracePeriodMonths ?? 0}
+                          onChange={(event) => updateFinancialLoanRow(index, "gracePeriodMonths", event.target.value)}
+                        />
+                      </label>
+                      <label className="optional-financial-field">
+                        <span>
+                          {copy("Loan term months", "Kredi vadesi ay")}
+                          <small>{copy("Required", "Zorunlu")}</small>
+                        </span>
+                        <input
+                          min="1"
+                          required
+                          step="1"
+                          type="number"
+                          value={loan.loanTermMonths ?? ""}
+                          onChange={(event) => updateFinancialLoanRow(index, "loanTermMonths", event.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="facts">
                       <span>
-                        {copy("Loan name", "Kredi adı")}
-                        <small>{copy("Optional", "Opsiyonel")}</small>
+                        {copy("Payment starts", "Ödeme başlangıcı")}
+                        <strong>
+                          {calculatedLoan.paymentStartDate
+                            ? formatMonthLabel(parseDateInput(calculatedLoan.paymentStartDate))
+                            : "-"}
+                        </strong>
                       </span>
-                      <input
-                        type="text"
-                        value={loan.name ?? ""}
-                        onChange={(event) => updateFinancialLoanRow(index, "name", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
                       <span>
-                        {copy("Currency", "Döviz")}
-                        <small>{copy("Required", "Zorunlu")}</small>
+                        {copy("Payment ends", "Ödeme bitişi")}
+                        <strong>
+                          {calculatedLoan.paymentEndDate
+                            ? formatMonthLabel(parseDateInput(calculatedLoan.paymentEndDate))
+                            : "-"}
+                        </strong>
                       </span>
-                      <select
-                        required
-                        value={normalizeCurrencyCode(loan.currency)}
-                        onChange={(event) => updateFinancialLoanRow(index, "currency", event.target.value)}
-                      >
-                        {financialLoanCurrencyOptions.map((currency) => (
-                          <option value={currency} key={currency}>
-                            {currency}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="optional-financial-field">
                       <span>
-                        {copy("Received date", "Alınma tarihi")}
-                        <small>{copy("Required", "Zorunlu")}</small>
+                        {copy("Repayment term", "Ödeme vadesi")}
+                        <strong>
+                          {formatNumber(calculatedLoan.repaymentTermMonths || 0)} {copy("mo", "ay")}
+                        </strong>
                       </span>
-                      <input
-                        required
-                        type="date"
-                        value={loan.receivedDate || loan.received_date || getTodayDateInputValue()}
-                        onChange={(event) => updateFinancialLoanRow(index, "receivedDate", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
                       <span>
-                        {copy("Loan amount", "Kredi tutarı")}
-                        <small>{copy("Required", "Zorunlu")}</small>
+                        {copy("Monthly payment", "Aylık ödeme")}
+                        <strong>
+                          {formatCurrencyAmount(calculatedLoan.monthlyPayment || 0, calculatedLoan.currency)}
+                        </strong>
                       </span>
-                      <input
-                        min="0.01"
-                        required
-                        step="1000"
-                        type="number"
-                        value={loan.amount ?? ""}
-                        onChange={(event) => updateFinancialLoanRow(index, "amount", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Annual interest %", "Yıllık faiz %")}
-                        <small>{copy("Required", "Zorunlu")}</small>
-                      </span>
-                      <input
-                        min="0"
-                        required
-                        step="0.01"
-                        type="number"
-                        value={loan.annualInterestRate ?? ""}
-                        onChange={(event) => updateFinancialLoanRow(index, "annualInterestRate", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Grace period months", "Ödemesiz ay")}
-                        <small>{copy("Required", "Zorunlu")}</small>
-                      </span>
-                      <input
-                        min="0"
-                        required
-                        step="1"
-                        type="number"
-                        value={loan.gracePeriodMonths ?? 0}
-                        onChange={(event) => updateFinancialLoanRow(index, "gracePeriodMonths", event.target.value)}
-                      />
-                    </label>
-                    <label className="optional-financial-field">
-                      <span>
-                        {copy("Loan term months", "Kredi vadesi ay")}
-                        <small>{copy("Required", "Zorunlu")}</small>
-                      </span>
-                      <input
-                        min="1"
-                        required
-                        step="1"
-                        type="number"
-                        value={loan.loanTermMonths ?? ""}
-                        onChange={(event) => updateFinancialLoanRow(index, "loanTermMonths", event.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <div className="financial-loan-card-metrics">
-                    <span>
-                      {copy("Payment starts", "Ödeme başlangıcı")}
-                      <strong>
-                        {calculatedLoan.paymentStartDate
-                          ? formatMonthLabel(parseDateInput(calculatedLoan.paymentStartDate))
-                          : "-"}
-                      </strong>
-                    </span>
-                    <span>
-                      {copy("Payment ends", "Ödeme bitişi")}
-                      <strong>
-                        {calculatedLoan.paymentEndDate
-                          ? formatMonthLabel(parseDateInput(calculatedLoan.paymentEndDate))
-                          : "-"}
-                      </strong>
-                    </span>
-                    <span>
-                      {copy("Repayment term", "Ödeme vadesi")}
-                      <strong>
-                        {formatNumber(calculatedLoan.repaymentTermMonths || 0)} {copy("mo", "ay")}
-                      </strong>
-                    </span>
-                    <span>
-                      {copy("Monthly payment", "Aylık ödeme")}
-                      <strong>
-                        {formatCurrencyAmount(calculatedLoan.monthlyPayment || 0, calculatedLoan.currency)}
-                      </strong>
-                    </span>
+                    </div>
                   </div>
                 </details>
               );
             })
           ) : (
-            <p className="planner-empty-state loan-empty-state">
+            <p className="planner-empty-state">
               {copy("No loan added. The model will use zero loan.", "Kredi eklenmedi. Model sıfır kredi kullanacak.")}
             </p>
           )}
         </div>
       </details>
       {renderFinancialLoanPaymentCalendar()}
-      <div className="financial-loan-actions">
+      <div className="button-row">
         <button type="button" onClick={addFinancialLoanRow}>
           {copy("Add Loan", "Kredi Ekle")}
         </button>
@@ -1245,10 +1109,10 @@ export default function FinancialModellingPage() {
     </form>
   );
   const renderFinancialTrendCard = () => (
-    <article className="financial-card financial-overview-wide financial-trend-card">
-      <div className="financial-card-heading">
+    <article className="card">
+      <div className="card-header">
         <h2>{copy("Income and Expense Projection", "Gelir ve Gider Projeksiyonu")}</h2>
-        <div className="mini-tabs">
+        <div className="segmented" role="group" aria-label={copy("Projection horizon", "Projeksiyon ufku")}>
           {[
             ["6m", copy("6 Months", "6 Ay")],
             ["1y", copy("1 Year", "1 Yıl")],
@@ -1256,6 +1120,7 @@ export default function FinancialModellingPage() {
           ].map(([value, label]) => (
             <button
               type="button"
+              aria-pressed={financialHorizon === value}
               className={financialHorizon === value ? "active" : ""}
               onClick={() => {
                 setFinancialHorizon(value);
@@ -1365,9 +1230,6 @@ export default function FinancialModellingPage() {
   const financialStatementPeriods = Array.from({ length: projectionPeriodCount }, (_, index) =>
     buildProjectionPeriod(index),
   );
-  const statementPeriodColumnWidth = financialStatementPeriod === "monthly" ? 116 : 132;
-  const statementGridTemplate = `minmax(240px, 1.22fr) repeat(${financialStatementPeriods.length}, minmax(${statementPeriodColumnWidth}px, 1fr))`;
-  const statementGridMinWidth = `${260 + financialStatementPeriods.length * statementPeriodColumnWidth}px`;
   const projectionRows = [
     { id: "income-section", section: copy("Income Statement", "Gelir Tablosu") },
     {
@@ -1639,8 +1501,8 @@ export default function FinancialModellingPage() {
     return toFiniteNumber(row.value(period)) >= 0 ? "positive" : "negative";
   };
   const renderOverviewFinancialRows = () => (
-    <article className="financial-card income-card financial-overview-wide">
-      <div className="financial-card-heading">
+    <article className="card">
+      <div className="card-header">
         <div>
           <h2>{copy("Financial Statement", "Finansal Tablo")}</h2>
           <p>
@@ -1657,13 +1519,9 @@ export default function FinancialModellingPage() {
                   )}
           </p>
         </div>
-        <div className="financial-statement-controls">
-          <span className="financial-row-count">{projectionPeriodCountLabel}</span>
-          <div
-            className="financial-statement-toggle"
-            role="group"
-            aria-label={copy("Statement period", "Tablo dönemi")}
-          >
+        <div className="button-row">
+          <span className="badge badge-neutral">{projectionPeriodCountLabel}</span>
+          <div className="segmented" role="group" aria-label={copy("Statement period", "Tablo dönemi")}>
             {[
               ["monthly", copy("Monthly", "Aylık")],
               ["quarterly", copy("Quarterly", "Çeyreklik")],
@@ -1671,6 +1529,7 @@ export default function FinancialModellingPage() {
             ].map(([value, label]) => (
               <button
                 type="button"
+                aria-pressed={financialStatementPeriod === value}
                 className={financialStatementPeriod === value ? "active" : ""}
                 onClick={() => setFinancialStatementPeriod(value)}
                 key={value}
@@ -1681,279 +1540,43 @@ export default function FinancialModellingPage() {
           </div>
         </div>
       </div>
-      <div className="financial-statement financial-projection-statement">
-        <div className="financial-projection-scroll">
-          <div
-            className="financial-projection-row financial-projection-head"
-            style={{ gridTemplateColumns: statementGridTemplate, minWidth: statementGridMinWidth }}
-          >
-            <span>{copy("Line Item", "Kalem")}</span>
-            {financialStatementPeriods.map((period) => (
-              <span key={period.label}>
-                <strong>{period.label}</strong>
-                <small>{period.rangeLabel}</small>
-              </span>
-            ))}
-          </div>
-          {projectionRows.map((row) =>
-            row.section ? (
-              <div
-                className="financial-projection-row financial-projection-section"
-                style={{ gridTemplateColumns: statementGridTemplate, minWidth: statementGridMinWidth }}
-                key={row.id}
-              >
-                <strong>{row.section}</strong>
-                {financialStatementPeriods.map((period) => (
-                  <span key={`${row.id}-${period.label}`} />
-                ))}
-              </div>
-            ) : (
-              <div
-                className={`financial-projection-row financial-projection-line ${row.emphasis ? "emphasis" : ""}`}
-                style={{ gridTemplateColumns: statementGridTemplate, minWidth: statementGridMinWidth }}
-                key={row.id}
-              >
-                <div>
-                  <strong>{row.label}</strong>
-                  <small>{row.detail}</small>
-                </div>
-                {financialStatementPeriods.map((period) => (
-                  <b className={getProjectionValueTone(row, period)} key={`${row.id}-${period.label}`}>
-                    {formatProjectionValue(row, period)}
-                  </b>
-                ))}
-              </div>
-            ),
-          )}
-        </div>
-      </div>
-    </article>
-  );
-  const renderWidgetMetric = (label, value, detail) => (
-    <div className="financial-widget-metric">
-      <span className="label-with-info">
-        {label}
-        <GlossaryTip language={form.language} term={label} />
-      </span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </div>
-  );
-  const renderWidgetScenarioList = (rows, emptyLabel) => (
-    <div className="scenario-list">
-      {(rows.length ? rows : [{ id: "empty", name: emptyLabel, costType: "-", amount: 0 }]).map((item) => (
-        <div className="scenario-row" key={item.id || item.name}>
-          <div>
-            <strong>{item.name || getFinancialRowLabel(item)}</strong>
-            <span>
-              {item.costType === "initial"
-                ? copy("Initial expense", "Başlangıç gideri")
-                : item.costType === "recurring"
-                  ? copy("Recurring expense", "Tekrarlayan gider")
-                  : item.costType || "-"}
-            </span>
-          </div>
-          <strong>{item.id === "empty" ? "-" : formatLira(item.amount)}</strong>
-        </div>
-      ))}
-    </div>
-  );
-  const financialWidgetCatalog = [
-    {
-      detail: copy("Liquidity after current inputs", "Mevcut girdilerle likidite"),
-      id: "cashRunway",
-      render: () =>
-        renderWidgetMetric(
-          copy("Cash Runway", "Nakit Dayanma"),
-          `${formatNumber(summary.cashRunwayMonths)} ${copy("months", "ay")}`,
-          copy(
-            "Uses initial cash, loans and monthly cash flow",
-            "Başlangıç nakdi, krediler ve aylık nakit akışını kullanır",
-          ),
-        ),
-      title: copy("Cash Runway", "Nakit Dayanma"),
-    },
-    {
-      detail: copy("First profitable operating month", "İlk kârlı operasyon ayı"),
-      id: "breakEven",
-      render: () =>
-        renderWidgetMetric(
-          copy("Break-even", "Başa Baş"),
-          formatMonth(summary.breakEvenMonth),
-          copy("Revenue minus operating cost and taxes", "Gelir eksi operasyon maliyeti ve vergiler"),
-        ),
-      title: copy("Break-even", "Başa Baş"),
-    },
-    {
-      detail: copy("Investment recovery estimate", "Yatırım geri dönüş tahmini"),
-      id: "payback",
-      render: () =>
-        renderWidgetMetric(
-          copy("Payback", "Geri Dönüş"),
-          formatMonth(summary.paybackMonth),
-          copy(
-            "Investment, working capital and loan effect included",
-            "Yatırım, işletme sermayesi ve kredi etkisi dahil",
-          ),
-        ),
-      title: copy("Payback", "Geri Dönüş"),
-    },
-    {
-      detail: copy("Break-even sales volume", "Başa baş satış hacmi"),
-      id: "requiredSales",
-      render: () =>
-        renderWidgetMetric(
-          copy("Required Monthly Sales", "Gerekli Aylık Satış"),
-          formatNumber(summary.requiredMonthlySalesVolume),
-          copy("Based on contribution per unit", "Birim katkı payına göre"),
-        ),
-      title: copy("Required Sales", "Gerekli Satış"),
-    },
-    {
-      detail: copy("Forecast not sold", "Satışa dönüşmeyen tahmin"),
-      id: "inventoryRisk",
-      render: () =>
-        renderWidgetMetric(
-          copy("Unsold Inventory", "Satılmayan Stok"),
-          `${formatNumber(summary.unsoldInventoryUnits)} ${copy("units", "adet")}`,
-          copy("Production above channel sales plan", "Kanal satış planını aşan üretim"),
-        ),
-      title: copy("Inventory Risk", "Stok Riski"),
-    },
-    {
-      detail: copy("Spoilage and return write-off", "Fire ve iade maliyeti"),
-      id: "writeOff",
-      render: () =>
-        renderWidgetMetric(
-          copy("Write-off Value", "Fire / İade Değeri"),
-          formatLira(summary.expiredWriteOffCost),
-          copy("Sales strategy return and spoilage inputs", "Satış stratejisi iade ve fire girdileri"),
-        ),
-      title: copy("Write-off", "Fire / İade"),
-    },
-    {
-      detail: copy("VAT and income tax", "KDV ve gelir vergisi"),
-      id: "taxLoad",
-      render: () =>
-        renderWidgetMetric(
-          copy("Tax Load", "Vergi Yükü"),
-          formatLira(summary.vatPayable + summary.incomeTax),
-          copy("Tax inputs from financial assumptions", "Finansal varsayımlardan gelen vergi girdileri"),
-        ),
-      title: copy("Tax Load", "Vergi Yükü"),
-    },
-    {
-      detail: copy("Loan payment impact", "Kredi ödeme etkisi"),
-      id: "loanSummary",
-      render: () => (
-        <div className="financial-widget-pair">
-          {renderWidgetMetric(
-            copy("Monthly Payment", "Aylık Ödeme"),
-            formatLira(summary.loanPayment),
-            copy("Current active installments", "Mevcut aktif taksitler"),
-          )}
-          {renderWidgetMetric(
-            copy("Total Loan", "Toplam Kredi"),
-            formatLira(summary.loanAmount),
-            copy("Saved in Loans page", "Krediler sayfasında kayıtlı"),
-          )}
-        </div>
-      ),
-      title: copy("Loan Summary", "Kredi Özeti"),
-    },
-    {
-      detail: copy("Operations and input cost mix", "Operasyon ve girdi maliyet karması"),
-      id: "costTypes",
-      render: () =>
-        renderBreakdownBars(
-          costBreakdownRows,
-          maxCostBreakdownAmount,
-          copy("No cost data yet", "Henüz maliyet verisi yok"),
-          "cost",
-        ),
-      title: copy("Cost Types", "Maliyet Türleri"),
-    },
-    {
-      detail: copy("Revenue, net and cash return", "Gelir, net ve nakit getiri"),
-      id: "returnTypes",
-      render: () =>
-        renderBreakdownBars(
-          returnBreakdownRows,
-          maxReturnBreakdownAmount,
-          copy("No return data yet", "Henüz getiri verisi yok"),
-          "income",
-        ),
-      title: copy("Return Types", "Getiri Türleri"),
-    },
-    {
-      detail: copy("Machine, equipment and working capital", "Makine, ekipman ve işletme sermayesi"),
-      id: "investmentBreakdown",
-      render: () =>
-        renderBreakdownBars(
-          investmentBreakdownRows,
-          maxInvestmentBreakdownAmount,
-          copy("No investment data yet", "Henüz yatırım verisi yok"),
-          "investment",
-        ),
-      title: copy("Investment Breakdown", "Yatırım Kırılımı"),
-    },
-    {
-      detail: copy("User-entered optional expenses", "Kullanıcının girdiği opsiyonel giderler"),
-      id: "optionalExpenses",
-      render: () =>
-        renderWidgetScenarioList(model.extraCosts || [], copy("No optional expense yet", "Henüz opsiyonel gider yok")),
-      title: copy("Optional Expenses", "Opsiyonel Giderler"),
-    },
-  ];
-  const selectedFinancialWidgets = financialOverviewWidgets
-    .map((widgetId) => financialWidgetCatalog.find((widget) => widget.id === widgetId))
-    .filter(Boolean);
-  const renderOverviewWidget = (widget) => (
-    <article className="financial-card financial-widget-card" key={widget.id}>
-      <div className="financial-card-heading">
-        <div>
-          <h2>{widget.title}</h2>
-          <p>{widget.detail}</p>
-        </div>
-        <button type="button" className="widget-remove-button" onClick={() => toggleFinancialOverviewWidget(widget.id)}>
-          x
-        </button>
-      </div>
-      {widget.render()}
-    </article>
-  );
-  const renderWidgetSelector = () => (
-    <article className="financial-card financial-widget-selector">
-      <div className="financial-card-heading">
-        <div>
-          <h2>{copy("Add widgets to this screen", "Bu ekrana widget ekle")}</h2>
-          <p>
-            {copy(
-              "Default view stays focused on financial rows and the projection chart. Pick the metrics you want to keep on your saved screen.",
-              "Varsayılan görünüm finansal satırlar ve projeksiyon grafiğine odaklı kalır. Kayıtlı ekranında görmek istediğin metrikleri seç.",
+      <div className="table-scroll">
+        <table className="data-table statement-table">
+          <thead>
+            <tr>
+              <th scope="col">{copy("Line Item", "Kalem")}</th>
+              {financialStatementPeriods.map((period) => (
+                <th className="is-num" scope="col" key={period.label}>
+                  {period.label}
+                  <small>{period.rangeLabel}</small>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {projectionRows.map((row) =>
+              row.section ? (
+                <tr className="statement-section" key={row.id}>
+                  <th colSpan={financialStatementPeriods.length + 1} scope="colgroup">
+                    {row.section}
+                  </th>
+                </tr>
+              ) : (
+                <tr className={row.emphasis ? "is-emphasis" : undefined} key={row.id}>
+                  <th scope="row">
+                    <strong>{row.label}</strong>
+                    <small>{row.detail}</small>
+                  </th>
+                  {financialStatementPeriods.map((period) => (
+                    <td className={`is-num ${getProjectionValueTone(row, period)}`} key={`${row.id}-${period.label}`}>
+                      {formatProjectionValue(row, period)}
+                    </td>
+                  ))}
+                </tr>
+              ),
             )}
-          </p>
-        </div>
-        <button type="button" className="primary" onClick={saveFinancialOverviewScreen} disabled={financialLoading}>
-          {copy("Save Screen", "Ekranı Kaydet")}
-        </button>
-      </div>
-      <div className="financial-widget-picker">
-        {financialWidgetCatalog.map((widget) => {
-          const isSelected = financialOverviewWidgets.includes(widget.id);
-
-          return (
-            <button
-              type="button"
-              className={isSelected ? "selected" : ""}
-              onClick={() => toggleFinancialOverviewWidget(widget.id)}
-              key={widget.id}
-            >
-              <strong>{widget.title}</strong>
-              <span>{widget.detail}</span>
-            </button>
-          );
-        })}
+          </tbody>
+        </table>
       </div>
     </article>
   );
@@ -1982,32 +1605,48 @@ export default function FinancialModellingPage() {
   const overviewMarginPercent = summary.salesRevenue
     ? (toFiniteNumber(summary.netIncome) / toFiniteNumber(summary.salesRevenue)) * 100
     : 0;
-  const overviewCashRunwayLimit = Math.min(overviewMonthCount, 6);
-  const overviewDecisionMetrics = [
-    {
-      detail: copy("Average of the selected projection horizon", "Seçili projeksiyon ufkunun aylık ortalaması"),
-      label: copy("Monthly net", "Aylık net"),
-      tone: overviewMonthlyNet >= 0 ? "good" : "risk",
-      value: overviewIsDecisionReady ? formatLira(overviewMonthlyNet) : "-",
-    },
-    {
-      detail: copy("Revenue after channel effects", "Kanal etkilerinden sonra gelir"),
-      label: copy("Monthly revenue", "Aylık ciro"),
-      tone: "neutral",
-      value: overviewIsDecisionReady ? formatLira(overviewMonthlyRevenue) : "-",
-    },
-    {
-      detail: copy("First month where cash turns negative", "Nakit negatifleşene kadar geçen süre"),
-      label: copy("Cash runway", "Nakit dayanma"),
-      tone: summary.cashRunwayMonths >= overviewCashRunwayLimit ? "good" : "risk",
-      value: overviewIsDecisionReady ? `${formatNumber(summary.cashRunwayMonths)} ${copy("mo", "ay")}` : "-",
-    },
-    {
-      detail: copy("Net income divided by investment base", "Net kazancın yatırım tabanına oranı"),
-      label: copy("ROI", "Yatırım getirisi"),
-      tone: overviewRoiPercent >= 0 ? "good" : "risk",
-      value: overviewIsDecisionReady && overviewInvestmentBase ? `${formatNumber(overviewRoiPercent, 1)}%` : "-",
-    },
+  const readyValue = (value) => (overviewIsDecisionReady ? value : "-");
+  const overviewKpis = [
+    [
+      copy("Monthly net", "Aylık net"),
+      readyValue(formatLira(overviewMonthlyNet)),
+      copy("Average of the selected projection horizon", "Seçili projeksiyon ufkunun aylık ortalaması"),
+    ],
+    [
+      copy("Monthly revenue", "Aylık ciro"),
+      readyValue(formatLira(overviewMonthlyRevenue)),
+      copy("Revenue after channel effects", "Kanal etkilerinden sonra gelir"),
+    ],
+    [
+      copy("Cash runway", "Nakit dayanma"),
+      readyValue(`${formatNumber(summary.cashRunwayMonths)} ${copy("mo", "ay")}`),
+      copy("Months before cash turns negative", "Nakit negatifleşene kadar geçen süre"),
+    ],
+    [
+      copy("ROI", "Yatırım getirisi"),
+      overviewInvestmentBase ? readyValue(`${formatNumber(overviewRoiPercent, 1)}%`) : "-",
+      copy("Net income divided by investment base", "Net kazancın yatırım tabanına oranı"),
+    ],
+    [
+      copy("Produced / Sold", "Üretilen / Satılan"),
+      readyValue(`${formatNumber(summary.totalProduced)} / ${formatNumber(summary.netSoldUnits)}`),
+      copy("selected horizon units", "seçili ufuk adedi"),
+    ],
+    [
+      copy("Unsold Inventory", "Satılmayan Stok"),
+      readyValue(`${formatNumber(summary.unsoldInventoryUnits)} ${copy("units", "adet")}`),
+      copy("production above sales", "satışı aşan üretim"),
+    ],
+    [
+      copy("Required Cash", "Gerekli Nakit"),
+      readyValue(formatLira(summary.initialCashRequired)),
+      copy("after initial loan and grant", "başlangıç kredi ve hibe sonrası"),
+    ],
+    [
+      copy("Payback", "Geri Dönüş"),
+      readyValue(formatMonth(summary.paybackMonth)),
+      copy("investment recovery month", "yatırımın geri dönüş ayı"),
+    ],
   ];
   const overviewMoneyFlowRows = [
     {
@@ -2090,7 +1729,7 @@ export default function FinancialModellingPage() {
               <h1>{financialPageMeta.title}</h1>
               <p>{financialPageMeta.description}</p>
             </div>
-            <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
+            <button type="button" onClick={() => loadFinancialData()}>
               {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
             </button>
           </div>
@@ -2098,42 +1737,20 @@ export default function FinancialModellingPage() {
           {renderFinancialInputs()}
           {financialStatus && <p className="status-message">{financialStatus}</p>}
 
-          <div className="financial-grid">
-            <article className="financial-card scenario-card">
-              <div className="financial-card-heading">
-                <h2>{copy("Saved Optional Expenses", "Kayıtlı Opsiyonel Giderler")}</h2>
-              </div>
-              <div className="scenario-list">
-                {(model.extraCosts?.length
-                  ? model.extraCosts
-                  : [{ id: "empty", name: copy("No extra cost yet", "Henüz ek gider yok"), costType: "-", amount: 0 }]
-                ).map((cost) => (
-                  <div className={`scenario-row${cost.id === "empty" ? "" : " has-row-action"}`} key={cost.id}>
-                    <div>
-                      <strong>{cost.name}</strong>
-                      <span>
-                        {cost.costType === "initial"
-                          ? copy("Initial expense", "Başlangıç gideri")
-                          : cost.costType === "recurring"
-                            ? copy("Recurring expense", "Tekrarlayan gider")
-                            : "-"}
-                      </span>
-                    </div>
-                    <strong>{cost.id === "empty" ? "-" : formatLira(cost.amount)}</strong>
-                    {cost.id !== "empty" && (
-                      <button
-                        type="button"
-                        className="table-delete-button"
-                        onClick={() => handleDeleteFinancialExtraCost(cost)}
-                      >
-                        {copy("Delete", "Sil")}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </article>
-          </div>
+          <article className="card">
+            <div className="card-header">
+              <h2>{copy("Saved Optional Expenses", "Kayıtlı Opsiyonel Giderler")}</h2>
+              <span>
+                {(model.extraCosts || []).length} {copy("records", "kayıt")}
+              </span>
+            </div>
+            <DataTable
+              columns={extraCostColumns}
+              emptyLabel={copy("No extra cost yet", "Henüz ek gider yok")}
+              onDeleteRow={handleDeleteFinancialExtraCost}
+              rows={model.extraCosts || []}
+            />
+          </article>
         </section>
       </DashboardLayout>
     );
@@ -2151,53 +1768,12 @@ export default function FinancialModellingPage() {
               <h1>{financialPageMeta.title}</h1>
               <p>{financialPageMeta.description}</p>
             </div>
-            <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
+            <button type="button" onClick={() => loadFinancialData()}>
               {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
             </button>
           </div>
 
           {financialStatus && <p className="status-message">{financialStatus}</p>}
-
-          <div className="finance-metric-grid">
-            {[
-              [
-                copy("Loan Count", "Kredi Sayısı"),
-                formatNumber(financialLoanRows.length),
-                copy("separate financing records", "ayrı finansman kaydı"),
-              ],
-              [
-                copy("Total Loan Amount", "Toplam Kredi Tutarı"),
-                formatLoanCurrencyTotals(loanAmountTotals),
-                copy("by loan currency", "kredi dövizine göre"),
-              ],
-              [
-                copy("Total Loan in TRY", "TL Bazlı Toplam Kredi"),
-                formatLoanTryTotal(totalLoanAmountTry),
-                loanTryDetail,
-              ],
-              [
-                copy("Monthly Loan Payment", "Aylık Kredi Ödemesi"),
-                formatLoanCurrencyTotals(monthlyLoanPaymentTotals),
-                copy("sum of active installments", "aktif taksitlerin toplamı"),
-              ],
-              [
-                copy("Monthly Payment in TRY", "TL Bazlı Aylık Ödeme"),
-                formatLoanTryTotal(totalMonthlyLoanPaymentTry),
-                loanTryDetail,
-              ],
-              [
-                copy("Longest Term", "En Uzun Vade"),
-                longestLoanTerm ? `${formatNumber(longestLoanTerm)} ${copy("months", "ay")}` : "-",
-                copy("used for repayment schedule", "ödeme planında kullanılır"),
-              ],
-            ].map(([label, value, detail]) => (
-              <article className="finance-metric-card" key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-                <small>{detail}</small>
-              </article>
-            ))}
-          </div>
 
           {renderFinancialLoans()}
         </section>
@@ -2218,39 +1794,36 @@ export default function FinancialModellingPage() {
             <h1>{financialPageMeta.title}</h1>
             <p>{financialPageMeta.description}</p>
           </div>
-          <button type="button" className="primary app-command-button" onClick={() => loadFinancialData()}>
+          <button type="button" onClick={() => loadFinancialData()}>
             {financialLoading ? copy("Loading...", "Yükleniyor...") : copy("Update Data", "Verileri Güncelle")}
           </button>
         </div>
 
         {financialStatus && <p className="status-message">{financialStatus}</p>}
 
-        <div className="financial-overview-grid financial-overview-primary">
-          {renderOverviewFinancialRows()}
-          {renderFinancialTrendCard()}
-        </div>
-
-        <div className="financial-decision-metrics">
-          {overviewDecisionMetrics.map((metric) => (
-            <article className={`financial-decision-card ${metric.tone}`} key={metric.label}>
+        <div className="kpi-grid">
+          {overviewKpis.map(([label, value, detail]) => (
+            <article className="card kpi" key={label}>
               <span className="label-with-info">
-                {metric.label}
-                <GlossaryTip language={form.language} term={metric.label} />
+                {label}
+                <GlossaryTip language={form.language} term={label} />
               </span>
-              <strong>{metric.value}</strong>
-              <small>{metric.detail}</small>
+              <strong>{value}</strong>
+              <small>{detail}</small>
             </article>
           ))}
         </div>
 
-        <div className="financial-overview-layout financial-overview-two-up">
-          <article className="financial-panel financial-flow-panel">
-            <div className="financial-panel-heading">
+        <div className="two-up">
+          <article className="card">
+            <div className="card-header">
               <div>
                 <span>{copy("Money flow", "Para akışı")}</span>
                 <h2>{copy("From sales to net return", "Satıştan net getiriye")}</h2>
               </div>
-              <strong>{overviewIsDecisionReady ? `${formatNumber(overviewMarginPercent, 1)}%` : "-"}</strong>
+              <span className="card-header-meta">
+                {overviewIsDecisionReady ? `${formatNumber(overviewMarginPercent, 1)}%` : "-"}
+              </span>
             </div>
             <div className="financial-flow-grid">
               {overviewMoneyFlowRows.map((row) => (
@@ -2263,13 +1836,15 @@ export default function FinancialModellingPage() {
             </div>
           </article>
 
-          <article className="financial-panel financial-breakdown-panel">
-            <div className="financial-panel-heading">
+          <article className="card">
+            <div className="card-header">
               <div>
                 <span>{copy("Cost pressure", "Maliyet baskısı")}</span>
                 <h2>{copy("Largest cash needs", "En büyük nakit ihtiyaçları")}</h2>
               </div>
-              <strong>{overviewIsDecisionReady ? formatLira(overviewMonthlyCost) : "-"}</strong>
+              <span className="card-header-meta">
+                {overviewIsDecisionReady ? formatLira(overviewMonthlyCost) : "-"}
+              </span>
             </div>
             {renderBreakdownBars(
               overviewCostBreakdownRows,
@@ -2280,47 +1855,8 @@ export default function FinancialModellingPage() {
           </article>
         </div>
 
-        <div className="financial-quick-grid">
-          {[
-            [
-              copy("Produced / Sold", "Üretilen / Satılan"),
-              overviewIsDecisionReady
-                ? `${formatNumber(summary.totalProduced)} / ${formatNumber(summary.netSoldUnits)}`
-                : "-",
-              copy("selected horizon units", "seçili ufuk adedi"),
-            ],
-            [
-              copy("Unsold Inventory", "Satılmayan Stok"),
-              overviewIsDecisionReady ? `${formatNumber(summary.unsoldInventoryUnits)} ${copy("units", "adet")}` : "-",
-              copy("production above sales", "satışı aşan üretim"),
-            ],
-            [
-              copy("Required Cash", "Gerekli Nakit"),
-              overviewIsDecisionReady ? formatLira(summary.initialCashRequired) : "-",
-              copy("after initial loan and grant", "başlangıç kredi ve hibe sonrası"),
-            ],
-            [
-              copy("Payback", "Geri Dönüş"),
-              overviewIsDecisionReady ? formatMonth(summary.paybackMonth) : "-",
-              copy("investment recovery month", "yatırımın geri dönüş ayı"),
-            ],
-          ].map(([label, value, detail]) => (
-            <article className="financial-quick-card" key={label}>
-              <span className="label-with-info">
-                {label}
-                <GlossaryTip language={form.language} term={label} />
-              </span>
-              <strong>{value}</strong>
-              <small>{detail}</small>
-            </article>
-          ))}
-        </div>
-
-        {selectedFinancialWidgets.length > 0 && (
-          <div className="financial-widget-grid">{selectedFinancialWidgets.map(renderOverviewWidget)}</div>
-        )}
-
-        {renderWidgetSelector()}
+        {renderFinancialTrendCard()}
+        {renderOverviewFinancialRows()}
       </section>
     </DashboardLayout>
   );

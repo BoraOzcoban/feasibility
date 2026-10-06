@@ -4,31 +4,6 @@
  * this file only lays them out.
  */
 @layer skin {
-  .stack {
-    display: grid;
-    gap: var(--space-5);
-  }
-
-  .tile-grid {
-    display: grid;
-    gap: var(--space-4);
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  }
-
-  .tile {
-    align-content: space-between;
-  }
-
-  .tile h2 {
-    font-size: var(--text-md);
-    margin: var(--space-2) 0 var(--space-1);
-  }
-
-  .tile p {
-    color: var(--ink-muted);
-    margin: 0;
-  }
-
   /* Record form next to its list; stacked on narrower screens. */
   .resource-definition-grid,
   .record-pair {

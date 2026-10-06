@@ -520,8 +520,8 @@ export default function SalesStrategyPage() {
           ))}
         </div>
 
-        <details className="card sales-section" open>
-          <summary className="sales-section-summary">
+        <details className="card collapsible" open>
+          <summary>
             <div>
               <span>{copy("Sales channels", "Satış kanalları")}</span>
               <h2>{copy("Product, monthly quantity and commission", "Ürün, aylık adet ve komisyon")}</h2>
@@ -530,7 +530,7 @@ export default function SalesStrategyPage() {
               {copy("Add Channel", "Kanal Ekle")}
             </button>
           </summary>
-          <div className="sales-item-list">
+          <div className="item-list">
             {salesStrategy.channels.length === 0 && (
               <p className="planner-empty-state">{copy("No channel yet.", "Henüz kanal yok.")}</p>
             )}
@@ -541,8 +541,8 @@ export default function SalesStrategyPage() {
               const unit = channelProduct.unit || copy("units", "adet");
 
               return (
-                <details className="sales-item" key={channel.id}>
-                  <summary className="sales-item-summary">
+                <details className="list-item" key={channel.id}>
+                  <summary>
                     <div>
                       <span>{`${copy("Channel", "Kanal")} ${index + 1}`}</span>
                       <strong>{channel.name?.trim() || copy("Unnamed channel", "Adsız kanal")}</strong>
@@ -565,7 +565,7 @@ export default function SalesStrategyPage() {
                       {copy("Delete", "Sil")}
                     </button>
                   </summary>
-                  <div className="sales-item-body">
+                  <div className="list-item-body">
                     <div className="form-grid">
                       <label>
                         <span>{copy("Channel name", "Kanal adı")} *</span>
@@ -699,8 +699,8 @@ export default function SalesStrategyPage() {
           </div>
         </details>
 
-        <details className="card sales-section">
-          <summary className="sales-section-summary">
+        <details className="card collapsible">
+          <summary>
             <div>
               <span>{copy("Marketing campaigns", "Pazarlama kampanyaları")}</span>
               <h2>
@@ -714,7 +714,7 @@ export default function SalesStrategyPage() {
               {copy("Add Campaign", "Kampanya Ekle")}
             </button>
           </summary>
-          <div className="sales-item-list">
+          <div className="item-list">
             {salesStrategy.campaigns.length === 0 && (
               <p className="planner-empty-state">{copy("No campaign yet.", "Henüz kampanya yok.")}</p>
             )}
@@ -722,8 +722,8 @@ export default function SalesStrategyPage() {
               const selectedType = campaignTypeOptions.find((type) => type.id === (campaign.typeId || "digital"));
 
               return (
-                <details className="sales-item" key={campaign.id}>
-                  <summary className="sales-item-summary">
+                <details className="list-item" key={campaign.id}>
+                  <summary>
                     <div>
                       <span>{`${copy("Campaign", "Kampanya")} ${index + 1}`}</span>
                       <strong>{campaign.name?.trim() || copy("Unnamed campaign", "Adsız kampanya")}</strong>
@@ -749,7 +749,7 @@ export default function SalesStrategyPage() {
                       {copy("Delete", "Sil")}
                     </button>
                   </summary>
-                  <div className="sales-item-body">
+                  <div className="list-item-body">
                     <div className="form-grid">
                       <label>
                         <span>{copy("Campaign", "Kampanya")}</span>
@@ -841,8 +841,8 @@ export default function SalesStrategyPage() {
           </div>
         </details>
 
-        <details className="card sales-section">
-          <summary className="sales-section-summary">
+        <details className="card collapsible">
+          <summary>
             <div>
               <span className="label-with-info">
                 {copy("Expectation multiplier period", "Beklenti çarpanı periyodu")}

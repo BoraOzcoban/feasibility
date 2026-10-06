@@ -26,6 +26,10 @@
   --decision-wait-ink: #6b4e00;
   --decision-risky-ink: #9b0c23;
 
+  /* Chart series: income in the finance colour, cost in the operations colour */
+  --chart-income: var(--module-finance);
+  --chart-expense: var(--module-operations);
+
   /* Neutrals */
   --page: #ececea; /* lighter than Cool Gray 1 C so white cards still separate */
   --surface: #ffffff;

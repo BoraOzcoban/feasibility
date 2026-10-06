@@ -102,7 +102,6 @@ function App() {
   const [financialSettingsForm, setFinancialSettingsForm] = useState(defaultFinancialSettings);
   const [financialStatus, setFinancialStatus] = useState("");
   const [financialLoading, setFinancialLoading] = useState(false);
-  const [financialOverviewWidgets, setFinancialOverviewWidgets] = useState([]);
   const [exchangeRates, setExchangeRates] = useState(defaultExchangeRates);
   const [reportsTab, setReportsTab] = useState("all");
   const [operationForms, setOperationForms] = useState(emptyOperationForms);
@@ -310,7 +309,6 @@ function App() {
       setFinancialSettingsForm(defaultFinancialSettings);
       setFinancialExtraCostForm(emptyFinancialExtraCostForm);
       setFinancialStatus("");
-      setFinancialOverviewWidgets([]);
       setExchangeRates(defaultExchangeRates);
       setSalesStrategy(emptySalesStrategy);
       setSalesStatus("");
@@ -1402,41 +1400,6 @@ function App() {
     }
   }
 
-  function toggleFinancialOverviewWidget(widgetId) {
-    setFinancialOverviewWidgets((current) => (
-      current.includes(widgetId)
-        ? current.filter((id) => id !== widgetId)
-        : [...current, widgetId]
-    ));
-  }
-
-  async function saveFinancialOverviewScreen() {
-    setFinancialStatus("");
-
-    if (!supabase || !session?.user?.id) {
-      setFinancialStatus(labels.configure);
-      return;
-    }
-
-    setFinancialLoading(true);
-
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ financial_overview_widgets: financialOverviewWidgets })
-        .eq("id", session.user.id);
-
-      if (error) throw error;
-
-      setCurrentProfile((current) => current ? { ...current, financial_overview_widgets: financialOverviewWidgets } : current);
-      setFinancialStatus(copy("Financial analysis screen was saved.", "Finansal analiz ekranı kaydedildi."));
-    } catch (error) {
-      setFinancialStatus(error.message);
-    } finally {
-      setFinancialLoading(false);
-    }
-  }
-
   async function handleSaveFinancialExtraCost(event) {
     event?.preventDefault?.();
     setFinancialStatus("");
@@ -1717,7 +1680,6 @@ function App() {
       if (profile?.theme && ["light", "dark"].includes(profile.theme)) {
         setTheme(profile.theme);
       }
-      setFinancialOverviewWidgets(Array.isArray(profile?.financial_overview_widgets) ? profile.financial_overview_widgets : []);
 
       const [{ data: canRead }, { data: canWrite }] = await Promise.all([
         supabase.rpc("has_module_permission", { p_module_key: "authorization", p_permission: "read" }),
@@ -2574,7 +2536,6 @@ function App() {
     financialHorizonOptions,
     financialLoading,
     financialModel,
-    financialOverviewWidgets,
     financialSettingsForModel,
     financialSettingsForm,
     financialStatementPeriod,
@@ -2646,7 +2607,6 @@ function App() {
     salesLoading,
     salesStatus,
     salesStrategy,
-    saveFinancialOverviewScreen,
     session,
     setAuthorizationTab,
     setConfirmPassword,
@@ -2671,7 +2631,6 @@ function App() {
     simulationVariants,
     status,
     theme,
-    toggleFinancialOverviewWidget,
     toggleTheme,
     unsavedPrompt,
     updateField,

@@ -8,6 +8,7 @@ import "./styles/shell.css";
 import "./styles/components.css";
 import "./styles/operations.css";
 import "./styles/sales.css";
+import "./styles/finance.css";
 import "./styles/skin.css";
 
 class AppErrorBoundary extends React.Component {
