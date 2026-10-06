@@ -2,3 +2,8 @@ node_modules
 dist
 .env
 .DS_Store
+
+# Browser tests
+e2e/.auth/
+playwright-report/
+test-results/
