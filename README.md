@@ -53,6 +53,7 @@ The first admin of a company can be created in the Supabase dashboard (`Authenti
 
 ```zsh
 npm run lint
+npm run format:check   # npm run format fixes it
 npm run test
 npm run build
 ```

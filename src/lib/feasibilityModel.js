@@ -6,7 +6,9 @@ function getDocumentLanguage() {
 }
 
 export function normalizeCurrencyCode(value) {
-  const currency = String(value || "TRY").trim().toUpperCase();
+  const currency = String(value || "TRY")
+    .trim()
+    .toUpperCase();
   return /^[A-Z]{3}$/.test(currency) ? currency : "TRY";
 }
 
@@ -101,7 +103,7 @@ export function getMonthKey(date) {
 }
 
 export function getMonthDifference(startDate, endDate) {
-  return ((endDate.getFullYear() - startDate.getFullYear()) * 12) + (endDate.getMonth() - startDate.getMonth());
+  return (endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth());
 }
 
 export function getMonthlyLoanPayment(amount, annualInterestRate, termMonths) {
@@ -112,12 +114,12 @@ export function getMonthlyLoanPayment(amount, annualInterestRate, termMonths) {
   if (!principal) return 0;
   if (!monthlyRate) return principal / term;
 
-  return principal * (monthlyRate * ((1 + monthlyRate) ** term)) / (((1 + monthlyRate) ** term) - 1);
+  return (principal * (monthlyRate * (1 + monthlyRate) ** term)) / ((1 + monthlyRate) ** term - 1);
 }
 
 export function getMonthlyRateFromAnnualPercent(annualPercent) {
   const annualRate = Math.max(0, toFiniteNumber(annualPercent)) / 100;
-  return ((1 + annualRate) ** (1 / 12)) - 1;
+  return (1 + annualRate) ** (1 / 12) - 1;
 }
 
 export function getIncreaseFrequencyMonths(frequency) {
@@ -132,7 +134,7 @@ export function getPeriodicAnnualIncreaseMultiplier(annualPercent, monthIndex, f
   if (!annualRate) return 1;
 
   const periodMonths = getIncreaseFrequencyMonths(frequency);
-  const periodRate = ((1 + annualRate) ** (periodMonths / 12)) - 1;
+  const periodRate = (1 + annualRate) ** (periodMonths / 12) - 1;
   const elapsedPeriods = Math.floor(monthIndex / periodMonths);
 
   return (1 + periodRate) ** elapsedPeriods;
@@ -142,15 +144,17 @@ export function getFinancialLoanRows(settings = {}) {
   const sourceRows = Array.isArray(settings.loanRows) ? settings.loanRows : [];
   const rows = sourceRows.length
     ? sourceRows
-    : (toFiniteNumber(settings.loanAmount) > 0
-        ? [{
+    : toFiniteNumber(settings.loanAmount) > 0
+      ? [
+          {
             amount: settings.loanAmount,
             annualInterestRate: settings.annualInterestRate,
             gracePeriodMonths: settings.gracePeriodMonths,
             id: "legacy-loan",
             loanTermMonths: settings.loanTermMonths,
-          }]
-        : []);
+          },
+        ]
+      : [];
 
   return rows
     .map((row, index) => {
@@ -168,7 +172,7 @@ export function getFinancialLoanRows(settings = {}) {
       const paymentStartMonth = addMonths(receivedMonth, gracePeriodMonths);
       const paymentEndMonth = addMonths(receivedMonth, loanTermMonths - 1);
       const monthlyRate = annualInterestRate / 100 / 12;
-      const principalAfterGrace = monthlyRate ? amount * ((1 + monthlyRate) ** gracePeriodMonths) : amount;
+      const principalAfterGrace = monthlyRate ? amount * (1 + monthlyRate) ** gracePeriodMonths : amount;
       const repaymentTermMonths = Math.max(1, loanTermMonths - gracePeriodMonths);
 
       return {
@@ -194,7 +198,9 @@ export function getSalesExpectationMultipliers(salesStrategy) {
   const company = salesStrategy.company || {};
   const source = Array.isArray(company.monthlyMultipliers)
     ? company.monthlyMultipliers
-    : (Array.isArray(company.monthlyForecast) ? company.monthlyForecast : []);
+    : Array.isArray(company.monthlyForecast)
+      ? company.monthlyForecast
+      : [];
 
   if (getSalesMultiplierPeriod(salesStrategy) === "quarterly") {
     const quarterlyMultipliers = getQuarterlySalesExpectationMultipliers(source);
@@ -217,7 +223,9 @@ export function getQuarterlySalesExpectationMultipliers(source) {
   }
 
   return Array.from({ length: 4 }, (_, quarterIndex) => {
-    const quarterValues = Array.from({ length: 3 }, (_, offset) => Math.max(0, toFiniteNumber(rows[(quarterIndex * 3) + offset], 1)));
+    const quarterValues = Array.from({ length: 3 }, (_, offset) =>
+      Math.max(0, toFiniteNumber(rows[quarterIndex * 3 + offset], 1)),
+    );
     return quarterValues.reduce((total, value) => total + value, 0) / quarterValues.length;
   });
 }
@@ -226,7 +234,9 @@ export function getSalesExpectationInputMultipliers(salesStrategy) {
   const company = salesStrategy.company || {};
   const source = Array.isArray(company.monthlyMultipliers)
     ? company.monthlyMultipliers
-    : (Array.isArray(company.monthlyForecast) ? company.monthlyForecast : []);
+    : Array.isArray(company.monthlyForecast)
+      ? company.monthlyForecast
+      : [];
 
   return getSalesMultiplierPeriod(salesStrategy) === "quarterly"
     ? getQuarterlySalesExpectationMultipliers(source)
@@ -274,7 +284,8 @@ export function getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy
   const failureRate = Math.min(1, Math.max(0, toFiniteNumber(channel.failureProbabilityPercent)) / 100);
   const capacityLimit = getOptionalPositiveNumber(channel.capacityLimit);
   const moqMonthly = getOptionalPositiveNumber(channel.moqMonthly);
-  let units = Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) *
+  let units =
+    Math.max(0, toFiniteNumber(channel.monthlySalesUnits)) *
     getChannelGrowthMultiplier(channel, elapsedMonthIndex) *
     expectationMultiplier *
     getChannelSeasonalityMultiplier(channel, monthIndex) *
@@ -303,7 +314,10 @@ export function getBaseMonthlySalesUnits(salesStrategy) {
 
 export function getSalesForecastForMonth(salesStrategy, monthIndex) {
   const channels = Array.isArray(salesStrategy.channels) ? salesStrategy.channels : [];
-  return channels.reduce((total, channel) => total + getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy), 0);
+  return channels.reduce(
+    (total, channel) => total + getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy),
+    0,
+  );
 }
 
 export function getPlanProductId(plan) {
@@ -318,7 +332,8 @@ export function getMonthlyProductProductionMap(operationsWorkspace, workingDaysP
     const productId = getPlanProductId(plan);
     if (!productId) return;
 
-    const monthlyProduced = Math.max(0, toFiniteNumber(plan.result?.producedQuantity)) * Math.max(1, toFiniteNumber(workingDaysPerMonth, 22));
+    const monthlyProduced =
+      Math.max(0, toFiniteNumber(plan.result?.producedQuantity)) * Math.max(1, toFiniteNumber(workingDaysPerMonth, 22));
     productionByProduct.set(productId, (productionByProduct.get(productId) || 0) + monthlyProduced);
   });
 
@@ -329,70 +344,85 @@ export function getOperationProductMap(operationsWorkspace) {
   return new Map((operationsWorkspace.products || []).map((product) => [product.id, product]));
 }
 
-export function calculateChannelMonth(monthIndex, salesStrategy, operationsWorkspace = {}, workingDaysPerMonth = 22, settingsInput = {}) {
+export function calculateChannelMonth(
+  monthIndex,
+  salesStrategy,
+  operationsWorkspace = {},
+  workingDaysPerMonth = 22,
+  settingsInput = {},
+) {
   const channels = Array.isArray(salesStrategy.channels) ? salesStrategy.channels : [];
   const productionByProduct = getMonthlyProductProductionMap(operationsWorkspace, workingDaysPerMonth);
   const productMap = getOperationProductMap(operationsWorkspace);
-  const priceIncreaseMultiplier = getPeriodicAnnualIncreaseMultiplier(settingsInput.priceIncreaseAnnualPercent, monthIndex, settingsInput.increaseFrequency);
+  const priceIncreaseMultiplier = getPeriodicAnnualIncreaseMultiplier(
+    settingsInput.priceIncreaseAnnualPercent,
+    monthIndex,
+    settingsInput.increaseFrequency,
+  );
 
-  const totals = channels.reduce((currentTotals, channel) => {
-    const productId = channel.productId || channel.product_id || "";
-    const desiredUnits = getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy);
-    const availableUnits = productId ? Math.max(0, productionByProduct.get(productId) || 0) : 0;
-    const channelUnits = Math.min(desiredUnits, availableUnits);
-    const product = productMap.get(productId) || channel.product || {};
-    const channelUnitPrice = getOptionalPositiveNumber(channel.unitSalesPrice);
-    const price = Math.max(0, channelUnitPrice ?? toFiniteNumber(product.price)) * priceIncreaseMultiplier;
-    const commissionRate = Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100;
-    const discountRate = Math.max(0, toFiniteNumber(channel.discountRatePercent)) / 100;
-    const returnRate = Math.max(0, toFiniteNumber(channel.returnRatePercent)) / 100;
-    const returnedUnits = channelUnits * returnRate;
-    const netUnits = Math.max(0, channelUnits - returnedUnits);
-    const launchFee = monthIndex + 1 === Math.max(1, Math.round(toFiniteNumber(channel.startMonth, 1)))
-      ? Math.max(0, toFiniteNumber(channel.launchFee))
-      : 0;
-    const grossRevenue = netUnits * price * Math.max(0, 1 - discountRate);
-    const acquisitionCost = netUnits * Math.max(0, toFiniteNumber(channel.customerAcquisitionCost));
-    const commissionCost = grossRevenue * commissionRate;
-    const channelCost = commissionCost + acquisitionCost + launchFee;
-    const revenue = Math.max(0, grossRevenue - channelCost);
-    const collectionDays = toOptionalFiniteNumber(channel.collectionDays) ?? toFiniteNumber(settingsInput.receivablesCollectionDays, 30);
-    const delayMonths = Math.max(0, Math.ceil(collectionDays / 30));
+  const totals = channels.reduce(
+    (currentTotals, channel) => {
+      const productId = channel.productId || channel.product_id || "";
+      const desiredUnits = getProjectedChannelSalesUnits(channel, monthIndex, salesStrategy);
+      const availableUnits = productId ? Math.max(0, productionByProduct.get(productId) || 0) : 0;
+      const channelUnits = Math.min(desiredUnits, availableUnits);
+      const product = productMap.get(productId) || channel.product || {};
+      const channelUnitPrice = getOptionalPositiveNumber(channel.unitSalesPrice);
+      const price = Math.max(0, channelUnitPrice ?? toFiniteNumber(product.price)) * priceIncreaseMultiplier;
+      const commissionRate = Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100;
+      const discountRate = Math.max(0, toFiniteNumber(channel.discountRatePercent)) / 100;
+      const returnRate = Math.max(0, toFiniteNumber(channel.returnRatePercent)) / 100;
+      const returnedUnits = channelUnits * returnRate;
+      const netUnits = Math.max(0, channelUnits - returnedUnits);
+      const launchFee =
+        monthIndex + 1 === Math.max(1, Math.round(toFiniteNumber(channel.startMonth, 1)))
+          ? Math.max(0, toFiniteNumber(channel.launchFee))
+          : 0;
+      const grossRevenue = netUnits * price * Math.max(0, 1 - discountRate);
+      const acquisitionCost = netUnits * Math.max(0, toFiniteNumber(channel.customerAcquisitionCost));
+      const commissionCost = grossRevenue * commissionRate;
+      const channelCost = commissionCost + acquisitionCost + launchFee;
+      const revenue = Math.max(0, grossRevenue - channelCost);
+      const collectionDays =
+        toOptionalFiniteNumber(channel.collectionDays) ?? toFiniteNumber(settingsInput.receivablesCollectionDays, 30);
+      const delayMonths = Math.max(0, Math.ceil(collectionDays / 30));
 
-    if (productId) {
-      productionByProduct.set(productId, Math.max(0, availableUnits - channelUnits));
-    }
+      if (productId) {
+        productionByProduct.set(productId, Math.max(0, availableUnits - channelUnits));
+      }
 
-    currentTotals.channels.push({
-      delayMonths,
-      desiredUnits,
-      marginCost: channelCost,
-      productId,
-      revenue,
-      returnedUnits,
-      units: netUnits,
-    });
-    currentTotals.delayWeight += desiredUnits;
-    currentTotals.discountCost += netUnits * price * discountRate;
-    currentTotals.marginCost += channelCost;
-    currentTotals.netSoldUnits += netUnits;
-    currentTotals.forecastUnits += desiredUnits;
-    currentTotals.revenue += revenue;
-    currentTotals.returnedUnits += returnedUnits;
-    currentTotals.weightedPaymentDelayDays += desiredUnits * collectionDays;
+      currentTotals.channels.push({
+        delayMonths,
+        desiredUnits,
+        marginCost: channelCost,
+        productId,
+        revenue,
+        returnedUnits,
+        units: netUnits,
+      });
+      currentTotals.delayWeight += desiredUnits;
+      currentTotals.discountCost += netUnits * price * discountRate;
+      currentTotals.marginCost += channelCost;
+      currentTotals.netSoldUnits += netUnits;
+      currentTotals.forecastUnits += desiredUnits;
+      currentTotals.revenue += revenue;
+      currentTotals.returnedUnits += returnedUnits;
+      currentTotals.weightedPaymentDelayDays += desiredUnits * collectionDays;
 
-    return currentTotals;
-  }, {
-    channels: [],
-    delayWeight: 0,
-    discountCost: 0,
-    forecastUnits: 0,
-    marginCost: 0,
-    netSoldUnits: 0,
-    returnedUnits: 0,
-    revenue: 0,
-    weightedPaymentDelayDays: 0,
-  });
+      return currentTotals;
+    },
+    {
+      channels: [],
+      delayWeight: 0,
+      discountCost: 0,
+      forecastUnits: 0,
+      marginCost: 0,
+      netSoldUnits: 0,
+      returnedUnits: 0,
+      revenue: 0,
+      weightedPaymentDelayDays: 0,
+    },
+  );
 
   return {
     ...totals,
@@ -424,7 +454,7 @@ export function calculatePlanDailyCost(result = {}, operationsWorkspace = {}, se
     if (normalizeCurrencyCode(record?.price_currency_original || record?.price_currency) !== "TRY") {
       foreignCurrencyMaterial += quantity * price;
     }
-    return total + (quantity * price);
+    return total + quantity * price;
   }, 0);
 
   const labor = asObjectArray(result?.workforceRows).reduce((total, row) => {
@@ -435,7 +465,7 @@ export function calculatePlanDailyCost(result = {}, operationsWorkspace = {}, se
       toFiniteNumber(row.hoursUsed, toFiniteNumber(row.peopleAssigned) * toFiniteNumber(row.dailyHours)),
     );
     if (hours > 0 && rate <= 0) missingWorkforceRates.push(record?.role_name || row.roleName || row.workforceId);
-    return total + (hours * rate);
+    return total + hours * rate;
   }, 0);
 
   const machineRows = asObjectArray(result?.machineRows);
@@ -473,7 +503,9 @@ export function getPlanDailyOutput(result = {}, operationsWorkspace = {}) {
   const makespanMinutes = Math.max(0, toFiniteNumber(result?.totalProductionTimeMinutes));
   const machines = buildIdMap(operationsWorkspace.machines);
   const availabilityHours = asObjectArray(result?.machineRows)
-    .map((row) => toFiniteNumber(machines.get(row.machineId)?.availability_hours, toFiniteNumber(row.availabilityHours)))
+    .map((row) =>
+      toFiniteNumber(machines.get(row.machineId)?.availability_hours, toFiniteNumber(row.availabilityHours)),
+    )
     .filter((hours) => hours > 0);
 
   if (!target || !makespanMinutes || !availabilityHours.length) {
@@ -508,7 +540,12 @@ export function buildProductionCostProfile(activePlans = [], operationsWorkspace
     const capacity = getPlanDailyOutput(plan.result, operationsWorkspace);
     const ratio = capacity.target ? capacity.output / capacity.target : 0;
     const productId = getPlanProductId(plan) || plan.id || "unknown";
-    const current = products.get(productId) || { daily: { energy: 0, labor: 0, material: 0 }, dailyOutput: 0, foreignCurrencyMaterial: 0, productId };
+    const current = products.get(productId) || {
+      daily: { energy: 0, labor: 0, material: 0 },
+      dailyOutput: 0,
+      foreignCurrencyMaterial: 0,
+      productId,
+    };
 
     current.dailyOutput += capacity.output;
     current.foreignCurrencyMaterial += cost.foreignCurrencyMaterial * ratio;
@@ -533,11 +570,11 @@ export function buildProductionCostProfile(activePlans = [], operationsWorkspace
   let dailyProduced = 0;
 
   products.forEach((product) => {
-    product.foreignCurrencyMaterialShare = product.daily.material > 0 ? product.foreignCurrencyMaterial / product.daily.material : 0;
-    product.unit = Object.fromEntries(COST_COMPONENTS.map((key) => [
-      key,
-      product.dailyOutput > 0 ? product.daily[key] / product.dailyOutput : 0,
-    ]));
+    product.foreignCurrencyMaterialShare =
+      product.daily.material > 0 ? product.foreignCurrencyMaterial / product.daily.material : 0;
+    product.unit = Object.fromEntries(
+      COST_COMPONENTS.map((key) => [key, product.dailyOutput > 0 ? product.daily[key] / product.dailyOutput : 0]),
+    );
     dailyProduced += product.dailyOutput;
     COST_COMPONENTS.forEach((key) => {
       daily[key] += product.daily[key];
@@ -599,7 +636,9 @@ function getSensitivity(settings = {}) {
 function allocateChannelSales(monthIndex, salesStrategy, productMap, stockUnits, settings) {
   const channels = Array.isArray(salesStrategy.channels) ? salesStrategy.channels : [];
   const sensitivity = getSensitivity(settings);
-  const priceIncreaseMultiplier = getPeriodicAnnualIncreaseMultiplier(settings.priceIncreaseAnnualPercent, monthIndex, settings.increaseFrequency) * sensitivity.price;
+  const priceIncreaseMultiplier =
+    getPeriodicAnnualIncreaseMultiplier(settings.priceIncreaseAnnualPercent, monthIndex, settings.increaseFrequency) *
+    sensitivity.price;
 
   return channels.map((channel) => {
     const productId = channel.productId || channel.product_id || "";
@@ -614,14 +653,16 @@ function allocateChannelSales(monthIndex, salesStrategy, productMap, stockUnits,
     const returnedUnits = shippedUnits * returnRate;
     const netUnits = Math.max(0, shippedUnits - returnedUnits);
     const netSales = netUnits * price * (1 - discountRate);
-    const launchFee = monthIndex + 1 === Math.max(1, Math.round(toFiniteNumber(channel.startMonth, 1)))
-      ? Math.max(0, toFiniteNumber(channel.launchFee))
-      : 0;
+    const launchFee =
+      monthIndex + 1 === Math.max(1, Math.round(toFiniteNumber(channel.startMonth, 1)))
+        ? Math.max(0, toFiniteNumber(channel.launchFee))
+        : 0;
     const channelCost =
-      (netSales * Math.max(0, toFiniteNumber(channel.commissionPercent)) / 100) +
-      (netUnits * Math.max(0, toFiniteNumber(channel.customerAcquisitionCost))) +
+      (netSales * Math.max(0, toFiniteNumber(channel.commissionPercent))) / 100 +
+      netUnits * Math.max(0, toFiniteNumber(channel.customerAcquisitionCost)) +
       launchFee;
-    const collectionDays = toOptionalFiniteNumber(channel.collectionDays) ?? toFiniteNumber(settings.receivablesCollectionDays, 30);
+    const collectionDays =
+      toOptionalFiniteNumber(channel.collectionDays) ?? toFiniteNumber(settings.receivablesCollectionDays, 30);
 
     if (productId) {
       stockUnits.set(productId, Math.max(0, availableUnits - shippedUnits));
@@ -668,7 +709,7 @@ export const DEFAULT_DISCOUNT_RATE_ANNUAL_PERCENT = 30;
 // at the end of month i.
 export function calculateNetPresentValue(flows = [], annualRatePercent = DEFAULT_DISCOUNT_RATE_ANNUAL_PERCENT) {
   const monthlyRate = getMonthlyRateFromAnnualPercent(annualRatePercent);
-  return flows.reduce((total, flow, month) => total + (toFiniteNumber(flow) / ((1 + monthlyRate) ** month)), 0);
+  return flows.reduce((total, flow, month) => total + toFiniteNumber(flow) / (1 + monthlyRate) ** month, 0);
 }
 
 // Annual internal rate of return in percent, or null when the flows never
@@ -677,7 +718,7 @@ export function calculateInternalRateOfReturn(flows = []) {
   const values = flows.map((flow) => toFiniteNumber(flow));
   if (!values.some((value) => value < 0) || !values.some((value) => value > 0)) return null;
 
-  const npvAt = (monthlyRate) => values.reduce((total, value, month) => total + (value / ((1 + monthlyRate) ** month)), 0);
+  const npvAt = (monthlyRate) => values.reduce((total, value, month) => total + value / (1 + monthlyRate) ** month, 0);
   let low = -0.99;
   let high = 1;
   let npvLow = npvAt(low);
@@ -691,7 +732,7 @@ export function calculateInternalRateOfReturn(flows = []) {
   for (let step = 0; step < 200; step += 1) {
     const middle = (low + high) / 2;
     const npvMiddle = npvAt(middle);
-    if (Math.abs(npvMiddle) < 1e-7 || (high - low) < 1e-12) {
+    if (Math.abs(npvMiddle) < 1e-7 || high - low < 1e-12) {
       low = middle;
       high = middle;
       break;
@@ -704,7 +745,7 @@ export function calculateInternalRateOfReturn(flows = []) {
     }
   }
 
-  return (((1 + ((low + high) / 2)) ** 12) - 1) * 100;
+  return ((1 + (low + high) / 2) ** 12 - 1) * 100;
 }
 
 // Decision thresholds are a team decision (see the audit's open questions);
@@ -728,9 +769,7 @@ export function evaluateFeasibilityDecision(summary = {}, thresholds = defaultDe
     { key: "capacity", ok: summary.capacityUtilization !== null && toFiniteNumber(summary.capacityUtilization) <= 1 },
   ];
   const failed = new Set(checks.filter((check) => !check.ok).map((check) => check.key));
-  const status = failed.has("npv") || paybackMonth === null
-    ? "risky"
-    : failed.size ? "wait" : "feasible";
+  const status = failed.has("npv") || paybackMonth === null ? "risky" : failed.size ? "wait" : "feasible";
 
   return { checks, status, thresholds };
 }
@@ -769,43 +808,59 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
         const record = machineRecords.get(row.machineId);
         const price = record
           ? toFiniteNumber(record.price)
-          : (normalizeCurrencyCode(row.priceCurrency) === "TRY" ? toFiniteNumber(row.price) : 0);
+          : normalizeCurrencyCode(row.priceCurrency) === "TRY"
+            ? toFiniteNumber(row.price)
+            : 0;
         uniqueMachines.set(row.machineId, Math.max(0, price));
       }
     });
   });
 
-  const machinePurchaseCost = Array.from(uniqueMachines.values()).reduce((total, price) => total + price, 0) || toFiniteNumber(baseModel.summary?.machinePurchaseCost);
+  const machinePurchaseCost =
+    Array.from(uniqueMachines.values()).reduce((total, price) => total + price, 0) ||
+    toFiniteNumber(baseModel.summary?.machinePurchaseCost);
   const equipmentPurchaseCost = (operationsWorkspace.equipment || []).reduce(
-    (total, equipment) => total + (Math.max(0, toFiniteNumber(equipment.price)) * Math.max(0, toFiniteNumber(equipment.quantity, 1))),
+    (total, equipment) =>
+      total + Math.max(0, toFiniteNumber(equipment.price)) * Math.max(0, toFiniteNumber(equipment.quantity, 1)),
     0,
   );
   const capitalExpenditure = machinePurchaseCost + equipmentPurchaseCost;
   const monthlyDepreciation = capitalExpenditure / (usefulLifeYears * 12);
   const extraCosts = baseModel.extraCosts || [];
-  const extraInitialCost = extraCosts.reduce((total, cost) => total + (cost.costType === "initial" ? Math.max(0, toFiniteNumber(cost.amount)) : 0), 0);
-  const extraRecurringCost = extraCosts.reduce((total, cost) => total + (cost.costType === "recurring" ? Math.max(0, toFiniteNumber(cost.amount)) : 0), 0);
+  const extraInitialCost = extraCosts.reduce(
+    (total, cost) => total + (cost.costType === "initial" ? Math.max(0, toFiniteNumber(cost.amount)) : 0),
+    0,
+  );
+  const extraRecurringCost = extraCosts.reduce(
+    (total, cost) => total + (cost.costType === "recurring" ? Math.max(0, toFiniteNumber(cost.amount)) : 0),
+    0,
+  );
   const initialInvestment = capitalExpenditure + extraInitialCost;
   const projectionStartMonth = getMonthStart(new Date());
-  const loanRows = getFinancialLoanRows(settings).map((loan) => ({
-    ...loan,
-    amount: convertMoneyToTry(loan.amount, loan.currency, settings.exchangeRates),
-    currency: "TRY",
-    monthlyPayment: convertMoneyToTry(loan.monthlyPayment, loan.currency, settings.exchangeRates),
-    originalAmount: loan.amount,
-    originalCurrency: loan.currency,
-    originalMonthlyPayment: loan.monthlyPayment,
-  })).map((loan) => {
-    const receivedMonth = getMonthStart(parseDateInput(loan.receivedDate) || projectionStartMonth);
-    const receivedMonthIndex = Math.max(0, getMonthDifference(projectionStartMonth, receivedMonth));
-
-    return {
+  const loanRows = getFinancialLoanRows(settings)
+    .map((loan) => ({
       ...loan,
-      receivedMonthIndex,
-    };
-  });
+      amount: convertMoneyToTry(loan.amount, loan.currency, settings.exchangeRates),
+      currency: "TRY",
+      monthlyPayment: convertMoneyToTry(loan.monthlyPayment, loan.currency, settings.exchangeRates),
+      originalAmount: loan.amount,
+      originalCurrency: loan.currency,
+      originalMonthlyPayment: loan.monthlyPayment,
+    }))
+    .map((loan) => {
+      const receivedMonth = getMonthStart(parseDateInput(loan.receivedDate) || projectionStartMonth);
+      const receivedMonthIndex = Math.max(0, getMonthDifference(projectionStartMonth, receivedMonth));
+
+      return {
+        ...loan,
+        receivedMonthIndex,
+      };
+    });
   const loanAmount = loanRows.reduce((total, row) => total + row.amount, 0);
-  const initialLoanFunding = loanRows.reduce((total, row) => (row.receivedMonthIndex === 0 ? total + row.amount : total), 0);
+  const initialLoanFunding = loanRows.reduce(
+    (total, row) => (row.receivedMonthIndex === 0 ? total + row.amount : total),
+    0,
+  );
   const monthlyLoanPayment = loanRows.reduce((total, row) => total + row.monthlyPayment, 0);
   const monthlyCurrencyIncreaseRate = Math.max(0, toFiniteNumber(settings.monthlyCurrencyIncreasePercent)) / 100;
   const monthlyEnergyPriceIncreaseRate = Math.max(0, toFiniteNumber(settings.monthlyEnergyPriceIncreasePercent)) / 100;
@@ -813,7 +868,7 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
   const monthlyWageIncreaseRate = Math.max(0, toFiniteNumber(settings.monthlyWageIncreasePercent)) / 100;
   const monthlyCogsInflationRate = getMonthlyRateFromAnnualPercent(settings.cogsInflationAnnualPercent);
   const monthlyOpexInflationRate = getMonthlyRateFromAnnualPercent(settings.opexInflationAnnualPercent);
-  const compoundMonthlyRate = (rate, monthIndex) => ((1 + rate) ** monthIndex);
+  const compoundMonthlyRate = (rate, monthIndex) => (1 + rate) ** monthIndex;
   const salesVatRate = Math.max(0, toFiniteNumber(settings.salesVatRate, settings.vatRate ?? 20)) / 100;
   const expenseVatRate = Math.max(0, toFiniteNumber(settings.expenseVatRate, settings.vatRate ?? 20)) / 100;
   const incomeTaxRate = Math.max(0, toFiniteNumber(settings.incomeTaxRate, 25)) / 100;
@@ -821,11 +876,15 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
   const supplierDelayMonths = getCollectionDelayMonths(settings.supplierPaymentDays);
   const rawMaterialBufferMonths =
     Math.max(0, toFiniteNumber(settings.rawMaterialBufferMonths, 1)) +
-    (Math.max(0, toFiniteNumber(settings.rawMaterialStockDays)) / 30);
-  const rawMaterialBufferValue = costProfile.daily.material * costSensitivity * workingDaysPerMonth * rawMaterialBufferMonths;
+    Math.max(0, toFiniteNumber(settings.rawMaterialStockDays)) / 30;
+  const rawMaterialBufferValue =
+    costProfile.daily.material * costSensitivity * workingDaysPerMonth * rawMaterialBufferMonths;
   const minimumCashReserve =
-    (costProfile.daily.labor * costSensitivity * workingDaysPerMonth * Math.max(0, toFiniteNumber(settings.salaryBufferMonths, 1))) +
-    (extraRecurringCost * Math.max(0, toFiniteNumber(settings.rentBufferMonths, 1)));
+    costProfile.daily.labor *
+      costSensitivity *
+      workingDaysPerMonth *
+      Math.max(0, toFiniteNumber(settings.salaryBufferMonths, 1)) +
+    extraRecurringCost * Math.max(0, toFiniteNumber(settings.rentBufferMonths, 1));
   const campaignSchedule = buildCampaignSpendSchedule(salesStrategy.campaigns, monthCount);
   const scheduleLength = monthCount + 36;
   const collections = Array.from({ length: scheduleLength }, () => 0);
@@ -839,10 +898,12 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     }
   });
   const loanBalances = loanRows.map((row) => (row.receivedMonthIndex === 0 ? row.amount : 0));
-  const stock = new Map(Array.from(costProfile.products.keys()).map((productId) => [
-    productId,
-    { units: 0, value: { energy: 0, labor: 0, material: 0 } },
-  ]));
+  const stock = new Map(
+    Array.from(costProfile.products.keys()).map((productId) => [
+      productId,
+      { units: 0, value: { energy: 0, labor: 0, material: 0 } },
+    ]),
+  );
   const paidInCapital = initialCash + investmentGrantAmount;
   let cashBalance = initialCash + initialLoanFunding + investmentGrantAmount - capitalExpenditure;
   let accumulatedDepreciation = 0;
@@ -899,9 +960,10 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     };
     const overheadMultiplier = compoundMonthlyRate(monthlyOpexInflationRate || monthlyInflationRate, index);
     const plannedUnits = dailyProduced * workingDaysPerMonth;
-    const capacityScale = index === 0 && initialCapacityUnits > 0 && plannedUnits > initialCapacityUnits
-      ? initialCapacityUnits / plannedUnits
-      : 1;
+    const capacityScale =
+      index === 0 && initialCapacityUnits > 0 && plannedUnits > initialCapacityUnits
+        ? initialCapacityUnits / plannedUnits
+        : 1;
 
     // 1. Production: costs go into finished-goods stock.
     const productionSpend = { energy: 0, labor: 0, material: 0 };
@@ -913,7 +975,9 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       productStock.units += units;
       const productMultipliers = {
         ...multipliers,
-        material: ((1 - product.foreignCurrencyMaterialShare) * localMaterialMultiplier) + (product.foreignCurrencyMaterialShare * foreignMaterialMultiplier),
+        material:
+          (1 - product.foreignCurrencyMaterialShare) * localMaterialMultiplier +
+          product.foreignCurrencyMaterialShare * foreignMaterialMultiplier,
       };
       COST_COMPONENTS.forEach((key) => {
         const amount = units * product.unit[key] * productMultipliers[key] * costSensitivity;
@@ -967,37 +1031,44 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     const rawMaterialPurchase = index === 0 ? rawMaterialBufferValue : 0;
 
     // 4. Financing.
-    const loanMonth = loanRows.reduce((total, loan, loanIndex) => {
-      const monthsSinceReceived = index - loan.receivedMonthIndex;
-      if (monthsSinceReceived === 0 && loan.receivedMonthIndex > 0) {
-        loanBalances[loanIndex] = loan.amount;
-      }
-      if (monthsSinceReceived < 0 || monthsSinceReceived >= loan.loanTermMonths) {
-        return total;
-      }
+    const loanMonth = loanRows.reduce(
+      (total, loan, loanIndex) => {
+        const monthsSinceReceived = index - loan.receivedMonthIndex;
+        if (monthsSinceReceived === 0 && loan.receivedMonthIndex > 0) {
+          loanBalances[loanIndex] = loan.amount;
+        }
+        if (monthsSinceReceived < 0 || monthsSinceReceived >= loan.loanTermMonths) {
+          return total;
+        }
 
-      const balance = loanBalances[loanIndex] || 0;
-      const monthlyRate = loan.annualInterestRate / 100 / 12;
-      const interest = balance * monthlyRate;
-      const isGraceMonth = monthsSinceReceived < loan.gracePeriodMonths;
-      const isLastMonth = monthsSinceReceived === loan.loanTermMonths - 1;
-      const scheduledPayment = isLastMonth ? balance + interest : Math.min(loan.monthlyPayment, balance + interest);
-      const payment = !isGraceMonth ? scheduledPayment : 0;
-      const principal = Math.max(0, payment - interest);
+        const balance = loanBalances[loanIndex] || 0;
+        const monthlyRate = loan.annualInterestRate / 100 / 12;
+        const interest = balance * monthlyRate;
+        const isGraceMonth = monthsSinceReceived < loan.gracePeriodMonths;
+        const isLastMonth = monthsSinceReceived === loan.loanTermMonths - 1;
+        const scheduledPayment = isLastMonth ? balance + interest : Math.min(loan.monthlyPayment, balance + interest);
+        const payment = !isGraceMonth ? scheduledPayment : 0;
+        const principal = Math.max(0, payment - interest);
 
-      loanBalances[loanIndex] = isGraceMonth
-        ? Math.max(0, balance + interest)
-        : Math.max(0, balance - principal);
+        loanBalances[loanIndex] = isGraceMonth ? Math.max(0, balance + interest) : Math.max(0, balance - principal);
 
-      return {
-        interest: total.interest + interest,
-        payment: total.payment + payment,
-      };
-    }, { interest: 0, payment: 0 });
+        return {
+          interest: total.interest + interest,
+          payment: total.payment + payment,
+        };
+      },
+      { interest: 0, payment: 0 },
+    );
 
     // 5. VAT: output minus input, credit carried forward, paid the next month.
     const vatableExpenses =
-      productionSpend.material + productionSpend.energy + overheadCost + marketingCost + channelCost + initialExpense + rawMaterialPurchase;
+      productionSpend.material +
+      productionSpend.energy +
+      overheadCost +
+      marketingCost +
+      channelCost +
+      initialExpense +
+      rawMaterialPurchase;
     const outputVat = netSales * salesVatRate;
     const inputVat = vatableExpenses * expenseVatRate;
     const vatPosition = outputVat - inputVat - vatCredit;
@@ -1010,7 +1081,8 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     // 6. Income tax on the year's profit, after losses carried from earlier years.
     const costOfSales = sumComponents(cogs);
     const operatingExpenses = channelCost + marketingCost + overheadCost + initialExpense;
-    const profitBeforeTax = netSales - costOfSales - writeOffCost - depreciation - operatingExpenses - loanMonth.interest;
+    const profitBeforeTax =
+      netSales - costOfSales - writeOffCost - depreciation - operatingExpenses - loanMonth.interest;
     yearToDateTaxableProfit += profitBeforeTax;
     const yearToDateTaxDue = Math.max(0, yearToDateTaxableProfit - taxLossCarryForward) * incomeTaxRate;
     const incomeTax = yearToDateTaxDue - yearToDateTaxProvision;
@@ -1045,8 +1117,8 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     const operatingCashOut =
       supplierPayment +
       productionSpend.labor +
-      (productionSpend.energy * (1 + expenseVatRate)) +
-      ((overheadCost + marketingCost + channelCost + initialExpense + rawMaterialPurchase) * (1 + expenseVatRate)) +
+      productionSpend.energy * (1 + expenseVatRate) +
+      (overheadCost + marketingCost + channelCost + initialExpense + rawMaterialPurchase) * (1 + expenseVatRate) +
       vatPayment +
       taxPayment;
     const operatingCashFlow = collected - operatingCashOut;
@@ -1158,7 +1230,9 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
 
   const lastRow = rows[rows.length - 1] || {};
   const firstMonth = rows[0] || {};
-  const averageNetPrice = totals.netSoldUnits ? totals.revenue / totals.netSoldUnits : toFiniteNumber(operationsWorkspace.products?.[0]?.price);
+  const averageNetPrice = totals.netSoldUnits
+    ? totals.revenue / totals.netSoldUnits
+    : toFiniteNumber(operationsWorkspace.products?.[0]?.price);
   const contributionPerUnit = Math.max(0, averageNetPrice - unitProductionCost);
   const requiredMonthlySalesVolume = contributionPerUnit
     ? (extraRecurringCost + Math.min(monthlyLoanPayment, loanAmount || monthlyLoanPayment)) / contributionPerUnit
@@ -1172,23 +1246,31 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
   // At the horizon the business is still running: count the machines' book
   // value and the working capital tied up in it as recovered.
   const residualValue = toFiniteNumber(lastRow.fixedAssets) + toFiniteNumber(lastRow.workingCapital);
-  const valuationFlows = projectCashFlows.map((flow, month) => (month === rows.length && month > 0 ? flow + residualValue : flow));
-  const discountRateAnnualPercent = Math.max(0, toFiniteNumber(settings.discountRateAnnualPercent, DEFAULT_DISCOUNT_RATE_ANNUAL_PERCENT));
+  const valuationFlows = projectCashFlows.map((flow, month) =>
+    month === rows.length && month > 0 ? flow + residualValue : flow,
+  );
+  const discountRateAnnualPercent = Math.max(
+    0,
+    toFiniteNumber(settings.discountRateAnnualPercent, DEFAULT_DISCOUNT_RATE_ANNUAL_PERCENT),
+  );
   const netPresentValue = calculateNetPresentValue(valuationFlows, discountRateAnnualPercent);
   const internalRateOfReturn = calculateInternalRateOfReturn(valuationFlows);
   const productionCapacityUnits = dailyProduced * workingDaysPerMonth * monthCount;
-  const capacityUtilization = productionCapacityUnits > 0
-    ? totals.forecastSalesUnits / productionCapacityUnits
-    : (totals.forecastSalesUnits > 0 ? null : 0);
-  const maxChartValue = Math.max(
-    1,
-    ...rows.map((row) => Math.max(row.salesRevenue, row.totalCost, row.netIncome, 0)),
-  );
-  const getPath = (field) => rows.map((row, index) => {
-    const x = rows.length <= 1 ? 36 : 36 + (index * (434 / (rows.length - 1)));
-    const y = 210 - ((Math.max(0, row[field]) / maxChartValue) * 170);
-    return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
-  }).join(" ");
+  const capacityUtilization =
+    productionCapacityUnits > 0
+      ? totals.forecastSalesUnits / productionCapacityUnits
+      : totals.forecastSalesUnits > 0
+        ? null
+        : 0;
+  const maxChartValue = Math.max(1, ...rows.map((row) => Math.max(row.salesRevenue, row.totalCost, row.netIncome, 0)));
+  const getPath = (field) =>
+    rows
+      .map((row, index) => {
+        const x = rows.length <= 1 ? 36 : 36 + index * (434 / (rows.length - 1));
+        const y = 210 - (Math.max(0, row[field]) / maxChartValue) * 170;
+        return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+      })
+      .join(" ");
 
   return {
     ...baseModel,
@@ -1208,17 +1290,83 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
     incomeRows: [
       { amount: totals.revenue, id: "salesRevenue", kind: "income", label: "Net sales" },
       { amount: investmentGrantAmount, id: "investmentGrant", kind: "income", label: "Investment grant / subsidy" },
-      { amount: totals.materialCost, costType: "recurring", id: "materialCost", kind: "cost", label: "Raw materials and packaging" },
-      { amount: totals.workforceCost, costType: "recurring", id: "workforceCost", kind: "cost", label: "Salaries and labor" },
-      { amount: totals.electricityCost, costType: "recurring", id: "electricityCost", kind: "cost", label: "Electricity" },
-      { amount: totals.depreciation, costType: "recurring", id: "otherProductionCost", kind: "cost", label: "Depreciation" },
-      { amount: totals.expiredWriteOffCost, costType: "recurring", id: "writeOffCost", kind: "cost", label: "Returns write-off" },
-      { amount: totals.channelCost, costType: "recurring", id: "channelCost", kind: "cost", label: "Channel commission and acquisition" },
-      { amount: totals.marketingCost, costType: "recurring", id: "marketingCost", kind: "cost", label: "Marketing campaigns" },
-      { amount: machinePurchaseCost, costType: "initial", id: "machinePurchase", kind: "cost", label: "Machine investment" },
-      { amount: equipmentPurchaseCost, costType: "initial", id: "equipmentPurchase", kind: "cost", label: "Equipment investment" },
-      { amount: extraInitialCost, costType: "initial", id: "extraInitialCost", kind: "cost", label: "Initial extra costs" },
-      { amount: peakWorkingCapital, costType: "initial", id: "workingCapital", kind: "cost", label: "Peak working capital" },
+      {
+        amount: totals.materialCost,
+        costType: "recurring",
+        id: "materialCost",
+        kind: "cost",
+        label: "Raw materials and packaging",
+      },
+      {
+        amount: totals.workforceCost,
+        costType: "recurring",
+        id: "workforceCost",
+        kind: "cost",
+        label: "Salaries and labor",
+      },
+      {
+        amount: totals.electricityCost,
+        costType: "recurring",
+        id: "electricityCost",
+        kind: "cost",
+        label: "Electricity",
+      },
+      {
+        amount: totals.depreciation,
+        costType: "recurring",
+        id: "otherProductionCost",
+        kind: "cost",
+        label: "Depreciation",
+      },
+      {
+        amount: totals.expiredWriteOffCost,
+        costType: "recurring",
+        id: "writeOffCost",
+        kind: "cost",
+        label: "Returns write-off",
+      },
+      {
+        amount: totals.channelCost,
+        costType: "recurring",
+        id: "channelCost",
+        kind: "cost",
+        label: "Channel commission and acquisition",
+      },
+      {
+        amount: totals.marketingCost,
+        costType: "recurring",
+        id: "marketingCost",
+        kind: "cost",
+        label: "Marketing campaigns",
+      },
+      {
+        amount: machinePurchaseCost,
+        costType: "initial",
+        id: "machinePurchase",
+        kind: "cost",
+        label: "Machine investment",
+      },
+      {
+        amount: equipmentPurchaseCost,
+        costType: "initial",
+        id: "equipmentPurchase",
+        kind: "cost",
+        label: "Equipment investment",
+      },
+      {
+        amount: extraInitialCost,
+        costType: "initial",
+        id: "extraInitialCost",
+        kind: "cost",
+        label: "Initial extra costs",
+      },
+      {
+        amount: peakWorkingCapital,
+        costType: "initial",
+        id: "workingCapital",
+        kind: "cost",
+        label: "Peak working capital",
+      },
       { amount: totals.incomeTax, costType: "recurring", id: "incomeTax", kind: "cost", label: "Income tax" },
       { amount: totals.loanInterest, costType: "recurring", id: "loanInterest", kind: "cost", label: "Loan interest" },
     ],
@@ -1285,7 +1433,13 @@ export function buildFinancialFeasibilityModel(baseModel, salesStrategy, setting
       unitWorkforceCost,
       unsoldInventoryUnits: toFiniteNumber(lastRow.inventoryUnits),
       vatPayable: totals.vatPayable,
-      weightedPaymentDelayDays: calculateChannelMonth(0, salesStrategy, operationsWorkspace, workingDaysPerMonth, settings).weightedPaymentDelayDays,
+      weightedPaymentDelayDays: calculateChannelMonth(
+        0,
+        salesStrategy,
+        operationsWorkspace,
+        workingDaysPerMonth,
+        settings,
+      ).weightedPaymentDelayDays,
       workingCapitalRequirement: peakWorkingCapital,
       workingDaysPerMonth,
     },
@@ -1312,7 +1466,13 @@ export const sensitivityCases = [
 // moved at a time: price ±10%, sales volume ±20%, unit production cost ±10%.
 export function buildSensitivityTable(baseModel, salesStrategy, settingsInput, operationsWorkspace, horizon = "5y") {
   const run = (sensitivity) => {
-    const { summary } = buildFinancialFeasibilityModel(baseModel, salesStrategy, { ...settingsInput, sensitivity }, operationsWorkspace, horizon);
+    const { summary } = buildFinancialFeasibilityModel(
+      baseModel,
+      salesStrategy,
+      { ...settingsInput, sensitivity },
+      operationsWorkspace,
+      horizon,
+    );
     return {
       decision: evaluateFeasibilityDecision(summary).status,
       lowestCashBalance: summary.lowestCashBalance,

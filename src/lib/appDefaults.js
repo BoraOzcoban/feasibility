@@ -42,7 +42,11 @@ export function normalizeSimulationAlgorithm(value) {
 
 export function isAdminRole(roleOrName) {
   const name = typeof roleOrName === "string" ? roleOrName : roleOrName?.name;
-  return String(name || "").trim().toLowerCase() === "admin";
+  return (
+    String(name || "")
+      .trim()
+      .toLowerCase() === "admin"
+  );
 }
 
 export const operationCurrencyOptions = ["TRY", "USD", "EUR"];
@@ -52,7 +56,10 @@ export function buildWorkforceRowsFromOperationRows(operationRows) {
     .map((row) => {
       const workforceId = row.workforceId || row.workforce_id || "";
       const peopleAssigned = Math.max(0, toFiniteNumber(row.peopleAssigned, 1));
-      const dailyHours = Math.max(0, toFiniteNumber(row.workforceDailyHours ?? row.workforceHours ?? row.dailyHours, 8));
+      const dailyHours = Math.max(
+        0,
+        toFiniteNumber(row.workforceDailyHours ?? row.workforceHours ?? row.dailyHours, 8),
+      );
 
       if (!workforceId || peopleAssigned <= 0 || dailyHours <= 0) return null;
 

@@ -96,23 +96,26 @@ export async function loadOperationsWorkspace(supabase) {
     { data: materials, error: materialsError },
     { data: activePlans, error: activePlansError },
     { data: workforce, error: workforceError },
-  ] =
-    await Promise.all([
-      supabase.from("operation_equipment").select("*").order("name", { ascending: true }),
-      supabase
-        .from("operation_products")
-        .select("*, material_rows:operation_product_materials(*, material:operation_materials(*)), process_rows:operation_product_processes(*)")
-        .order("name", { ascending: true }),
-      supabase.from("operation_machines").select("*").order("name", { ascending: true }),
-      supabase.from("operation_materials").select("*").order("name", { ascending: true }),
-      supabase
-        .from("operation_resource_plans")
-        .select("*, product:operation_products(id, name, unit, price, price_currency, cycle_time_minutes, cycle_time_unit)")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(50),
-      supabase.from("operation_workforce_resources").select("*").order("role_name", { ascending: true }),
-    ]);
+  ] = await Promise.all([
+    supabase.from("operation_equipment").select("*").order("name", { ascending: true }),
+    supabase
+      .from("operation_products")
+      .select(
+        "*, material_rows:operation_product_materials(*, material:operation_materials(*)), process_rows:operation_product_processes(*)",
+      )
+      .order("name", { ascending: true }),
+    supabase.from("operation_machines").select("*").order("name", { ascending: true }),
+    supabase.from("operation_materials").select("*").order("name", { ascending: true }),
+    supabase
+      .from("operation_resource_plans")
+      .select(
+        "*, product:operation_products(id, name, unit, price, price_currency, cycle_time_minutes, cycle_time_unit)",
+      )
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase.from("operation_workforce_resources").select("*").order("role_name", { ascending: true }),
+  ]);
 
   if (equipmentError) throw equipmentError;
   if (productError) throw productError;
@@ -123,14 +126,14 @@ export async function loadOperationsWorkspace(supabase) {
 
   const contextProductId = activePlans?.[0]?.product_id || activePlans?.[0]?.product?.id || products?.[0]?.id || "";
   const product = (products || []).find((item) => item.id === contextProductId) || products?.[0] || null;
-  let latestPlan = activePlans?.find((plan) => plan.product_id === product?.id || plan.product?.id === product?.id) || activePlans?.[0] || null;
+  let latestPlan =
+    activePlans?.find((plan) => plan.product_id === product?.id || plan.product?.id === product?.id) ||
+    activePlans?.[0] ||
+    null;
   let notes = [];
 
   if (product) {
-    const [
-      { data: noteRows, error: notesError },
-      { data: latestPlans, error: plansError },
-    ] = await Promise.all([
+    const [{ data: noteRows, error: notesError }, { data: latestPlans, error: plansError }] = await Promise.all([
       supabase
         .from("operation_notes")
         .select("*")

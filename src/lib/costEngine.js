@@ -24,15 +24,7 @@ export class CostValidationError extends Error {
  * @property {Record<string, number>} intermediateValues
  */
 
-const BREAKDOWN_KEYS = [
-  "material",
-  "consumables",
-  "labor",
-  "electricity",
-  "depreciation",
-  "maintenance",
-  "mold",
-];
+const BREAKDOWN_KEYS = ["material", "consumables", "labor", "electricity", "depreciation", "maintenance", "mold"];
 
 function numberValue(input, field) {
   const value = Number(input?.[field]);
@@ -61,10 +53,7 @@ function nonNegative(input, field) {
 function employeeCoefficient(input) {
   const group = String(input?.employeeGroup || "");
   if (!Object.prototype.hasOwnProperty.call(employeeCostCoefficients, group)) {
-    throw new CostValidationError(
-      "employeeGroup",
-      `tanınmayan çalışan grubu "${group || "(boş)"}".`,
-    );
+    throw new CostValidationError("employeeGroup", `tanınmayan çalışan grubu "${group || "(boş)"}".`);
   }
   return employeeCostCoefficients[group];
 }
@@ -102,29 +91,18 @@ function batchMachineCosts(input, common, totalCycleSeconds, piecesPerOperation)
   const machinePurchasePriceEur = nonNegative(input, "machinePurchasePriceEur");
   const annualMaintenanceCostEur = nonNegative(input, "annualMaintenanceCostEur");
   const requiredOperationCount = common.orderQuantity / piecesPerOperation;
-  const annualProductionCapacity =
-    common.annualOperatingSeconds / totalCycleSeconds * piecesPerOperation;
+  const annualProductionCapacity = (common.annualOperatingSeconds / totalCycleSeconds) * piecesPerOperation;
   const electricityCostPerUnitEur =
-    totalCycleSeconds *
-    common.electricityCostTryPerKwSecond *
-    machinePowerKw /
-    common.tryPerEur /
-    piecesPerOperation;
+    (totalCycleSeconds * common.electricityCostTryPerKwSecond * machinePowerKw) / common.tryPerEur / piecesPerOperation;
   const laborCostPerUnitEur =
-    totalCycleSeconds *
-    common.laborCostTryPerSecond /
-    piecesPerOperation /
-    common.tryPerEur *
+    ((totalCycleSeconds * common.laborCostTryPerSecond) / piecesPerOperation / common.tryPerEur) *
     common.employeeCoefficient *
     common.employeeCount;
   const depreciationCostPerUnitEur =
-    requiredOperationCount *
-    totalCycleSeconds *
-    machinePurchasePriceEur /
+    (requiredOperationCount * totalCycleSeconds * machinePurchasePriceEur) /
     common.machineUsefulLifeSeconds /
     common.orderQuantity;
-  const maintenanceCostPerUnitEur =
-    annualMaintenanceCostEur / annualProductionCapacity;
+  const maintenanceCostPerUnitEur = annualMaintenanceCostEur / annualProductionCapacity;
 
   return {
     annualProductionCapacity,
@@ -184,55 +162,35 @@ export function calculateInjectionCost(input) {
   const annualMoldMaintenanceCostEur = nonNegative(input, "annualMoldMaintenanceCostEur");
 
   if (dailyPreparationSeconds >= dailyAvailableSeconds) {
-    throw new CostValidationError(
-      "dailyPreparationSeconds",
-      "günlük kullanılabilir süreden küçük olmalıdır.",
-    );
+    throw new CostValidationError("dailyPreparationSeconds", "günlük kullanılabilir süreden küçük olmalıdır.");
   }
 
-  const dailyShotCount =
-    (dailyAvailableSeconds - dailyPreparationSeconds) / injectionCycleSeconds;
+  const dailyShotCount = (dailyAvailableSeconds - dailyPreparationSeconds) / injectionCycleSeconds;
   const requiredShotCount = common.orderQuantity / moldCavityCount;
-  const requiredProductionDays =
-    requiredShotCount / dailyShotCount / simultaneousMachineCount;
+  const requiredProductionDays = requiredShotCount / dailyShotCount / simultaneousMachineCount;
   const preparationSecondsPerShot = dailyPreparationSeconds / dailyShotCount;
   const adjustedCycleSeconds = injectionCycleSeconds + preparationSecondsPerShot;
   const grossWeightPerUnitGrams = totalGrossShotWeightGrams / moldCavityCount;
   const totalRunnerWasteGrams = dailyRunnerWasteGrams * requiredProductionDays;
   const moldPurchaseCostPerUnit = moldPurchasePriceEur / common.orderQuantity;
   const materialCostPerUnitEur =
-    rawMaterialPriceEurPerKg * grossWeightPerUnitGrams / 1000 +
-    rawMaterialPriceEurPerKg * totalRunnerWasteGrams / 1000 / common.orderQuantity;
+    (rawMaterialPriceEurPerKg * grossWeightPerUnitGrams) / 1000 +
+    (rawMaterialPriceEurPerKg * totalRunnerWasteGrams) / 1000 / common.orderQuantity;
   const laborCostPerUnitEur =
-    adjustedCycleSeconds *
-    common.laborCostTryPerSecond /
-    moldCavityCount /
-    common.tryPerEur *
+    ((adjustedCycleSeconds * common.laborCostTryPerSecond) / moldCavityCount / common.tryPerEur) *
     common.employeeCoefficient *
     common.employeeCount;
   const electricityCostPerUnitEur =
-    adjustedCycleSeconds *
-    common.electricityCostTryPerKwSecond *
-    machinePowerKw /
-    moldCavityCount /
-    common.tryPerEur;
+    (adjustedCycleSeconds * common.electricityCostTryPerKwSecond * machinePowerKw) / moldCavityCount / common.tryPerEur;
   const depreciationCostPerUnitEur =
-    requiredShotCount *
-    adjustedCycleSeconds *
-    machinePurchasePriceEur /
+    (requiredShotCount * adjustedCycleSeconds * machinePurchasePriceEur) /
     common.machineUsefulLifeSeconds /
     common.orderQuantity;
-  const annualProductionCapacity =
-    common.annualOperatingSeconds / adjustedCycleSeconds * moldCavityCount;
-  const machineMaintenanceCostPerUnitEur =
-    annualMachineMaintenanceCostEur / annualProductionCapacity;
-  const annualMoldProductionCapacity =
-    common.annualOperatingSeconds / injectionCycleSeconds * moldCavityCount;
-  const moldMaintenanceCostPerUnitEur =
-    annualMoldMaintenanceCostEur / annualMoldProductionCapacity;
-  const includedMoldPurchaseCostPerUnitEur = input.moldPurchaseRequired
-    ? moldPurchaseCostPerUnit
-    : 0;
+  const annualProductionCapacity = (common.annualOperatingSeconds / adjustedCycleSeconds) * moldCavityCount;
+  const machineMaintenanceCostPerUnitEur = annualMachineMaintenanceCostEur / annualProductionCapacity;
+  const annualMoldProductionCapacity = (common.annualOperatingSeconds / injectionCycleSeconds) * moldCavityCount;
+  const moldMaintenanceCostPerUnitEur = annualMoldMaintenanceCostEur / annualMoldProductionCapacity;
+  const includedMoldPurchaseCostPerUnitEur = input.moldPurchaseRequired ? moldPurchaseCostPerUnit : 0;
 
   return result(
     input,
@@ -321,17 +279,12 @@ export function calculateNitrogenDeflashingCost(input) {
   const tankCapacityLiters = nonNegative(input, "tankCapacityLiters");
   const nitrogenUsagePercentage = nonNegative(input, "nitrogenUsagePercentage");
   const nitrogenPriceTryPerLiter = nonNegative(input, "nitrogenPriceTryPerLiter");
-  const stoneConsumptionKgPerReferencePeriod =
-    nonNegative(input, "stoneConsumptionKgPerReferencePeriod");
-  const stoneConsumptionReferenceSeconds =
-    positive(input, "stoneConsumptionReferenceSeconds");
+  const stoneConsumptionKgPerReferencePeriod = nonNegative(input, "stoneConsumptionKgPerReferencePeriod");
+  const stoneConsumptionReferenceSeconds = positive(input, "stoneConsumptionReferenceSeconds");
   const stonePriceTryPerKg = nonNegative(input, "stonePriceTryPerKg");
   const grossWeightPerUnitGrams = netWeightPerUnitGrams * grossWeightMultiplier;
   const totalCycleSeconds =
-    benchCoolingSeconds +
-    machineProcessingSeconds +
-    loadingUnloadingSeconds +
-    startupCoolingSeconds / operationsPerDay;
+    benchCoolingSeconds + machineProcessingSeconds + loadingUnloadingSeconds + startupCoolingSeconds / operationsPerDay;
   if (totalCycleSeconds <= 0) {
     throw new CostValidationError("totalCycleSeconds", "sıfırdan büyük olmalıdır.");
   }
@@ -339,15 +292,11 @@ export function calculateNitrogenDeflashingCost(input) {
   const machineCosts = batchMachineCosts(input, common, totalCycleSeconds, piecesPerOperation);
   const nitrogenLitersPerOperation = tankCapacityLiters * nitrogenUsagePercentage;
   const nitrogenLitersPerUnit = nitrogenLitersPerOperation / piecesPerOperation;
-  const nitrogenCostPerUnitEur =
-    nitrogenLitersPerUnit * nitrogenPriceTryPerLiter / common.tryPerEur;
+  const nitrogenCostPerUnitEur = (nitrogenLitersPerUnit * nitrogenPriceTryPerLiter) / common.tryPerEur;
   const stoneKgPerOperation =
-    stoneConsumptionKgPerReferencePeriod *
-    totalCycleSeconds /
-    stoneConsumptionReferenceSeconds;
+    (stoneConsumptionKgPerReferencePeriod * totalCycleSeconds) / stoneConsumptionReferenceSeconds;
   const stoneKgPerUnit = stoneKgPerOperation / piecesPerOperation;
-  const stoneCostPerUnitEur =
-    stoneKgPerUnit * stonePriceTryPerKg / common.tryPerEur;
+  const stoneCostPerUnitEur = (stoneKgPerUnit * stonePriceTryPerKg) / common.tryPerEur;
 
   return result(
     input,
@@ -429,8 +378,7 @@ export function calculateWashingCost(input) {
   const loadingUnloadingSeconds = nonNegative(input, "loadingUnloadingSeconds");
   const machineProcessingSeconds = nonNegative(input, "machineProcessingSeconds");
   const detergentReferenceCostEur = nonNegative(input, "detergentReferenceCostEur");
-  const detergentReferenceDurationSeconds =
-    positive(input, "detergentReferenceDurationSeconds");
+  const detergentReferenceDurationSeconds = positive(input, "detergentReferenceDurationSeconds");
   const piecesPerOperation = totalProcessedWeightGrams / netWeightPerUnitGrams;
   const totalCycleSeconds = loadingUnloadingSeconds + machineProcessingSeconds;
   if (totalCycleSeconds <= 0) {
@@ -438,11 +386,8 @@ export function calculateWashingCost(input) {
   }
   const machineCosts = batchMachineCosts(input, common, totalCycleSeconds, piecesPerOperation);
   const detergentCostPerOperationEur =
-    detergentReferenceCostEur *
-    totalCycleSeconds /
-    detergentReferenceDurationSeconds;
-  const detergentCostPerUnitEur =
-    detergentCostPerOperationEur / piecesPerOperation;
+    (detergentReferenceCostEur * totalCycleSeconds) / detergentReferenceDurationSeconds;
+  const detergentCostPerUnitEur = detergentCostPerOperationEur / piecesPerOperation;
 
   return result(
     input,
@@ -486,36 +431,24 @@ export function calculateCompressionSetCost(input) {
     throw new CostValidationError("totalCycleSeconds", "sıfırdan büyük olmalıdır.");
   }
   const electricityCostPerUnitEur =
-    totalCycleSeconds *
-    repeatCount *
-    common.electricityCostTryPerKwSecond *
-    machinePowerKw /
+    (totalCycleSeconds * repeatCount * common.electricityCostTryPerKwSecond * machinePowerKw) /
     common.tryPerEur /
     common.orderQuantity;
   const laborSeconds = loadingUnloadingSeconds + resultReviewSeconds;
   const laborCostPerUnitEur =
-    laborSeconds *
-    common.laborCostTryPerSecond /
-    common.orderQuantity /
-    common.tryPerEur *
+    ((laborSeconds * common.laborCostTryPerSecond) / common.orderQuantity / common.tryPerEur) *
     common.employeeCount *
     common.employeeCoefficient;
   const depreciationCostPerUnitEur =
-    repeatCount *
-    totalCycleSeconds *
-    machinePurchasePriceEur /
+    (repeatCount * totalCycleSeconds * machinePurchasePriceEur) /
     common.machineUsefulLifeSeconds /
     common.orderQuantity;
   const maintenanceCostPerUnitEur =
-    annualMaintenanceCostEur *
-    repeatCount *
-    totalCycleSeconds /
-    common.annualOperatingSeconds /
-    common.orderQuantity;
+    (annualMaintenanceCostEur * repeatCount * totalCycleSeconds) / common.annualOperatingSeconds / common.orderQuantity;
 
   return result(
     input,
-    totalCycleSeconds * repeatCount / common.orderQuantity,
+    (totalCycleSeconds * repeatCount) / common.orderQuantity,
     {
       electricity: electricityCostPerUnitEur,
       labor: laborCostPerUnitEur,
@@ -558,8 +491,7 @@ export function calculateTotalProductionCost(input) {
       ...(input.compressionSet || {}),
     }),
   };
-  const totalUnitCostEur = Object.values(operations)
-    .reduce((total, operation) => total + operation.unitCostEur, 0);
+  const totalUnitCostEur = Object.values(operations).reduce((total, operation) => total + operation.unitCostEur, 0);
   const totalOrderCostEur = totalUnitCostEur * orderQuantity;
   const productionLeadTimeSeconds = [
     operations.injection,
@@ -568,8 +500,7 @@ export function calculateTotalProductionCost(input) {
     operations.postCuring,
     operations.washing,
   ].reduce((total, operation) => total + operation.unitCycleTimeSeconds, 0);
-  const qualityControlTimeSeconds =
-    operations.compressionSet.intermediateValues.qualityControlTimeSeconds;
+  const qualityControlTimeSeconds = operations.compressionSet.intermediateValues.qualityControlTimeSeconds;
   const breakdown = completeBreakdown();
 
   Object.values(operations).forEach((operation) => {

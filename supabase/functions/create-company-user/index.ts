@@ -23,7 +23,9 @@ function json(status: number, body: Record<string, unknown>) {
 }
 
 function text(value: unknown, maxLength = 200) {
-  return String(value ?? "").trim().slice(0, maxLength);
+  return String(value ?? "")
+    .trim()
+    .slice(0, maxLength);
 }
 
 Deno.serve(async (request) => {
@@ -57,7 +59,8 @@ Deno.serve(async (request) => {
     .select("company_id")
     .eq("id", callerData.user.id)
     .single();
-  if (profileError || !callerProfile?.company_id) return json(403, { error: "Your profile is not connected to a company." });
+  if (profileError || !callerProfile?.company_id)
+    return json(403, { error: "Your profile is not connected to a company." });
 
   let body: Record<string, unknown>;
   try {

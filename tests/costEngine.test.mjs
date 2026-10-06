@@ -15,10 +15,7 @@ import {
 
 const tolerance = 1e-9;
 const closeTo = (actual, expected) => {
-  assert.ok(
-    Math.abs(actual - expected) < tolerance,
-    `Expected ${actual} to be within ${tolerance} of ${expected}`,
-  );
+  assert.ok(Math.abs(actual - expected) < tolerance, `Expected ${actual} to be within ${tolerance} of ${expected}`);
 };
 
 function cloneRegressionInput() {
@@ -29,20 +26,11 @@ test("reproduces the Excel operation-cost regression totals", () => {
   const result = calculateTotalProductionCost(cloneRegressionInput());
 
   closeTo(result.operations.injection.unitCostEur, expectedExcelOperationCosts.injection);
-  closeTo(
-    result.operations.roughDeflashing.unitCostEur,
-    expectedExcelOperationCosts.roughDeflashing,
-  );
-  closeTo(
-    result.operations.nitrogenDeflashing.unitCostEur,
-    expectedExcelOperationCosts.nitrogenDeflashing,
-  );
+  closeTo(result.operations.roughDeflashing.unitCostEur, expectedExcelOperationCosts.roughDeflashing);
+  closeTo(result.operations.nitrogenDeflashing.unitCostEur, expectedExcelOperationCosts.nitrogenDeflashing);
   closeTo(result.operations.postCuring.unitCostEur, expectedExcelOperationCosts.postCuring);
   closeTo(result.operations.washing.unitCostEur, expectedExcelOperationCosts.washing);
-  closeTo(
-    result.operations.compressionSet.unitCostEur,
-    expectedExcelOperationCosts.compressionSet,
-  );
+  closeTo(result.operations.compressionSet.unitCostEur, expectedExcelOperationCosts.compressionSet);
   closeTo(result.totalUnitCostEur, expectedExcelOperationCosts.totalUnitCost);
   closeTo(result.totalOrderCostEur, expectedExcelOperationCosts.totalOrderCost);
   closeTo(result.totalOrderCostEur, result.totalUnitCostEur * result.orderQuantity);
@@ -71,21 +59,13 @@ test("calculates batch electricity, labor, depreciation, and maintenance indepen
   const piecesPerOperation = 20;
   const totalCycleSeconds = 60;
   const annualOperatingSeconds = 200 * 10 * 3600;
-  closeTo(result.breakdown.electricity, 60 * (4 / 3600) * 9 / 40 / piecesPerOperation);
-  closeTo(
-    result.breakdown.labor,
-    60 * (81_000 / 225 / 3600) / piecesPerOperation / 40 * 1.5 * 2,
-  );
+  closeTo(result.breakdown.electricity, (60 * (4 / 3600) * 9) / 40 / piecesPerOperation);
+  closeTo(result.breakdown.labor, ((60 * (81_000 / 225 / 3600)) / piecesPerOperation / 40) * 1.5 * 2);
   closeTo(
     result.breakdown.depreciation,
-    (10_000 / piecesPerOperation) * 60 * 100_000 /
-      (5 * annualOperatingSeconds) /
-      10_000,
+    ((10_000 / piecesPerOperation) * 60 * 100_000) / (5 * annualOperatingSeconds) / 10_000,
   );
-  closeTo(
-    result.breakdown.maintenance,
-    360 / (annualOperatingSeconds / totalCycleSeconds * piecesPerOperation),
-  );
+  closeTo(result.breakdown.maintenance, 360 / ((annualOperatingSeconds / totalCycleSeconds) * piecesPerOperation));
   closeTo(result.unitCycleTimeSeconds, totalCycleSeconds / piecesPerOperation);
   closeTo(result.orderCostEur, result.unitCostEur * 10_000);
 });
@@ -117,10 +97,8 @@ test("converts injection weights from grams to kilograms and adds mold purchase 
   };
   const result = calculateInjectionCost(input);
   const dailyShotCount = (10.5 * 3600) / 10;
-  const requiredProductionDays = (1_000 / 10) / dailyShotCount;
-  const expectedMaterial =
-    10 * (100 / 10) / 1_000 +
-    10 * (1_000 * requiredProductionDays) / 1_000 / 1_000;
+  const requiredProductionDays = 1_000 / 10 / dailyShotCount;
+  const expectedMaterial = (10 * (100 / 10)) / 1_000 + (10 * (1_000 * requiredProductionDays)) / 1_000 / 1_000;
 
   closeTo(result.breakdown.material, expectedMaterial);
   closeTo(result.breakdown.mold, 1);
@@ -175,10 +153,7 @@ test("keeps compression-set waiting time out of labor and main production lead t
   const total = calculateTotalProductionCost(input);
   const expectedLaborSeconds = 30;
 
-  closeTo(
-    operation.breakdown.labor,
-    expectedLaborSeconds * (81_000 / 225 / 3600) / 5_000_000 / 40,
-  );
+  closeTo(operation.breakdown.labor, (expectedLaborSeconds * (81_000 / 225 / 3600)) / 5_000_000 / 40);
   assert.equal(operation.intermediateValues.qualityControlTimeSeconds, 20_020);
   assert.equal(total.qualityControlTimeSeconds, 20_020);
   assert.ok(total.productionLeadTimeSeconds < total.qualityControlTimeSeconds);
@@ -186,19 +161,60 @@ test("keeps compression-set waiting time out of labor and main production lead t
 
 test("rejects invalid divisors and unknown employee groups before calculation", () => {
   const invalidCases = [
-    ["orderQuantity", (input) => { input.orderQuantity = 0; }],
-    ["moldCavityCount", (input) => { input.injection.moldCavityCount = 0; }],
-    ["tryPerEur", (input) => { input.common.tryPerEur = 0; }],
-    ["injectionCycleSeconds", (input) => { input.injection.injectionCycleSeconds = 0; }],
-    ["totalProcessedWeightGrams", (input) => {
-      input.nitrogenDeflashing.totalProcessedWeightGrams = 0;
-    }],
-    ["netWeightPerUnitGrams", (input) => { input.washing.netWeightPerUnitGrams = 0; }],
-    ["simultaneousMachineCount", (input) => {
-      input.injection.simultaneousMachineCount = 0;
-    }],
-    ["usefulLifeYears", (input) => { input.postCuring.usefulLifeYears = 0; }],
-    ["employeeGroup", (input) => { input.roughDeflashing.employeeGroup = "Uzman"; }],
+    [
+      "orderQuantity",
+      (input) => {
+        input.orderQuantity = 0;
+      },
+    ],
+    [
+      "moldCavityCount",
+      (input) => {
+        input.injection.moldCavityCount = 0;
+      },
+    ],
+    [
+      "tryPerEur",
+      (input) => {
+        input.common.tryPerEur = 0;
+      },
+    ],
+    [
+      "injectionCycleSeconds",
+      (input) => {
+        input.injection.injectionCycleSeconds = 0;
+      },
+    ],
+    [
+      "totalProcessedWeightGrams",
+      (input) => {
+        input.nitrogenDeflashing.totalProcessedWeightGrams = 0;
+      },
+    ],
+    [
+      "netWeightPerUnitGrams",
+      (input) => {
+        input.washing.netWeightPerUnitGrams = 0;
+      },
+    ],
+    [
+      "simultaneousMachineCount",
+      (input) => {
+        input.injection.simultaneousMachineCount = 0;
+      },
+    ],
+    [
+      "usefulLifeYears",
+      (input) => {
+        input.postCuring.usefulLifeYears = 0;
+      },
+    ],
+    [
+      "employeeGroup",
+      (input) => {
+        input.roughDeflashing.employeeGroup = "Uzman";
+      },
+    ],
   ];
 
   invalidCases.forEach(([field, mutate]) => {

@@ -95,14 +95,10 @@ export const generalFinancialAssumptionFields = [
   "initialCapacityUnits",
 ];
 
-export const optionalFinancialSettingFields = [
-  "loanRows",
-];
+export const optionalFinancialSettingFields = ["loanRows"];
 
 // Valuation inputs: optional, the defaults above apply when blank.
-export const valuationFinancialSettingFields = [
-  "discountRateAnnualPercent",
-];
+export const valuationFinancialSettingFields = ["discountRateAnnualPercent"];
 
 export const optionalMacroFinancialSettingFields = [
   "monthlyCurrencyIncreasePercent",
@@ -169,7 +165,9 @@ function getTodayDateInputValue() {
 }
 
 function normalizeLoanCurrency(value) {
-  const currency = String(value || "TRY").trim().toUpperCase();
+  const currency = String(value || "TRY")
+    .trim()
+    .toUpperCase();
   return currencyCodePattern.test(currency) && financialLoanCurrencyOptions.includes(currency) ? currency : "TRY";
 }
 
@@ -189,14 +187,16 @@ export function normalizeFinancialLoanRows(input = {}) {
   const legacyLoanAmount = Number(input.loanAmount);
   const rows = sourceRows.length
     ? sourceRows
-    : (Number.isFinite(legacyLoanAmount) && legacyLoanAmount > 0
-        ? [{
+    : Number.isFinite(legacyLoanAmount) && legacyLoanAmount > 0
+      ? [
+          {
             amount: input.loanAmount,
             annualInterestRate: input.annualInterestRate,
             gracePeriodMonths: input.gracePeriodMonths,
             loanTermMonths: input.loanTermMonths,
-          }]
-        : []);
+          },
+        ]
+      : [];
 
   return rows.map((row, index) => {
     const amount = Number(row.amount);
@@ -255,7 +255,7 @@ export function normalizeFinancialLoanRows(input = {}) {
 function getLoanSummary(loanRows) {
   const loanAmount = loanRows.reduce((total, row) => total + row.amount, 0);
   const annualInterestRate = loanAmount
-    ? loanRows.reduce((total, row) => total + (row.annualInterestRate * row.amount), 0) / loanAmount
+    ? loanRows.reduce((total, row) => total + row.annualInterestRate * row.amount, 0) / loanAmount
     : 0;
   const loanTermMonths = loanRows.length
     ? loanRows.reduce((longestTerm, row) => Math.max(longestTerm, row.loanTermMonths), 1)
@@ -478,7 +478,7 @@ export async function loadFinancialModel(supabase, horizon = "6m") {
     settings: {
       ...defaultFinancialSettings,
       ...mappedSettings,
-      loanRows: mappedLoanRows.length ? mappedLoanRows : (mappedSettings.loanRows || []),
+      loanRows: mappedLoanRows.length ? mappedLoanRows : mappedSettings.loanRows || [],
     },
     settingsSaved: Boolean(settingsRow),
     horizon,

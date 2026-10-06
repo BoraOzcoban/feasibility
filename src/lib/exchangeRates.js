@@ -12,7 +12,9 @@ export function getTcmBRatesFromXml(xmlText) {
 
   const getRate = (currency) => {
     const row = documentXml.querySelector(`Currency[CurrencyCode="${currency}"]`);
-    const value = Number(row?.querySelector("ForexSelling")?.textContent || row?.querySelector("ForexBuying")?.textContent);
+    const value = Number(
+      row?.querySelector("ForexSelling")?.textContent || row?.querySelector("ForexBuying")?.textContent,
+    );
     if (!Number.isFinite(value) || value <= 0) {
       throw new Error(`TCMB ${currency}/TRY rate was not available.`);
     }
@@ -118,9 +120,7 @@ export async function saveExchangeRatesToSupabase(supabaseClient, companyId, rat
     rate_to_try: rates[currency],
     source: rates.source || "TCMB",
   }));
-  const { error } = await supabaseClient
-    .from("financial_exchange_rates")
-    .insert(rows);
+  const { error } = await supabaseClient.from("financial_exchange_rates").insert(rows);
 
   if (error) throw error;
 }
@@ -164,7 +164,9 @@ export function withTryOperationWorkspace(workspace = {}, exchangeRates = defaul
         product: convertProduct(plan.product),
       })),
     equipment: (workspace.equipment || []).map((row) => convertPriceRow(row)),
-    latestPlan: workspace.latestPlan ? { ...workspace.latestPlan, product: convertProduct(workspace.latestPlan.product) } : workspace.latestPlan,
+    latestPlan: workspace.latestPlan
+      ? { ...workspace.latestPlan, product: convertProduct(workspace.latestPlan.product) }
+      : workspace.latestPlan,
     machines: (workspace.machines || []).map((row) => convertPriceRow(row)),
     materials: (workspace.materials || []).map((row) => convertPriceRow(row, "price_per_unit", "price_currency")),
     product: convertProduct(workspace.product),

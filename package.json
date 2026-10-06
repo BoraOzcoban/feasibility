@@ -9,8 +9,9 @@
     "preview": "vite preview",
     "test": "node --test tests/*.test.mjs",
     "lint": "eslint .",
-    "format": "prettier --write \"src/pages/**/*.jsx\" \"src/components/**/*.jsx\" \"src/app/**/*.js\" \"src/styles/*.css\"",
-    "e2e": "playwright test"
+    "format": "prettier --write .",
+    "e2e": "playwright test",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",

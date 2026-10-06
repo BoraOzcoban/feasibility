@@ -8,7 +8,15 @@ test("normalizes a complete financial input set", () => {
     electricityPricePerKwh: 3.2,
     initialCash: 500000,
     loanRows: [
-      { amount: 100000, annualInterestRate: 24, currency: "usd", gracePeriodMonths: 2, loanTermMonths: 12, name: "Equipment loan", receivedDate: "2026-06-10" },
+      {
+        amount: 100000,
+        annualInterestRate: 24,
+        currency: "usd",
+        gracePeriodMonths: 2,
+        loanTermMonths: 12,
+        name: "Equipment loan",
+        receivedDate: "2026-06-10",
+      },
     ],
   });
 
@@ -22,10 +30,14 @@ test("normalizes a complete financial input set", () => {
 });
 
 test("rejects missing required financial assumptions", () => {
-  assert.throws(() => normalizeFinancialModelSettings({
-    ...defaultFinancialSettings,
-    electricityPricePerKwh: "",
-  }), /Missing required financial input: electricityPricePerKwh/);
+  assert.throws(
+    () =>
+      normalizeFinancialModelSettings({
+        ...defaultFinancialSettings,
+        electricityPricePerKwh: "",
+      }),
+    /Missing required financial input: electricityPricePerKwh/,
+  );
 });
 
 test("normalizes unsupported loan currencies to TRY", () => {
@@ -34,7 +46,14 @@ test("normalizes unsupported loan currencies to TRY", () => {
     electricityPricePerKwh: 3.2,
     initialCash: 500000,
     loanRows: [
-      { amount: 100000, annualInterestRate: 24, currency: "gbp", gracePeriodMonths: 0, loanTermMonths: 12, receivedDate: "2026-06-10" },
+      {
+        amount: 100000,
+        annualInterestRate: 24,
+        currency: "gbp",
+        gracePeriodMonths: 0,
+        loanTermMonths: 12,
+        receivedDate: "2026-06-10",
+      },
     ],
   });
 
@@ -54,7 +73,15 @@ test("normalizes the startup feasibility financial assumptions", () => {
     initialCapacityUnits: 12000,
     investmentGrantAmount: 500000,
     loanRows: [
-      { amount: 1500000, annualInterestRate: 38, currency: "TRY", gracePeriodMonths: 3, loanTermMonths: 36, name: "Startup 36 Ay İşletme ve Kapasite Kredisi", receivedDate: "2026-06-28" },
+      {
+        amount: 1500000,
+        annualInterestRate: 38,
+        currency: "TRY",
+        gracePeriodMonths: 3,
+        loanTermMonths: 36,
+        name: "Startup 36 Ay İşletme ve Kapasite Kredisi",
+        receivedDate: "2026-06-28",
+      },
     ],
     monthlyCurrencyIncreasePercent: 1.5,
     monthlyEnergyPriceIncreasePercent: 2,

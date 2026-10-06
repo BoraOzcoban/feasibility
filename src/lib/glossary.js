@@ -8,7 +8,15 @@ export const glossaryEntries = [
     infoTr: "Hazırlık, risk ve modül durumlarının özetlendiği ana çalışma alanı.",
   },
   {
-    en: ["Product", "Product record", "Product definition", "Product to produce", "Product Name", "Product Code", "Product Group"],
+    en: [
+      "Product",
+      "Product record",
+      "Product definition",
+      "Product to produce",
+      "Product Name",
+      "Product Code",
+      "Product Group",
+    ],
     tr: ["Ürün", "Ürün kaydı", "Ürün tanımı", "Üretilecek ürün", "Ürün Adı", "Ürün Kodu", "Ürün Grubu"],
     infoEn: "The sellable item whose recipe, price, process, and demand drive feasibility.",
     infoTr: "Reçete, fiyat, süreç ve talep bilgileriyle fizibiliteyi belirleyen satılabilir kalem.",
@@ -94,8 +102,10 @@ export const glossaryEntries = [
   {
     en: ["Pull", "Pull system", "Kanban"],
     tr: ["Çekme", "Çekme sistemi", "Kanban"],
-    infoEn: "Demand-driven production where downstream need triggers replenishment and safety stock prevents material starvation.",
-    infoTr: "Sonraki proses ihtiyacının ikmali tetiklediği ve güvenli stokun malzeme beklemesini önlediği talep odaklı üretim.",
+    infoEn:
+      "Demand-driven production where downstream need triggers replenishment and safety stock prevents material starvation.",
+    infoTr:
+      "Sonraki proses ihtiyacının ikmali tetiklediği ve güvenli stokun malzeme beklemesini önlediği talep odaklı üretim.",
   },
   {
     en: ["Push", "Push system", "MRP"],
@@ -106,12 +116,20 @@ export const glossaryEntries = [
   {
     en: ["Safety stock", "Minimum safety stock"],
     tr: ["Güvenli stok", "Minimum güvenli stok"],
-    infoEn: "Intermediate stock reserved in Pull mode so downstream production does not stop while waiting for replenishment.",
+    infoEn:
+      "Intermediate stock reserved in Pull mode so downstream production does not stop while waiting for replenishment.",
     infoTr: "Çekme modunda sonraki prosesin ikmal beklerken durmaması için ayrılan ara stok.",
   },
   {
     en: ["Cost", "Daily Cost", "Monthly cost", "Estimated Cost", "Tracked Daily Cost", "Unit production cost"],
-    tr: ["Maliyet", "Günlük Maliyet", "Aylık maliyet", "Tahmini Maliyet", "Takip Edilen Günlük Maliyet", "Birim üretim maliyeti"],
+    tr: [
+      "Maliyet",
+      "Günlük Maliyet",
+      "Aylık maliyet",
+      "Tahmini Maliyet",
+      "Takip Edilen Günlük Maliyet",
+      "Birim üretim maliyeti",
+    ],
     infoEn: "Money spent to produce, operate, finance, or deliver the planned activity.",
     infoTr: "Planlanan faaliyeti üretmek, işletmek, finanse etmek veya teslim etmek için harcanan para.",
   },
@@ -148,8 +166,10 @@ export const glossaryEntries = [
   {
     en: ["Net present value", "NPV"],
     tr: ["Net bugünkü değer", "NBD"],
-    infoEn: "Today's value of the project's future cash flows, discounted at the discount rate, minus the investment. Positive means the project earns more than that rate.",
-    infoTr: "Projenin gelecekteki nakit akışlarının iskonto oranıyla bugüne indirgenmiş değerinden yatırımın düşülmüş hali. Pozitifse proje bu orandan fazla kazandırır.",
+    infoEn:
+      "Today's value of the project's future cash flows, discounted at the discount rate, minus the investment. Positive means the project earns more than that rate.",
+    infoTr:
+      "Projenin gelecekteki nakit akışlarının iskonto oranıyla bugüne indirgenmiş değerinden yatırımın düşülmüş hali. Pozitifse proje bu orandan fazla kazandırır.",
   },
   {
     en: ["Internal rate of return", "IRR"],
@@ -166,14 +186,18 @@ export const glossaryEntries = [
   {
     en: ["Lowest cash", "Lowest cash balance"],
     tr: ["En düşük nakit"],
-    infoEn: "The lowest month-end cash balance over 5 years with the entered starting cash. Below zero means more funding is needed.",
-    infoTr: "Girilen başlangıç nakdiyle 5 yıl içindeki en düşük ay sonu nakit. Sıfırın altındaysa ek finansman gerekir.",
+    infoEn:
+      "The lowest month-end cash balance over 5 years with the entered starting cash. Below zero means more funding is needed.",
+    infoTr:
+      "Girilen başlangıç nakdiyle 5 yıl içindeki en düşük ay sonu nakit. Sıfırın altındaysa ek finansman gerekir.",
   },
   {
     en: ["Capacity use"],
     tr: ["Kapasite kullanımı"],
-    infoEn: "5-year sales demand divided by what the production plan can make. Over 100% means part of the demand cannot be produced.",
-    infoTr: "5 yıllık satış talebinin üretim planının üretebileceği miktara oranı. %100'ün üstü, talebin bir kısmının üretilemeyeceği anlamına gelir.",
+    infoEn:
+      "5-year sales demand divided by what the production plan can make. Over 100% means part of the demand cannot be produced.",
+    infoTr:
+      "5 yıllık satış talebinin üretim planının üretebileceği miktara oranı. %100'ün üstü, talebin bir kısmının üretilemeyeceği anlamına gelir.",
   },
   {
     en: ["Loan", "Loans", "Loan amount", "Total loan", "Loan records"],

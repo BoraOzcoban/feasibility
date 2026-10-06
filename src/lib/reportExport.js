@@ -4,7 +4,19 @@ import { getCurrentOperationPlans, hasViablePlanResult } from "./operationsCalcu
 export const reportPackSections = {
   executive: ["summary", "sensitivity", "income", "cash", "risks"],
   financial: ["summary", "sensitivity", "assumptions", "income", "cash", "balance", "loans", "monthly"],
-  full: ["summary", "sensitivity", "assumptions", "income", "cash", "balance", "loans", "operations", "sales", "risks", "monthly"],
+  full: [
+    "summary",
+    "sensitivity",
+    "assumptions",
+    "income",
+    "cash",
+    "balance",
+    "loans",
+    "operations",
+    "sales",
+    "risks",
+    "monthly",
+  ],
   operations: ["summary", "operations"],
   sales: ["summary", "sales"],
 };
@@ -23,7 +35,8 @@ export function summarizeYears(rows = []) {
     const first = yearRows[0] || {};
     const last = yearRows[yearRows.length - 1] || {};
     const salesRevenue = sum(yearRows, "salesRevenue");
-    const costOfSales = sum(yearRows, "materialCost") + sum(yearRows, "workforceCost") + sum(yearRows, "electricityCost");
+    const costOfSales =
+      sum(yearRows, "materialCost") + sum(yearRows, "workforceCost") + sum(yearRows, "electricityCost");
     const grossProfit = salesRevenue - costOfSales - sum(yearRows, "depreciation") - sum(yearRows, "writeOffCost");
     const operatingProfit = grossProfit - sum(yearRows, "sellingCost") - sum(yearRows, "overheadCost");
     const netIncome = sum(yearRows, "netIncome");
@@ -61,7 +74,8 @@ export function summarizeYears(rows = []) {
       receivables: toFiniteNumber(last.receivables) + toFiniteNumber(last.vatCredit),
       salesRevenue,
       sellingCost: sum(yearRows, "sellingCost"),
-      shortTermLiabilities: toFiniteNumber(last.payables) + toFiniteNumber(last.vatDue) + toFiniteNumber(last.taxPayable),
+      shortTermLiabilities:
+        toFiniteNumber(last.payables) + toFiniteNumber(last.vatDue) + toFiniteNumber(last.taxPayable),
       startingCash: toFiniteNumber(first.cashBalance) - toFiniteNumber(first.cashFlow),
       totalAssets: toFiniteNumber(last.totalAssets),
       totalLiabilitiesAndEquity: toFiniteNumber(last.totalLiabilitiesAndEquity),
@@ -145,12 +159,21 @@ export function buildFeasibilityReport({
       [t("Income tax %", "Gelir vergisi %"), toFiniteNumber(settings.incomeTaxRate)],
       [t("Customer collection days", "Müşteri tahsilat günü"), toFiniteNumber(settings.receivablesCollectionDays)],
       [t("Supplier payment days", "Tedarikçi ödeme günü"), toFiniteNumber(settings.supplierPaymentDays)],
-      [t("Raw material buffer (months)", "Hammadde tampon stoku (ay)"), toFiniteNumber(settings.rawMaterialBufferMonths)],
+      [
+        t("Raw material buffer (months)", "Hammadde tampon stoku (ay)"),
+        toFiniteNumber(settings.rawMaterialBufferMonths),
+      ],
       [t("COGS inflation % / year", "SMM enflasyonu % / yıl"), toFiniteNumber(settings.cogsInflationAnnualPercent)],
-      [t("Overhead inflation % / year", "Genel gider enflasyonu % / yıl"), toFiniteNumber(settings.opexInflationAnnualPercent)],
+      [
+        t("Overhead inflation % / year", "Genel gider enflasyonu % / yıl"),
+        toFiniteNumber(settings.opexInflationAnnualPercent),
+      ],
       [t("Price increase % / year", "Fiyat artışı % / yıl"), toFiniteNumber(settings.priceIncreaseAnnualPercent)],
       [t("Discount rate % / year", "İskonto oranı % / yıl"), toFiniteNumber(summary.discountRateAnnualPercent)],
-      [t("Depreciation (years, straight-line)", "Amortisman (yıl, doğrusal)"), toFiniteNumber(summary.assetUsefulLifeYears)],
+      [
+        t("Depreciation (years, straight-line)", "Amortisman (yıl, doğrusal)"),
+        toFiniteNumber(summary.assetUsefulLifeYears),
+      ],
     ],
     channels: (salesStrategy.channels || []).map((channel) => ({
       collectionDays: toFiniteNumber(channel.collectionDays),
@@ -170,14 +193,32 @@ export function buildFeasibilityReport({
       [t("Unit production cost", "Birim üretim maliyeti"), toFiniteNumber(summary.unitProductionCost), "money2"],
       [t("Initial investment", "Başlangıç yatırımı"), toFiniteNumber(summary.initialInvestment), "money"],
       [t("Own cash required", "Gerekli öz nakit"), toFiniteNumber(summary.initialCashRequired), "money"],
-      [t("Peak working capital", "En yüksek işletme sermayesi"), toFiniteNumber(summary.workingCapitalRequirement), "money"],
+      [
+        t("Peak working capital", "En yüksek işletme sermayesi"),
+        toFiniteNumber(summary.workingCapitalRequirement),
+        "money",
+      ],
       [t("Break-even month", "Başa baş ayı"), summary.breakEvenMonth ?? null, "month"],
       [t("Payback month", "Geri dönüş ayı"), summary.paybackMonth ?? null, "month"],
       [t("Net present value", "Net bugünkü değer"), toFiniteNumber(summary.netPresentValue), "money"],
-      [t("Internal rate of return % / year", "İç verim oranı % / yıl"), summary.internalRateOfReturn ?? null, "percent"],
-      [t("Discount rate % / year", "İskonto oranı % / yıl"), toFiniteNumber(summary.discountRateAnnualPercent), "percent"],
+      [
+        t("Internal rate of return % / year", "İç verim oranı % / yıl"),
+        summary.internalRateOfReturn ?? null,
+        "percent",
+      ],
+      [
+        t("Discount rate % / year", "İskonto oranı % / yıl"),
+        toFiniteNumber(summary.discountRateAnnualPercent),
+        "percent",
+      ],
       [t("Lowest cash balance", "En düşük nakit"), toFiniteNumber(summary.lowestCashBalance), "money"],
-      [t("Capacity use %", "Kapasite kullanımı %"), summary.capacityUtilization === null || summary.capacityUtilization === undefined ? null : summary.capacityUtilization * 100, "percent"],
+      [
+        t("Capacity use %", "Kapasite kullanımı %"),
+        summary.capacityUtilization === null || summary.capacityUtilization === undefined
+          ? null
+          : summary.capacityUtilization * 100,
+        "percent",
+      ],
       [t("Closing cash", "Dönem sonu nakit"), toFiniteNumber(summary.endingCash), "money"],
     ],
     loans: (summary.loanRows || []).map((loan) => ({
@@ -255,16 +296,25 @@ export function buildReportSheets(report, pack, t = (en) => en) {
       data: [
         [headerCell(t("Feasibility report", "Fizibilite raporu")), report.companyName || ""],
         [t("Product", "Ürün"), report.productName || ""],
-        [t("Generated", "Oluşturulma"), report.generatedAt instanceof Date ? report.generatedAt.toISOString().slice(0, 10) : String(report.generatedAt || "")],
+        [
+          t("Generated", "Oluşturulma"),
+          report.generatedAt instanceof Date
+            ? report.generatedAt.toISOString().slice(0, 10)
+            : String(report.generatedAt || ""),
+        ],
         [t("Decision", "Karar"), report.verdict?.label || ""],
         [t("Decision note", "Karar notu"), report.verdict?.copy || ""],
         [null, null],
         ...report.kpis.map(([label, value, format]) => [
           label,
           format === "month"
-            ? (value ? numberCell(value, formats.units) : t("Not reached", "Ulaşılmadı"))
+            ? value
+              ? numberCell(value, formats.units)
+              : t("Not reached", "Ulaşılmadı")
             : format === "percent"
-              ? (value === null ? "-" : numberCell(value, formats.percent))
+              ? value === null
+                ? "-"
+                : numberCell(value, formats.percent)
               : numberCell(value, format === "money2" ? formats.money2 : formats.money),
         ]),
       ],
@@ -273,11 +323,31 @@ export function buildReportSheets(report, pack, t = (en) => en) {
   }
 
   if (sections.includes("sensitivity") && report.sensitivity?.length) {
-    const decisionLabels = { feasible: t("Feasible", "Uygun"), risky: t("Risky", "Riskli"), wait: t("Wait", "Beklenmeli") };
+    const decisionLabels = {
+      feasible: t("Feasible", "Uygun"),
+      risky: t("Risky", "Riskli"),
+      wait: t("Wait", "Beklenmeli"),
+    };
     sheets.push({
-      columns: [{ width: 26 }, { width: 18 }, { width: 16 }, { width: 18 }, { width: 14 }, { width: 18 }, { width: 14 }],
+      columns: [
+        { width: 26 },
+        { width: 18 },
+        { width: 16 },
+        { width: 18 },
+        { width: 14 },
+        { width: 18 },
+        { width: 14 },
+      ],
       data: [
-        [t("Case", "Senaryo"), t("Net present value", "Net bugünkü değer"), t("Change", "Fark"), t("5-year net profit", "5 yıllık net kâr"), t("Payback (months)", "Geri dönüş (ay)"), t("Lowest cash", "En düşük nakit"), t("Decision", "Karar")].map(headerCell),
+        [
+          t("Case", "Senaryo"),
+          t("Net present value", "Net bugünkü değer"),
+          t("Change", "Fark"),
+          t("5-year net profit", "5 yıllık net kâr"),
+          t("Payback (months)", "Geri dönüş (ay)"),
+          t("Lowest cash", "En düşük nakit"),
+          t("Decision", "Karar"),
+        ].map(headerCell),
         ...report.sensitivity.map((row) => [
           row.label || row.lever,
           numberCell(row.netPresentValue),
@@ -303,15 +373,34 @@ export function buildReportSheets(report, pack, t = (en) => en) {
     });
   }
 
-  if (sections.includes("income")) sheets.push(statementSheet(t("Income statement", "Gelir tablosu"), layout.income, report.years, t));
-  if (sections.includes("cash")) sheets.push(statementSheet(t("Cash flow", "Nakit akışı"), layout.cash, report.years, t));
-  if (sections.includes("balance")) sheets.push(statementSheet(t("Balance sheet", "Bilanço"), layout.balance, report.years, t));
+  if (sections.includes("income"))
+    sheets.push(statementSheet(t("Income statement", "Gelir tablosu"), layout.income, report.years, t));
+  if (sections.includes("cash"))
+    sheets.push(statementSheet(t("Cash flow", "Nakit akışı"), layout.cash, report.years, t));
+  if (sections.includes("balance"))
+    sheets.push(statementSheet(t("Balance sheet", "Bilanço"), layout.balance, report.years, t));
 
   if (sections.includes("loans") && report.loans.length) {
     sheets.push({
-      columns: [{ width: 30 }, { width: 14 }, { width: 10 }, { width: 14 }, { width: 12 }, { width: 14 }, { width: 14 }],
+      columns: [
+        { width: 30 },
+        { width: 14 },
+        { width: 10 },
+        { width: 14 },
+        { width: 12 },
+        { width: 14 },
+        { width: 14 },
+      ],
       data: [
-        [t("Loan", "Kredi"), t("Amount", "Tutar"), t("Currency", "Döviz"), t("Interest % / year", "Faiz % / yıl"), t("Term (months)", "Vade (ay)"), t("Grace (months)", "Ödemesiz (ay)"), t("Received", "Kullanım")].map(headerCell),
+        [
+          t("Loan", "Kredi"),
+          t("Amount", "Tutar"),
+          t("Currency", "Döviz"),
+          t("Interest % / year", "Faiz % / yıl"),
+          t("Term (months)", "Vade (ay)"),
+          t("Grace (months)", "Ödemesiz (ay)"),
+          t("Received", "Kullanım"),
+        ].map(headerCell),
         ...report.loans.map((loan) => [
           loan.name,
           numberCell(loan.amount),
@@ -328,9 +417,27 @@ export function buildReportSheets(report, pack, t = (en) => en) {
 
   if (sections.includes("operations")) {
     sheets.push({
-      columns: [{ width: 30 }, { width: 28 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 16 }],
+      columns: [
+        { width: 30 },
+        { width: 28 },
+        { width: 14 },
+        { width: 14 },
+        { width: 14 },
+        { width: 14 },
+        { width: 14 },
+        { width: 16 },
+      ],
       data: [
-        [t("Plan", "Plan"), t("Product", "Ürün"), t("Target / day", "Hedef / gün"), t("Output / day", "Çıktı / gün"), t("Material / unit", "Malzeme / birim"), t("Labour / unit", "İşçilik / birim"), t("Energy / unit", "Enerji / birim"), t("Daily cost", "Günlük maliyet")].map(headerCell),
+        [
+          t("Plan", "Plan"),
+          t("Product", "Ürün"),
+          t("Target / day", "Hedef / gün"),
+          t("Output / day", "Çıktı / gün"),
+          t("Material / unit", "Malzeme / birim"),
+          t("Labour / unit", "İşçilik / birim"),
+          t("Energy / unit", "Enerji / birim"),
+          t("Daily cost", "Günlük maliyet"),
+        ].map(headerCell),
         ...report.plans.map((plan) => [
           plan.name,
           plan.product,
@@ -348,9 +455,27 @@ export function buildReportSheets(report, pack, t = (en) => en) {
 
   if (sections.includes("sales")) {
     sheets.push({
-      columns: [{ width: 28 }, { width: 28 }, { width: 12 }, { width: 16 }, { width: 12 }, { width: 14 }, { width: 12 }, { width: 14 }],
+      columns: [
+        { width: 28 },
+        { width: 28 },
+        { width: 12 },
+        { width: 16 },
+        { width: 12 },
+        { width: 14 },
+        { width: 12 },
+        { width: 14 },
+      ],
       data: [
-        [t("Channel", "Kanal"), t("Product", "Ürün"), t("Start month", "Başlangıç ayı"), t("First month units", "İlk ay adet"), t("Unit price", "Birim fiyat"), t("Commission %", "Komisyon %"), t("Unit CAC", "Birim CAC"), t("Collection days", "Tahsilat günü")].map(headerCell),
+        [
+          t("Channel", "Kanal"),
+          t("Product", "Ürün"),
+          t("Start month", "Başlangıç ayı"),
+          t("First month units", "İlk ay adet"),
+          t("Unit price", "Birim fiyat"),
+          t("Commission %", "Komisyon %"),
+          t("Unit CAC", "Birim CAC"),
+          t("Collection days", "Tahsilat günü"),
+        ].map(headerCell),
         ...report.channels.map((channel) => [
           channel.name,
           channel.product,

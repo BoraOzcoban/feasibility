@@ -3,7 +3,12 @@ import test from "node:test";
 import writeExcelFile from "write-excel-file/node";
 import { buildFinancialFeasibilityModel, buildSensitivityTable } from "../src/lib/feasibilityModel.js";
 import { defaultFinancialSettings, emptyFinancialModel } from "../src/lib/financialService.js";
-import { buildFeasibilityReport, buildReportSheets, reportPackSections, summarizeYears } from "../src/lib/reportExport.js";
+import {
+  buildFeasibilityReport,
+  buildReportSheets,
+  reportPackSections,
+  summarizeYears,
+} from "../src/lib/reportExport.js";
 
 const workspace = {
   equipment: [],
@@ -24,13 +29,35 @@ const plan = {
     workforceRows: [{ hoursUsed: 8, workforceId: "operator" }],
   },
 };
-const settings = { ...defaultFinancialSettings, electricityPricePerKwh: 3, initialCash: 300000, workingDaysPerMonth: 20 };
+const settings = {
+  ...defaultFinancialSettings,
+  electricityPricePerKwh: 3,
+  initialCash: 300000,
+  workingDaysPerMonth: 20,
+};
 const salesStrategy = {
   campaigns: [],
-  channels: [{ collectionDays: 30, commissionPercent: 5, id: "direct", monthlySalesUnits: 1800, name: "Direct", productId: "drink", startMonth: 1, unitSalesPrice: 40 }],
+  channels: [
+    {
+      collectionDays: 30,
+      commissionPercent: 5,
+      id: "direct",
+      monthlySalesUnits: 1800,
+      name: "Direct",
+      productId: "drink",
+      startMonth: 1,
+      unitSalesPrice: 40,
+    },
+  ],
   company: { monthlyMultipliers: Array.from({ length: 12 }, () => 1) },
 };
-const model = buildFinancialFeasibilityModel(emptyFinancialModel, salesStrategy, settings, { ...workspace, activePlans: [plan] }, "5y");
+const model = buildFinancialFeasibilityModel(
+  emptyFinancialModel,
+  salesStrategy,
+  settings,
+  { ...workspace, activePlans: [plan] },
+  "5y",
+);
 const report = buildFeasibilityReport({
   companyName: "Test Co",
   generatedAt: new Date("2026-10-04T00:00:00Z"),
@@ -39,7 +66,10 @@ const report = buildFeasibilityReport({
   productName: "Drink",
   risks: [{ detail: "Demand above capacity", title: "Capacity gap" }],
   salesStrategy,
-  sensitivity: buildSensitivityTable(emptyFinancialModel, salesStrategy, settings, { ...workspace, activePlans: [plan] }),
+  sensitivity: buildSensitivityTable(emptyFinancialModel, salesStrategy, settings, {
+    ...workspace,
+    activePlans: [plan],
+  }),
   settings,
   verdict: { copy: "Check cash", label: "Proceed with care" },
 });
@@ -53,7 +83,9 @@ test("yearly summary adds up the monthly rows and keeps year-end balances", () =
   assert.ok(Math.abs(monthlyNet - yearlyNet) < 1e-6);
   assert.equal(years[4].endingCash, model.trendRows[59].cashBalance);
   years.forEach((year) => assert.ok(Math.abs(year.totalAssets - year.totalLiabilitiesAndEquity) < 1e-4));
-  years.forEach((year) => assert.ok(Math.abs(year.operatingProfit - year.loanInterest - year.incomeTax - year.netIncome) < 1e-4));
+  years.forEach((year) =>
+    assert.ok(Math.abs(year.operatingProfit - year.loanInterest - year.incomeTax - year.netIncome) < 1e-4),
+  );
 });
 
 test("each report pack produces its own sheets", () => {
@@ -62,7 +94,18 @@ test("each report pack produces its own sheets", () => {
   assert.deepEqual(names("executive"), ["Summary", "Sensitivity", "Income statement", "Cash flow", "Risks"]);
   assert.deepEqual(names("operations"), ["Summary", "Production"]);
   // No loans in this scenario, so the full pack has no loan sheet.
-  assert.deepEqual(names("full"), ["Summary", "Sensitivity", "Assumptions", "Income statement", "Cash flow", "Balance sheet", "Production", "Sales channels", "Risks", "Monthly"]);
+  assert.deepEqual(names("full"), [
+    "Summary",
+    "Sensitivity",
+    "Assumptions",
+    "Income statement",
+    "Cash flow",
+    "Balance sheet",
+    "Production",
+    "Sales channels",
+    "Risks",
+    "Monthly",
+  ]);
   assert.equal(reportPackSections.full.includes("loans"), true);
 });
 

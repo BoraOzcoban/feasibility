@@ -10,7 +10,9 @@ export function withoutNegativeZero(value, maximumFractionDigits) {
 
 export function formatNumber(value, maximumFractionDigits = 0) {
   const locale = document.documentElement.lang === "tr" ? "tr-TR" : "en-US";
-  return new Intl.NumberFormat(locale, { maximumFractionDigits }).format(withoutNegativeZero(value, maximumFractionDigits));
+  return new Intl.NumberFormat(locale, { maximumFractionDigits }).format(
+    withoutNegativeZero(value, maximumFractionDigits),
+  );
 }
 
 export const countableUnits = new Set(["", "adet", "ad", "pcs", "pc", "piece", "pieces", "unit", "units"]);
@@ -18,7 +20,16 @@ export const countableUnits = new Set(["", "adet", "ad", "pcs", "pc", "piece", "
 // Pieces are shown as whole numbers ("545 adet", not "545,46 adet");
 // measured units such as kg or litre keep two decimals.
 export function formatQuantity(value, unit = "") {
-  return formatNumber(value, countableUnits.has(String(unit || "").trim().toLowerCase()) ? 0 : 2);
+  return formatNumber(
+    value,
+    countableUnits.has(
+      String(unit || "")
+        .trim()
+        .toLowerCase(),
+    )
+      ? 0
+      : 2,
+  );
 }
 
 export function formatLira(value, maximumFractionDigits = 0) {
@@ -45,7 +56,12 @@ export function formatCurrencyAmount(value, currency = "TRY", maximumFractionDig
   }
 }
 
-export function formatOperationMoney(value, currency = "TRY", exchangeRates = defaultExchangeRates, maximumFractionDigits = 2) {
+export function formatOperationMoney(
+  value,
+  currency = "TRY",
+  exchangeRates = defaultExchangeRates,
+  maximumFractionDigits = 2,
+) {
   const currencyCode = normalizeCurrencyCode(currency);
   const originalValue = Math.max(0, toFiniteNumber(value));
   const originalLabel = formatCurrencyAmount(originalValue, currencyCode, maximumFractionDigits);
@@ -98,8 +114,10 @@ export function formatCycleTime(minutes, preferredUnit, maximumFractionDigits = 
 
 export function formatMinutesDuration(minutes) {
   const safeMinutes = Math.max(0, toFiniteNumber(minutes));
-  if (safeMinutes >= 1440) return `${formatNumber(safeMinutes / 1440, 2)} ${document.documentElement.lang === "tr" ? "gün" : "days"}`;
-  if (safeMinutes >= 60) return `${formatNumber(safeMinutes / 60, 2)} ${document.documentElement.lang === "tr" ? "saat" : "hours"}`;
+  if (safeMinutes >= 1440)
+    return `${formatNumber(safeMinutes / 1440, 2)} ${document.documentElement.lang === "tr" ? "gün" : "days"}`;
+  if (safeMinutes >= 60)
+    return `${formatNumber(safeMinutes / 60, 2)} ${document.documentElement.lang === "tr" ? "saat" : "hours"}`;
   return `${formatNumber(safeMinutes, 2)} ${document.documentElement.lang === "tr" ? "dk" : "min"}`;
 }
 
@@ -120,7 +138,8 @@ export function formatTrendAxisAmount(value) {
   const sign = safeValue < 0 ? "-" : "";
   const isTurkish = document.documentElement.lang === "tr";
 
-  if (absoluteValue >= 1_000_000_000) return `${sign}${formatNumber(absoluteValue / 1_000_000_000, 1)} ${isTurkish ? "Mr" : "B"}`;
+  if (absoluteValue >= 1_000_000_000)
+    return `${sign}${formatNumber(absoluteValue / 1_000_000_000, 1)} ${isTurkish ? "Mr" : "B"}`;
   if (absoluteValue >= 1_000_000) return `${sign}${formatNumber(absoluteValue / 1_000_000, 1)} Mn`;
   if (absoluteValue >= 1_000) return `${sign}${formatNumber(absoluteValue / 1_000, 1)} ${isTurkish ? "Bin" : "K"}`;
 

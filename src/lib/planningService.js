@@ -91,12 +91,10 @@ function mapSalesType(row) {
 function throwPlanningError(error) {
   const message = error?.message || "";
 
-  if (
-    error?.code === "42P01" ||
-    message.includes("schema cache") ||
-    message.includes("Could not find the table")
-  ) {
-    throw new Error("Planning tables are missing in the database. Apply the migrations in supabase/migrations, then refresh this page.");
+  if (error?.code === "42P01" || message.includes("schema cache") || message.includes("Could not find the table")) {
+    throw new Error(
+      "Planning tables are missing in the database. Apply the migrations in supabase/migrations, then refresh this page.",
+    );
   }
 
   throw error;
@@ -117,10 +115,7 @@ export async function loadSalesStrategy(supabase) {
       .from("sales_channels")
       .select("*, product:operation_products(id, name, unit, price), type:sales_channel_types(*)")
       .order("created_at", { ascending: true }),
-    supabase
-      .from("sales_campaigns")
-      .select("*, type:sales_campaign_types(*)")
-      .order("created_at", { ascending: true }),
+    supabase.from("sales_campaigns").select("*, type:sales_campaign_types(*)").order("created_at", { ascending: true }),
   ]);
 
   if (channelTypesError) throwPlanningError(channelTypesError);
@@ -227,26 +222,25 @@ export async function loadSimulationVariants(supabase) {
 }
 
 export async function saveSimulationVariant(supabase, companyId, variant) {
-  const { error } = await supabase.from("simulation_variants").upsert({
-    company_id: companyId,
-    id: variant.id,
-    label: variant.label || variant.name || variant.id,
-    name: variant.name || variant.label || variant.id,
-    parameters: {
-      ...defaultSimulationParameters,
-      ...(variant.parameters || {}),
+  const { error } = await supabase.from("simulation_variants").upsert(
+    {
+      company_id: companyId,
+      id: variant.id,
+      label: variant.label || variant.name || variant.id,
+      name: variant.name || variant.label || variant.id,
+      parameters: {
+        ...defaultSimulationParameters,
+        ...(variant.parameters || {}),
+      },
+      path: variant.path || `/simulation/${variant.id}`,
     },
-    path: variant.path || `/simulation/${variant.id}`,
-  }, { onConflict: "company_id,id" });
+    { onConflict: "company_id,id" },
+  );
 
   if (error) throwPlanningError(error);
 }
 
 export async function deleteSimulationVariantRecord(supabase, companyId, id) {
-  const { error } = await supabase
-    .from("simulation_variants")
-    .delete()
-    .eq("company_id", companyId)
-    .eq("id", id);
+  const { error } = await supabase.from("simulation_variants").delete().eq("company_id", companyId).eq("id", id);
   if (error) throwPlanningError(error);
 }

@@ -1,6 +1,13 @@
 // Data preparation for the income/expense trend chart and the loan calendar.
 
-import { addMonths, getMonthDifference, getMonthKey, getMonthStart, parseDateInput, toFiniteNumber } from "./feasibilityModel";
+import {
+  addMonths,
+  getMonthDifference,
+  getMonthKey,
+  getMonthStart,
+  parseDateInput,
+  toFiniteNumber,
+} from "./feasibilityModel";
 import { formatCompactMonthLabel, formatMonthLabel, formatTrendAxisAmount } from "./format";
 
 export function getNiceTrendTickStep(maxValue, targetSegments = 6) {
@@ -17,7 +24,7 @@ export function getTrendAxisScale(maxValue) {
   const axisMax = Math.max(tickStep, Math.ceil(Math.max(1, toFiniteNumber(maxValue)) / tickStep) * tickStep);
   const tickValues = [];
 
-  for (let value = 0; value <= axisMax + (tickStep / 2); value += tickStep) {
+  for (let value = 0; value <= axisMax + tickStep / 2; value += tickStep) {
     tickValues.push(Math.min(value, axisMax));
   }
 
@@ -44,14 +51,11 @@ export function buildIncomeExpenseTrendChart(rows = []) {
     date: getFinancialTrendRowDate(row, index),
     revenue: Math.max(0, toFiniteNumber(row.salesRevenue)),
   }));
-  const maxValue = Math.max(
-    1,
-    ...sanitizedRows.flatMap((row) => [row.revenue, row.cost]),
-  );
+  const maxValue = Math.max(1, ...sanitizedRows.flatMap((row) => [row.revenue, row.cost]));
   const axisScale = getTrendAxisScale(maxValue);
   const yTicks = axisScale.tickValues.map((value) => {
     const ratio = value / axisScale.axisMax;
-    const y = plot.bottom - (ratio * (plot.bottom - plot.top));
+    const y = plot.bottom - ratio * (plot.bottom - plot.top);
 
     return {
       label: formatTrendAxisAmount(value),
@@ -59,17 +63,15 @@ export function buildIncomeExpenseTrendChart(rows = []) {
       y,
     };
   });
-  const getX = (index) => (
-    sanitizedRows.length <= 1
-      ? plot.left
-      : plot.left + (index * ((plot.right - plot.left) / (sanitizedRows.length - 1)))
-  );
-  const getY = (value) => plot.bottom - ((Math.max(0, value) / axisScale.axisMax) * (plot.bottom - plot.top));
-  const getPoints = (field) => sanitizedRows.map((row, index) => ({
-    value: row[field],
-    x: getX(index),
-    y: getY(row[field]),
-  }));
+  const getX = (index) =>
+    sanitizedRows.length <= 1 ? plot.left : plot.left + index * ((plot.right - plot.left) / (sanitizedRows.length - 1));
+  const getY = (value) => plot.bottom - (Math.max(0, value) / axisScale.axisMax) * (plot.bottom - plot.top);
+  const getPoints = (field) =>
+    sanitizedRows.map((row, index) => ({
+      value: row[field],
+      x: getX(index),
+      y: getY(row[field]),
+    }));
   const buildPath = (points) => {
     if (!points.length) return "";
     if (points.length === 1) return `M${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
@@ -80,8 +82,8 @@ export function buildIncomeExpenseTrendChart(rows = []) {
       const previous = points[index - 1];
       const beforePrevious = points[index - 2] || previous;
       const next = points[index + 1] || point;
-      const controlOneX = previous.x + ((point.x - beforePrevious.x) / 6);
-      const controlTwoX = point.x - ((next.x - previous.x) / 6);
+      const controlOneX = previous.x + (point.x - beforePrevious.x) / 6;
+      const controlTwoX = point.x - (next.x - previous.x) / 6;
 
       return `${path} C${controlOneX.toFixed(2)} ${previous.y.toFixed(2)}, ${controlTwoX.toFixed(2)} ${point.y.toFixed(2)}, ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
     }, "");

@@ -37,7 +37,10 @@ function getTransferBatchSize(strategy, targetQuantity, batchSize, minimumTransf
   const safeTargetQuantity = Math.max(0, toFiniteNumber(targetQuantity));
   if (safeTargetQuantity <= 0) return 0;
 
-  const safeMinimumTransferQuantity = Math.max(1, Math.min(safeTargetQuantity, toFiniteNumber(minimumTransferQuantity, 1)));
+  const safeMinimumTransferQuantity = Math.max(
+    1,
+    Math.min(safeTargetQuantity, toFiniteNumber(minimumTransferQuantity, 1)),
+  );
   if (strategy === "push") return safeTargetQuantity;
 
   return Math.max(
@@ -64,10 +67,7 @@ function normalizeOperationRows(operationRows, machines, machineRows, productCyc
         1,
         toFiniteNumber(row.capacity ?? row.concurrentCapacity ?? machine?.concurrent_capacity, 1),
       );
-      const speedMultiplier = Math.max(
-        0.0001,
-        toFiniteNumber(row.speedMultiplier ?? row.speed_multiplier, 1),
-      );
+      const speedMultiplier = Math.max(0.0001, toFiniteNumber(row.speedMultiplier ?? row.speed_multiplier, 1));
       const availabilityHours = Math.max(
         0,
         toFiniteNumber(row.dailyHours ?? row.availabilityHours ?? machine?.availability_hours, machinePlanHours || 8),
@@ -115,9 +115,10 @@ function buildBatchCandidates(targetQuantity, minimumTransferQuantity, currentBa
     safeTargetQuantity,
   ]);
   const maxCandidateCount = 80;
-  const rawStep = safeTargetQuantity / safeMinimumTransferQuantity <= maxCandidateCount
-    ? safeMinimumTransferQuantity
-    : Math.ceil((safeTargetQuantity / maxCandidateCount) / safeMinimumTransferQuantity) * safeMinimumTransferQuantity;
+  const rawStep =
+    safeTargetQuantity / safeMinimumTransferQuantity <= maxCandidateCount
+      ? safeMinimumTransferQuantity
+      : Math.ceil(safeTargetQuantity / maxCandidateCount / safeMinimumTransferQuantity) * safeMinimumTransferQuantity;
   const step = Math.max(safeMinimumTransferQuantity, rawStep);
 
   for (let batch = safeMinimumTransferQuantity; batch <= safeTargetQuantity; batch += step) {
@@ -192,7 +193,9 @@ function scheduleGroupOnMachine(machineState, operation, group, precedenceReadyM
   if (setupMinutes > 0) {
     const setupStartMinutes = Math.max(precedenceReadyMinutes, ...machineState.slotAvailableAt);
     const setupFinishMinutes = setupStartMinutes + setupMinutes;
-    machineState.slotAvailableAt = machineState.slotAvailableAt.map((slotTime) => Math.max(slotTime, setupFinishMinutes));
+    machineState.slotAvailableAt = machineState.slotAvailableAt.map((slotTime) =>
+      Math.max(slotTime, setupFinishMinutes),
+    );
     addInterval(machineState.intervals, setupStartMinutes, setupFinishMinutes);
     addInterval(groupIntervals, setupStartMinutes, setupFinishMinutes);
     startMinutes = setupStartMinutes;
@@ -210,9 +213,8 @@ function scheduleGroupOnMachine(machineState, operation, group, precedenceReadyM
     addInterval(machineState.intervals, unitStartMinutes, unitFinishMinutes);
     addInterval(groupIntervals, unitStartMinutes, unitFinishMinutes);
     startMinutes = startMinutes === null ? unitStartMinutes : Math.min(startMinutes, unitStartMinutes);
-    processingStartMinutes = processingStartMinutes === null
-      ? unitStartMinutes
-      : Math.min(processingStartMinutes, unitStartMinutes);
+    processingStartMinutes =
+      processingStartMinutes === null ? unitStartMinutes : Math.min(processingStartMinutes, unitStartMinutes);
     finishMinutes = Math.max(finishMinutes, unitFinishMinutes);
   }
 
@@ -232,9 +234,7 @@ function scheduleGroupOnMachine(machineState, operation, group, precedenceReadyM
 function runOperationSchedule(operationRows, options = {}) {
   const targetQuantity = Math.max(0, toFiniteNumber(options.targetQuantity));
   const isPull = options.flowStrategy === "pull";
-  const minimumSafetyStockQuantity = isPull
-    ? Math.max(0, toFiniteNumber(options.safetyStockQuantity))
-    : 0;
+  const minimumSafetyStockQuantity = isPull ? Math.max(0, toFiniteNumber(options.safetyStockQuantity)) : 0;
   const transferBatchSize = getTransferBatchSize(
     options.flowStrategy,
     targetQuantity,
@@ -275,11 +275,7 @@ function runOperationSchedule(operationRows, options = {}) {
     groups.forEach((group, groupIndex) => {
       const precedenceReadyMinutes = operationIndex === 0 || isPull ? 0 : previousFinishes[groupIndex] || 0;
       const machineAvailableBefore = Math.min(
-        ...(
-          machineState.slotAvailableAt.length
-            ? machineState.slotAvailableAt
-            : [0]
-        ),
+        ...(machineState.slotAvailableAt.length ? machineState.slotAvailableAt : [0]),
       );
       const scheduledGroup = scheduleGroupOnMachine(
         machineState,
@@ -288,18 +284,18 @@ function runOperationSchedule(operationRows, options = {}) {
         precedenceReadyMinutes,
         groupIndex === 0,
       );
-      const stockoutWaitMinutes = operationIndex === 0 || isPull
-        ? 0
-        : Math.max(0, precedenceReadyMinutes - machineAvailableBefore);
+      const stockoutWaitMinutes =
+        operationIndex === 0 || isPull ? 0 : Math.max(0, precedenceReadyMinutes - machineAvailableBefore);
 
       scheduledGroup.groupIntervals.forEach((interval) => operationIntervals.push(interval));
       operationWaitMinutes += scheduledGroup.waitMinutes;
       totalQueueWaitMinutes += scheduledGroup.waitMinutes;
       totalStockoutWaitMinutes += stockoutWaitMinutes;
       makespanMinutes = Math.max(makespanMinutes, scheduledGroup.finishMinutes);
-      firstStartMinutes = firstStartMinutes === null
-        ? scheduledGroup.startMinutes
-        : Math.min(firstStartMinutes, scheduledGroup.startMinutes);
+      firstStartMinutes =
+        firstStartMinutes === null
+          ? scheduledGroup.startMinutes
+          : Math.min(firstStartMinutes, scheduledGroup.startMinutes);
       lastFinishMinutes = Math.max(lastFinishMinutes, scheduledGroup.finishMinutes);
       currentFinishes[groupIndex] = scheduledGroup.finishMinutes;
 
@@ -385,9 +381,7 @@ function runOperationSchedule(operationRows, options = {}) {
     });
 
     const requiredSafetyStockQuantity = isPull ? Math.max(0, -minimumRawLevel) : 0;
-    const bufferSafetyStockQuantity = isPull
-      ? Math.max(minimumSafetyStockQuantity, requiredSafetyStockQuantity)
-      : 0;
+    const bufferSafetyStockQuantity = isPull ? Math.max(minimumSafetyStockQuantity, requiredSafetyStockQuantity) : 0;
     let level = bufferSafetyStockQuantity;
     let lastTimeMinutes = 0;
     let bufferArea = 0;
@@ -408,9 +402,10 @@ function runOperationSchedule(operationRows, options = {}) {
     maxWipQuantity = Math.max(maxWipQuantity, bufferMaxWip);
     bufferRows.push({
       averageWip: makespanMinutes ? bufferArea / makespanMinutes : 0,
-      bufferLimitBreached: toFiniteNumber(options.bufferMaxQuantity) > 0
-        ? bufferMaxWip > toFiniteNumber(options.bufferMaxQuantity)
-        : false,
+      bufferLimitBreached:
+        toFiniteNumber(options.bufferMaxQuantity) > 0
+          ? bufferMaxWip > toFiniteNumber(options.bufferMaxQuantity)
+          : false,
       bufferMaxQuantity: Math.max(0, toFiniteNumber(options.bufferMaxQuantity)),
       fromOperationName: operationRows[operationIndex]?.operationName || `Operation ${operationIndex + 1}`,
       maxWip: bufferMaxWip,
@@ -423,10 +418,13 @@ function runOperationSchedule(operationRows, options = {}) {
 
   const queueWaitingTimeHours = totalQueueWaitMinutes / 60;
   const stockoutWaitTimeHours = totalStockoutWaitMinutes / 60;
-  const waitingCost = (queueWaitingTimeHours + stockoutWaitTimeHours)
-    * Math.max(0, toFiniteNumber(options.waitingCostPerHour));
+  const waitingCost =
+    (queueWaitingTimeHours + stockoutWaitTimeHours) * Math.max(0, toFiniteNumber(options.waitingCostPerHour));
   const inventoryCost = (totalWipUnitMinutes / 60) * Math.max(0, toFiniteNumber(options.inventoryCostPerUnitHour));
-  const scheduleWindowMinutes = Math.max(...operationRows.map((row) => Math.max(0, toFiniteNumber(row.dailyHours)) * 60), 0);
+  const scheduleWindowMinutes = Math.max(
+    ...operationRows.map((row) => Math.max(0, toFiniteNumber(row.dailyHours)) * 60),
+    0,
+  );
   const delayMinutes = Math.max(0, makespanMinutes - scheduleWindowMinutes);
   const delayCost = (delayMinutes / 60) * Math.max(0, toFiniteNumber(options.delayCostPerHour));
   let totalIdleTimeHours = 0;
@@ -454,9 +452,11 @@ function runOperationSchedule(operationRows, options = {}) {
   });
 
   const capacityLossCost = totalIdleTimeHours * Math.max(0, toFiniteNumber(options.capacityLossCostPerHour));
-  const bottleneckOperation = operationRows.reduce((current, operation) => (
-    !current || toFiniteNumber(operation.busyMinutes) > toFiniteNumber(current.busyMinutes) ? operation : current
-  ), null);
+  const bottleneckOperation = operationRows.reduce(
+    (current, operation) =>
+      !current || toFiniteNumber(operation.busyMinutes) > toFiniteNumber(current.busyMinutes) ? operation : current,
+    null,
+  );
   const objectiveScore = makespanMinutes + waitingCost + inventoryCost + delayCost + capacityLossCost;
 
   return {
@@ -506,14 +506,30 @@ function normalizeFlowStrategy(value) {
   return "pull";
 }
 
-function simulateOperationFlow(operationRows, plan, workspace, machineRows, productCycleTimeMinutes, product = {}, options = {}) {
+function simulateOperationFlow(
+  operationRows,
+  plan,
+  workspace,
+  machineRows,
+  productCycleTimeMinutes,
+  product = {},
+  options = {},
+) {
   const productFlowStrategy = normalizeFlowStrategy(product.default_flow_strategy || product.defaultFlowStrategy);
-  const flowStrategy = normalizeFlowStrategy(String(getPlanValue(plan, "flowStrategy", productFlowStrategy) || productFlowStrategy));
+  const flowStrategy = normalizeFlowStrategy(
+    String(getPlanValue(plan, "flowStrategy", productFlowStrategy) || productFlowStrategy),
+  );
   const targetQuantity = Math.max(0, toFiniteNumber(getPlanValue(plan, "targetQuantity", 0)));
-  const productMinimumTransferQuantity = Math.max(1, toFiniteNumber(product.minimum_transfer_quantity ?? product.minimumTransferQuantity, 1));
+  const productMinimumTransferQuantity = Math.max(
+    1,
+    toFiniteNumber(product.minimum_transfer_quantity ?? product.minimumTransferQuantity, 1),
+  );
   const minimumTransferQuantity = Math.max(
     1,
-    toFiniteNumber(getPlanValue(plan, "minimumTransferQuantity", productMinimumTransferQuantity), productMinimumTransferQuantity),
+    toFiniteNumber(
+      getPlanValue(plan, "minimumTransferQuantity", productMinimumTransferQuantity),
+      productMinimumTransferQuantity,
+    ),
   );
   const productBatchSize = Math.max(
     minimumTransferQuantity,
@@ -527,16 +543,22 @@ function simulateOperationFlow(operationRows, plan, workspace, machineRows, prod
     0,
     toFiniteNumber(product.default_safety_stock_quantity ?? product.defaultSafetyStockQuantity, 0),
   );
-  const safetyStockQuantity = flowStrategy === "pull"
-    ? Math.max(
-        0,
-        toFiniteNumber(
-          getPlanValue(plan, "safetyStockQuantity", productSafetyStockQuantity),
-          productSafetyStockQuantity,
-        ),
-      )
-    : 0;
-  const normalizedRows = normalizeOperationRows(operationRows, workspace.machines || [], machineRows, productCycleTimeMinutes);
+  const safetyStockQuantity =
+    flowStrategy === "pull"
+      ? Math.max(
+          0,
+          toFiniteNumber(
+            getPlanValue(plan, "safetyStockQuantity", productSafetyStockQuantity),
+            productSafetyStockQuantity,
+          ),
+        )
+      : 0;
+  const normalizedRows = normalizeOperationRows(
+    operationRows,
+    workspace.machines || [],
+    machineRows,
+    productCycleTimeMinutes,
+  );
 
   if (!normalizedRows.length || targetQuantity <= 0) return null;
 
@@ -553,18 +575,21 @@ function simulateOperationFlow(operationRows, plan, workspace, machineRows, prod
     targetQuantity,
     waitingCostPerHour: Math.max(0, toFiniteNumber(getPlanValue(plan, "waitingCostPerHour", 0))),
   };
-  const schedule = runOperationSchedule(normalizedRows.map((row) => ({ ...row })), scheduleOptions);
+  const schedule = runOperationSchedule(
+    normalizedRows.map((row) => ({ ...row })),
+    scheduleOptions,
+  );
   const shouldOptimize = options.optimize !== false && flowStrategy === "pull";
   const candidates = shouldOptimize ? buildBatchCandidates(targetQuantity, minimumTransferQuantity, batchSize) : [];
   const optimal = shouldOptimize
     ? candidates
-        .map((candidateBatchSize) => runOperationSchedule(
-          normalizedRows.map((row) => ({ ...row })),
-          { ...scheduleOptions, batchSize: candidateBatchSize, flowStrategy: "pull" },
-        ))
-        .reduce((best, candidate) => (
-          !best || candidate.objectiveScore < best.objectiveScore ? candidate : best
-        ), null)
+        .map((candidateBatchSize) =>
+          runOperationSchedule(
+            normalizedRows.map((row) => ({ ...row })),
+            { ...scheduleOptions, batchSize: candidateBatchSize, flowStrategy: "pull" },
+          ),
+        )
+        .reduce((best, candidate) => (!best || candidate.objectiveScore < best.objectiveScore ? candidate : best), null)
     : null;
   const savedOptimization = plan.result?.optimization || null;
 
@@ -574,8 +599,9 @@ function simulateOperationFlow(operationRows, plan, workspace, machineRows, prod
     flowStrategy,
     minimumTransferQuantity,
     safetyStockQuantity: schedule.safetyStockQuantity,
-    optimization: flowStrategy === "pull"
-      ? (optimal
+    optimization:
+      flowStrategy === "pull"
+        ? optimal
           ? {
               objectiveScore: optimal.objectiveScore,
               recommendedBatchSize: optimal.transferBatchSize,
@@ -584,8 +610,8 @@ function simulateOperationFlow(operationRows, plan, workspace, machineRows, prod
               waitingCost: optimal.waitingCost,
               inventoryCost: optimal.inventoryCost,
             }
-          : savedOptimization)
-      : null,
+          : savedOptimization
+        : null,
     targetQuantity,
   };
 }
@@ -623,8 +649,19 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = 
     dailyQuantity: row.dailyQuantity,
     materialId: row.materialId,
   }));
-  const productCycleTimeMinutes = Math.max(0.0001, toFiniteNumber(product.cycle_time_minutes, toFiniteNumber(plan.result?.cycleTimeMinutes, 1)));
-  const flowSimulation = simulateOperationFlow(operationRows, plan, workspace, machineRows, productCycleTimeMinutes, product, options);
+  const productCycleTimeMinutes = Math.max(
+    0.0001,
+    toFiniteNumber(product.cycle_time_minutes, toFiniteNumber(plan.result?.cycleTimeMinutes, 1)),
+  );
+  const flowSimulation = simulateOperationFlow(
+    operationRows,
+    plan,
+    workspace,
+    machineRows,
+    productCycleTimeMinutes,
+    product,
+    options,
+  );
   let machineHoursUsed = 0;
   let primaryMachineDailyHours = 0;
   let energyConsumptionKwh = 0;
@@ -668,7 +705,8 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = 
     });
   }
 
-  const producedQuantity = flowSimulation?.producedQuantity ?? ((primaryMachineDailyHours * 60) / productCycleTimeMinutes);
+  const producedQuantity =
+    flowSimulation?.producedQuantity ?? (primaryMachineDailyHours * 60) / productCycleTimeMinutes;
   const recipeRows = asObjectArray(product.material_rows);
   const materialSummary = (recipeRows.length ? recipeRows : manualMaterialRows)
     .map((row) => {
@@ -744,17 +782,18 @@ export function calculateCurrentPlanResult(plan = {}, workspace = {}, options = 
 }
 
 export function getCurrentOperationPlans(workspace = {}, options = {}) {
-  const sourcePlans = Array.isArray(workspace.activePlans) && workspace.activePlans.length
-    ? workspace.activePlans
-    : (workspace.latestPlan ? [workspace.latestPlan] : []);
+  const sourcePlans =
+    Array.isArray(workspace.activePlans) && workspace.activePlans.length
+      ? workspace.activePlans
+      : workspace.latestPlan
+        ? [workspace.latestPlan]
+        : [];
 
   return sourcePlans
     .filter((plan) => plan && typeof plan === "object")
     .map((plan) => ({
       ...plan,
-      result: !options.recalculate && plan.result
-        ? plan.result
-        : calculateCurrentPlanResult(plan, workspace, options),
+      result: !options.recalculate && plan.result ? plan.result : calculateCurrentPlanResult(plan, workspace, options),
     }));
 }
 

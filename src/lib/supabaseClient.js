@@ -7,6 +7,4 @@ const normalizedSupabaseUrl = supabaseUrl?.replace(/\/rest\/v1\/?$/, "").replace
 
 export const isSupabaseConfigured = Boolean(normalizedSupabaseUrl && supabaseAnonKey);
 
-export const supabase = isSupabaseConfigured
-  ? createClient(normalizedSupabaseUrl, supabaseAnonKey)
-  : null;
+export const supabase = isSupabaseConfigured ? createClient(normalizedSupabaseUrl, supabaseAnonKey) : null;
