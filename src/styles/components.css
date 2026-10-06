@@ -91,7 +91,7 @@
     font-size: var(--text-lg);
   }
 
-  .card-header > div > span:first-child {
+  .card-header > div:first-child > span:first-child {
     color: var(--ink-muted);
     display: block;
     font-size: var(--text-xs);
@@ -138,6 +138,52 @@
   .planner-empty-state {
     color: var(--ink-muted);
     margin: 0;
+  }
+
+  .form-grid.compact {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+
+  /* Collapsible sub-section inside a card. */
+  .sub-section > summary {
+    color: var(--brand);
+    cursor: pointer;
+    font-weight: var(--weight-semibold);
+    padding: var(--space-1) 0;
+  }
+
+  .sub-section[open] > summary {
+    margin-bottom: var(--space-3);
+  }
+
+  .badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* Two or three mutually exclusive options. */
+  .segmented {
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+  }
+
+  .segmented button {
+    background: transparent;
+    border: 0;
+    color: var(--ink-muted);
+    min-height: 30px;
+    padding: 0 var(--space-3);
+  }
+
+  .segmented button.active {
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+    color: var(--ink);
   }
 
   /* ---------- Facts: label over value, wrapping ---------- */

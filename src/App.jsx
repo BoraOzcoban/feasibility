@@ -59,8 +59,7 @@ import {
   getCycleTimeMinutes,
   normalizeCycleTimeUnit,
 } from "./lib/format";
-import { normalizeGlossaryText } from "./lib/glossary";
-import { cloneSalesVisibleSections, createUnsavedWorkspaceSnapshot, getStoredSalesVisibleSections, normalizeSalesVisibleSections, salesStrategyStorageKey } from "./lib/uiPreferences";
+import { createUnsavedWorkspaceSnapshot } from "./lib/unsavedChanges";
 import { fetchExchangeRates, isMissingExchangeRatesTableError, loadLatestExchangeRatesFromSupabase, saveExchangeRatesToSupabase, withTryOperationWorkspace } from "./lib/exchangeRates";
 import { text } from "./i18n/text";
 import { isSignedInRoute, normalizeRoutePath } from "./lib/routes";
@@ -80,8 +79,6 @@ function App() {
   const [currentProfile, setCurrentProfile] = useState(null);
   // Narrow screens start with the menu closed; it overlays the page when opened.
   const [dashboardSidebarOpen, setDashboardSidebarOpen] = useState(() => typeof window === "undefined" || window.innerWidth > 1024);
-  const [salesEditorOpen, setSalesEditorOpen] = useState(false);
-  const [salesVisibleSections, setSalesVisibleSections] = useState(getStoredSalesVisibleSections);
   const [savedWorkspaceSnapshot, setSavedWorkspaceSnapshot] = useState("");
   const [unsavedPrompt, setUnsavedPrompt] = useState({
     message: "",
@@ -114,7 +111,6 @@ function App() {
   const [processDefinitionOpen, setProcessDefinitionOpen] = useState(false);
   const [operationsLoading, setOperationsLoading] = useState(false);
   const [operationsStatus, setOperationsStatus] = useState("");
-  const [tableControls, setTableControls] = useState({});
   const [salesStrategy, setSalesStrategy] = useState(emptySalesStrategy);
   const [salesStatus, setSalesStatus] = useState("");
   const [salesLoading, setSalesLoading] = useState(false);
@@ -137,7 +133,9 @@ function App() {
   const copy = (en, tr) => (form.language === "tr" ? tr : en);
   const locale = form.language === "tr" ? "tr-TR" : "en-US";
   const workspaceSnapshotRef = useRef("");
-  const syncSavedWorkspaceSnapshotRef = useRef(false);
+  // Bumped after a load or save; the effect below then records the snapshot
+  // of the state that load or save produced as the saved one.
+  const [workspaceCleanRequest, setWorkspaceCleanRequest] = useState(0);
 
   const editableWorkspaceSnapshot = useMemo(() => createUnsavedWorkspaceSnapshot({
     financialExtraCostForm,
@@ -173,22 +171,12 @@ function App() {
   }, [form.language]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    window.localStorage.setItem(
-      salesStrategyStorageKey,
-      JSON.stringify(normalizeSalesVisibleSections(salesVisibleSections)),
-    );
-  }, [salesVisibleSections]);
+    workspaceSnapshotRef.current = editableWorkspaceSnapshot;
+  }, [editableWorkspaceSnapshot]);
 
   useEffect(() => {
-    workspaceSnapshotRef.current = editableWorkspaceSnapshot;
-
-    if (syncSavedWorkspaceSnapshotRef.current) {
-      syncSavedWorkspaceSnapshotRef.current = false;
-      setSavedWorkspaceSnapshot(editableWorkspaceSnapshot);
-    }
-  }, [editableWorkspaceSnapshot]);
+    if (workspaceCleanRequest) setSavedWorkspaceSnapshot(workspaceSnapshotRef.current);
+  }, [workspaceCleanRequest]);
 
   useEffect(() => {
     if (!session) {
@@ -389,8 +377,7 @@ function App() {
   }, [currentProfile?.company_id]);
 
   function markWorkspaceSnapshotClean() {
-    syncSavedWorkspaceSnapshotRef.current = true;
-    setSavedWorkspaceSnapshot(workspaceSnapshotRef.current || editableWorkspaceSnapshot);
+    setWorkspaceCleanRequest((count) => count + 1);
   }
 
   function goTo(pathname, nextMode, options = {}) {
@@ -2023,170 +2010,6 @@ function App() {
     goTo("/login", "login");
   }
 
-  const updateTableControl = (tableId, patch) => {
-    setTableControls((current) => ({
-      ...current,
-      [tableId]: {
-        ...(current[tableId] || {}),
-        ...patch,
-      },
-    }));
-  };
-
-  const getNextTableSortPatch = (control, key) => {
-    if (control.sortKey !== key) {
-      return { direction: "asc", sortKey: key };
-    }
-
-    if (control.direction === "asc") {
-      return { direction: "desc", sortKey: key };
-    }
-
-    return { direction: undefined, sortKey: undefined };
-  };
-
-  const getTableColumnKey = (column, index) => column.key || column.header || `column-${index}`;
-
-  const getTableSortIndicator = (control, key) => {
-    if (control.sortKey !== key) return "−";
-    return control.direction === "desc" ? "↓" : "↑";
-  };
-
-  const getHiddenTableColumns = (control = {}) => Array.isArray(control.hiddenColumns) ? control.hiddenColumns : [];
-
-  const getHiddenTableRows = (control = {}) => Array.isArray(control.hiddenRows) ? control.hiddenRows : [];
-
-  const getVisibleTableColumns = (tableId, columns) => {
-    const control = tableControls[tableId] || {};
-    const hiddenColumns = new Set(getHiddenTableColumns(control));
-    return columns.filter((column, index) => !hiddenColumns.has(getTableColumnKey(column, index)));
-  };
-
-  const splitGridTemplateColumns = (gridTemplateColumns) => {
-    const template = String(gridTemplateColumns || "").trim();
-    const repeatMatch = template.match(/^repeat\((\d+),\s*(.+)\)$/);
-
-    if (repeatMatch) {
-      return Array.from({ length: Number(repeatMatch[1]) }, () => repeatMatch[2]);
-    }
-
-    const columns = [];
-    let depth = 0;
-    let current = "";
-
-    for (const character of template) {
-      if (character === "(") depth += 1;
-      if (character === ")") depth = Math.max(0, depth - 1);
-
-      if (/\s/.test(character) && depth === 0) {
-        if (current) {
-          columns.push(current);
-          current = "";
-        }
-      } else {
-        current += character;
-      }
-    }
-
-    if (current) columns.push(current);
-    return columns;
-  };
-
-  // "1.2fr" becomes "minmax(144px, 1.2fr)" so a column never shrinks until its
-  // header breaks letter by letter; the table scrolls sideways instead.
-  const getReadableGridTrack = (track) => {
-    const match = /^([\d.]+)fr$/.exec(String(track).trim());
-    if (!match) return { minWidth: 120, track };
-    const fraction = Number(match[1]);
-    const minWidth = Math.round(Math.min(240, Math.max(96, fraction * 120)));
-    return { minWidth, track: `minmax(${minWidth}px, ${fraction}fr)` };
-  };
-
-  const getVisibleTableGridTemplate = (tableId, columns, gridTemplateColumns, includeRowActions = true) => {
-    const control = tableControls[tableId] || {};
-    const hiddenColumns = new Set(getHiddenTableColumns(control));
-    const templateParts = splitGridTemplateColumns(gridTemplateColumns);
-    const visibleTemplateParts = columns
-      .map((column, index) => ({
-        key: getTableColumnKey(column, index),
-        template: templateParts[index] || "minmax(120px, 1fr)",
-      }))
-      .filter((item) => !hiddenColumns.has(item.key))
-      .map((item) => getReadableGridTrack(item.template).track);
-
-    return [...visibleTemplateParts, ...(includeRowActions ? ["72px"] : [])].join(" ");
-  };
-
-  const getTableMinWidth = (columns, gridTemplateColumns, includeRowActions) => {
-    const templateParts = splitGridTemplateColumns(gridTemplateColumns);
-    const columnsWidth = columns.reduce((total, _column, index) => total + getReadableGridTrack(templateParts[index] || "1fr").minWidth, 0);
-    return columnsWidth + (includeRowActions ? 72 : 0) + (columns.length * 10) + 20;
-  };
-
-  const resetTableHiding = (tableId) => {
-    setTableControls((current) => {
-      const control = current[tableId] || {};
-      return {
-        ...current,
-        [tableId]: {
-          ...control,
-          hiddenColumns: [],
-          hiddenRows: [],
-        },
-      };
-    });
-  };
-
-  const getTableCellValue = (column, row) => {
-    if (column.value) return column.value(row);
-    if (column.sortValue) return column.sortValue(row);
-    if (column.filterValue) return column.filterValue(row);
-    if (column.render) return column.render(row);
-    return "";
-  };
-
-  const normalizeTableValue = (value) => {
-    if (value == null || value === false) return "";
-    if (typeof value === "number") return value;
-    if (typeof value === "string") return value;
-    if (Array.isArray(value)) return value.map(normalizeTableValue).join(" ");
-    if (React.isValidElement(value)) return "";
-    return String(value);
-  };
-
-  const getSortableTableRows = (tableId, rows, columns, getRowKey = (row) => row.id) => {
-    const control = tableControls[tableId] || {};
-    const query = normalizeGlossaryText(control.query || "");
-    const hiddenRows = new Set(getHiddenTableRows(control).map(String));
-    const visibleColumns = getVisibleTableColumns(tableId, columns);
-    const filteredRows = rows.filter((row) => {
-      if (hiddenRows.has(String(getRowKey(row)))) return false;
-      if (!query) return true;
-
-      return visibleColumns.some((column) => {
-        const rawValue = column.filterValue ? column.filterValue(row) : getTableCellValue(column, row);
-        return normalizeGlossaryText(normalizeTableValue(rawValue)).includes(query);
-      });
-    });
-
-    if (!control.sortKey) return filteredRows;
-
-    const column = visibleColumns.find((item, index) => getTableColumnKey(item, columns.indexOf(item) >= 0 ? columns.indexOf(item) : index) === control.sortKey);
-    if (!column || column.sortable === false) return filteredRows;
-
-    const direction = control.direction === "desc" ? -1 : 1;
-    return [...filteredRows].sort((leftRow, rightRow) => {
-      const leftValue = normalizeTableValue(column.sortValue ? column.sortValue(leftRow) : getTableCellValue(column, leftRow));
-      const rightValue = normalizeTableValue(column.sortValue ? column.sortValue(rightRow) : getTableCellValue(column, rightRow));
-
-      if (typeof leftValue === "number" && typeof rightValue === "number") {
-        return (leftValue - rightValue) * direction;
-      }
-
-      return String(leftValue).localeCompare(String(rightValue), locale, { numeric: true, sensitivity: "base" }) * direction;
-    });
-  };
-
   const references = [
     { name: copy("Production Planning", "Üretim Planlama"), mark: "PP", tone: "teal" },
     { name: copy("Feasibility Model", "Fizibilite Modeli"), mark: "FM", tone: "cyan" },
@@ -2602,25 +2425,6 @@ function App() {
 
 
 
-  function toggleSalesVisibleSection(group, key) {
-    setSalesVisibleSections((current) => {
-      const normalized = normalizeSalesVisibleSections(current);
-      const currentKeys = normalized[group] || [];
-      const nextKeys = currentKeys.includes(key)
-        ? currentKeys.filter((item) => item !== key)
-        : [...currentKeys, key];
-
-      return {
-        ...normalized,
-        [group]: nextKeys,
-      };
-    });
-  }
-
-  function resetSalesVisibleSections() {
-    setSalesVisibleSections(cloneSalesVisibleSections());
-  }
-
   function getDirtyOperationFormEntities() {
     return Object.keys(emptyOperationForms).filter((entity) => (
       JSON.stringify(operationForms[entity]) !== JSON.stringify(emptyOperationForms[entity])
@@ -2777,20 +2581,10 @@ function App() {
     financialStatus,
     financialSubmodules,
     form,
-    getHiddenTableColumns,
-    getHiddenTableRows,
-    getNextTableSortPatch,
     getProductFlowDefaults,
     getProductProcessRows,
     getRecipeMaterialId,
     getSensitivityCaseLabel,
-    getSortableTableRows,
-    getTableCellValue,
-    getTableColumnKey,
-    getTableMinWidth,
-    getTableSortIndicator,
-    getVisibleTableColumns,
-    getVisibleTableGridTemplate,
     goTo,
     handleCreateManagedUser,
     handleCreateRole,
@@ -2824,7 +2618,6 @@ function App() {
     mode,
     moveProductProcessRow,
     normalizeFlowStrategy,
-    normalizeTableValue,
     operationForms,
     operationPlan,
     operationPlanResult,
@@ -2849,14 +2642,10 @@ function App() {
     reportFormats,
     reportStats,
     reportTabs,
-    resetSalesVisibleSections,
-    resetTableHiding,
     roleForm,
-    salesEditorOpen,
     salesLoading,
     salesStatus,
     salesStrategy,
-    salesVisibleSections,
     saveFinancialOverviewScreen,
     session,
     setAuthorizationTab,
@@ -2872,7 +2661,6 @@ function App() {
     setOperationsStatus,
     setProcessDefinitionOpen,
     setReportsTab,
-    setSalesEditorOpen,
     setSalesStrategy,
     setShowConfirmPassword,
     setShowPassword,
@@ -2882,10 +2670,8 @@ function App() {
     simulationStatus,
     simulationVariants,
     status,
-    tableControls,
     theme,
     toggleFinancialOverviewWidget,
-    toggleSalesVisibleSection,
     toggleTheme,
     unsavedPrompt,
     updateField,
@@ -2905,7 +2691,6 @@ function App() {
     updateSalesItem,
     updateSimulationParameter,
     updateSimulationVariant,
-    updateTableControl,
     userTableColumns,
   };
 
