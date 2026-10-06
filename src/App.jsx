@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { supabase } from "./lib/supabaseClient";
 import {
   createDemoFinancialLoanRows,
@@ -31,9 +30,14 @@ import { calculateCurrentPlanResult, getCurrentOperationPlans, hasViablePlanResu
 import { deleteOperationRecord, emptyOperationForms, emptyOperationPlan, emptyPlanRows, getRecordInUseCounts, loadOperationsWorkspace, saveOperationRecord, saveOperationResourcePlan } from "./lib/operationsService";
 import { deleteSimulationVariantRecord, emptySalesStrategy, emptySimulationVariant, loadSalesStrategy, loadSimulationVariants, saveSalesStrategy, saveSimulationVariant } from "./lib/planningService";
 import { buildFeasibilityReport, buildReportSheets } from "./lib/reportExport";
-import logoUrl from "./assets/atera-logo.svg";
 import { AppContext } from "./app/AppContext";
-import OperationPlanner from "./components/OperationPlanner";
+import AuthPage from "./pages/AuthPage";
+import AuthorizationPage from "./pages/AuthorizationPage";
+import ReportsPage from "./pages/ReportsPage";
+import ProcessDefinitionPage from "./pages/ProcessDefinitionPage";
+import OperationsOverviewPage from "./pages/OperationsOverviewPage";
+import DashboardPage from "./pages/DashboardPage";
+import LandingPage from "./pages/LandingPage";
 import PrintableReportPage from "./pages/PrintableReportPage";
 import FinancialModellingPage from "./pages/FinancialModellingPage";
 import SimulationPage from "./pages/SimulationPage";
@@ -58,11 +62,9 @@ import {
 } from "./lib/format";
 import { useMatchedPanelHeight } from "./hooks/useMatchedPanelHeight";
 import { normalizeGlossaryText } from "./lib/glossary";
-import { GlossaryTip, InfoTip } from "./components/InfoTip";
 import { cloneDashboardVisibleSections, cloneSalesVisibleSections, createUnsavedWorkspaceSnapshot, dashboardStorageKey, getStoredDashboardVisibleSections, getStoredSalesVisibleSections, normalizeDashboardVisibleSections, normalizeSalesVisibleSections, salesStrategyStorageKey } from "./lib/uiPreferences";
 import { fetchExchangeRates, isMissingExchangeRatesTableError, loadLatestExchangeRatesFromSupabase, saveExchangeRatesToSupabase, withTryOperationWorkspace } from "./lib/exchangeRates";
 import { text } from "./i18n/text";
-import { PersonaAvatar } from "./components/PersonaAvatar";
 import { isSignedInRoute, normalizeRoutePath } from "./lib/routes";
 
 function App() {
@@ -740,21 +742,6 @@ function App() {
 
       return nextTheme;
     });
-  }
-
-  function ThemeToggle() {
-    const isDark = theme === "dark";
-
-    return (
-      <button
-        type="button"
-        className="theme-toggle"
-        aria-label={isDark ? labels.themeLight : labels.themeDark}
-        onClick={toggleTheme}
-      >
-        <span>{isDark ? labels.light : labels.dark}</span>
-      </button>
-    );
   }
 
   function updateRoleForm(field, value) {
@@ -1687,39 +1674,6 @@ function App() {
     return `${lever} ${row.change > 0 ? "+" : "−"}%${formatNumber(Math.abs(row.change * 100))}`;
   }
 
-  function renderSensitivityTable(rows, className) {
-    const decisionLabels = { feasible: copy("Feasible", "Uygun"), risky: copy("Risky", "Riskli"), wait: copy("Wait", "Beklenmeli") };
-
-    return (
-      <table className={className}>
-        <thead>
-          <tr>
-            <th>{copy("Case", "Senaryo")}</th>
-            <th>{copy("Net present value", "Net bugünkü değer")}</th>
-            <th>{copy("Change", "Fark")}</th>
-            <th>{copy("5-year net profit", "5 yıllık net kâr")}</th>
-            <th>{copy("Payback", "Geri dönüş")}</th>
-            <th>{copy("Lowest cash", "En düşük nakit")}</th>
-            <th>{copy("Decision", "Karar")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr className={row.lever === "base" ? "sensitivity-base" : ""} key={`${row.lever}-${row.change}`}>
-              <th scope="row">{getSensitivityCaseLabel(row)}</th>
-              <td>{formatLira(row.netPresentValue)}</td>
-              <td>{row.lever === "base" ? "-" : formatLira(row.netPresentValueChange)}</td>
-              <td>{formatLira(row.netIncome)}</td>
-              <td>{row.paybackMonth ? `${formatNumber(row.paybackMonth)} ${copy("mo", "ay")}` : copy("Over 5 years", "5 yıldan uzun")}</td>
-              <td>{formatLira(row.lowestCashBalance)}</td>
-              <td><span className={`decision-badge ${row.decision}`}>{decisionLabels[row.decision]}</span></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
-
   function buildExportReport() {
     const exportModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, "5y");
 
@@ -2250,281 +2204,6 @@ function App() {
     });
   };
 
-  const renderTableToolbar = (tableId, rows, visibleRows) => {
-    const control = tableControls[tableId] || {};
-    const hiddenCount = getHiddenTableColumns(control).length + getHiddenTableRows(control).length;
-
-    return (
-      <div className="table-control-bar">
-        <label>
-          <span>{copy("Filter", "Filtrele")}</span>
-          <input
-            type="search"
-            value={control.query || ""}
-            placeholder={copy("Search table", "Tabloda ara")}
-            onChange={(event) => updateTableControl(tableId, { query: event.target.value })}
-          />
-        </label>
-        <div className="table-control-actions">
-          {hiddenCount > 0 && (
-            <button type="button" className="table-reset-hidden-button" onClick={() => resetTableHiding(tableId)}>
-              {copy("Show hidden", "Gizlemeleri kaldır")}
-            </button>
-          )}
-          <strong>{formatNumber(visibleRows.length)} / {formatNumber(rows.length)}</strong>
-        </div>
-      </div>
-    );
-  };
-
-  const renderSortableTableHead = (tableId, columns, gridTemplateColumns, hasRowActions = false, minWidth = undefined) => {
-    const control = tableControls[tableId] || {};
-    const hiddenColumns = new Set(getHiddenTableColumns(control));
-    const visibleColumns = columns
-      .map((column, index) => ({ column, index, key: getTableColumnKey(column, index) }))
-      .filter((item) => !hiddenColumns.has(item.key));
-    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns, hasRowActions);
-
-    return (
-      <div className="operation-data-row operation-data-head sortable-table-head" style={{ gridTemplateColumns: visibleGridTemplateColumns, minWidth }}>
-        {visibleColumns.map(({ column, index, key }) => {
-          const active = control.sortKey === key;
-
-          return (
-            <div className="sortable-heading-cell" key={key}>
-              <button
-                type="button"
-                className={`sort-heading-button ${active ? "active" : ""}`}
-                disabled={column.sortable === false}
-                onClick={() => updateTableControl(tableId, getNextTableSortPatch(control, key))}
-              >
-                <span>{column.header}</span>
-                {column.sortable !== false && <small className="sort-indicator" aria-hidden="true">{getTableSortIndicator(control, key)}</small>}
-              </button>
-            </div>
-          );
-        })}
-        {hasRowActions && <span className="table-row-action-head" aria-hidden="true" />}
-      </div>
-    );
-  };
-
-  const renderSortableDataTable = ({
-    columns,
-    emptyLabel,
-    gridTemplateColumns,
-    getRowKey = (row) => row.id,
-    onDeleteRow,
-    onRowClick,
-    rows,
-    tableId,
-    useButtonRows = false,
-  }) => {
-    const visibleRows = getSortableTableRows(tableId, rows, columns, getRowKey);
-    const visibleColumns = getVisibleTableColumns(tableId, columns);
-    const hasRowActions = Boolean(onDeleteRow);
-    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns, hasRowActions);
-    const minWidth = getTableMinWidth(visibleColumns, gridTemplateColumns, hasRowActions);
-    const displayRows = visibleRows.length ? visibleRows : [{ id: "empty" }];
-
-    return (
-      <>
-        {renderTableToolbar(tableId, rows, visibleRows)}
-        <div className="operation-data-table">
-          {renderSortableTableHead(tableId, columns, gridTemplateColumns, hasRowActions, minWidth)}
-          {displayRows.map((row) => {
-            const isEmpty = row.id === "empty";
-            const rowKey = isEmpty ? `${tableId}-empty` : getRowKey(row);
-
-            return (
-              <div
-                role={useButtonRows && !isEmpty ? "button" : undefined}
-                tabIndex={useButtonRows && !isEmpty ? 0 : undefined}
-                className={`operation-data-row${useButtonRows ? " operation-data-button-row" : ""}${isEmpty ? " table-empty-row" : ""}`}
-                style={{ gridTemplateColumns: visibleGridTemplateColumns, minWidth }}
-                key={rowKey}
-                onClick={useButtonRows ? () => {
-                  if (!isEmpty && onRowClick) onRowClick(row);
-                } : undefined}
-                onKeyDown={useButtonRows ? (event) => {
-                  if (!isEmpty && onRowClick && (event.key === "Enter" || event.key === " ")) {
-                    event.preventDefault();
-                    onRowClick(row);
-                  }
-                } : undefined}
-              >
-                {isEmpty ? (
-                  <span className="table-empty-cell">{emptyLabel || copy("No matching records", "Eşleşen kayıt yok")}</span>
-                ) : (
-                  <>
-                    {visibleColumns.map((column) => {
-                      const originalIndex = columns.indexOf(column);
-                      const text = normalizeTableValue(getTableCellValue(column, row));
-                      return (
-                        <span className="operation-data-cell" key={getTableColumnKey(column, originalIndex)} title={text || undefined}>
-                          {column.render ? column.render(row) : text}
-                        </span>
-                      );
-                    })}
-                    {onDeleteRow && (
-                      <button
-                        type="button"
-                        className="table-delete-button"
-                        aria-label={copy("Delete record", "Kaydı sil")}
-                        title={copy("Delete record", "Kaydı sil")}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onDeleteRow(row);
-                        }}
-                      >
-                        {copy("Delete", "Sil")}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </>
-    );
-  };
-
-  const renderSimpleSortableGrid = ({
-    columns,
-    emptyLabel,
-    getRowKey = (row) => row.id,
-    gridTemplateColumns,
-    headClassName,
-    rowClassName,
-    rows,
-    tableClassName,
-    tableId,
-  }) => {
-    const control = tableControls[tableId] || {};
-    const hiddenColumns = new Set(getHiddenTableColumns(control));
-    const visibleColumns = columns
-      .map((column, index) => ({ column, index, key: getTableColumnKey(column, index) }))
-      .filter((item) => !hiddenColumns.has(item.key));
-    const visibleRows = getSortableTableRows(tableId, rows, columns, getRowKey);
-    const visibleGridTemplateColumns = getVisibleTableGridTemplate(tableId, columns, gridTemplateColumns, false);
-
-    return (
-      <>
-        {renderTableToolbar(tableId, rows, visibleRows)}
-        <div className={tableClassName}>
-          <div className={`${rowClassName} ${headClassName} sortable-table-head`} style={{ gridTemplateColumns: visibleGridTemplateColumns }}>
-            {visibleColumns.map(({ column, key }) => {
-              const active = control.sortKey === key;
-
-              return (
-                <div className="sortable-heading-cell" key={key}>
-                  <button
-                    type="button"
-                    className={`sort-heading-button ${active ? "active" : ""}`}
-                    disabled={column.sortable === false}
-                    onClick={() => updateTableControl(tableId, getNextTableSortPatch(control, key))}
-                  >
-                    <span>{column.header}</span>
-                    {column.sortable !== false && <small className="sort-indicator" aria-hidden="true">{getTableSortIndicator(control, key)}</small>}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          {(visibleRows.length ? visibleRows : [{ id: "empty" }]).map((row) => (
-            <div className={`${rowClassName}${row.id === "empty" ? " table-empty-row" : ""}`} style={{ gridTemplateColumns: visibleGridTemplateColumns }} key={row.id === "empty" ? `${tableId}-empty` : getRowKey(row)}>
-              {row.id === "empty" ? (
-                <span className="table-empty-cell">{emptyLabel || copy("No matching records", "Eşleşen kayıt yok")}</span>
-              ) : (
-                <>
-                  {visibleColumns.map(({ column, index, key }) => {
-                    const content = column.render ? column.render(row) : normalizeTableValue(getTableCellValue(column, row));
-                    const CellTag = index === 0 && (rowClassName.includes("users-row") || rowClassName.includes("permissions-row")) ? "strong" : "span";
-                    return <CellTag key={key}>{content}</CellTag>;
-                  })}
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      </>
-    );
-  };
-
-  function renderOperationRecordForm(entity, fields, options = {}) {
-    const formClassName = [
-      "operation-card operation-data-form operations-record-form-card",
-      options.className,
-    ].filter(Boolean).join(" ");
-    const recordFormLabels = {
-      equipment: {
-        eyebrow: copy("Register equipment", "Ekipman kaydı"),
-        title: copy("Equipment details", "Ekipman detayları"),
-      },
-      machine: {
-        eyebrow: copy("Register machine", "Makine kaydı"),
-        title: copy("Machine capability", "Makine kabiliyeti"),
-      },
-      material: {
-        eyebrow: copy("Register material", "Malzeme kaydı"),
-        title: copy("Material details", "Malzeme detayları"),
-      },
-      workforce: {
-        eyebrow: copy("Register workforce", "İşgücü kaydı"),
-        title: copy("Workforce details", "İşgücü detayları"),
-      },
-    };
-    const recordFormLabel = recordFormLabels[entity] || {
-      eyebrow: copy("New record", "Yeni kayıt"),
-      title: copy("Record details", "Kayıt detayları"),
-    };
-
-    return (
-      <form ref={options.formRef} className={formClassName} onSubmit={(event) => handleSaveOperationRecord(entity, event)}>
-        <div className="operation-card-heading">
-          <div>
-            <span>{recordFormLabel.eyebrow}</span>
-            <h2>{recordFormLabel.title}</h2>
-          </div>
-        </div>
-        <div className="operation-data-fields">
-          {fields.map((field) => (
-            <label key={field.name}>
-              <span className="label-with-info">
-                {field.label}
-                {field.info && <InfoTip label={`${field.label} ${copy("info", "bilgi")}`} text={field.info} />}
-              </span>
-              {field.type === "select" ? (
-                <select value={operationForms[entity][field.name]} onChange={(event) => updateOperationForm(entity, field.name, event.target.value)}>
-                  {field.options.map((option) => {
-                    const value = Array.isArray(option) ? option[0] : option.value ?? option;
-                    const label = Array.isArray(option) ? option[1] : option.label ?? option;
-
-                    return <option value={value} key={value}>{label}</option>;
-                  })}
-                </select>
-              ) : field.type === "textarea" ? (
-                <textarea value={operationForms[entity][field.name]} onChange={(event) => updateOperationForm(entity, field.name, event.target.value)} />
-              ) : (
-                <input
-                  min={field.min ?? 0}
-                  step={field.step || "1"}
-                  type={field.type || "text"}
-                  value={operationForms[entity][field.name]}
-                  onChange={(event) => updateOperationForm(entity, field.name, event.target.value)}
-                />
-              )}
-            </label>
-          ))}
-        </div>
-        <button className="submit-button planner-save-button" disabled={operationsLoading} type="submit">
-          {operationsLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save", "Kaydet")}
-        </button>
-      </form>
-    );
-  }
-
   const references = [
     { name: copy("Production Planning", "Üretim Planlama"), mark: "PP", tone: "teal" },
     { name: copy("Feasibility Model", "Fizibilite Modeli"), mark: "FM", tone: "cyan" },
@@ -2563,16 +2242,6 @@ function App() {
       difference: labels.exporterDifference,
     },
   ];
-
-  const renderAteraOrbit = (className = "") => (
-    <div className={`who-orbit ${className}`.trim()} aria-hidden="true">
-      <div className="who-core">Atera</div>
-      <span className="who-node node-plan">{copy("Plan", "Planla")}</span>
-      <span className="who-node node-test">{copy("Test", "Dene")}</span>
-      <span className="who-node node-decide">{copy("Decide", "Karar ver")}</span>
-      <span className="who-node node-scale">{copy("Scale", "Büyüt")}</span>
-    </div>
-  );
 
   const dashboardModules = [
     { key: "operations", path: "/operations", label: copy("Operations", "Operasyon"), category: copy("Production", "Üretim"), tone: "operations" },
@@ -3364,203 +3033,56 @@ function App() {
     continuePendingNavigation();
   }
 
-  function renderUnsavedChangesPrompt() {
-    if (!unsavedPrompt.open || typeof document === "undefined") return null;
-
-    return createPortal(
-      <div className="unsaved-changes-backdrop" role="presentation">
-        <section className="unsaved-changes-dialog" role="dialog" aria-modal="true" aria-labelledby="unsaved-changes-title">
-          <span>{copy("Unsaved changes", "Kaydedilmemiş değişiklik")}</span>
-          <h2 id="unsaved-changes-title">{copy("You have not saved your changes", "Değişiklikleri kaydetmediniz")}</h2>
-          <p>{copy("Do you want to save before leaving, or continue without saving?", "Çıkmadan önce kaydetmek mi, yoksa kaydetmeden devam etmek mi istersiniz?")}</p>
-          {unsavedPrompt.message && <small>{unsavedPrompt.message}</small>}
-          <div className="unsaved-changes-actions">
-            <button type="button" className="ghost" onClick={closeUnsavedPrompt} disabled={unsavedPrompt.saving}>
-              {copy("Stay on page", "Sayfada kal")}
-            </button>
-            <button type="button" className="secondary" onClick={handleLeaveWithoutSaving} disabled={unsavedPrompt.saving}>
-              {copy("Leave without saving", "Kaydetmeden çık")}
-            </button>
-            <button type="button" className="primary" onClick={handleSaveUnsavedAndContinue} disabled={unsavedPrompt.saving}>
-              {unsavedPrompt.saving ? copy("Saving...", "Kaydediliyor...") : copy("Save and continue", "Kaydet ve devam et")}
-            </button>
-          </div>
-        </section>
-      </div>,
-      document.body,
-    );
-  }
-
-  function renderDashboardLayout(activePage, children) {
-    return (
-      <>
-        <main className={`dashboard-shell ${dashboardSidebarOpen ? "sidebar-open" : "sidebar-collapsed"}`}>
-          <aside className="dashboard-sidebar" aria-label="Dashboard navigation">
-            <div className="dashboard-brand-block">
-              <div className="dashboard-sidebar-top">
-                <button type="button" className="landing-brand dashboard-brand" onClick={() => goTo("/dashboard", "login")}>
-                  <img src={logoUrl} alt="Atera logo" />
-                  <strong>Atera</strong>
-                </button>
-                <button
-                  type="button"
-                  className="dashboard-sidebar-toggle"
-                  aria-label={dashboardSidebarOpen ? copy("Close menu", "Menüyü kapat") : copy("Open menu", "Menüyü aç")}
-                  aria-expanded={dashboardSidebarOpen}
-                  onClick={() => setDashboardSidebarOpen((isOpen) => !isOpen)}
-                >
-                  <span aria-hidden="true">{dashboardSidebarOpen ? "<" : ">"}</span>
-                </button>
-              </div>
-
-              <div className="dashboard-controls">
-                <label className="language-picker">
-                  <span>{labels.language}</span>
-                  <select value={form.language} onChange={(event) => updateField("language", event.target.value)}>
-                    <option value="en">EN</option>
-                    <option value="tr">TR</option>
-                  </select>
-                </label>
-                <ThemeToggle />
-              </div>
-            </div>
-
-            <nav className="dashboard-nav">
-              <button
-                type="button"
-                className={activePage.startsWith("dashboard") ? "active" : ""}
-                onClick={() => goTo("/dashboard", "login")}
-              >
-                {labels.dashboard}
-              </button>
-              {dashboardModules.map((module) => (
-                <React.Fragment key={module.key}>
-                <button
-                  type="button"
-                  className={`dashboard-nav-item ${module.tone} ${activePage === module.key || (module.key === "operations" && activePage.startsWith("operations/")) || (module.key === "financial-modelling" && activePage.startsWith("financial-modelling/")) || (module.key === "simulation" && activePage.startsWith("simulation/")) ? "active" : ""}`}
-                  onClick={() => goTo(module.key === "financial-modelling" ? "/financial-modelling/girdiler" : module.key === "simulation" ? "/simulation/current-situation" : module.path, "login")}
-                >
-                  <span className="dashboard-nav-category">{module.category}</span>
-                  <strong>{module.label}</strong>
-                </button>
-                {module.key === "operations" && (activePage === "operations" || activePage.startsWith("operations/")) && (
-                  <div className="dashboard-subnav" aria-label="Operations submodules">
-                    {operationsSubmodules.map((submodule) => (
-                      <button
-                        type="button"
-                        className={activePage === `operations/${submodule.key}` ? "active" : ""}
-                        onClick={() => goTo(submodule.path, "login")}
-                        key={submodule.key}
-                      >
-                        {submodule.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {module.key === "financial-modelling" && (activePage === "financial-modelling" || activePage.startsWith("financial-modelling/")) && (
-                  <div className="dashboard-subnav" aria-label="Finansal Modelleme submodules">
-                    {[...new Set(financialSubmodules.map((submodule) => submodule.group))].map((group) => (
-                      <React.Fragment key={group}>
-                        <span className="dashboard-subnav-label">{group}</span>
-                        {financialSubmodules.filter((submodule) => submodule.group === group).map((submodule) => (
-                          <button
-                            type="button"
-                            className={activePage === `financial-modelling/${submodule.key}` ? "active" : ""}
-                            onClick={() => goTo(submodule.path, "login")}
-                            key={submodule.key}
-                          >
-                            {submodule.label}
-                          </button>
-                        ))}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                )}
-                {module.key === "simulation" && (activePage === "simulation" || activePage.startsWith("simulation/")) && (
-                  <div className="dashboard-subnav" aria-label={copy("Simulation variants", "Simülasyon varyantları")}>
-                    {simulationVariants.map((variant) => (
-                      <div className="simulation-subnav-item" key={variant.id}>
-                        <button
-                          type="button"
-                          className={activePage === `simulation/${variant.id}` ? "active" : ""}
-                          onClick={() => goTo(variant.path, "login")}
-                        >
-                          {variant.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : variant.name || variant.label}
-                        </button>
-                        {variant.id !== "current-situation" && (
-                          <button
-                            type="button"
-                            className="variant-delete-button"
-                            aria-label={copy("Delete variant", "Varyantı sil")}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              deleteSimulationVariant(variant.id);
-                            }}
-                          >
-                            x
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button type="button" onClick={addSimulationVariant}>
-                      + {copy("Add Variant", "Varyant Ekle")}
-                    </button>
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
-            {authorizationAccess.read && (
-              <button
-                type="button"
-                className={activePage === "authorization" ? "active" : ""}
-                onClick={() => goTo("/authorization", "login")}
-              >
-                {labels.authorizationPage}
-              </button>
-            )}
-          </nav>
-
-          <div className="sidebar-footer">
-            <div className="sync-status-card" role="status" aria-label="Data synchronization status">
-              <span className="live-dot" />
-              <div>
-                <strong>{labels.dataSync}</strong>
-                <small>{labels.live}</small>
-              </div>
-            </div>
-            <button type="button" className="link-button dashboard-logout" onClick={handleLogout}>
-              {labels.logout}
-            </button>
-          </div>
-        </aside>
-
-        <section className="dashboard-content">{children}</section>
-        </main>
-        {renderUnsavedChangesPrompt()}
-      </>
-    );
-  }
-
   const appContextValue = {
     activeFinancialSubmodule,
+    activeModule,
     activeOperationsSubmodule,
+    activePlanResults,
+    activeReportTab,
     activeSimulationVariant,
     addFinancialLoanRow,
     addProductMaterialRow,
     addProductProcessRow,
     addSalesItem,
     addSimulationVariant,
+    authorizationAccess,
+    authorizationLoading,
+    authorizationStatus,
+    authorizationTab,
     buildExportReport,
     buildProductOperationRows,
+    closeUnsavedPrompt,
+    confirmPassword,
     copy,
     copyOperationRecordToForm,
+    currentProfile,
+    dashboardAssumptionMenu,
     dashboardCompanyName,
+    dashboardEditorGroups,
+    dashboardEditorOpen,
+    dashboardHorizonSelectLabel,
+    dashboardModuleRollup,
+    dashboardModules,
+    dashboardProductContext,
+    dashboardProductSelectLabel,
+    dashboardRiskPriority,
+    dashboardRiskRows,
+    dashboardSelectedProductId,
+    dashboardSidebarOpen,
+    decisionKpis,
     deleteSimulationVariant,
+    downloadReport,
+    editableAuthorizationRoles,
     equipmentFormRef,
     equipmentListHeightStyle,
     exchangeRates,
+    feasibilityChecklist,
+    feasibilityReadinessStatus,
+    feasibilityReadyCount,
+    feasibilityVerdict,
     financialExtraCostForm,
     financialHorizon,
+    financialHorizonOptions,
     financialLoading,
     financialModel,
     financialOverviewWidgets,
@@ -3570,62 +3092,102 @@ function App() {
     financialStatus,
     financialSubmodules,
     form,
+    getHiddenTableColumns,
+    getHiddenTableRows,
     getNextTableSortPatch,
     getProductFlowDefaults,
     getProductProcessRows,
     getRecipeMaterialId,
+    getSensitivityCaseLabel,
     getSortableTableRows,
+    getTableCellValue,
     getTableColumnKey,
+    getTableMinWidth,
     getTableSortIndicator,
+    getVisibleTableColumns,
+    getVisibleTableGridTemplate,
     goTo,
+    handleCreateManagedUser,
+    handleCreateRole,
+    handleDashboardProductChange,
     handleDeleteFinancialExtraCost,
     handleDeleteOperationRecord,
     handleFetchExchangeRates,
+    handleForgotPassword,
+    handleLeaveWithoutSaving,
+    handleLogin,
+    handleLogout,
+    handleResetPassword,
     handleSaveFinancialExtraCost,
     handleSaveFinancialSettings,
     handleSaveOperationPlan,
     handleSaveOperationRecord,
     handleSaveSalesStrategy,
+    handleSaveUnsavedAndContinue,
+    handleUseAtera,
+    hasFinancialAssumptions,
     hasFinancialSourceData,
+    hasOperationData,
+    hasSalesForecast,
+    improvementFocus,
+    labels,
     loadFinancialData,
     loadOperationsData,
     loadPlanningData,
+    loading,
     locale,
     machineFormRef,
     machineListHeightStyle,
+    managedUserForm,
     materialFormRef,
     materialListHeightStyle,
+    mode,
     moveProductProcessRow,
     normalizeFlowStrategy,
+    normalizeTableValue,
+    normalizedDashboardVisibleSections,
     operationForms,
     operationPlan,
     operationPlanResult,
     operationsLoading,
     operationsStatus,
+    operationsSubmodules,
     operationsWorkspace,
     operationsWorkspaceForFinance,
+    periodLabel,
+    permissionTableColumns,
+    permissionTableRows,
     persistSimulationVariant,
+    personas,
     processDefinitionOpen,
     productFormRef,
     productListHeightStyle,
+    profilePreview,
+    profiles,
+    references,
     removeFinancialLoanRow,
     removeProductMaterialRow,
     removeProductProcessRow,
     removeSalesItem,
-    renderDashboardLayout,
-    renderOperationRecordForm,
-    renderSensitivityTable,
-    renderSimpleSortableGrid,
-    renderSortableDataTable,
-    renderTableToolbar,
+    reportFormats,
+    reportStats,
     reportTabs,
+    resetDashboardVisibleSections,
     resetSalesVisibleSections,
+    resetTableHiding,
+    roleForm,
     salesEditorOpen,
     salesLoading,
     salesStatus,
     salesStrategy,
     salesVisibleSections,
     saveFinancialOverviewScreen,
+    session,
+    setAuthorizationTab,
+    setConfirmPassword,
+    setDashboardAssumptionMenu,
+    setDashboardEditorOpen,
+    setDashboardSidebarOpen,
     setFinancialExtraCostForm,
     setFinancialHorizon,
     setFinancialSettingsForm,
@@ -3635,15 +3197,27 @@ function App() {
     setOperationPlanResult,
     setOperationsStatus,
     setProcessDefinitionOpen,
+    setReportsTab,
     setSalesEditorOpen,
     setSalesStrategy,
+    setShowConfirmPassword,
+    setShowPassword,
+    showConfirmPassword,
+    showPassword,
     simulationLoading,
     simulationStatus,
     simulationVariants,
+    status,
     tableControls,
+    theme,
+    toggleDashboardVisibleSection,
     toggleFinancialOverviewWidget,
     toggleSalesVisibleSection,
+    toggleTheme,
+    unsavedPrompt,
+    updateField,
     updateFinancialLoanRow,
+    updateManagedUserForm,
     updateOperationForm,
     updateOperationPlan,
     updateOperationPlanRow,
@@ -3651,6 +3225,7 @@ function App() {
     updateProductMaterialRow,
     updateProductProcessRow,
     updateProductProcessRowFields,
+    updateRoleForm,
     updateSalesChannelSeasonality,
     updateSalesCompany,
     updateSalesForecast,
@@ -3658,6 +3233,10 @@ function App() {
     updateSimulationParameter,
     updateSimulationVariant,
     updateTableControl,
+    userTableColumns,
+    visibleDashboardAssumptionRows,
+    visibleDashboardExecutiveMetrics,
+    visibleDashboardFinancialDetailRows,
     workforceFormRef,
     workforceListHeightStyle,
   };
@@ -3670,178 +3249,7 @@ function App() {
 
   function renderRoute() {
     if (path === "/") {
-      return (
-        <main className="landing-page">
-          <header className="landing-header">
-            <button type="button" className="landing-brand" onClick={() => goTo("/", "login")}>
-              <img src={logoUrl} alt="Atera logo" />
-              <strong>Atera</strong>
-            </button>
-
-            <nav className="landing-nav" aria-label="Landing page sections">
-              <a href="#who">{labels.who}</a>
-              <a href="#solutions">{labels.solutions}</a>
-              <a href="#references">{labels.references}</a>
-              <a href="#contact">{labels.contact}</a>
-            </nav>
-
-            <div className="landing-controls">
-              <label className="language-picker">
-                <span>{labels.language}</span>
-                <select value={form.language} onChange={(event) => updateField("language", event.target.value)}>
-                  <option value="en">EN</option>
-                  <option value="tr">TR</option>
-                </select>
-              </label>
-              <ThemeToggle />
-            </div>
-          </header>
-
-          <section className="landing-hero">
-            <div className="landing-hero-content">
-              <span className="hero-eyebrow">{copy("The operating layer behind feasible factories", "Fizibl fabrikaların arkasındaki operasyon katmanı")}</span>
-              <h1>{labels.heroTitle}</h1>
-              <p>{labels.heroCopy}</p>
-              <div className="hero-actions">
-                <button type="button" className="submit-button landing-login" onClick={handleUseAtera}>
-                  {labels.goToLogin}
-                </button>
-                <a className="hero-secondary-link" href="#solutions">
-                  {copy("Discover the model", "Modeli keşfet")}
-                </a>
-              </div>
-              <div className="hero-proof-strip" aria-label={copy("Atera model signals", "Atera model sinyalleri")}>
-                <span>{copy("Capacity", "Kapasite")}</span>
-                <span>{copy("Cash", "Nakit")}</span>
-                <span>{copy("Margin", "Marj")}</span>
-                <span>{copy("Delivery", "Termin")}</span>
-              </div>
-            </div>
-            <div className="landing-hero-stage" aria-hidden="true">
-              {renderAteraOrbit("hero-orbit")}
-              <div className="hero-product-card hero-product-card-main">
-                <span>{copy("Decision engine", "Karar motoru")}</span>
-                <strong>{copy("Feasibility live", "Fizibilite canlı")}</strong>
-                <div className="hero-card-bars">
-                  <i />
-                  <i />
-                  <i />
-                </div>
-              </div>
-              <div className="hero-product-card hero-product-card-side">
-                <span>{copy("Scenario delta", "Senaryo farkı")}</span>
-                <strong>+18%</strong>
-              </div>
-              <div className="hero-app-chip chip-finance">FM</div>
-              <div className="hero-app-chip chip-ops">OP</div>
-            </div>
-          </section>
-
-          <section className="landing-sections" aria-label="Atera information">
-            <article id="who" className="landing-section">
-              <div className="section-kicker">
-                <span>{labels.who}</span>
-                <h2>{labels.who}</h2>
-              </div>
-              <div className="who-content">
-                <div className="who-copy-block">
-                  <p>{labels.whoCopy}</p>
-                  <div className="who-signal-grid" aria-label={copy("Atera decision signals", "Atera karar sinyalleri")}>
-                    <span>{copy("Capacity pressure", "Kapasite baskısı")}</span>
-                    <span>{copy("Cash exposure", "Nakit riski")}</span>
-                    <span>{copy("Margin impact", "Marj etkisi")}</span>
-                    <span>{copy("Delivery confidence", "Termin güveni")}</span>
-                  </div>
-                </div>
-                <div className="who-visual-panel">
-                  {renderAteraOrbit("who-section-orbit")}
-                  <div className="who-panel-caption">
-                    <strong>{copy("Scenario command layer", "Senaryo komuta katmanı")}</strong>
-                    <span>{copy("From assumption to decision without spreadsheet fog.", "Varsayımdan karara Excel sisine girmeden.")}</span>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article id="solutions" className="landing-section solutions-section">
-              <div className="section-kicker">
-                <h2>{labels.solutions}</h2>
-                <p>{copy("Plan. Model. Decide. Scale.", "Planla. Modelle. Karar ver. Büyüt.")}</p>
-              </div>
-              <div className="solutions-content">
-                <p>{labels.solutionsCopy}</p>
-                <div className="solution-signal-row" aria-label={copy("Atera solution modules", "Atera çözüm modülleri")}>
-                  <span>{copy("Operational planning", "Operasyon planlama")}</span>
-                  <span>{copy("Financial feasibility", "Finansal fizibilite")}</span>
-                  <span>{copy("Sales simulation", "Satış simülasyonu")}</span>
-                </div>
-                <div className="persona-carousel" aria-label="Solution personas">
-                  <div className="persona-track">
-                    {[...personas, ...personas].map((persona, index) => (
-                      <article className="persona-card" key={`${persona.title}-${index}`}>
-                        <PersonaAvatar type={persona.avatarType} title={persona.title} />
-                        <div>
-                          <h3>{persona.title}</h3>
-                          <p>{persona.need}</p>
-                          <p>{persona.benefit}</p>
-                          <p>{persona.difference}</p>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article id="references" className="landing-section references-section">
-              <div className="section-kicker">
-                <h2>{labels.references}</h2>
-                <p>{copy("One loop for the decisions that usually live apart.", "Genelde ayrı yaşayan kararlar için tek döngü.")}</p>
-              </div>
-              <div className="references-content">
-                <div className="reference-carousel" aria-label="Reference company logos">
-                  <div className="reference-track">
-                    {references.length ? (
-                      [...references, ...references].map((reference, index) => (
-                        <article className={`reference-logo-card ${reference.tone}`} key={`${reference.name}-${index}`}>
-                          <div className="reference-mark">{reference.mark}</div>
-                          <strong>{reference.name}</strong>
-                        </article>
-                      ))
-                    ) : (
-                      <article className="reference-logo-card teal">
-                        <div className="reference-mark">DB</div>
-                        <strong>{copy("No reference records yet", "Henüz referans kaydı yok")}</strong>
-                      </article>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article id="contact" className="landing-section contact-section">
-              <div>
-                <span>{labels.contact}</span>
-                <h2>{labels.contact}</h2>
-              </div>
-              <div className="contact-content">
-                <div className="contact-card">
-                  <div className="contact-card-mark" aria-hidden="true">A</div>
-                  <address className="contact-details">
-                    {labels.contactPhone && <a href={`tel:${labels.contactPhone.replaceAll(" ", "")}`}>{labels.contactPhone}</a>}
-                    <a href={`mailto:${labels.contactEmail}`}>{labels.contactEmail}</a>
-                    <span>{labels.contactLocation}</span>
-                  </address>
-                  <div className="contact-status" aria-hidden="true">
-                    <span />
-                    {copy("Open for onboarding conversations", "Onboarding görüşmeleri için açık")}
-                  </div>
-                </div>
-              </div>
-            </article>
-          </section>
-        </main>
-      );
+      return <LandingPage />;
     }
 
     if (session && routePath.startsWith("/reports/print/")) {
@@ -3849,461 +3257,18 @@ function App() {
     }
 
     if (session && routePath === "/dashboard") {
-      return renderDashboardLayout(
-        "dashboard/overview",
-          <section className="command-dashboard feasibility-dashboard" aria-label="Atera feasibility dashboard">
-            <div className="command-topbar executive-topbar">
-              <div className="command-context">
-                <strong>{dashboardCompanyName}</strong>
-                <span>{dashboardProductContext}</span>
-              </div>
-              <div className="command-live">
-                <span className="live-dot" />
-                <strong>{hasOperationData || hasSalesForecast ? copy("Workspace data loaded", "Çalışma alanı verisi yüklendi") : copy("Input needed", "Girdi gerekli")}</strong>
-              </div>
-              <div className="command-user">
-                <span>{currentProfile?.username || form.username || "Atera"}</span>
-                <small>{currentProfile?.access_level || "-"}</small>
-              </div>
-              <button
-                type="button"
-                className={`dashboard-edit-toggle ${dashboardEditorOpen ? "active" : ""}`}
-                onClick={() => setDashboardEditorOpen((isOpen) => !isOpen)}
-                aria-controls="dashboard-editor-panel"
-                aria-expanded={dashboardEditorOpen}
-              >
-                <span>{dashboardEditorOpen ? copy("Done editing", "Düzenlemeyi bitir") : copy("Edit screen", "Ekranı düzenle")}</span>
-              </button>
-              <button type="button" className="command-run-button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
-            </div>
-
-            {dashboardEditorOpen && (
-              <section id="dashboard-editor-panel" className="dashboard-editor-panel" aria-label={copy("Dashboard editor", "Dashboard düzenleyici")}>
-                <div className="dashboard-editor-heading">
-                  <div>
-                    <span>{copy("Dashboard view", "Dashboard görünümü")}</span>
-                    <h2>{copy("Visible data groups", "Görünür veri grupları")}</h2>
-                    <p>{copy("Selections are saved for this browser.", "Seçimler bu tarayıcı için saklanır.")}</p>
-                  </div>
-                  <div className="dashboard-editor-actions">
-                    <button type="button" onClick={resetDashboardVisibleSections}>{copy("Reset", "Sıfırla")}</button>
-                    <button type="button" className="primary" onClick={() => setDashboardEditorOpen(false)}>{copy("Done", "Bitti")}</button>
-                  </div>
-                </div>
-                <div className="dashboard-editor-grid">
-                  {dashboardEditorGroups.map((group) => {
-                    const visibleKeys = normalizedDashboardVisibleSections[group.key] || [];
-
-                    return (
-                      <article className="dashboard-editor-group" key={group.key}>
-                        <div className="dashboard-editor-group-heading">
-                          <div>
-                            <span>{group.title}</span>
-                            <p>{group.description}</p>
-                          </div>
-                          <strong>{visibleKeys.length}/{group.options.length}</strong>
-                        </div>
-                        {Boolean(group.fixedItems?.length) && (
-                          <div className="dashboard-editor-fixed-items">
-                            {group.fixedItems.map(([label, value]) => (
-                              <span key={label}>
-                                <small>{label}</small>
-                                <strong>{value}</strong>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <div className="dashboard-editor-options">
-                          {group.options.map((option) => {
-                            const isSelected = visibleKeys.includes(option.id);
-
-                            return (
-                              <label className={`dashboard-editor-option ${isSelected ? "selected" : ""}`} key={option.id}>
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => toggleDashboardVisibleSection(group.key, option.id)}
-                                />
-                                <span>
-                                  <strong>{option.label}</strong>
-                                  <small>{option.detail}</small>
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            <section className={`dashboard-assumption-strip ${feasibilityVerdict.tone}`} aria-label={copy("Assumption snapshot", "Varsayım özeti")}>
-              <div className="dashboard-assumption-strip-heading">
-                <span>{copy("Assumption snapshot", "Varsayım özeti")}</span>
-                <h2>{copy("What this dashboard is based on", "Bu dashboard neye dayanıyor")}</h2>
-              </div>
-              <div
-                className="dashboard-assumption-strip-controls"
-                onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget)) {
-                    setDashboardAssumptionMenu(null);
-                  }
-                }}
-              >
-                <div className={`assumption-control product-control ${dashboardAssumptionMenu === "product" ? "open" : ""}`}>
-                  <span>{copy("Product", "Ürün")}</span>
-                  <button
-                    type="button"
-                    className="assumption-select-trigger"
-                    onClick={() => setDashboardAssumptionMenu((current) => (current === "product" ? null : "product"))}
-                    disabled={!operationsWorkspace.products.length}
-                    aria-expanded={dashboardAssumptionMenu === "product"}
-                  >
-                    <strong>{dashboardProductSelectLabel}</strong>
-                    <i aria-hidden="true">⌄</i>
-                  </button>
-                  {dashboardAssumptionMenu === "product" && Boolean(operationsWorkspace.products.length) && (
-                    <div className="assumption-select-menu" role="listbox">
-                      {operationsWorkspace.products.map((product) => {
-                        const label = product.name || product.product_code || copy("Unnamed product", "İsimsiz ürün");
-                        const isSelected = product.id === dashboardSelectedProductId;
-                        return (
-                          <button
-                            type="button"
-                            className={isSelected ? "selected" : ""}
-                            onClick={() => {
-                              handleDashboardProductChange(product.id);
-                              setDashboardAssumptionMenu(null);
-                            }}
-                            role="option"
-                            aria-selected={isSelected}
-                            key={product.id}
-                          >
-                            <span>{label}</span>
-                            <small>{product.product_code || product.product_group || copy("Product", "Ürün")}</small>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                <div className={`assumption-control horizon-control ${dashboardAssumptionMenu === "horizon" ? "open" : ""}`}>
-                  <span>{copy("Projection horizon", "Projeksiyon ufku")}</span>
-                  <button
-                    type="button"
-                    className="assumption-select-trigger"
-                    onClick={() => setDashboardAssumptionMenu((current) => (current === "horizon" ? null : "horizon"))}
-                    aria-expanded={dashboardAssumptionMenu === "horizon"}
-                  >
-                    <strong>{dashboardHorizonSelectLabel}</strong>
-                    <i aria-hidden="true">⌄</i>
-                  </button>
-                  {dashboardAssumptionMenu === "horizon" && (
-                    <div className="assumption-select-menu" role="listbox">
-                      {financialHorizonOptions.map(([value, label]) => {
-                        const isSelected = value === financialHorizon;
-                        return (
-                          <button
-                            type="button"
-                            className={isSelected ? "selected" : ""}
-                            onClick={() => {
-                              loadFinancialData(value);
-                              setDashboardAssumptionMenu(null);
-                            }}
-                            role="option"
-                            aria-selected={isSelected}
-                            key={value}
-                          >
-                            <span>{label}</span>
-                            <small>{value === "6m" ? copy("Short range", "Kısa ufuk") : value === "1y" ? copy("Annual range", "Yıllık ufuk") : copy("Long range", "Uzun ufuk")}</small>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="assumption-strip-list">
-                {visibleDashboardAssumptionRows.length
-                  ? visibleDashboardAssumptionRows.map((row) => (
-                    <span key={row.id}>{row.label}<strong>{row.value}</strong></span>
-                  ))
-                  : (
-                    <span className="dashboard-empty-selection">
-                      {copy("No extra assumptions selected", "Ek varsayım alanı seçilmedi")}
-                      <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
-                    </span>
-                  )}
-              </div>
-            </section>
-
-            <section className={`executive-brief ${feasibilityVerdict.tone}`} aria-label={copy("Feasibility executive brief", "Fizibilite yönetici özeti")}>
-              <div className="executive-brief-copy">
-                <span>{copy("Feasibility executive brief", "Fizibilite yönetici özeti")}</span>
-                <h1>{feasibilityVerdict.label}</h1>
-                <p>{feasibilityVerdict.copy}</p>
-                {hasFinancialSourceData && (
-                  <div className="decision-kpi-grid">
-                    {decisionKpis.map((kpi) => (
-                      <article className={`decision-kpi ${kpi.ok ? "ok" : "failed"}`} key={kpi.key}>
-                        <span className="label-with-info">{kpi.label}<GlossaryTip language={form.language} term={kpi.label} /></span>
-                        <strong>{kpi.value}</strong>
-                        <small>{kpi.detail}</small>
-                      </article>
-                    ))}
-                  </div>
-                )}
-                <div className="executive-brief-actions">
-                  <button type="button" onClick={() => goTo(feasibilityVerdict.path, "login")}>{feasibilityVerdict.action}</button>
-                  <button type="button" className="secondary" onClick={() => goTo("/simulation/current-situation", "login")}>{copy("Test scenario", "Senaryo test et")}</button>
-                  <button type="button" className="secondary" onClick={() => goTo("/reports", "login")}>{copy("Open report pack", "Rapor paketini aç")}</button>
-                </div>
-              </div>
-              <aside className="executive-readiness-card">
-                <span>{copy("Decision readiness", "Karar hazırlığı")}</span>
-                <strong className="executive-readiness-status">{feasibilityReadinessStatus}</strong>
-                <p>{copy("Core modules ready", "Hazır ana modül")}: {feasibilityReadyCount}/{feasibilityChecklist.length}</p>
-                <div className="readiness-step-list">
-                  {feasibilityChecklist.map((item) => (
-                    <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
-                      <i>{item.done ? "OK" : "!"}</i>
-                      <span>{item.label}</span>
-                      <strong>{item.done ? copy("Ready", "Hazır") : copy("Data entry needed", "Veri girişi gerekiyor")}</strong>
-                    </button>
-                  ))}
-                </div>
-              </aside>
-            </section>
-
-            <section className="dashboard-section-group" aria-label={copy("Business case metrics", "İş modeli metrikleri")}>
-              <div className="dashboard-section-heading">
-                <div>
-                  <span>{copy("Business case", "İş modeli")}</span>
-                  <h2>{copy("The numbers a business owner should see first", "İş sahibinin önce görmesi gereken sayılar")}</h2>
-                </div>
-                <strong>{periodLabel}</strong>
-              </div>
-              <div className="executive-metric-grid">
-                {visibleDashboardExecutiveMetrics.length
-                  ? visibleDashboardExecutiveMetrics.map((metric) => (
-                    <article className={`command-card executive-metric-card ${metric.tone}`} key={metric.id}>
-                      <span>{metric.category}</span>
-                      <h3 className="label-with-info">{metric.label}<GlossaryTip language={form.language} term={metric.label} /></h3>
-                      <strong>{metric.value}</strong>
-                      <small>{metric.detail}</small>
-                    </article>
-                  ))
-                  : (
-                    <article className="command-card dashboard-empty-selection-card">
-                      <span>{copy("Business case", "İş modeli")}</span>
-                      <h3>{copy("No metrics selected", "Metrik seçilmedi")}</h3>
-                      <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
-                      <small>{copy("Open the editor to show business model numbers.", "İş modeli sayılarını göstermek için düzenleyiciyi açın.")}</small>
-                    </article>
-                  )}
-              </div>
-            </section>
-
-            <section className="dashboard-two-column" aria-label={copy("Risks and next actions", "Riskler ve sonraki aksiyonlar")}>
-              <article className="command-card dashboard-risk-board">
-                <div className="card-heading">
-                  <div>
-                    <span>{copy("Risk board", "Risk panosu")}</span>
-                    <h2>{copy("What can stop this project", "Bu projeyi ne durdurabilir")}</h2>
-                  </div>
-                </div>
-                <div className="dashboard-risk-list">
-                  {(dashboardRiskRows.length ? dashboardRiskRows : [{
-                    action: copy("Run simulation", "Simülasyon çalıştır"),
-                    detail: copy("Core feasibility data is in place. Test conservative and optimistic scenarios before committing.", "Ana fizibilite verisi hazır. Karar vermeden önce temkinli ve iyimser senaryoları test edin."),
-                    path: "/simulation/current-situation",
-                    priority: dashboardRiskPriority.controlled,
-                    severity: copy("Controlled", "Kontrollü"),
-                    tone: "teal",
-                    title: copy("No blocking risk detected", "Engelleyici risk görünmüyor"),
-                  }]).map((risk) => (
-                    <button type="button" className={`dashboard-risk-row ${risk.tone}`} onClick={() => goTo(risk.path, "login")} key={risk.title}>
-                      <span>{risk.severity}</span>
-                      <strong>{risk.title}</strong>
-                      <p>{risk.detail}</p>
-                      <b>{risk.action}</b>
-                    </button>
-                  ))}
-                </div>
-              </article>
-
-              <article className="command-card dashboard-action-board">
-                <div className="card-heading">
-                  <div>
-                    <span>{copy("Recommended sequence", "Önerilen sıra")}</span>
-                    <h2>{copy("What to do before committing capital", "Sermaye bağlamadan önce ne yapılmalı")}</h2>
-                  </div>
-                </div>
-                <div className="action-sequence">
-                  {(improvementFocus.length ? improvementFocus : [
-                    copy("Run at least one conservative scenario and confirm payback, cash runway, and capacity coverage.", "En az bir temkinli senaryo çalıştırın; geri dönüş, nakit dayanma ve kapasite kapsamını doğrulayın."),
-                    copy("Export or review the report pack before discussing investment or financing.", "Yatırım veya finansman konuşmadan önce rapor paketini inceleyin."),
-                  ]).map((item, index) => (
-                    <article key={item}>
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                      <p>{item}</p>
-                    </article>
-                  ))}
-                </div>
-              </article>
-            </section>
-
-            <section className="dashboard-section-group" aria-label={copy("Module summary", "Modül özeti")}>
-              <div className="dashboard-section-heading">
-                <div>
-                  <span>{copy("Across the project", "Proje genelinde")}</span>
-                  <h2>{copy("Where each source module stands", "Her kaynak modülün durumu")}</h2>
-                </div>
-              </div>
-              <div className="module-rollup-grid">
-                {dashboardModuleRollup.map((module) => (
-                  <button type="button" className={`module-rollup-card ${module.tone} ${module.done ? "done" : ""}`} onClick={() => goTo(module.path, "login")} key={module.label}>
-                    <span>{module.done ? copy("Ready", "Hazır") : copy("Needs input", "Girdi gerekli")}</span>
-                    <strong>{module.label}</strong>
-                    <p>{module.detail}</p>
-                    <b>{module.action}</b>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="dashboard-financial-detail" aria-label={copy("Financial detail", "Finans detayı")}>
-              <article className="command-card dashboard-business-case">
-                <div className="card-heading">
-                  <div>
-                    <span>{copy("Financial and operating detail", "Finansal ve operasyonel detay")}</span>
-                    <h2>{copy("Signals behind the verdict", "Kararın arkasındaki sinyaller")}</h2>
-                  </div>
-                  <button type="button" onClick={() => goTo("/financial-modelling/analiz", "login")}>{copy("Open analysis", "Analizi aç")}</button>
-                </div>
-                <div className="business-case-list">
-                  {visibleDashboardFinancialDetailRows.length
-                    ? visibleDashboardFinancialDetailRows.map((row) => (
-                      <span key={row.id}>{row.label}<strong>{row.value}</strong></span>
-                    ))
-                    : (
-                      <span className="dashboard-empty-selection">
-                        {copy("No detail metrics selected", "Detay metriği seçilmedi")}
-                        <strong>{copy("Edit screen", "Ekranı düzenle")}</strong>
-                      </span>
-                    )}
-                </div>
-              </article>
-            </section>
-
-            <div className="dashboard-logo-row" aria-label={copy("Company and Atera logos", "Şirket ve Atera logoları")}>
-              <div className="customer-logo-mark" aria-label={copy("Company logo", "Şirket logosu")}>
-                <strong>{dashboardCompanyName.slice(0, 2).toUpperCase()}</strong>
-                <span>{dashboardCompanyName}</span>
-              </div>
-              <div className="atera-logo-mark" aria-label="Atera logo">
-                <img src={logoUrl} alt="" />
-                <span>Atera</span>
-              </div>
-            </div>
-          </section>,
-      );
+      return <DashboardPage />;
     }
 
     if (routeRedirect) return null;
 
     if (session && (activeModule || isOperationsRoute || isFinancialRoute || isSimulationRoute)) {
       if (routePath === "/operations") {
-        return renderDashboardLayout(
-          "operations",
-            <section className="module-placeholder operations-overview">
-              <div>
-                <span>Operations</span>
-                <h1>{copy("Operations", "Operasyon")}</h1>
-                <p>{copy("Choose the operational workspace you want to work on: resources, products, machines, process definition, or active processes.", "Çalışmak istediğiniz operasyon alanını seçin: kaynaklar, ürünler, makineler, süreç tanımı veya mevcut süreçler.")}</p>
-              </div>
-              <div className="placeholder-grid">
-                {operationsSubmodules.map((submodule) => (
-                  <article key={submodule.key}>
-                    <strong>{submodule.label}</strong>
-                    <p>
-                      {submodule.key === "resources" && copy("Define materials and workforce resources used in production plans.", "Üretim planlarında kullanılan malzeme ve iş gücü kaynaklarını tanımlayın.")}
-                      {submodule.key === "products" && copy("Create products and connect their material recipes.", "Ürünleri oluşturun ve malzeme reçetelerini bağlayın.")}
-                      {submodule.key === "machines-equipment" && copy("Manage machines and equipment before planning capacity.", "Kapasite planlamadan önce makine ve ekipmanları yönetin.")}
-                      {submodule.key === "data-entry" && copy("Build and save daily process plans for feasibility analysis.", "Fizibilite analizi için günlük süreç planları oluşturup kaydedin.")}
-                      {submodule.key === "active-processes" && copy("Review saved process plans and their latest feasibility output.", "Kayıtlı süreç planlarını ve son fizibilite çıktılarını inceleyin.")}
-                    </p>
-                    <button type="button" onClick={() => goTo(submodule.path, "login")}>
-                      {copy("Open", "Aç")}
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </section>,
-        );
+        return <OperationsOverviewPage />;
       }
 
       if (activeOperationsSubmodule?.key === "data-entry") {
-        const processSetupItems = [
-          {
-            isReady: operationsWorkspace.products.length > 0,
-            label: copy("Product", "Ürün"),
-            path: "/operations/products",
-            readyCopy: copy("At least one product is defined.", "En az bir ürün tanımlı."),
-            todoCopy: copy("Create a product before defining a process.", "Süreç tanımlamadan önce ürün oluşturun."),
-          },
-          {
-            isReady: operationsWorkspace.machines.length > 0,
-            label: copy("Machine", "Makine"),
-            path: "/operations/machines-equipment",
-            readyCopy: copy("At least one machine is defined.", "En az bir makine tanımlı."),
-            todoCopy: copy("Add a machine with daily capacity inputs.", "Günlük kapasite girdileriyle bir makine ekleyin."),
-          },
-          {
-            isReady: operationsWorkspace.workforce.length > 0,
-            label: copy("Workforce", "İşgücü"),
-            path: "/operations/resources",
-            readyCopy: copy("At least one workforce role is defined.", "En az bir işgücü rolü tanımlı."),
-            todoCopy: copy("Add a workforce role and hourly cost.", "İşgücü rolü ve saatlik maliyet ekleyin."),
-          },
-        ];
-        const isProcessSetupReady = processSetupItems.every((item) => item.isReady);
-
-        return renderDashboardLayout(
-          `operations/${activeOperationsSubmodule.key}`,
-            <section className="operations-workspace operations-modern operations-process-page">
-              <div className="operations-header">
-                <div>
-                  <span>{copy("Operations", "Operasyon")} / {copy("Process Definition", "Süreç Tanımlama")}</span>
-                  <h1>{copy("Process Definition", "Süreç Tanımlama")}</h1>
-                  <p>{copy("Build a daily process plan only after the required product, machine, and workforce records exist.", "Gerekli ürün, makine ve işgücü kayıtları oluştuktan sonra günlük süreç planını kurun.")}</p>
-                </div>
-                <div className="operations-actions">
-                  <button type="button" className="operations-refresh-button" onClick={loadOperationsData}>{copy("Refresh Data", "Verileri Yenile")}</button>
-                </div>
-              </div>
-              {!isProcessSetupReady ? (
-                <div className="process-setup-grid">
-                  {processSetupItems.map((item) => (
-                    <article className={`operation-card process-setup-card ${item.isReady ? "ready" : "todo"}`} key={item.label}>
-                      <div>
-                        <mark>{item.isReady ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</mark>
-                        <h2>{item.label}</h2>
-                        <p>{item.isReady ? item.readyCopy : item.todoCopy}</p>
-                      </div>
-                      <button type="button" onClick={() => goTo(item.path, "login")}>
-                        {item.isReady ? copy("Review", "İncele") : copy("Add", "Ekle")}
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <OperationPlanner />
-              )}
-            </section>,
-        );
+        return <ProcessDefinitionPage />;
       }
 
       if (activeOperationsSubmodule?.key === "resources") {
@@ -4322,29 +3287,6 @@ function App() {
         return <ProductsPage />;
       }
 
-      if (activeOperationsSubmodule) {
-        return renderDashboardLayout(
-          `operations/${activeOperationsSubmodule.key}`,
-            <section className="module-placeholder">
-              <div>
-                <span>{copy("Operations placeholder", "Operasyon boş durum")}</span>
-                <h1>{activeOperationsSubmodule.label}</h1>
-                <p>{copy("This subpage is not available yet.", "Bu alt sayfa henüz hazır değil.")}</p>
-              </div>
-              <div className="placeholder-grid">
-                <article>
-                  <strong>{copy("Submodule", "Alt Modül")}</strong>
-                  <p>{copy("The screen structure for", "Ekran yapısı")} {activeOperationsSubmodule.label} {copy("will be developed here.", "için burada geliştirilecek.")}</p>
-                </article>
-                <article>
-                  <strong>{copy("Status", "Durum")}</strong>
-                  <p>{copy("For now, only frontend routing and the empty state screen are available.", "Şimdilik sadece frontend routing ve boş durum ekranı mevcut.")}</p>
-                </article>
-              </div>
-            </section>,
-        );
-      }
-
       if (activeModule?.key === "financial-modelling" || activeFinancialSubmodule) {
         return <FinancialModellingPage />;
       }
@@ -4357,484 +3299,19 @@ function App() {
         return <SalesStrategyPage />;
       }
 
-      if (activeModule.key === "reports") {
-        return renderDashboardLayout(
-          activeModule.key,
-            <section className="reports-workspace">
-              <div className="reports-header">
-                <div>
-                  <span>{dashboardCompanyName} / {copy("Export center", "Export merkezi")}</span>
-                  <h1>{copy("Report Downloads", "Rapor İndirme")}</h1>
-                  <p>{copy("Choose a report pack and download it as PDF or XLSX. Reports are built from the current data and are not archived.", "Bir rapor paketi seçin ve PDF ya da XLSX olarak indirin. Raporlar güncel veriden üretilir, arşivlenmez.")}</p>
-                </div>
-                <div className="reports-header-panel" aria-label={copy("Download behavior", "İndirme davranışı")}>
-                  <strong>{copy("Download only", "Sadece indir")}</strong>
-                  <span>{copy("Not archived", "Arşivlenmez")}</span>
-                </div>
-              </div>
-
-              <div className="reports-tabs" role="tablist" aria-label={copy("Report types", "Rapor türleri")}>
-                {reportTabs.map((tab) => (
-                  <button type="button" className={activeReportTab.key === tab.key ? "active" : ""} onClick={() => setReportsTab(tab.key)} key={tab.key}>{tab.label}</button>
-                ))}
-              </div>
-
-              <div className="report-stat-grid">
-                {reportStats.map(([label, value, detail]) => (
-                  <article className="report-stat-card" key={label}>
-                    <span>{label}</span>
-                    <strong>{value}</strong>
-                    <small>{detail}</small>
-                  </article>
-                ))}
-              </div>
-
-              <div className="reports-export-layout">
-                <section className="reports-pack-grid" aria-label={copy("Report packs", "Rapor paketleri")}>
-                  {reportTabs.map((tab) => (
-                    <article className={`reports-pack-card ${tab.tone} ${activeReportTab.key === tab.key ? "active" : ""}`} key={tab.key}>
-                      <button type="button" onClick={() => setReportsTab(tab.key)}>
-                        <span>{copy("Report pack", "Rapor paketi")}</span>
-                        <strong>{tab.label}</strong>
-                        <small>{tab.detail}</small>
-                      </button>
-                      <div className="reports-pack-includes">
-                        {tab.includes.map((item) => <em key={item}>{item}</em>)}
-                      </div>
-                    </article>
-                  ))}
-                </section>
-
-                <aside className="reports-export-panel">
-                  <article className="reports-card reports-selected-card">
-                    <div className="reports-card-heading">
-                      <div>
-                        <span>{copy("Selected export", "Seçili export")}</span>
-                        <h2>{activeReportTab.label}</h2>
-                      </div>
-                    </div>
-                    <p>{activeReportTab.detail}</p>
-                    <div className="reports-selected-includes">
-                      {activeReportTab.includes.map((item) => <span key={item}>{item}</span>)}
-                    </div>
-                  </article>
-
-                  <article className="reports-card reports-format-card">
-                    <div className="reports-card-heading">
-                      <div>
-                        <span>{copy("Download format", "İndirme formatı")}</span>
-                        <h2>{copy("Choose file type", "Dosya türü seçin")}</h2>
-                      </div>
-                    </div>
-                    <div className="reports-format-grid">
-                      {reportFormats.map((format) => (
-                        <button type="button" onClick={() => downloadReport(activeReportTab, format)} key={format.key}>
-                          <strong>{format.label}</strong>
-                          <span>{format.note}</span>
-                          <small>{copy("Download", "İndir")}</small>
-                        </button>
-                      ))}
-                    </div>
-                    <p>{copy("PDF opens a print-ready report; choose \"Save as PDF\" in the print dialog. XLSX downloads the statements as a spreadsheet.", "PDF, yazdırmaya hazır raporu açar; yazdırma penceresinde \"PDF olarak kaydet\"i seçin. XLSX tabloları Excel dosyası olarak indirir.")}</p>
-                  </article>
-
-                  <article className="reports-card reports-readiness-card">
-                    <div className="reports-card-heading">
-                      <div>
-                        <span>{copy("Source readiness", "Kaynak hazırlığı")}</span>
-                        <h2>{copy("What the report can use", "Raporun kullanabileceği kaynaklar")}</h2>
-                      </div>
-                      <button type="button" onClick={loadPlanningData}>{copy("Refresh", "Yenile")}</button>
-                    </div>
-                    {[
-                      [copy("Product record", "Ürün kaydı"), Boolean(operationsWorkspace.product)],
-                      [copy("Process result", "Süreç sonucu"), activePlanResults.length > 0],
-                      [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast],
-                      [copy("Financial assumptions", "Finansal varsayımlar"), hasFinancialAssumptions],
-                    ].map(([item, ready]) => (
-                      <div className="schedule-row" key={item}>
-                        <strong>{item}</strong>
-                        <span>{copy("Used in the report", "Raporda kullanılır")}</span>
-                        <mark className={`status-badge ${ready ? "ready" : "needed"}`}>{ready ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}</mark>
-                      </div>
-                    ))}
-                  </article>
-                </aside>
-              </div>
-            </section>,
-        );
+      if (activeModule?.key === "reports") {
+        return <ReportsPage />;
       }
 
-      if (activeModule.key === "human-resources-plus") {
-        return renderDashboardLayout(
-          activeModule.key,
-            <section className="module-placeholder">
-              <div>
-                <span>{copy("Workforce module", "İnsan kaynağı modülü")}</span>
-                <h1>{activeModule.label}</h1>
-                <p>{copy("This workspace is ready for workforce definitions, skills, labor capacity, and planning across operations.", "Bu çalışma alanı iş gücü tanımları, yetkinlikler, işçilik kapasitesi ve operasyon geneli planlama için hazırlandı.")}</p>
-              </div>
-              <div className="placeholder-grid">
-                <article>
-                  <strong>{copy("Workforce Planning", "İş Gücü Planlama")}</strong>
-                  <p>{copy("Connect roles, operators, and capacity needs to production workflows.", "Rolleri, operatörleri ve kapasite ihtiyaçlarını üretim iş akışlarına bağlayın.")}</p>
-                </article>
-                <article>
-                  <strong>{copy("Status", "Durum")}</strong>
-                  <p>{copy("Frontend routing is active; data tables and business logic can be added next.", "Frontend routing aktif; veri tabloları ve iş mantığı sonraki adımda eklenebilir.")}</p>
-                </article>
-              </div>
-            </section>,
-        );
-      }
-
-      return renderDashboardLayout(
-        activeModule.key,
-          <section className="module-placeholder">
-            <div>
-              <span>{copy("Module placeholder", "Modül boş durumu")}</span>
-              <h1>{activeModule.label}</h1>
-              <p>{copy("This module is visible in the dashboard navigation and is ready for its frontend workflow.", "Bu modül dashboard navigasyonunda görünür ve frontend iş akışı için hazırdır.")}</p>
-            </div>
-            <div className="placeholder-grid">
-              <article>
-                <strong>{copy("Workspace", "Çalışma Alanı")}</strong>
-                <p>{copy("Empty state for upcoming tools, tables, and decision screens.", "Yakında eklenecek araçlar, tablolar ve karar ekranları için boş durum.")}</p>
-              </article>
-              <article>
-                <strong>{copy("Status", "Durum")}</strong>
-                <p>{copy("This module is not available yet.", "Bu modül henüz hazır değil.")}</p>
-              </article>
-            </div>
-          </section>,
-      );
+      // Every module and sub-page above is handled; anything else was redirected.
+      return null;
     }
 
     if (session && routePath === "/authorization") {
-      return renderDashboardLayout(
-        "authorization",
-          <section className="authorization-page">
-            <div className="authorization-heading">
-              <span>{labels.dashboard}</span>
-              <h1>{labels.authorizationPage}</h1>
-              <p>{authorizationAccess.read ? labels.authorizationCopy : labels.authorizationLockedCopy}</p>
-            </div>
-
-            {!authorizationAccess.read ? (
-              <div className="authorization-locked">
-                <strong>{labels.authorizationLocked}</strong>
-                <p>{labels.authorizationLockedCopy}</p>
-              </div>
-            ) : (
-              <>
-                <div className="authorization-tabs" role="tablist" aria-label={labels.authorizationPage}>
-                  <button
-                    type="button"
-                    className={authorizationTab === "roles" ? "active" : ""}
-                    onClick={() => setAuthorizationTab("roles")}
-                  >
-                    {labels.roleDefinition}
-                  </button>
-                  <button
-                    type="button"
-                    className={authorizationTab === "users" ? "active" : ""}
-                    onClick={() => setAuthorizationTab("users")}
-                  >
-                    {labels.userDefinition}
-                  </button>
-                </div>
-
-                {authorizationTab === "users" ? (
-                  <div className="authorization-grid user-definition-grid">
-                    <form className="authorization-card user-definition-form" onSubmit={handleCreateManagedUser}>
-                      <h2>{labels.userDefinition}</h2>
-                      <p>{labels.userDefinitionCopy}</p>
-                      <label>
-                        <span>{labels.username}</span>
-                        <input
-                          disabled={!authorizationAccess.write || authorizationLoading}
-                          required
-                          value={managedUserForm.username}
-                          onChange={(event) => updateManagedUserForm("username", event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        <span>{labels.email}</span>
-                        <input
-                          disabled={!authorizationAccess.write || authorizationLoading}
-                          required
-                          type="email"
-                          value={managedUserForm.email}
-                          onChange={(event) => updateManagedUserForm("email", event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        <span>{labels.password}</span>
-                        <input
-                          disabled={!authorizationAccess.write || authorizationLoading}
-                          minLength="8"
-                          required
-                          type="password"
-                          value={managedUserForm.password}
-                          onChange={(event) => updateManagedUserForm("password", event.target.value)}
-                        />
-                      </label>
-                      <div className="user-definition-fields">
-                        <label>
-                          <span>{labels.phoneNumber}</span>
-                          <input
-                            disabled={!authorizationAccess.write || authorizationLoading}
-                            value={managedUserForm.phoneNumber}
-                            onChange={(event) => updateManagedUserForm("phoneNumber", event.target.value)}
-                          />
-                        </label>
-                        <label>
-                          <span>{labels.department}</span>
-                          <input
-                            disabled={!authorizationAccess.write || authorizationLoading}
-                            value={managedUserForm.department}
-                            onChange={(event) => updateManagedUserForm("department", event.target.value)}
-                          />
-                        </label>
-                        <label>
-                          <span>{labels.accessLevel}</span>
-                          <select
-                            disabled={!authorizationAccess.write || authorizationLoading}
-                            value={managedUserForm.accessLevel}
-                            onChange={(event) => updateManagedUserForm("accessLevel", event.target.value)}
-                          >
-                            {editableAuthorizationRoles.map((role) => (
-                              <option value={role.name} key={role.id}>
-                                {role.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          <span>{labels.language}</span>
-                          <select
-                            disabled={!authorizationAccess.write || authorizationLoading}
-                            value={managedUserForm.language}
-                            onChange={(event) => updateManagedUserForm("language", event.target.value)}
-                          >
-                            <option value="en">EN</option>
-                            <option value="tr">TR</option>
-                          </select>
-                        </label>
-                      </div>
-                      <button className="submit-button" disabled={!authorizationAccess.write || authorizationLoading} type="submit">
-                        {authorizationLoading ? "..." : labels.createManagedUser}
-                      </button>
-                      <p className="authorization-note">
-                        {authorizationAccess.write ? labels.writeAccess : labels.readOnlyMode}
-                      </p>
-                    </form>
-
-                    <div className="authorization-card users-card">
-                      <div className="permissions-header">
-                        <h2>{labels.managedUsers}</h2>
-                        {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
-                      </div>
-                      {renderSimpleSortableGrid({
-                        columns: userTableColumns,
-                        gridTemplateColumns: "1fr 1.4fr 1fr 0.8fr",
-                        headClassName: "users-row-head",
-                        rowClassName: "users-row",
-                        rows: profiles,
-                        tableClassName: "users-table",
-                        tableId: "authorization-users",
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="authorization-grid">
-                    <form className="authorization-card role-form" onSubmit={handleCreateRole}>
-                      <h2>{labels.newRole}</h2>
-                      <label>
-                        <span>{labels.roleName}</span>
-                        <input
-                          disabled={!authorizationAccess.write || authorizationLoading}
-                          value={roleForm.name}
-                          onChange={(event) => updateRoleForm("name", event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        <span>{labels.roleDescription}</span>
-                        <input
-                          disabled={!authorizationAccess.write || authorizationLoading}
-                          value={roleForm.description}
-                          onChange={(event) => updateRoleForm("description", event.target.value)}
-                        />
-                      </label>
-                      <button className="submit-button" disabled={!authorizationAccess.write || authorizationLoading} type="submit">
-                        {labels.createRole}
-                      </button>
-                      <p className="authorization-note">
-                        {authorizationAccess.write ? labels.writeAccess : labels.readOnlyMode}
-                      </p>
-                    </form>
-
-                    <div className="authorization-card permissions-card">
-                      <div className="permissions-header">
-                        <h2>{labels.permissions}</h2>
-                        {currentProfile?.company?.name && <span>{currentProfile.company.name}</span>}
-                      </div>
-                      {renderSimpleSortableGrid({
-                        columns: permissionTableColumns,
-                        gridTemplateColumns: "1fr 1fr 0.8fr 0.8fr",
-                        headClassName: "permissions-row-head",
-                        rowClassName: "permissions-row",
-                        rows: permissionTableRows,
-                        tableClassName: "permissions-table",
-                        tableId: "authorization-permissions",
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {authorizationStatus && <p className="status-message">{authorizationStatus}</p>}
-          </section>,
-      );
+      return <AuthorizationPage />;
     }
 
-    return (
-      <main className="auth-shell">
-        <section className="auth-panel" aria-label="Atera authentication">
-          <header className="brand-bar">
-            <div className="brand-mark">
-              <img src={logoUrl} alt="Atera logo" />
-              <div>
-                <strong>Atera</strong>
-                <span>{copy("Production feasibility", "Üretim fizibilitesi")}</span>
-              </div>
-            </div>
-
-            <div className="auth-controls">
-              <label className="language-picker">
-                <span>{labels.language}</span>
-                <select value={form.language} onChange={(event) => updateField("language", event.target.value)}>
-                  <option value="en">EN</option>
-                  <option value="tr">TR</option>
-                </select>
-              </label>
-              <ThemeToggle />
-            </div>
-          </header>
-
-          {profilePreview && (
-            <div className="avatar-zone">
-              <div className="avatar">
-                <img src={profilePreview} alt={copy("Profile preview", "Profil önizlemesi")} />
-              </div>
-            </div>
-          )}
-
-          {session ? (
-            <div className="signed-in">
-              <p>{labels.signedIn}</p>
-              <button type="button" onClick={handleLogout}>
-                {labels.logout}
-              </button>
-            </div>
-          ) : mode === "reset" ? (
-            <form className="auth-form" onSubmit={handleResetPassword}>
-              <label>
-                <span>{labels.resetPassword}</span>
-                <div className="password-field">
-                  <input
-                    autoComplete="new-password"
-                    required
-                    type={showPassword ? "text" : "password"}
-                    value={form.password}
-                    onChange={(event) => updateField("password", event.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="password-toggle"
-                    aria-label={showPassword ? labels.hidePassword : labels.showPassword}
-                    onClick={() => setShowPassword((current) => !current)}
-                  >
-                    {showPassword ? labels.hide : labels.show}
-                  </button>
-                </div>
-              </label>
-              <label>
-                <span>{labels.confirmPassword}</span>
-                <div className="password-field">
-                  <input
-                    autoComplete="new-password"
-                    required
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="password-toggle"
-                    aria-label={showConfirmPassword ? labels.hidePassword : labels.showPassword}
-                    onClick={() => setShowConfirmPassword((current) => !current)}
-                  >
-                    {showConfirmPassword ? labels.hide : labels.show}
-                  </button>
-                </div>
-              </label>
-              <button className="submit-button" disabled={loading} type="submit">
-                {loading ? "..." : labels.resetPassword}
-              </button>
-            </form>
-          ) : (
-            <form className="auth-form" onSubmit={handleLogin}>
-              <label>
-                <span>{labels.loginEmail}</span>
-                <input
-                  autoComplete="email"
-                  required
-                  type="email"
-                  value={form.email}
-                  onChange={(event) => updateField("email", event.target.value)}
-                />
-              </label>
-
-              <label>
-                <span>{labels.password}</span>
-                <div className="password-field">
-                  <input
-                    autoComplete="current-password"
-                    required
-                    type={showPassword ? "text" : "password"}
-                    value={form.password}
-                    onChange={(event) => updateField("password", event.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="password-toggle"
-                    aria-label={showPassword ? labels.hidePassword : labels.showPassword}
-                    onClick={() => setShowPassword((current) => !current)}
-                  >
-                    {showPassword ? labels.hide : labels.show}
-                  </button>
-                </div>
-              </label>
-
-              <div className="form-options">
-                <span>{labels.adminProvisionedAccess}</span>
-                <button type="button" className="link-button" onClick={handleForgotPassword}>
-                  {labels.forgot}
-                </button>
-              </div>
-
-              <button className="submit-button" disabled={loading} type="submit">
-                {loading ? "..." : labels.submitLogin}
-              </button>
-            </form>
-          )}
-
-          {status && <p className="status-message">{status}</p>}
-        </section>
-      </main>
-    );
+    return <AuthPage />;
   }
 }
 

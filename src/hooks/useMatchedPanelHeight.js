@@ -41,8 +41,5 @@ export function useMatchedPanelHeight(dependencyKey) {
     };
   }, [dependencyKey]);
 
-  return [
-    sourceRef,
-    height ? { "--matched-record-card-height": `${height}px` } : undefined,
-  ];
+  return [sourceRef, height ? { "--matched-record-card-height": `${height}px` } : undefined];
 }

@@ -2,16 +2,10 @@ import React from "react";
 import { formatCurrencyAmount, formatLira, formatNumber } from "../lib/format";
 import { getStatementLayout, reportPackSections } from "../lib/reportExport";
 import { useAppContext } from "../app/AppContext";
+import SensitivityTable from "../components/SensitivityTable";
 
 export default function PrintableReportPage({ packKey }) {
-  const {
-    buildExportReport,
-    copy,
-    goTo,
-    locale,
-    renderSensitivityTable,
-    reportTabs,
-  } = useAppContext();
+  const { buildExportReport, copy, goTo, locale, reportTabs } = useAppContext();
 
   const pack = reportTabs.find((tab) => tab.key === packKey) || reportTabs[0];
   const sections = reportPackSections[pack.key] || reportPackSections.full;
@@ -19,7 +13,8 @@ export default function PrintableReportPage({ packKey }) {
   const layout = getStatementLayout(copy);
   const has = (section) => sections.includes(section);
   const formatKpi = (value, format) => {
-    if (format === "month") return value ? `${formatNumber(value)}. ${copy("month", "ay")}` : copy("Not reached", "Ulaşılmadı");
+    if (format === "month")
+      return value ? `${formatNumber(value)}. ${copy("month", "ay")}` : copy("Not reached", "Ulaşılmadı");
     if (format === "percent") return value === null ? "-" : `%${formatNumber(value, 1)}`;
     return formatLira(value, format === "money2" ? 2 : 0);
   };
@@ -30,7 +25,9 @@ export default function PrintableReportPage({ packKey }) {
         <thead>
           <tr>
             <th>{copy("TRY", "TL")}</th>
-            {report.years.map((year) => <th key={year.label}>{copy(`Year ${year.label}`, `Yıl ${year.label}`)}</th>)}
+            {report.years.map((year) => (
+              <th key={year.label}>{copy(`Year ${year.label}`, `Yıl ${year.label}`)}</th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -52,21 +49,30 @@ export default function PrintableReportPage({ packKey }) {
   return (
     <main className="print-report">
       <div className="print-toolbar">
-        <button type="button" onClick={() => goTo("/reports", "login")}>{copy("Back", "Geri")}</button>
-        <button type="button" className="primary" onClick={() => window.print()}>{copy("Print / Save as PDF", "Yazdır / PDF olarak kaydet")}</button>
+        <button type="button" onClick={() => goTo("/reports", "login")}>
+          {copy("Back", "Geri")}
+        </button>
+        <button type="button" className="primary" onClick={() => window.print()}>
+          {copy("Print / Save as PDF", "Yazdır / PDF olarak kaydet")}
+        </button>
       </div>
 
       <header className="print-cover">
         <span>{pack.label}</span>
         <h1>{report.companyName}</h1>
         <p>{report.productName}</p>
-        <small>{copy("Prepared on", "Hazırlanma tarihi")} {new Date().toLocaleDateString(locale)} · {copy("5-year projection", "5 yıllık projeksiyon")}</small>
+        <small>
+          {copy("Prepared on", "Hazırlanma tarihi")} {new Date().toLocaleDateString(locale)} ·{" "}
+          {copy("5-year projection", "5 yıllık projeksiyon")}
+        </small>
       </header>
 
       {has("summary") && (
         <section className="print-section">
           <h2>{copy("Decision", "Karar")}</h2>
-          <p className="print-verdict"><strong>{report.verdict.label}</strong> {report.verdict.copy}</p>
+          <p className="print-verdict">
+            <strong>{report.verdict.label}</strong> {report.verdict.copy}
+          </p>
           <div className="print-kpis">
             {report.kpis.map(([label, value, format]) => (
               <div key={label}>
@@ -81,8 +87,13 @@ export default function PrintableReportPage({ packKey }) {
       {has("sensitivity") && report.sensitivity.length > 0 && (
         <section className="print-section">
           <h2>{copy("Sensitivity", "Duyarlılık analizi")}</h2>
-          <p className="print-note">{copy("Full 5-year model re-run with one assumption changed at a time.", "Her seferinde tek bir varsayım değiştirilerek tam 5 yıllık model yeniden çalıştırıldı.")}</p>
-          {renderSensitivityTable(report.sensitivity, "print-table print-table-sensitivity")}
+          <p className="print-note">
+            {copy(
+              "Full 5-year model re-run with one assumption changed at a time.",
+              "Her seferinde tek bir varsayım değiştirilerek tam 5 yıllık model yeniden çalıştırıldı.",
+            )}
+          </p>
+          {<SensitivityTable rows={report.sensitivity} className="print-table print-table-sensitivity" />}
         </section>
       )}
 
@@ -92,7 +103,10 @@ export default function PrintableReportPage({ packKey }) {
           <table className="print-table print-table-compact">
             <tbody>
               {report.assumptions.map(([label, value]) => (
-                <tr key={label}><td>{label}</td><td>{formatNumber(value, 2)}</td></tr>
+                <tr key={label}>
+                  <td>{label}</td>
+                  <td>{formatNumber(value, 2)}</td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -148,8 +162,14 @@ export default function PrintableReportPage({ packKey }) {
             <tbody>
               {report.plans.map((plan) => (
                 <tr key={plan.name}>
-                  <td>{plan.name}<small>{plan.product}</small></td>
-                  <td>{formatNumber(plan.dailyOutput)}{plan.dailyOutput < plan.target ? ` / ${formatNumber(plan.target)}` : ""}</td>
+                  <td>
+                    {plan.name}
+                    <small>{plan.product}</small>
+                  </td>
+                  <td>
+                    {formatNumber(plan.dailyOutput)}
+                    {plan.dailyOutput < plan.target ? ` / ${formatNumber(plan.target)}` : ""}
+                  </td>
                   <td>{formatLira(plan.unitMaterial, 2)}</td>
                   <td>{formatLira(plan.unitLabor, 2)}</td>
                   <td>{formatLira(plan.unitEnergy, 2)}</td>
@@ -177,7 +197,10 @@ export default function PrintableReportPage({ packKey }) {
             <tbody>
               {report.channels.map((channel) => (
                 <tr key={channel.name}>
-                  <td>{channel.name}<small>{channel.product}</small></td>
+                  <td>
+                    {channel.name}
+                    <small>{channel.product}</small>
+                  </td>
                   <td>{formatNumber(channel.firstMonthUnits)}</td>
                   <td>{formatLira(channel.unitPrice, 2)}</td>
                   <td>{formatNumber(channel.commissionPercent, 1)}</td>
@@ -190,13 +213,30 @@ export default function PrintableReportPage({ packKey }) {
             <thead>
               <tr>
                 <th>{copy("Units", "Adet")}</th>
-                {report.years.map((year) => <th key={year.label}>{copy(`Year ${year.label}`, `Yıl ${year.label}`)}</th>)}
+                {report.years.map((year) => (
+                  <th key={year.label}>{copy(`Year ${year.label}`, `Yıl ${year.label}`)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              <tr><td>{copy("Produced", "Üretilen")}</td>{report.years.map((year) => <td key={year.label}>{formatNumber(year.producedUnits)}</td>)}</tr>
-              <tr><td>{copy("Sold", "Satılan")}</td>{report.years.map((year) => <td key={year.label}>{formatNumber(year.netSoldUnits)}</td>)}</tr>
-              <tr><td>{copy("In stock at year end", "Yıl sonu stok")}</td>{report.years.map((year) => <td key={year.label}>{formatNumber(year.inventoryUnits)}</td>)}</tr>
+              <tr>
+                <td>{copy("Produced", "Üretilen")}</td>
+                {report.years.map((year) => (
+                  <td key={year.label}>{formatNumber(year.producedUnits)}</td>
+                ))}
+              </tr>
+              <tr>
+                <td>{copy("Sold", "Satılan")}</td>
+                {report.years.map((year) => (
+                  <td key={year.label}>{formatNumber(year.netSoldUnits)}</td>
+                ))}
+              </tr>
+              <tr>
+                <td>{copy("In stock at year end", "Yıl sonu stok")}</td>
+                {report.years.map((year) => (
+                  <td key={year.label}>{formatNumber(year.inventoryUnits)}</td>
+                ))}
+              </tr>
             </tbody>
           </table>
         </section>
@@ -206,13 +246,20 @@ export default function PrintableReportPage({ packKey }) {
         <section className="print-section">
           <h2>{copy("Risks to resolve", "Çözülmesi gereken riskler")}</h2>
           <ul className="print-risks">
-            {report.risks.map((risk) => <li key={risk.title}><strong>{risk.title}</strong> {risk.detail}</li>)}
+            {report.risks.map((risk) => (
+              <li key={risk.title}>
+                <strong>{risk.title}</strong> {risk.detail}
+              </li>
+            ))}
           </ul>
         </section>
       )}
 
       <footer className="print-footer">
-        {copy("Prices and costs exclude VAT. Projections are estimates based on the assumptions entered in Atera.", "Fiyat ve maliyetler KDV hariçtir. Projeksiyonlar Atera'ya girilen varsayımlara dayanan tahminlerdir.")}
+        {copy(
+          "Prices and costs exclude VAT. Projections are estimates based on the assumptions entered in Atera.",
+          "Fiyat ve maliyetler KDV hariçtir. Projeksiyonlar Atera'ya girilen varsayımlara dayanan tahminlerdir.",
+        )}
       </footer>
     </main>
   );

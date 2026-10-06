@@ -1,10 +1,19 @@
 import React from "react";
 import { GlossaryTip } from "../components/InfoTip";
 import { normalizeSimulationAlgorithm, simulationAlgorithms } from "../lib/appDefaults";
-import { buildFinancialFeasibilityModel, buildSensitivityTable, getOperationProductMap, getProjectionMonthCount, getSalesForecastForMonth, toFiniteNumber } from "../lib/feasibilityModel";
+import {
+  buildFinancialFeasibilityModel,
+  buildSensitivityTable,
+  getOperationProductMap,
+  getProjectionMonthCount,
+  getSalesForecastForMonth,
+  toFiniteNumber,
+} from "../lib/feasibilityModel";
 import { emptyFinancialModel } from "../lib/financialService";
 import { formatLira, formatNumber } from "../lib/format";
 import { useAppContext } from "../app/AppContext";
+import SensitivityTable from "../components/SensitivityTable";
+import DashboardLayout from "../components/DashboardLayout";
 
 export default function SimulationPage() {
   const {
@@ -23,8 +32,6 @@ export default function SimulationPage() {
     operationsWorkspace,
     operationsWorkspaceForFinance,
     persistSimulationVariant,
-    renderDashboardLayout,
-    renderSensitivityTable,
     salesStrategy,
     simulationLoading,
     simulationStatus,
@@ -44,27 +51,43 @@ export default function SimulationPage() {
     const value = Number(parameters[field]);
     return Number.isFinite(value) ? value : fallback;
   };
-  const linkedFinancialModel = buildFinancialFeasibilityModel(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance, financialHorizon);
+  const linkedFinancialModel = buildFinancialFeasibilityModel(
+    financialModel,
+    salesStrategy,
+    financialSettingsForModel,
+    operationsWorkspaceForFinance,
+    financialHorizon,
+  );
   const linkedSummary = linkedFinancialModel.summary || emptyFinancialModel.summary;
   const defaultHorizonMonths = Math.max(1, getProjectionMonthCount(financialHorizon));
   const timeHorizonMonths = Math.max(1, Math.round(positiveParam("timeHorizonMonths", defaultHorizonMonths)));
   const productMap = getOperationProductMap(operationsWorkspaceForFinance);
-  const firstChannelProduct = salesStrategy.channels.map((channel) => productMap.get(channel.productId) || channel.product).find(Boolean);
+  const firstChannelProduct = salesStrategy.channels
+    .map((channel) => productMap.get(channel.productId) || channel.product)
+    .find(Boolean);
   // The linked model covers the financial horizon; turn its totals into
   // monthly values before applying the variant's own horizon.
   const defaultSalesUnits = Math.round(
-    toFiniteNumber(linkedSummary.netSoldUnits) / defaultHorizonMonths ||
-    getSalesForecastForMonth(salesStrategy, 0),
+    toFiniteNumber(linkedSummary.netSoldUnits) / defaultHorizonMonths || getSalesForecastForMonth(salesStrategy, 0),
   );
   const defaultUnitSalesPrice = toFiniteNumber(
     linkedSummary.averageNetPrice,
-    toFiniteNumber(firstChannelProduct?.price, toFiniteNumber(operationsWorkspaceForFinance.product?.price, toFiniteNumber(operationsWorkspaceForFinance.products[0]?.price))),
+    toFiniteNumber(
+      firstChannelProduct?.price,
+      toFiniteNumber(
+        operationsWorkspaceForFinance.product?.price,
+        toFiniteNumber(operationsWorkspaceForFinance.products[0]?.price),
+      ),
+    ),
   );
   const scenarioSalesUnits = Math.max(0, positiveParam("salesUnits", defaultSalesUnits));
   const scenarioUnitSalesPrice = Math.max(0, positiveParam("unitSalesPrice", defaultUnitSalesPrice));
   const scenarioProductionUnits = Math.max(
     scenarioSalesUnits,
-    positiveParam("productionUnits", Math.round(toFiniteNumber(linkedSummary.totalProduced) / defaultHorizonMonths) || scenarioSalesUnits),
+    positiveParam(
+      "productionUnits",
+      Math.round(toFiniteNumber(linkedSummary.totalProduced) / defaultHorizonMonths) || scenarioSalesUnits,
+    ),
   );
   const discountPercent = Math.min(100, Math.max(0, finiteParam("discountPercent", 0)));
   const returnRatePercent = Math.min(100, Math.max(0, finiteParam("returnRatePercent", 0)));
@@ -88,19 +111,32 @@ export default function SimulationPage() {
     [simulationAlgorithms.withTendency, copy("Apply assumption changes", "Varsayım değişikliklerini uygula")],
     [simulationAlgorithms.withoutTendency, copy("Base plan only", "Yalnız baz plan")],
   ];
-  const simulationAlgorithmLabel = simulationAlgorithmOptions.find(([value]) => value === simulationAlgorithm)?.[1] || simulationAlgorithmOptions[0][1];
+  const simulationAlgorithmLabel =
+    simulationAlgorithmOptions.find(([value]) => value === simulationAlgorithm)?.[1] ||
+    simulationAlgorithmOptions[0][1];
   const volatility = numberParam("volatility") / 100;
   const costVolatility = numberParam("costVolatility") / 100;
-  const fixedCost = Math.max(0, positiveParam("fixedCost", (toFiniteNumber(linkedSummary.extraRecurringCost) / defaultHorizonMonths) * timeHorizonMonths));
+  const fixedCost = Math.max(
+    0,
+    positiveParam(
+      "fixedCost",
+      (toFiniteNumber(linkedSummary.extraRecurringCost) / defaultHorizonMonths) * timeHorizonMonths,
+    ),
+  );
   const marketingBudget = Math.max(0, finiteParam("marketingBudget", 0)) * timeHorizonMonths;
   const derivedVariableCostRatio = baseRevenue ? Math.min(95, (scenarioProductionCost / baseRevenue) * 100) : 0;
-  const variableCostRatio = Math.min(0.95, Math.max(0, finiteParam("variableCostRatio", derivedVariableCostRatio) / 100));
+  const variableCostRatio = Math.min(
+    0.95,
+    Math.max(0, finiteParam("variableCostRatio", derivedVariableCostRatio) / 100),
+  );
   const tendencyEffect = demandEffect + priceEffect + campaignEffect + efficiencyEffect * 0.42 - competitorDrag * 0.55;
   const appliedTendencyEffect = simulationAlgorithm === simulationAlgorithms.withoutTendency ? 0 : tendencyEffect;
   const trendAdjustedRevenue = baseRevenue * Math.max(0, 1 + appliedTendencyEffect);
-  const projectedVariableCost = scenarioProductionCost || (trendAdjustedRevenue * Math.min(variableCostRatio + costVolatility * 0.22, 0.92));
-  const outcomeSpread = trendAdjustedRevenue * Math.max(volatility + costVolatility * 0.65 + competitorDrag * 0.35, 0.08);
-  const contributionPerUnit = Math.max(0, (scenarioUnitSalesPrice * Math.max(0, 1 - discountRate)) - unitProductionCost);
+  const projectedVariableCost =
+    scenarioProductionCost || trendAdjustedRevenue * Math.min(variableCostRatio + costVolatility * 0.22, 0.92);
+  const outcomeSpread =
+    trendAdjustedRevenue * Math.max(volatility + costVolatility * 0.65 + competitorDrag * 0.35, 0.08);
+  const contributionPerUnit = Math.max(0, scenarioUnitSalesPrice * Math.max(0, 1 - discountRate) - unitProductionCost);
   const buildOutcome = (key, shiftLabel, label, tone, multiplier) => {
     const revenue = trendAdjustedRevenue + outcomeSpread * multiplier;
     const variableCost = projectedVariableCost * (revenue / Math.max(trendAdjustedRevenue, 1));
@@ -136,9 +172,13 @@ export default function SimulationPage() {
   const breakEvenVolume = contributionPerUnit > 0 ? breakEvenFixedCost / contributionPerUnit : null;
   const projectedVolume = scenarioSalesUnits * timeHorizonMonths;
   const chartVolumeMax = Math.max(1, projectedVolume * 1.2, (breakEvenVolume || 0) * 1.5);
-  const chartMoneyMax = Math.max(1, netUnitPrice * chartVolumeMax, breakEvenFixedCost + (unitProductionCost * chartVolumeMax));
-  const chartX = (volume) => 50 + ((volume / chartVolumeMax) * 520);
-  const chartY = (money) => 240 - ((money / chartMoneyMax) * 198);
+  const chartMoneyMax = Math.max(
+    1,
+    netUnitPrice * chartVolumeMax,
+    breakEvenFixedCost + unitProductionCost * chartVolumeMax,
+  );
+  const chartX = (volume) => 50 + (volume / chartVolumeMax) * 520;
+  const chartY = (money) => 240 - (money / chartMoneyMax) * 198;
   const likelyOutcome = outcomes.find((outcome) => outcome.key === "likely");
   const maxRevenue = Math.max(...outcomes.map((outcome) => outcome.revenue), 1);
   const maxNetAbs = Math.max(...outcomes.map((outcome) => Math.abs(outcome.net)), 1);
@@ -181,20 +221,37 @@ export default function SimulationPage() {
     [copy("Monthly sales", "Aylık satış"), `${formatNumber(scenarioSalesUnits)} ${copy("units", "adet")}`],
     [copy("Net sellable units", "Net satılabilir adet"), `${formatNumber(netSellableUnits)} ${copy("units", "adet")}`],
     [copy("Unit price", "Birim fiyat"), formatLira(scenarioUnitSalesPrice, 2)],
-    [copy("Unit production cost", "Birim üretim maliyeti"), unitProductionCost ? formatLira(unitProductionCost, 2) : "-"],
+    [
+      copy("Unit production cost", "Birim üretim maliyeti"),
+      unitProductionCost ? formatLira(unitProductionCost, 2) : "-",
+    ],
     [copy("Projection horizon", "Projeksiyon ufku"), `${formatNumber(timeHorizonMonths)} ${copy("months", "ay")}`],
   ];
-  const simulationHasSalesForecast = salesStrategy.channels.some((channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0);
-  const simulationSourceReady = Boolean(toFiniteNumber(linkedSummary.planCount) && simulationHasSalesForecast && financialModel.settingsSaved);
+  const simulationHasSalesForecast = salesStrategy.channels.some(
+    (channel) => channel.productId && toFiniteNumber(channel.monthlySalesUnits) > 0,
+  );
+  const simulationSourceReady = Boolean(
+    toFiniteNumber(linkedSummary.planCount) && simulationHasSalesForecast && financialModel.settingsSaved,
+  );
   const positiveOutcomeCount = outcomes.filter((outcome) => outcome.net > 0).length;
   const simulationConfidencePercent = Math.round((positiveOutcomeCount / outcomes.length) * 100);
   const simulationReadinessItems = [
-    { done: toFiniteNumber(linkedSummary.planCount) > 0, label: copy("Operations", "Operasyon"), path: "/operations/data-entry" },
+    {
+      done: toFiniteNumber(linkedSummary.planCount) > 0,
+      label: copy("Operations", "Operasyon"),
+      path: "/operations/data-entry",
+    },
     { done: simulationHasSalesForecast, label: copy("Sales", "Satış"), path: "/sales-strategy" },
     { done: financialModel.settingsSaved, label: copy("Finance", "Finans"), path: "/financial-modelling/analiz" },
-    { done: scenarioSalesUnits > 0 && scenarioUnitSalesPrice > 0, label: copy("Variant", "Varyant"), path: variant.path || `/simulation/${variant.id}` },
+    {
+      done: scenarioSalesUnits > 0 && scenarioUnitSalesPrice > 0,
+      label: copy("Variant", "Varyant"),
+      path: variant.path || `/simulation/${variant.id}`,
+    },
   ];
-  const simulationReadinessPercent = Math.round((simulationReadinessItems.filter((item) => item.done).length / simulationReadinessItems.length) * 100);
+  const simulationReadinessPercent = Math.round(
+    (simulationReadinessItems.filter((item) => item.done).length / simulationReadinessItems.length) * 100,
+  );
   const simulationWorstNet = outcomes[0].net;
   const simulationDownsideGap = likelyOutcome.net - simulationWorstNet;
   const simulationUpsideGap = outcomes[3].net - likelyOutcome.net;
@@ -223,7 +280,10 @@ export default function SimulationPage() {
       );
   const simulationSignalRows = [
     {
-      detail: copy(`${positiveOutcomeCount}/${outcomes.length} scenarios with positive net`, `${outcomes.length} senaryonun ${positiveOutcomeCount} tanesi pozitif`),
+      detail: copy(
+        `${positiveOutcomeCount}/${outcomes.length} scenarios with positive net`,
+        `${outcomes.length} senaryonun ${positiveOutcomeCount} tanesi pozitif`,
+      ),
       label: copy("Positive scenarios", "Pozitif senaryolar"),
       tone: positiveOutcomeCount >= 3 ? "good" : positiveOutcomeCount >= 2 ? "watch" : "risk",
       value: `${simulationConfidencePercent}%`,
@@ -241,20 +301,31 @@ export default function SimulationPage() {
       value: formatLira(simulationUpsideGap),
     },
     {
-      detail: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("assumption changes ignored", "varsayım değişiklikleri yok sayılıyor") : copy("assumption changes applied", "varsayım değişiklikleri uygulanıyor"),
+      detail:
+        simulationAlgorithm === simulationAlgorithms.withoutTendency
+          ? copy("assumption changes ignored", "varsayım değişiklikleri yok sayılıyor")
+          : copy("assumption changes applied", "varsayım değişiklikleri uygulanıyor"),
       label: copy("Mode", "Mod"),
       tone: "neutral",
-      value: simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("Base", "Baz") : copy("Adjusted", "Ayarlı"),
+      value:
+        simulationAlgorithm === simulationAlgorithms.withoutTendency ? copy("Base", "Baz") : copy("Adjusted", "Ayarlı"),
     },
   ];
-  return renderDashboardLayout(
-    `simulation/${variant.id}`,
+  return (
+    <DashboardLayout activePage={`simulation/${variant.id}`}>
       <section className="simulation-workspace monte-carlo-workspace">
         <div className="simulation-header">
           <div>
-            <span>{dashboardCompanyName} / {copy("Scenario Analysis", "Senaryo Analizi")}</span>
+            <span>
+              {dashboardCompanyName} / {copy("Scenario Analysis", "Senaryo Analizi")}
+            </span>
             <h1>{variant.id === "current-situation" ? copy("Current Situation", "Mevcut Durum") : variant.name}</h1>
-            <p>{copy("Variants are saved with simple product and sales assumptions. Outputs are recalculated from the saved operations, sales, and financial data available now.", "Varyantlar basit ürün ve satış varsayımlarıyla kaydedilir. Çıktılar kayıtlı operasyon, satış ve finans verilerinden yeniden hesaplanır.")}</p>
+            <p>
+              {copy(
+                "Variants are saved with simple product and sales assumptions. Outputs are recalculated from the saved operations, sales, and financial data available now.",
+                "Varyantlar basit ürün ve satış varsayımlarıyla kaydedilir. Çıktılar kayıtlı operasyon, satış ve finans verilerinden yeniden hesaplanır.",
+              )}
+            </p>
           </div>
           <div className="simulation-header-actions">
             <button type="button" onClick={loadPlanningData} disabled={simulationLoading}>
@@ -263,15 +334,24 @@ export default function SimulationPage() {
             <button type="button" onClick={() => persistSimulationVariant(variant)} disabled={simulationLoading}>
               {simulationLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Variant", "Varyantı Kaydet")}
             </button>
-            <button type="button" className="primary" onClick={addSimulationVariant}>{copy("Add Variant", "Varyant Ekle")}</button>
+            <button type="button" className="primary" onClick={addSimulationVariant}>
+              {copy("Add Variant", "Varyant Ekle")}
+            </button>
           </div>
         </div>
 
         {simulationStatus && <p className="status-message">{simulationStatus}</p>}
 
-        <div className="simulation-variant-strip" role="tablist" aria-label={copy("Simulation variants", "Simülasyon varyantları")}>
+        <div
+          className="simulation-variant-strip"
+          role="tablist"
+          aria-label={copy("Simulation variants", "Simülasyon varyantları")}
+        >
           {simulationVariants.map((item) => (
-            <div className={variant.id === item.id ? "simulation-variant-pill active" : "simulation-variant-pill"} key={item.id}>
+            <div
+              className={variant.id === item.id ? "simulation-variant-pill active" : "simulation-variant-pill"}
+              key={item.id}
+            >
               <button
                 type="button"
                 role="tab"
@@ -303,7 +383,12 @@ export default function SimulationPage() {
             <h2>{simulationHeadline}</h2>
             <p>{simulationBrief}</p>
             <div className="simulation-command-actions">
-              <button type="button" className="primary" onClick={() => persistSimulationVariant(variant)} disabled={simulationLoading}>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => persistSimulationVariant(variant)}
+                disabled={simulationLoading}
+              >
                 {simulationLoading ? copy("Saving...", "Kaydediliyor...") : copy("Save Variant", "Varyantı Kaydet")}
               </button>
               <button type="button" className="secondary" onClick={() => goTo("/financial-modelling/analiz", "login")}>
@@ -311,14 +396,22 @@ export default function SimulationPage() {
               </button>
             </div>
           </div>
-          <div className="simulation-confidence-panel" aria-label={copy("Simulation readiness", "Simülasyon hazırlığı")}>
+          <div
+            className="simulation-confidence-panel"
+            aria-label={copy("Simulation readiness", "Simülasyon hazırlığı")}
+          >
             <div className="readiness-ring" style={{ "--readiness": `${simulationReadinessPercent}%` }}>
               <strong>{simulationReadinessPercent}%</strong>
               <span>{copy("Ready", "Hazır")}</span>
             </div>
             <div className="simulation-source-list">
               {simulationReadinessItems.map((item) => (
-                <button type="button" className={item.done ? "done" : ""} onClick={() => goTo(item.path, "login")} key={item.label}>
+                <button
+                  type="button"
+                  className={item.done ? "done" : ""}
+                  onClick={() => goTo(item.path, "login")}
+                  key={item.label}
+                >
                   <span>{item.label}</span>
                   <strong>{item.done ? copy("Done", "Tamam") : copy("Needed", "Gerekli")}</strong>
                 </button>
@@ -340,12 +433,23 @@ export default function SimulationPage() {
         <div className="monte-carlo-summary">
           {[
             [copy("Base-case net", "Baz senaryo net"), formatLira(likelyOutcome.net), scenarioShiftLabel(0)],
-            [copy("Break-even point", "Başa baş noktası"), `${formatNumber(likelyOutcome.breakEvenUnits)} ${copy("units", "adet")}`, copy("current price basis", "mevcut fiyat bazlı")],
+            [
+              copy("Break-even point", "Başa baş noktası"),
+              `${formatNumber(likelyOutcome.breakEvenUnits)} ${copy("units", "adet")}`,
+              copy("current price basis", "mevcut fiyat bazlı"),
+            ],
             [copy("Pessimistic net", "Kötümser net"), formatLira(outcomes[0].net), outcomes[0].shiftLabel],
-            [copy("Revenue range", "Gelir aralığı"), `${formatLira(outcomes[1].revenue)} - ${formatLira(outcomes[3].revenue)}`, copy("cautious to optimistic", "temkinliden iyimsere")],
+            [
+              copy("Revenue range", "Gelir aralığı"),
+              `${formatLira(outcomes[1].revenue)} - ${formatLira(outcomes[3].revenue)}`,
+              copy("cautious to optimistic", "temkinliden iyimsere"),
+            ],
           ].map(([label, value, detail]) => (
             <article className="monte-carlo-stat" key={label}>
-              <span className="label-with-info">{label}<GlossaryTip language={form.language} term={label} /></span>
+              <span className="label-with-info">
+                {label}
+                <GlossaryTip language={form.language} term={label} />
+              </span>
               <strong>{value}</strong>
               <small>{detail}</small>
             </article>
@@ -362,7 +466,10 @@ export default function SimulationPage() {
             </div>
             <label className="simulation-name-field">
               <span>{copy("Variant name", "Varyant adı")}</span>
-              <input value={variant.name} onChange={(event) => updateSimulationVariant(variant.id, "name", event.target.value)} />
+              <input
+                value={variant.name}
+                onChange={(event) => updateSimulationVariant(variant.id, "name", event.target.value)}
+              />
             </label>
             <label className="simulation-name-field">
               <span>{copy("Simulation algorithm", "Simülasyon algoritması")}</span>
@@ -371,7 +478,9 @@ export default function SimulationPage() {
                 onChange={(event) => updateSimulationParameter(variant.id, "simulationAlgorithm", event.target.value)}
               >
                 {simulationAlgorithmOptions.map(([value, label]) => (
-                  <option value={value} key={value}>{label}</option>
+                  <option value={value} key={value}>
+                    {label}
+                  </option>
                 ))}
               </select>
             </label>
@@ -390,7 +499,11 @@ export default function SimulationPage() {
                         max={max}
                         step={step}
                         type="number"
-                        placeholder={usesLinkedDefault ? `${formatNumber(linkedDefault, 2)} (${copy("from plan", "plandan")})` : undefined}
+                        placeholder={
+                          usesLinkedDefault
+                            ? `${formatNumber(linkedDefault, 2)} (${copy("from plan", "plandan")})`
+                            : undefined
+                        }
                         value={usesLinkedDefault ? "" : (parameters[field] ?? "")}
                         onChange={(event) => updateSimulationParameter(variant.id, field, event.target.value)}
                       />
@@ -406,8 +519,18 @@ export default function SimulationPage() {
               <div className="simulation-card-heading">
                 <div>
                   <span>{copy("Sensitivity scenarios", "Duyarlılık senaryoları")}</span>
-                  <h2>{copy("Pessimistic, cautious, base and optimistic cases", "Kötümser, temkinli, baz ve iyimser senaryolar")}</h2>
-                  <p>{copy("Each case shifts base revenue by a fixed share of the volatility you enter (at least 8%). They show sensitivity, not probability.", "Her senaryo baz geliri, girdiğiniz oynaklığın (en az %8) sabit bir katı kadar kaydırır. Olasılık değil, duyarlılık gösterir.")}</p>
+                  <h2>
+                    {copy(
+                      "Pessimistic, cautious, base and optimistic cases",
+                      "Kötümser, temkinli, baz ve iyimser senaryolar",
+                    )}
+                  </h2>
+                  <p>
+                    {copy(
+                      "Each case shifts base revenue by a fixed share of the volatility you enter (at least 8%). They show sensitivity, not probability.",
+                      "Her senaryo baz geliri, girdiğiniz oynaklığın (en az %8) sabit bir katı kadar kaydırır. Olasılık değil, duyarlılık gösterir.",
+                    )}
+                  </p>
                 </div>
               </div>
               <div className="percentile-grid">
@@ -416,8 +539,12 @@ export default function SimulationPage() {
                     <span>{outcome.shiftLabel}</span>
                     <h3>{outcome.label}</h3>
                     <strong>{formatLira(outcome.net)}</strong>
-                    <p>{copy("Revenue", "Gelir")}: {formatLira(outcome.revenue)}</p>
-                    <p>{copy("Break-even", "Başa baş")}: {formatNumber(outcome.breakEvenUnits)} {copy("units", "adet")}</p>
+                    <p>
+                      {copy("Revenue", "Gelir")}: {formatLira(outcome.revenue)}
+                    </p>
+                    <p>
+                      {copy("Break-even", "Başa baş")}: {formatNumber(outcome.breakEvenUnits)} {copy("units", "adet")}
+                    </p>
                   </article>
                 ))}
               </div>
@@ -431,21 +558,49 @@ export default function SimulationPage() {
                 </div>
               </div>
               <div className="simulation-chart-stage">
-                <svg className="monte-chart break-even-chart" viewBox="0 0 620 280" role="img" aria-label={copy("Break-even chart", "Başa baş grafiği")}>
+                <svg
+                  className="monte-chart break-even-chart"
+                  viewBox="0 0 620 280"
+                  role="img"
+                  aria-label={copy("Break-even chart", "Başa baş grafiği")}
+                >
                   <path className="chart-grid" d="M42 40 H580 M42 90 H580 M42 140 H580 M42 190 H580 M42 240 H580" />
                   <path className="chart-axis" d="M42 28 V240 H585" />
-                  <path className="break-even-cost" d={`M${chartX(0)} ${chartY(breakEvenFixedCost)} L${chartX(chartVolumeMax)} ${chartY(breakEvenFixedCost + (unitProductionCost * chartVolumeMax))}`} />
-                  <path className="break-even-revenue" d={`M${chartX(0)} ${chartY(0)} L${chartX(chartVolumeMax)} ${chartY(netUnitPrice * chartVolumeMax)}`} />
+                  <path
+                    className="break-even-cost"
+                    d={`M${chartX(0)} ${chartY(breakEvenFixedCost)} L${chartX(chartVolumeMax)} ${chartY(breakEvenFixedCost + unitProductionCost * chartVolumeMax)}`}
+                  />
+                  <path
+                    className="break-even-revenue"
+                    d={`M${chartX(0)} ${chartY(0)} L${chartX(chartVolumeMax)} ${chartY(netUnitPrice * chartVolumeMax)}`}
+                  />
                   {breakEvenVolume !== null && breakEvenVolume <= chartVolumeMax ? (
                     <>
-                      <line className="break-even-marker" x1={chartX(breakEvenVolume)} x2={chartX(breakEvenVolume)} y1="42" y2="240" />
-                      <text className="chart-tick" x={chartX(breakEvenVolume) + 8} y="68">{copy("Break-even", "Başa baş")}: {formatNumber(breakEvenVolume)} {copy("units", "adet")}</text>
+                      <line
+                        className="break-even-marker"
+                        x1={chartX(breakEvenVolume)}
+                        x2={chartX(breakEvenVolume)}
+                        y1="42"
+                        y2="240"
+                      />
+                      <text className="chart-tick" x={chartX(breakEvenVolume) + 8} y="68">
+                        {copy("Break-even", "Başa baş")}: {formatNumber(breakEvenVolume)} {copy("units", "adet")}
+                      </text>
                     </>
                   ) : (
-                    <text className="chart-tick" x="60" y="68">{copy("No break-even: price does not cover unit cost", "Başa baş yok: fiyat birim maliyeti karşılamıyor")}</text>
+                    <text className="chart-tick" x="60" y="68">
+                      {copy(
+                        "No break-even: price does not cover unit cost",
+                        "Başa baş yok: fiyat birim maliyeti karşılamıyor",
+                      )}
+                    </text>
                   )}
-                  <text className="chart-tick" x="48" y="262">{copy("Units over the horizon", "Ufuk boyunca adet")}</text>
-                  <text className="chart-tick chart-tick-end" x="570" y="262" textAnchor="end">{copy("Projected sales", "Projeksiyon satış")}: {formatNumber(projectedVolume)}</text>
+                  <text className="chart-tick" x="48" y="262">
+                    {copy("Units over the horizon", "Ufuk boyunca adet")}
+                  </text>
+                  <text className="chart-tick chart-tick-end" x="570" y="262" textAnchor="end">
+                    {copy("Projected sales", "Projeksiyon satış")}: {formatNumber(projectedVolume)}
+                  </text>
                 </svg>
               </div>
               <div className="chart-legend">
@@ -480,8 +635,17 @@ export default function SimulationPage() {
                       const y = value >= 0 ? 202 - height : 202;
                       return (
                         <React.Fragment key={label}>
-                          <rect className={value >= 0 ? "income-positive" : "income-negative"} x={x} y={y} width="46" height={height} rx="6" />
-                          <text className="chart-tick" x={x - 8} y="230">{index + 1}</text>
+                          <rect
+                            className={value >= 0 ? "income-positive" : "income-negative"}
+                            x={x}
+                            y={y}
+                            width="46"
+                            height={height}
+                            rx="6"
+                          />
+                          <text className="chart-tick" x={x - 8} y="230">
+                            {index + 1}
+                          </text>
                         </React.Fragment>
                       );
                     })}
@@ -502,14 +666,22 @@ export default function SimulationPage() {
               </div>
               <div className="used-parameter-list">
                 {visibleAssumptions.map(([label, value]) => (
-                  <span key={label}>{label}<strong>{value}</strong></span>
+                  <span key={label}>
+                    {label}
+                    <strong>{value}</strong>
+                  </span>
                 ))}
               </div>
             </article>
 
             <article className="simulation-card risk-card">
               <h2>{copy("Pessimistic scenario", "Kötümser senaryo")}</h2>
-              <p>{copy("The pessimistic case is shown separately: if it is negative, check margin, cash and break-even timing before committing capital.", "Kötümser senaryo ayrıca gösterilir: negatifse sermaye bağlamadan önce marjı, nakdi ve başa baş zamanlamasını kontrol edin.")}</p>
+              <p>
+                {copy(
+                  "The pessimistic case is shown separately: if it is negative, check margin, cash and break-even timing before committing capital.",
+                  "Kötümser senaryo ayrıca gösterilir: negatifse sermaye bağlamadan önce marjı, nakdi ve başa baş zamanlamasını kontrol edin.",
+                )}
+              </p>
               <strong>{formatLira(outcomes[0].net)}</strong>
             </article>
           </aside>
@@ -523,12 +695,28 @@ export default function SimulationPage() {
                 <h2>{copy("What if one assumption is wrong?", "Bir varsayım tutmazsa ne olur?")}</h2>
               </div>
             </div>
-            <p>{copy("Each row re-runs the full 5-year model (tax, VAT, stock and loans) with one lever moved and everything else kept as planned.", "Her satır, tek bir kaldıraç değiştirilip diğer her şey plandaki gibi tutularak tam 5 yıllık modeli (vergi, KDV, stok ve krediler) yeniden çalıştırır.")}</p>
+            <p>
+              {copy(
+                "Each row re-runs the full 5-year model (tax, VAT, stock and loans) with one lever moved and everything else kept as planned.",
+                "Her satır, tek bir kaldıraç değiştirilip diğer her şey plandaki gibi tutularak tam 5 yıllık modeli (vergi, KDV, stok ve krediler) yeniden çalıştırır.",
+              )}
+            </p>
             <div className="sensitivity-table-wrap">
-              {renderSensitivityTable(buildSensitivityTable(financialModel, salesStrategy, financialSettingsForModel, operationsWorkspaceForFinance), "sensitivity-table")}
+              {
+                <SensitivityTable
+                  rows={buildSensitivityTable(
+                    financialModel,
+                    salesStrategy,
+                    financialSettingsForModel,
+                    operationsWorkspaceForFinance,
+                  )}
+                  className="sensitivity-table"
+                />
+              }
             </div>
           </article>
         )}
-      </section>,
+      </section>
+    </DashboardLayout>
   );
 }
