@@ -14,11 +14,18 @@ export default function ReportsPage() {
     hasSalesForecast,
     loadPlanningData,
     operationsWorkspace,
+    periodLabel,
     reportFormats,
-    reportStats,
     reportTabs,
     setReportsTab,
   } = useAppContext();
+
+  const sources = [
+    [copy("Product record", "Ürün kaydı"), Boolean(operationsWorkspace.product)],
+    [copy("Process result", "Süreç sonucu"), activePlanResults.length > 0],
+    [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast],
+    [copy("Financial assumptions", "Finansal varsayımlar"), hasFinancialAssumptions],
+  ];
 
   return (
     <DashboardLayout activePage={activeModule.key}>
@@ -36,89 +43,60 @@ export default function ReportsPage() {
               )}
             </p>
           </div>
-          <div className="reports-header-panel" aria-label={copy("Download behavior", "İndirme davranışı")}>
-            <strong>{copy("Download only", "Sadece indir")}</strong>
-            <span>{copy("Not archived", "Arşivlenmez")}</span>
-          </div>
         </div>
 
-        <div className="reports-tabs" role="tablist" aria-label={copy("Report types", "Rapor türleri")}>
-          {reportTabs.map((tab) => (
-            <button
-              type="button"
-              className={activeReportTab.key === tab.key ? "active" : ""}
-              onClick={() => setReportsTab(tab.key)}
-              key={tab.key}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="report-stat-grid">
-          {reportStats.map(([label, value, detail]) => (
-            <article className="report-stat-card" key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
-              <small>{detail}</small>
-            </article>
-          ))}
-        </div>
-
-        <div className="reports-export-layout">
-          <section className="reports-pack-grid" aria-label={copy("Report packs", "Rapor paketleri")}>
-            {reportTabs.map((tab) => (
-              <article
-                className={`reports-pack-card ${tab.tone} ${activeReportTab.key === tab.key ? "active" : ""}`}
-                key={tab.key}
-              >
-                <button type="button" onClick={() => setReportsTab(tab.key)}>
-                  <span>{copy("Report pack", "Rapor paketi")}</span>
+        <div className="reports-layout">
+          <section className="card" aria-label={copy("Report packs", "Rapor paketleri")}>
+            <div className="card-header">
+              <h2>{copy("Report packs", "Rapor paketleri")}</h2>
+            </div>
+            <div className="choice-list" role="radiogroup" aria-label={copy("Report packs", "Rapor paketleri")}>
+              {reportTabs.map((tab) => (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={activeReportTab.key === tab.key}
+                  className={`choice${activeReportTab.key === tab.key ? " is-selected" : ""}`}
+                  onClick={() => setReportsTab(tab.key)}
+                  key={tab.key}
+                >
                   <strong>{tab.label}</strong>
-                  <small>{tab.detail}</small>
+                  <span>{tab.detail}</span>
                 </button>
-                <div className="reports-pack-includes">
-                  {tab.includes.map((item) => (
-                    <em key={item}>{item}</em>
-                  ))}
-                </div>
-              </article>
-            ))}
+              ))}
+            </div>
           </section>
 
-          <aside className="reports-export-panel">
-            <article className="reports-card reports-selected-card">
-              <div className="reports-card-heading">
+          <div className="stack">
+            <article className="card">
+              <div className="card-header">
                 <div>
                   <span>{copy("Selected export", "Seçili export")}</span>
                   <h2>{activeReportTab.label}</h2>
+                  <p>{activeReportTab.detail}</p>
                 </div>
               </div>
-              <p>{activeReportTab.detail}</p>
-              <div className="reports-selected-includes">
+              <div className="badge-row">
                 {activeReportTab.includes.map((item) => (
-                  <span key={item}>{item}</span>
+                  <span className="badge badge-neutral" key={item}>
+                    {item}
+                  </span>
                 ))}
+                <span className="badge badge-neutral">{periodLabel}</span>
               </div>
-            </article>
-
-            <article className="reports-card reports-format-card">
-              <div className="reports-card-heading">
-                <div>
-                  <span>{copy("Download format", "İndirme formatı")}</span>
-                  <h2>{copy("Choose file type", "Dosya türü seçin")}</h2>
-                </div>
-              </div>
-              <div className="reports-format-grid">
+              <div className="button-row">
                 {reportFormats.map((format) => (
-                  <button type="button" onClick={() => downloadReport(activeReportTab, format)} key={format.key}>
-                    <strong>{format.label}</strong>
-                    <span>{format.note}</span>
-                    <small>{copy("Download", "İndir")}</small>
+                  <button
+                    type="button"
+                    className={format.key === "pdf" ? "primary" : undefined}
+                    onClick={() => downloadReport(activeReportTab, format)}
+                    key={format.key}
+                  >
+                    {copy(`Download ${format.label}`, `${format.label} indir`)}
                   </button>
                 ))}
               </div>
-              <p>
+              <p className="planner-empty-state">
                 {copy(
                   'PDF opens a print-ready report; choose "Save as PDF" in the print dialog. XLSX downloads the statements as a spreadsheet.',
                   'PDF, yazdırmaya hazır raporu açar; yazdırma penceresinde "PDF olarak kaydet"i seçin. XLSX tabloları Excel dosyası olarak indirir.',
@@ -126,8 +104,8 @@ export default function ReportsPage() {
               </p>
             </article>
 
-            <article className="reports-card reports-readiness-card">
-              <div className="reports-card-heading">
+            <article className="card">
+              <div className="card-header">
                 <div>
                   <span>{copy("Source readiness", "Kaynak hazırlığı")}</span>
                   <h2>{copy("What the report can use", "Raporun kullanabileceği kaynaklar")}</h2>
@@ -136,22 +114,20 @@ export default function ReportsPage() {
                   {copy("Refresh", "Yenile")}
                 </button>
               </div>
-              {[
-                [copy("Product record", "Ürün kaydı"), Boolean(operationsWorkspace.product)],
-                [copy("Process result", "Süreç sonucu"), activePlanResults.length > 0],
-                [copy("Channel sales plan", "Kanal satış planı"), hasSalesForecast],
-                [copy("Financial assumptions", "Finansal varsayımlar"), hasFinancialAssumptions],
-              ].map(([item, ready]) => (
-                <div className="schedule-row" key={item}>
-                  <strong>{item}</strong>
-                  <span>{copy("Used in the report", "Raporda kullanılır")}</span>
-                  <mark className={`status-badge ${ready ? "ready" : "needed"}`}>
-                    {ready ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}
-                  </mark>
-                </div>
-              ))}
+              <ul className="action-list">
+                {sources.map(([item, ready]) => (
+                  <li className="action-row is-static" key={item}>
+                    <span className={`badge badge-${ready ? "feasible" : "neutral"}`}>
+                      {ready ? copy("Ready", "Hazır") : copy("Needed", "Gerekli")}
+                    </span>
+                    <span className="action-row-text">
+                      <strong>{item}</strong>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </article>
-          </aside>
+          </div>
         </div>
       </section>
     </DashboardLayout>

@@ -1,0 +1,264 @@
+/*
+ * Report downloads page and the printable report. The printable report
+ * keeps a fixed light palette so it prints the same in either theme.
+ */
+@layer skin {
+  .reports-layout {
+    align-items: start;
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  /* Selectable option cards (radio group). */
+  .choice-list {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .choice {
+    align-content: start;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    display: grid;
+    font-weight: var(--weight-regular);
+    gap: 2px;
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    width: 100%;
+  }
+
+  .choice strong {
+    font-weight: var(--weight-semibold);
+  }
+
+  .choice span {
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+  }
+
+  .choice.is-selected {
+    border-color: var(--brand);
+    box-shadow: inset 3px 0 0 var(--brand);
+  }
+
+  @media (max-width: 900px) {
+    .reports-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* ---------- Printable report ---------- */
+  .print-report {
+    --print-ink: #1d2328;
+    --print-muted: #5b6168;
+    --print-line: #d9d9d6;
+    --print-brand: #00263e;
+    background: #ffffff;
+    color: var(--print-ink);
+    font-family: var(--font);
+    margin: 0 auto;
+    max-width: 1040px;
+    min-height: 100vh;
+    padding: 32px 40px 56px;
+  }
+
+  .print-toolbar {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: flex-end;
+    margin-bottom: var(--space-5);
+  }
+
+  .print-toolbar button {
+    background: #ffffff;
+    border: 1px solid var(--print-line);
+    border-radius: var(--radius-sm);
+    color: var(--print-ink);
+    cursor: pointer;
+    font-family: var(--font);
+    font-weight: var(--weight-semibold);
+    padding: 10px 16px;
+  }
+
+  .print-toolbar button.primary {
+    background: var(--print-brand);
+    border-color: var(--print-brand);
+    color: #ffffff;
+  }
+
+  .print-cover {
+    border-bottom: 3px solid var(--print-brand);
+    margin-bottom: var(--space-5);
+    padding-bottom: var(--space-4);
+  }
+
+  .print-cover :is(span, small),
+  .print-note,
+  .print-table th,
+  .print-table td small,
+  .print-kpis span,
+  .print-footer {
+    color: var(--print-muted);
+  }
+
+  .print-cover :is(span, small) {
+    font-size: 13px;
+  }
+
+  .print-cover h1 {
+    color: var(--print-brand);
+    font-size: 28px;
+    margin: 4px 0;
+  }
+
+  .print-cover p {
+    font-size: 16px;
+    margin: 0 0 8px;
+  }
+
+  .print-section {
+    break-inside: avoid;
+    margin-bottom: 28px;
+  }
+
+  .print-section h2 {
+    color: var(--print-brand);
+    font-size: 18px;
+    margin: 0 0 12px;
+  }
+
+  .print-verdict {
+    font-size: 15px;
+    margin: 0 0 16px;
+  }
+
+  .print-verdict strong {
+    margin-right: 6px;
+  }
+
+  .print-kpis {
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .print-kpis div {
+    border: 1px solid var(--print-line);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+
+  .print-kpis span {
+    display: block;
+    font-size: 12px;
+  }
+
+  .print-kpis strong {
+    font-size: 16px;
+  }
+
+  .print-table {
+    border-collapse: collapse;
+    font-size: 12.5px;
+    margin-bottom: var(--space-3);
+    width: 100%;
+  }
+
+  .print-table :is(th, td) {
+    border-bottom: 1px solid var(--print-line);
+    padding: 6px 8px;
+    text-align: right;
+  }
+
+  .print-table :is(th, td):first-child {
+    text-align: left;
+  }
+
+  .print-table th {
+    font-weight: var(--weight-semibold);
+  }
+
+  .print-table tr:is(.emphasis, .is-emphasis) :is(th, td) {
+    color: var(--print-ink);
+    font-weight: var(--weight-bold);
+  }
+
+  .print-table td small {
+    display: block;
+    font-size: 11px;
+  }
+
+  .print-table-sensitivity {
+    font-size: 11px;
+  }
+
+  .print-table-sensitivity :is(th, td) {
+    padding: 5px 6px;
+    white-space: nowrap;
+  }
+
+  .print-report .badge {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-note {
+    font-size: 12px;
+    margin: 0 0 8px;
+  }
+
+  .print-table-compact {
+    max-width: 560px;
+  }
+
+  .print-risks {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .print-risks li {
+    margin-bottom: 6px;
+  }
+
+  .print-footer {
+    border-top: 1px solid var(--print-line);
+    font-size: 11.5px;
+    padding-top: var(--space-3);
+  }
+
+  @media (max-width: 720px) {
+    .print-report {
+      padding: var(--space-4);
+    }
+
+    .print-kpis {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .print-table {
+      display: block;
+      overflow-x: auto;
+    }
+  }
+
+  @media print {
+    @page {
+      margin: 14mm;
+      size: A4;
+    }
+
+    :where(html, body) {
+      background: #ffffff;
+    }
+
+    .print-toolbar {
+      display: none;
+    }
+
+    .print-report {
+      max-width: none;
+      padding: 0;
+    }
+  }
+}

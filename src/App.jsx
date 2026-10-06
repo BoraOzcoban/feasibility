@@ -2223,12 +2223,6 @@ function App() {
     { extension: "pdf", key: "pdf", label: "PDF", mime: "application/pdf", note: copy("print-ready report", "yazdırmaya hazır rapor") },
     { extension: "xlsx", key: "xlsx", label: "XLSX", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", note: copy("spreadsheet model extract", "tablo model çıktısı") },
   ];
-  const reportStats = [
-    [copy("Selected pack", "Seçili paket"), activeReportTab.label, copy("choose one report type", "tek rapor türü seçin")],
-    [copy("Output formats", "Çıktı formatları"), "PDF / XLSX", copy("built from current data", "güncel veriden üretilir")],
-    [copy("Storage", "Kayıt"), copy("Local file", "Lokal dosya"), copy("not archived", "arşivlenmez")],
-    [copy("Period", "Dönem"), periodLabel, copy("uses current horizon", "mevcut ufku kullanır")],
-  ];
   const hasFinancialAssumptions = Boolean(financialModel.settingsSaved) && requiredFinancialSettingFields.every((field) => (
     financialSettingsForm[field] !== "" &&
     financialSettingsForm[field] !== null &&
@@ -2601,7 +2595,6 @@ function App() {
     removeProductProcessRow,
     removeSalesItem,
     reportFormats,
-    reportStats,
     reportTabs,
     roleForm,
     salesLoading,
