@@ -275,7 +275,7 @@ export default function ProductsPage() {
                 <div className="cycle-time-control">
                   <input
                     min="0.0001"
-                    step="0.01"
+                    step="any"
                     type="number"
                     value={operationForms.product.cycleTimeValue}
                     onChange={(event) => updateOperationForm("product", "cycleTimeValue", event.target.value)}
@@ -544,7 +544,7 @@ export default function ProductsPage() {
                             <span>{copy("Min / unit", "Dk / birim")}</span>
                             <input
                               min="0.0001"
-                              step="0.01"
+                              step="any"
                               type="number"
                               value={row.processTimeMinutes ?? ""}
                               onChange={(event) =>
@@ -682,7 +682,7 @@ export default function ProductsPage() {
                             <span>{copy("Speed", "Hız")}</span>
                             <input
                               min="0.0001"
-                              step="0.01"
+                              step="any"
                               type="number"
                               value={row.speedMultiplier ?? ""}
                               onChange={(event) =>

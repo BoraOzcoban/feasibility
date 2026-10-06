@@ -431,7 +431,7 @@ export default function OperationPlanner() {
                 </span>
                 <input
                   min="0"
-                  step="1"
+                  step="any"
                   type="number"
                   value={operationPlan.targetQuantity ?? ""}
                   onChange={(event) => updateOperationPlan("targetQuantity", event.target.value)}
@@ -511,7 +511,7 @@ export default function OperationPlanner() {
                             <span>{copy("Min / unit", "Dk / birim")}</span>
                             <input
                               min="0.0001"
-                              step="0.01"
+                              step="any"
                               type="number"
                               value={row.processTimeMinutes ?? ""}
                               onChange={(event) =>
@@ -673,7 +673,7 @@ export default function OperationPlanner() {
                               <span>{copy("Speed", "Hız")}</span>
                               <input
                                 min="0.0001"
-                                step="0.01"
+                                step="any"
                                 type="number"
                                 value={row.speedMultiplier ?? ""}
                                 onChange={(event) =>
