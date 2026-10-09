@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "local": "node scripts/local.mjs",
+    "local:stop": "supabase stop",
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test tests/*.test.mjs",

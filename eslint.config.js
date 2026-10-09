@@ -28,8 +28,8 @@ export default [
     settings: { react: { version: "detect" } },
   },
   {
-    // Browser tests: Node code that also hands functions to the page to run.
-    files: ["e2e/**/*.js"],
+    // Browser tests and local scripts: Node code; the tests also hand functions to the page to run.
+    files: ["e2e/**/*.js", "scripts/**/*.{js,mjs}"],
     languageOptions: {
       ecmaVersion: "latest",
       globals: { ...globals.browser, ...globals.node },

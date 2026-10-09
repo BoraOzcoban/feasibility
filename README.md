@@ -18,6 +18,19 @@ Fill `.env` with the values from your new Supabase project:
 
 To work against a local database instead, start it as described under [Browser tests](#browser-tests) and put the `API_URL` and `ANON_KEY` that `npx supabase status` prints into `.env`.
 
+## Try it with demo data
+
+With Docker Desktop running:
+
+```zsh
+npm install
+npm run local
+```
+
+This starts a database on this computer with the cold-chain beverage demo data (`supabase/seeds/startup_feasibility_seed.sql`), then the app, and opens the login page. Sign in with `demo@atera.local` / `atera-demo`. Nothing touches the hosted project, and `.env` is not needed or changed.
+
+The first run downloads the database images (a few GB) and takes several minutes; later runs take seconds. Stop the app with Ctrl+C and the database with `npm run local:stop`. Changes you make are kept for next time; `npx supabase db reset` brings back the original demo data (run `npm run local` again afterwards to recreate the demo account).
+
 ## Supabase setup
 
 Database changes live in `supabase/migrations` and are applied in file-name order.

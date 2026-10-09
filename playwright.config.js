@@ -1,6 +1,6 @@
 // Browser tests against a local Supabase. See "Browser tests" in README.md.
 import { defineConfig } from "@playwright/test";
-import { getLocalSupabase } from "./e2e/support/localSupabase.js";
+import { getLocalSupabase } from "./scripts/localSupabase.js";
 import { adminStatePath } from "./e2e/support/users.js";
 
 const supabase = getLocalSupabase();
